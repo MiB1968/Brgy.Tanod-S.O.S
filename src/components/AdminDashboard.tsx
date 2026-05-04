@@ -19,6 +19,8 @@ import { cn } from '../lib/utils';
 import { Howl } from 'howler';
 import DispatchModal from './DispatchModal';
 import { TanodLogo } from './Branding';
+import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
+import { PoliceLights } from './PoliceLights';
 
 const alarm = new Howl({
   src: ['https://assets.mixkit.co/active_storage/sfx/1004/1004-preview.mp3'],
@@ -28,6 +30,7 @@ const alarm = new Howl({
 
 export default function AdminDashboard({ profile, onTabChange }: { profile: User | null, onTabChange: (tab: string) => void }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [stats, setStats] = useState({
     residents: 0,
@@ -51,10 +54,15 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
         if (!alarm.playing()) {
           alarm.volume(1.0);
           alarm.play();
-          setTimeout(() => { alarm.stop(); }, 10000);
+          setIsFlashing(true);
+          setTimeout(() => { 
+            alarm.stop(); 
+            setIsFlashing(false);
+          }, 10000);
         }
       } else {
         alarm.stop();
+        setIsFlashing(false);
       }
     }, (error) => {
       console.error("Dashboard Alerts listener error:", error);
@@ -139,6 +147,12 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
 
   return (
     <div className="space-y-6 md:space-y-8">
+      <PoliceLights active={isFlashing} />
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-black italic tracking-tighter uppercase text-white">Commander Overview</h2>
+        <ReviewArchivedLogsDrawer profile={profile} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Alerts Feed */}
         <div className="lg:col-span-3 space-y-4 md:space-y-6">

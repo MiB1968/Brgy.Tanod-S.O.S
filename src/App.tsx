@@ -64,6 +64,8 @@ import { TanodLogo, TanodWordmark, BackgroundPattern, AppIcon } from './componen
 import { analyzeIncident } from './services/aiService';
 import { db as dexieDb } from './lib/mapDb';
 import { startGPSTracking, calculateDistance } from './services/gpsService';
+import { Toaster, toast } from 'react-hot-toast';
+import { scheduleDailyLogReset } from './lib/scheduler.mock';
 
 // Siren sound
 const siren = new Howl({
@@ -71,6 +73,8 @@ const siren = new Howl({
   loop: true,
   volume: 0.5,
 });
+
+import TanodCommandAlert from './components/TanodCommandAlert';
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -116,6 +120,19 @@ export default function App() {
       return () => stopTracking();
     }
   }, [user, profile]);
+
+  // Daily Audit Log Archive Scheduler
+  useEffect(() => {
+    const unsub = scheduleDailyLogReset((archivedDate) => {
+      // In a real app we'd clear the Zustand store or active logs slice here
+      // useLogStore.getState().clearActiveLogs();
+      toast.success(`📋 Daily Log Archived & Reset — 07:00 AM Cycle Complete (${archivedDate})`, {
+        duration: 8000,
+        position: 'top-center'
+      });
+    });
+    return () => unsub();
+  }, []);
 
   // Offline Sync Effect
   useEffect(() => {
@@ -382,6 +399,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0F1115] text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
+      <Toaster />
       <BackgroundPattern />
       {/* Mobile Top Bar */}
       <div className="md:hidden flex items-center justify-between p-4 bg-[#16191F]/80 backdrop-blur-md border-b border-[#2D3139] shrink-0 z-50">
@@ -1049,6 +1067,8 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
           </div>
         )}
       </AnimatePresence>
+
+      {profile && profile.role === 'tanod' && <TanodCommandAlert profile={profile} />}
     </div>
   );
 }

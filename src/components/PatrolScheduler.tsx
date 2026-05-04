@@ -56,6 +56,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
         endTime: new Date(endTime).toISOString(),
         sector,
         status: 'scheduled',
+        tanodResponse: 'pending',
         notes,
         createdAt: new Date().toISOString()
       });

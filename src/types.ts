@@ -115,6 +115,7 @@ export interface Shift {
   endTime: string;   // ISO string
   sector: string;    // e.g., "Zone 1", "Market Area"
   status: 'scheduled' | 'active' | 'completed';
+  tanodResponse?: 'pending' | 'accepted' | 'rejected';
   notes?: string;
   createdAt: string;
 }
