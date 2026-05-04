@@ -340,7 +340,7 @@ export function AppIcon({ size = 64, className }: { size?: number, className?: s
       <circle cx="32" cy="29" r="6" fill="#f59e0b" />
       <circle cx="32" cy="29" r="3" fill="#fde68a" />
       <text x="32" y="48" fontFamily="'Space Mono', monospace" fontSize="7" fontWeight="700"
-        fill="#ef4444" textAnchor="middle" letterSpacing="1.5">TANODNET AI</text>
+        fill="#ef4444" textAnchor="middle" letterSpacing="0">Brgy.TANOD 🆘 ALERT</text>
     </svg>
   );
 }

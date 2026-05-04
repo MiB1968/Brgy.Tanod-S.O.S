@@ -387,7 +387,7 @@ export default function App() {
       <div className="md:hidden flex items-center justify-between p-4 bg-[#16191F]/80 backdrop-blur-md border-b border-[#2D3139] shrink-0 z-50">
         <div className="flex items-center gap-2">
           <TanodLogo size={32} animated={false} />
-          <span className="font-extrabold tracking-tighter text-lg uppercase font-mono">TanodNet AI</span>
+          <span className="font-extrabold tracking-tighter text-lg uppercase font-mono">Brgy.TANOD 🆘 ALERT</span>
         </div>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -477,7 +477,7 @@ export default function App() {
         <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8 shrink-0 relative z-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono">{activeTab}</h1>
-            <p className="text-[#8E9299] text-xs font-medium tracking-wide uppercase">TanodNet AI — Barangay Emergency Intelligence System</p>
+            <p className="text-[#8E9299] text-xs font-medium tracking-wide uppercase">Brgy.TANOD 🆘 ALERT — Barangay Emergency Intelligence System</p>
           </div>
           <div className="flex items-center justify-between md:justify-end gap-3 flex-wrap">
             {profile?.role === 'admin' && (
