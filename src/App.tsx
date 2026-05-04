@@ -797,13 +797,16 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
         
         // Parallel Save to Supabase (Upsert for robustness)
         try {
-          await supabase.from('incidents').upsert([{
+          await supabase.from('report_logs').upsert([{
             id: alertId,
+            incident_id: alertId,
             type: alertData.type,
             status: alertData.status,
+            location_lat: alertData.location.lat,
+            location_lng: alertData.location.lng,
             lat: alertData.location.lat,
             lng: alertData.location.lng,
-            tanod_id: null
+            citizen_id: profile?.uid || 'anonymous'
           }]);
         } catch (supaErr) {
           console.error('Supabase save failed:', supaErr);

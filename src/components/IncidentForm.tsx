@@ -55,11 +55,22 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
 
       // Sync to Supabase
       try {
-        await supabase.from('incidents').upsert([{
+        let coords = { lat: 0, lng: 0 };
+        try {
+          const pos = await new Promise<GeolocationPosition>((res, rej) => 
+            navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
+          );
+          coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } catch (e) { /* ignore location error */ }
+
+        await supabase.from('report_logs').upsert([{
           id: incidentId,
+          incident_id: incidentId,
           type: formData.type,
           status: formData.status,
-          tanod_id: auth.currentUser.uid
+          tanod_assigned: profile.name,
+          location_lat: coords.lat,
+          location_lng: coords.lng
         }]);
       } catch (supaErr) {
         console.error('Supabase incident sync failed:', supaErr);

@@ -120,11 +120,14 @@ export default function TanodDashboard({ profile, onTabChange }: { profile: User
       // Sync to Supabase (Robust update/insert)
       try {
         await supabase
-          .from('incidents')
+          .from('report_logs')
           .upsert([{ 
             id: alert.id,
+            incident_id: alert.id,
             type: alert.type,
-            lat: alert.location.lat,
+            location_lat: alert.location.lat,
+            location_lng: alert.location.lng,
+            lat: alert.location.lat, 
             lng: alert.location.lng,
             status: updateData.status,
             tanod_id: profile?.uid || null 

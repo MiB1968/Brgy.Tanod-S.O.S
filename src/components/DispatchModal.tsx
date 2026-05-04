@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import { User, Alert } from '../types';
 import { X, Shield, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -27,12 +28,33 @@ export default function DispatchModal({ alert, onClose }: DispatchModalProps) {
     setSubmitting(true);
     try {
       const tanod = tanods.find(t => t.uid === selectedTanod);
-      await updateDoc(doc(db, 'alerts', alert.id), {
-        status: 'responding',
+      const updateData = {
+        status: 'responding' as const,
         respondedBy: selectedTanod,
         respondedByName: tanod?.name || 'Assigned Tanod',
         respondedAt: new Date().toISOString()
-      });
+      };
+
+      await updateDoc(doc(db, 'alerts', alert.id), updateData);
+
+      // Sync to Supabase
+      try {
+        await supabase.from('report_logs').upsert([{
+          id: alert.id,
+          incident_id: alert.id,
+          type: alert.type,
+          status: 'responding',
+          tanod_assigned: tanod?.name || 'Assigned Tanod',
+          tanod_id: selectedTanod,
+          location_lat: alert.location.lat,
+          location_lng: alert.location.lng,
+          lat: alert.location.lat,
+          lng: alert.location.lng
+        }]);
+      } catch (suErr) {
+        console.error('Supabase dispatch sync failed:', suErr);
+      }
+
       onClose();
     } catch (err) {
       console.error(err);

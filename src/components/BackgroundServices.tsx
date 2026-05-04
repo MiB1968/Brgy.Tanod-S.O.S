@@ -18,27 +18,28 @@ export default function BackgroundServices() {
   const { setPatrols, setShifts } = useTanodStore();
   const { clearActiveLogs } = useLogStore();
 
-  // 1. Supabase Real-time Listener (The "Tactical Command" Feed)
+  // 2. Supabase Real-time Listener (The "Tactical Command" Feed)
   useEffect(() => {
-    const channel = supabase
+    // A. Incidents Listener
+    const incidentChannel = supabase
       .channel('incidents-live')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'incidents',
+          table: 'report_logs',
         },
         (payload) => {
-          console.log('📡 Tactical Update:', payload.eventType, payload.new || payload.old);
+          console.log('📡 Tactical Update (Logs):', payload.eventType, payload.new || payload.old);
           
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const data = payload.new as any;
             const mappedAlert: any = {
-              id: data.id,
+              id: data.id || data.incident_id,
               type: data.type,
               status: data.status,
-              location: { lat: data.lat, lng: data.lng },
+              location: { lat: data.location_lat || data.lat, lng: data.location_lng || data.lng },
               timestamp: data.created_at || new Date().toISOString(),
               residentName: 'Field Unit', 
               residentId: data.uid || 'unknown'
@@ -49,23 +50,58 @@ export default function BackgroundServices() {
           }
         }
       )
+      .subscribe();
+
+    // B. Tanods Listener (Live Patrol Map)
+    const tanodChannel = supabase
+      .channel('tanods-live')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tanods',
+        },
+        (payload) => {
+          console.log('📡 Tactical Update (Tanods):', payload.eventType, payload.new || payload.old);
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const data = payload.new as any;
+            const mappedPatrol: PatrolLocation = {
+              id: data.id,
+              tanodId: data.id,
+              tanodName: data.name,
+              location: {
+                lat: data.location_lat || data.lat,
+                lng: data.location_lng || data.lng,
+              },
+              isActive: true,
+              lastUpdate: data.updated_at
+            };
+            
+            // Sync to local store
+            setPatrols((prev: PatrolLocation[]) => {
+              const others = prev.filter(p => p.tanodId !== data.id);
+              return [...others, mappedPatrol];
+            });
+          }
+        }
+      )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Tactical Live Link: ACTIVE');
+          console.log('✅ Tactical Live Link (Tanods): ACTIVE');
         }
         if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Tactical Link Error: Please ensure Replication is enabled for "incidents" table in Supabase Dashboard -> Database -> Replication.');
+          console.error('❌ Tactical Link Error: Please ensure Realtime/Replication is enabled for "report_logs" and "tanods" tables in Supabase Dashboard.');
           toast.error('Tactical link unstable. Verify Supabase Replication.', { id: 'supa-error' });
-        }
-        if (status === 'TIMED_OUT') {
-          console.warn('⚠️ Tactical Link: Connection Timed Out.');
         }
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(incidentChannel);
+      supabase.removeChannel(tanodChannel);
     };
-  }, [addAlert, removeAlert]);
+  }, [addAlert, removeAlert, setPatrols]);
 
   // 2. Tanod Location heartbeat (Sync to Supabase maps)
   useEffect(() => {
@@ -80,7 +116,9 @@ export default function BackgroundServices() {
         await supabase.from('tanods').upsert([{
           id: auth.currentUser?.uid,
           name: profile.name,
-          lat: pos.coords.latitude,
+          location_lat: pos.coords.latitude,
+          location_lng: pos.coords.longitude,
+          lat: pos.coords.latitude, // Support both naming styles
           lng: pos.coords.longitude,
           status: 'On-Duty',
           updated_at: new Date().toISOString()
