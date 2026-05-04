@@ -36,6 +36,28 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom?: number 
       map.setView(center, zoom || map.getZoom());
     }
   }, [center, zoom, map]);
+
+  useEffect(() => {
+    const observer = new window.ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    
+    const container = map.getContainer();
+    observer.observe(container);
+    
+    // Multiple fallbacks for React render cycles
+    const timers = [
+      setTimeout(() => map.invalidateSize(), 10),
+      setTimeout(() => map.invalidateSize(), 100),
+      setTimeout(() => map.invalidateSize(), 500),
+      setTimeout(() => map.invalidateSize(), 1000)
+    ];
+
+    return () => {
+      observer.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [map]);
   return null;
 }
 
@@ -96,7 +118,7 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
   // 1. First active alert
   // 2. Provided prop center
   // 3. Default center
-  const [mapCenter, setMapCenter] = useState<[number, number]>(propCenter || [13.0641, 120.7303]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>(propCenter || [13.2236, 120.5960]); // Mamburao, Occidental Mindoro
   const [zoom, setZoom] = useState(15);
 
   const handleDownload = async () => {
@@ -123,6 +145,62 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
     }
   }, [alerts, propCenter]);
 
+  const MyLocationButton = () => {
+    const map = useMap();
+    const [locating, setLocating] = useState(false);
+  
+    useEffect(() => {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 400); 
+    }, [map]);
+
+    const locateMe = () => {
+      setLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          map.flyTo([latitude, longitude], 17);
+          
+          const RedIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          });
+
+          L.marker([latitude, longitude], { icon: RedIcon })
+            .addTo(map)
+            .bindPopup("<div class='text-black font-bold'>You are here 📍</div>")
+            .openPopup();
+            
+          setLocating(false);
+        },
+        (err) => {
+          console.error("GPS error", err);
+          setLocating(false);
+          alert("Unable to fetch location");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+  
+    return (
+      <button 
+        onClick={(e) => { e.preventDefault(); locateMe(); }}
+        className={cn(
+          "absolute bottom-4 right-4 z-[400] w-12 h-12 bg-[#252932] text-xl rounded-full shadow-lg border border-[#2D3139] flex items-center justify-center hover:bg-[#FF4B4B] hover:scale-110 transition-all",
+          locating && "animate-pulse"
+        )}
+        title="Pinpoint My Location"
+      >
+        {locating ? <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "📍"}
+      </button>
+    );
+  };
+
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative border border-[#2D3139]">
       <MapContainer 
@@ -132,11 +210,12 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
         className="w-full h-full z-0"
       >
         <OfflineTileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="grayscale invert brightness-90 contrast-90" 
+          attribution="Google Maps"
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
         />
         <ChangeView center={mapCenter} zoom={zoom} />
+        
+        <MyLocationButton />
         
         {/* Tactical Overlay */}
         <div className="absolute inset-0 pointer-events-none z-[400] opacity-20 overflow-hidden">

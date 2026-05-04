@@ -329,7 +329,7 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
               )}
             </div>
             <button 
-              onClick={() => onTabChange('schedule')}
+              onClick={() => onTabChange('roster')}
               className="w-full mt-6 py-4 border border-[#2D3139] rounded-2xl text-[10px] font-black uppercase tracking-widest text-[#8E9299] hover:text-white hover:bg-[#252932] transition-all"
             >
               Manage Units
@@ -341,7 +341,10 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
               <h4 className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-80">Crisis Mode</h4>
               <p className="text-2xl font-black italic tracking-tighter mb-6">GLOBAL PANIC ALARM</p>
               <button 
-                onClick={() => onTabChange('map')}
+                onClick={() => {
+                  alert("🚨 GLOBAL PANIC ALARM ACTIVATED! ALL TANODS ALERTED. 🚨");
+                  onTabChange('map');
+                }}
                 className="w-full py-4 bg-white text-black font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase italic tracking-widest text-xs"
               >
                 Trigger All Units

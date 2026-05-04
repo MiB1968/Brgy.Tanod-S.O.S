@@ -21,12 +21,31 @@ function MapUpdater({ center }: { center: [number, number] }) {
   useEffect(() => {
     if (center) {
       map.setView(center, 18);
-      // Classic Leaflet fix for maps in hidden/transitioning containers
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 500);
     }
   }, [center, map]);
+  
+  useEffect(() => {
+    const observer = new window.ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    
+    const container = map.getContainer();
+    observer.observe(container);
+    
+    // Multiple fallbacks for React render cycles
+    const timers = [
+      setTimeout(() => map.invalidateSize(), 10),
+      setTimeout(() => map.invalidateSize(), 100),
+      setTimeout(() => map.invalidateSize(), 500),
+      setTimeout(() => map.invalidateSize(), 1000)
+    ];
+
+    return () => {
+      observer.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [map]);
+
   return null;
 }
 
@@ -375,8 +394,8 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                     scrollWheelZoom={false}
                   >
                     <TileLayer 
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
-                      className="grayscale invert brightness-90 contrast-125" 
+                      url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                      attribution="Google Maps"
                     />
                     <MapUpdater center={[formData.gpsLat, formData.gpsLng]} />
                     <LocationPicker 

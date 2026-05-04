@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ResidentProfile } from '../types';
 import { Check, X, Eye, Search, Filter, MapPin, Phone, User, Calendar, ExternalLink } from 'lucide-react';
@@ -32,15 +32,15 @@ export default function AdminResidents({ profile }: { profile: any }) {
   const handleApprove = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to approve ${name}?`)) return;
     try {
-      await updateDoc(doc(db, 'residents', id), {
+      await setDoc(doc(db, 'residents', id), {
         status: 'approved',
         approvedAt: new Date().toISOString()
-      });
+      }, { merge: true });
       console.log('Approve resident doc success');
       // Sync with users collection
-      await updateDoc(doc(db, 'users', id), {
+      await setDoc(doc(db, 'users', id), {
         status: 'approved'
-      });
+      }, { merge: true });
       console.log('Approve user doc success');
     } catch (err: any) {
       console.error('Approve failed:', err);
@@ -52,14 +52,14 @@ export default function AdminResidents({ profile }: { profile: any }) {
     const reason = prompt(`Reason for rejecting ${name}:`);
     if (reason === null) return;
     try {
-      await updateDoc(doc(db, 'residents', id), {
+      await setDoc(doc(db, 'residents', id), {
         status: 'rejected',
         rejectionReason: reason
-      });
+      }, { merge: true });
       // Sync with users collection
-      await updateDoc(doc(db, 'users', id), {
+      await setDoc(doc(db, 'users', id), {
         status: 'rejected'
-      });
+      }, { merge: true });
     } catch (err: any) {
       console.error('Reject failed:', err);
       alert('Reject failed: ' + err.message);

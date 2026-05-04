@@ -95,6 +95,10 @@ export default function App() {
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
 
   const [isRegistering, setIsRegistering] = useState(false);
+  const [viewOverride, setViewOverride] = useState<'admin' | 'tanod' | 'resident' | null>(null);
+
+  const effectiveRole = viewOverride || profile?.role;
+  const effectiveProfile = profile ? { ...profile, role: effectiveRole as 'admin' | 'tanod' | 'resident' } : null;
 
   // Live GPS Tracking for active users
   useEffect(() => {
@@ -345,14 +349,14 @@ export default function App() {
   if (user && !profile && !residentProfile) return <RoleSelection onSelect={handleSetRole} onRegister={() => setIsRegistering(true)} />;
 
   // Resident Pending/Rejected State
-  if (profile?.role === 'resident') {
+  if (effectiveRole === 'resident' && profile && !viewOverride) {
     if (profile.status === 'pending') return <PendingApproval user={user} />;
     if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} />;
   }
 
   const items = navItems.filter(item => {
-    if (profile?.role === 'admin') return true;
-    if (profile?.role === 'tanod') {
+    if (effectiveRole === 'admin') return true;
+    if (effectiveRole === 'tanod') {
       return !['residents', 'settings'].includes(item.id);
     }
     // Residents only see Dashboard, Map, Directory, Settings
@@ -448,16 +452,38 @@ export default function App() {
             <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono">{activeTab}</h1>
             <p className="text-[#8E9299] text-xs font-medium tracking-wide uppercase">TanodNet AI — Barangay Emergency Intelligence System</p>
           </div>
-          <div className="flex items-center justify-between md:justify-end gap-3">
-            {(profile?.role === 'tanod' || profile?.role === 'admin') && (
+          <div className="flex items-center justify-between md:justify-end gap-3 flex-wrap">
+            {profile?.role === 'admin' && (
+              <div className="flex bg-[#16191F] border border-[#2D3139] rounded-xl overflow-hidden text-[10px] sm:text-xs font-bold mr-0 sm:mr-2 shrink-0">
+                <button 
+                  onClick={() => { setViewOverride(null); setActiveTab('home'); }} 
+                  className={cn("px-3 py-2 transition-colors", !viewOverride ? "bg-[#FF4B4B] text-white" : "text-[#8E9299] hover:bg-[#252932]")}
+                >
+                  ADMIN
+                </button>
+                <button 
+                  onClick={() => { setViewOverride('tanod'); setActiveTab('home'); }} 
+                  className={cn("px-3 py-2 transition-colors", viewOverride === 'tanod' ? "bg-[#FF4B4B] text-white" : "text-[#8E9299] border-l border-[#2D3139] hover:bg-[#252932]")}
+                >
+                  TANOD VIEW
+                </button>
+                <button 
+                  onClick={() => { setViewOverride('resident'); setActiveTab('home'); }} 
+                  className={cn("px-3 py-2 transition-colors", viewOverride === 'resident' ? "bg-[#FF4B4B] text-white" : "text-[#8E9299] border-l border-[#2D3139] hover:bg-[#252932]")}
+                >
+                  CLIENT VIEW
+                </button>
+              </div>
+            )}
+            {(effectiveRole === 'tanod' || effectiveRole === 'admin') && (
               <button 
                 onClick={() => setIsIncidentFormOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#FF4B4B] rounded-xl hover:scale-105 transition-all shadow-lg font-bold text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#FF4B4B] rounded-xl hover:scale-105 transition-all shadow-lg font-bold text-sm shrink-0"
               >
                 <Plus className="w-4 h-4" /> NEW INCIDENT
               </button>
             )}
-            <button className="p-2.5 bg-[#16191F] border border-[#2D3139] rounded-xl hover:bg-[#252932] relative">
+            <button className="p-2.5 bg-[#16191F] border border-[#2D3139] rounded-xl hover:bg-[#252932] relative shrink-0">
               <Bell className="w-5 h-5" />
               {alerts.length > 0 && <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-[#FF4B4B] border-2 border-[#0F1115] rounded-full"></span>}
             </button>
@@ -466,8 +492,8 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="flex-1">
-            {activeTab === 'home' && profile && (
-              <DashboardView profile={profile} alerts={alerts} patrols={patrols} onTabChange={setActiveTab} isOnline={isOnline} />
+            {activeTab === 'home' && effectiveProfile && (
+              <DashboardView profile={effectiveProfile} alerts={alerts} patrols={patrols} onTabChange={setActiveTab} isOnline={isOnline} />
             )}
             {activeTab === 'map' && (
               <div className="h-full min-h-[500px]">
@@ -483,17 +509,17 @@ export default function App() {
                 <LiveMap />
               </div>
             )}
-            {activeTab === 'residents' && profile?.role === 'admin' && profile && <AdminResidents profile={profile} />}
+            {activeTab === 'residents' && effectiveRole === 'admin' && effectiveProfile && <AdminResidents profile={effectiveProfile} />}
             {activeTab === 'directory' && <DirectoryView />}
-            {activeTab === 'schedule' && profile && <ScheduleView role={profile.role} profile={profile} />}
+            {activeTab === 'schedule' && effectiveProfile && <ScheduleView role={effectiveRole as any} profile={effectiveProfile} />}
             {activeTab === 'reports' && <ReportsView />}
             {activeTab === 'settings' && <SettingsView />}
             {activeTab === 'roster' && <TanodRosterView />}
           </motion.div>
         </AnimatePresence>
 
-        {isIncidentFormOpen && profile && (
-          <IncidentForm profile={profile} onClose={() => setIsIncidentFormOpen(false)} />
+        {isIncidentFormOpen && effectiveProfile && (
+          <IncidentForm profile={effectiveProfile} onClose={() => setIsIncidentFormOpen(false)} />
         )}
       </main>
     </div>
@@ -815,22 +841,33 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
 
       {!activeAlert && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(['medical', 'fire', 'crime', 'flood'] as EmergencyType[]).map(type => (
-            <button 
-              key={type}
-              onClick={() => handleSOS(type)}
-              className="p-6 bg-[#16191F] border border-[#2D3139] rounded-3xl hover:bg-[#1A1D23] hover:border-[#FF4B4B] transition-all group"
-            >
-              <div className="w-12 h-12 bg-[#252932] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#FF4B4B] transition-colors">
-                <AlertTriangle className="w-6 h-6 text-[#8E9299] group-hover:text-white" />
-              </div>
-              <p className="text-xs font-black uppercase text-[#8E9299] tracking-widest group-hover:text-white uppercase">{type}</p>
-            </button>
-          ))}
+          {(['medical', 'fire', 'crime', 'flood'] as EmergencyType[]).map(type => {
+            const getIcon = (t: string) => {
+              switch(t) {
+                case 'medical': return '🏥';
+                case 'fire': return '🔥';
+                case 'crime': return '🚨';
+                case 'flood': return '🌊';
+                default: return '⚠️';
+              }
+            };
+            return (
+              <button 
+                key={type}
+                onClick={() => handleSOS(type)}
+                className="p-6 bg-[#16191F] border border-[#2D3139] rounded-3xl hover:bg-[#1A1D23] hover:border-[#FF4B4B] transition-all group"
+              >
+                <div className="w-12 h-12 bg-[#252932] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#FF4B4B] transition-colors text-2xl">
+                  <span>{getIcon(type)}</span>
+                </div>
+                <p className="text-xs font-black uppercase text-[#8E9299] tracking-widest group-hover:text-white">{type}</p>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="bg-[#16191F] border border-[#2D3139] rounded-[40px] p-8">
+      <div className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-8">
         <h3 className="font-bold text-xl mb-6 flex items-center gap-2 text-white">
           <MapIcon className="w-5 h-5 text-[#FF4B4B]" /> LIVE PATROL STATUS
         </h3>
@@ -936,21 +973,28 @@ function DirectoryView() {
       {contacts.map(c => {
         const Icon = c.icon;
         return (
-          <div key={c.name} className="p-8 bg-[#16191F] border border-[#2D3139] rounded-[40px] flex justify-between items-center hover:border-white/20 transition-all shadow-xl group">
-            <div className="flex items-center gap-6">
+          <div key={c.name} className="p-6 md:p-8 bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] flex flex-col md:flex-row justify-between items-center hover:border-white/20 transition-all shadow-xl group gap-6 md:gap-0">
+            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
                <div className={cn("p-6 rounded-[30px] group-hover:scale-110 transition-transform", c.bg, c.color)}>
-                  <Icon className="w-8 h-8" />
+                  <Icon className="w-8 h-8 md:w-8 md:h-8" />
                </div>
                <div>
-                  <h4 className="font-extrabold text-[#8E9299] text-xs tracking-widest">{c.name}</h4>
-                  <p className="text-3xl font-black italic text-white mt-1 tracking-tighter">{c.number}</p>
+                  <h4 className="font-extrabold text-[#8E9299] text-[10px] md:text-xs tracking-widest">{c.name}</h4>
+                  <p className="text-2xl md:text-3xl font-black italic text-white mt-1 tracking-tighter">{c.number}</p>
                </div>
             </div>
             <button 
-              onClick={() => window.location.href = `tel:${c.number}`}
-              className="p-5 bg-white rounded-2xl hover:bg-[#FF4B4B] hover:text-white text-black transition-all active:scale-95 shadow-2xl"
+              onClick={() => {
+                try {
+                  window.location.href = `tel:${c.number.replace(/-/g, '')}`;
+                } catch(e) {
+                  window.open(`tel:${c.number.replace(/-/g, '')}`, '_top');
+                }
+              }}
+              className="w-full md:w-auto p-4 md:p-5 flex items-center justify-center bg-white rounded-2xl hover:bg-[#FF4B4B] hover:text-white text-black transition-all active:scale-95 shadow-2xl"
             >
-               <Phone className="w-8 h-8" />
+               <Phone className="w-6 h-6 md:w-8 md:h-8" />
+               <span className="ml-2 font-bold md:hidden">CALL</span>
             </button>
           </div>
         );
@@ -971,12 +1015,14 @@ function TanodRosterView() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#16191F] p-8 rounded-[40px] border border-[#2D3139] flex justify-between items-center">
+      <div className="bg-[#16191F] p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-[#2D3139] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white">Tanod Roster</h2>
-          <p className="text-[#8E9299] font-medium">Official Barangay Peacekeeping Force Units</p>
+          <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase text-white">Tanod Roster</h2>
+          <p className="text-[#8E9299] font-medium text-sm md:text-base">Official Barangay Peacekeeping Force Units</p>
         </div>
-        <button className="px-8 py-4 bg-[#FF4B4B] text-white font-black italic rounded-xl hover:scale-105 transition-all flex items-center gap-2 text-xs shadow-xl shadow-red-500/20">
+        <button 
+          onClick={() => alert("Adding tanod members is restricted to the IT/Admin setup process currently.")}
+          className="w-full md:w-auto justify-center px-8 py-4 bg-[#FF4B4B] text-white font-black italic rounded-xl hover:scale-105 transition-all flex items-center gap-2 text-xs shadow-xl shadow-red-500/20">
           <Plus className="w-4 h-4" /> ADD UNIT
         </button>
       </div>
@@ -1008,10 +1054,14 @@ function TanodRosterView() {
             </div>
 
             <div className="flex gap-2">
-              <button className="flex-1 py-3 bg-[#252932] border border-[#2D3139] text-[10px] font-black uppercase tracking-widest text-[#8E9299] hover:text-white rounded-xl transition-all">
+              <button 
+                onClick={() => alert(`Viewing profile details for ${t.name}`)}
+                className="flex-1 py-3 bg-[#252932] border border-[#2D3139] text-[10px] font-black uppercase tracking-widest text-[#8E9299] hover:text-white rounded-xl transition-all">
                 Profile
               </button>
-              <button className="flex-1 py-3 bg-[#252932] border border-[#2D3139] text-[10px] font-black uppercase tracking-widest text-[#8E9299] hover:text-white rounded-xl transition-all">
+              <button 
+                onClick={() => alert(`Viewing incident history for ${t.name}`)}
+                className="flex-1 py-3 bg-[#252932] border border-[#2D3139] text-[10px] font-black uppercase tracking-widest text-[#8E9299] hover:text-white rounded-xl transition-all">
                 History
               </button>
             </div>
@@ -1102,12 +1152,24 @@ function ReportsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-[#16191F] p-8 rounded-[40px] border border-[#2D3139]">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#16191F] p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-[#2D3139] gap-4">
         <div>
-          <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white">Incident Log Vault</h2>
+          <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase text-white">Incident Log Vault</h2>
           <p className="text-[#8E9299] text-sm font-medium">Archived incident reports and tanod response logs</p>
         </div>
-        <button className="px-8 py-4 bg-[#252932] border border-[#2D3139] text-white font-black italic rounded-2xl hover:bg-[#2D3139] transition-all flex items-center gap-2 text-xs">
+        <button 
+          onClick={() => {
+            const csv = "id,type,date,status,citizen,location\n" + (reports.map(r => `${r.id},${r.type},${r.date},${r.status},${r.citizen},"${r.location}"`).join('\n'));
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `incident_audit_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            alert("Audit log exported successfully!");
+          }}
+          className="w-full md:w-auto justify-center px-8 py-4 bg-[#252932] border border-[#2D3139] text-white font-black italic rounded-xl md:rounded-2xl hover:bg-[#2D3139] transition-all flex items-center gap-2 text-xs"
+        >
           <FileText className="w-4 h-4" /> EXPORT AUDIT
         </button>
       </div>
@@ -1170,7 +1232,7 @@ function SettingsView() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="bg-[#16191F] border border-[#2D3139] rounded-[40px] p-8 md:p-12">
+      <div className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-12">
         <h3 className="text-2xl font-black mb-8 italic tracking-tighter uppercase text-white">System Config</h3>
         
         <div className="space-y-6">
@@ -1205,7 +1267,21 @@ function SettingsView() {
           </div>
 
           <div className="pt-6">
-            <button className="w-full py-5 bg-[#FF4B4B] text-white font-black italic rounded-2xl hover:scale-105 transition-all shadow-xl shadow-red-500/20">
+            <button 
+              onClick={(e) => {
+                const btn = e.currentTarget;
+                const orig = btn.innerText;
+                btn.innerText = "SAVED!";
+                btn.classList.add('bg-[#22C55E]');
+                btn.classList.remove('bg-[#FF4B4B]');
+                setTimeout(() => {
+                  btn.innerText = orig;
+                  btn.classList.remove('bg-[#22C55E]');
+                  btn.classList.add('bg-[#FF4B4B]');
+                }, 2000);
+              }}
+              className="w-full py-5 bg-[#FF4B4B] text-white font-black italic rounded-2xl hover:scale-105 transition-all shadow-xl shadow-red-500/20"
+            >
               SAVE CHANGES
             </button>
           </div>
@@ -1215,10 +1291,14 @@ function SettingsView() {
       <div className="bg-[#16191F] border border-[#2D3139] rounded-[40px] p-8">
         <h4 className="text-xs font-black uppercase text-[#8E9299] tracking-widest mb-6">Tanod Unit Controls</h4>
         <div className="flex gap-4">
-           <button className="flex-1 p-4 bg-[#252932] rounded-2xl border border-[#2D3139] text-xs font-bold hover:bg-[#2D3139] transition-all">
+           <button 
+              onClick={() => alert("Silent SOS Broadcast Triggered! Alerting nearest units.")}
+              className="flex-1 p-4 bg-[#252932] rounded-2xl border border-[#2D3139] text-xs font-bold hover:bg-[#2D3139] transition-all">
               BROADCAST SOS SILENT
            </button>
-           <button className="flex-1 p-4 bg-[#252932] rounded-2xl border border-[#2D3139] text-xs font-bold hover:bg-[#2D3139] transition-all">
+           <button 
+              onClick={() => alert("Patrol Sectors Reset completed.")}
+              className="flex-1 p-4 bg-[#252932] rounded-2xl border border-[#2D3139] text-xs font-bold hover:bg-[#2D3139] transition-all">
               RESET PATROL SECTORS
            </button>
         </div>
