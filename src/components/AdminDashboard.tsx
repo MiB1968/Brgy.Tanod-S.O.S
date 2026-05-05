@@ -387,7 +387,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                       <p className="text-sm font-black text-white leading-tight font-mono uppercase italic">{t.name}</p>
                       <p className={cn(
                         "text-[9px] font-black uppercase tracking-[0.1em] font-mono mt-1",
-                        t.status === 'responding' ? "text-emergency animate-pulse" : "text-success"
+                        (t.status as string) === 'responding' ? "text-emergency animate-pulse" : "text-success"
                       )}>{t.status || 'Active'}</p>
                     </div>
                   </div>

@@ -57,7 +57,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   }, [filteredAlerts, profile]);
 
   useEffect(() => {
-    if (!profile || profile.role !== 'tanod') return;
+    if (!profile || profile.role !== 'tanod' || !db) return;
 
     // Shift log (resolved by me today)
     const qLog = query(

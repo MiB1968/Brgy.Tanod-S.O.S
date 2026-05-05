@@ -11,45 +11,69 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'rubenlleg12@gmail.com';
     }
 
-    function getUserData() {
-      let path = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(path) ? get(path).data : null;
+    // Role-based helpers using data fields instead of recursive get() lookups 
+    // where possible (or just trust the user profile read)
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isAdmin() { 
-      return isSignedIn() && (
-        isMasterAdmin() || 
-        (getUserData() != null && getUserData().role == 'admin')
-      );
-    }
-    
-    function isTanod() { 
-      return isSignedIn() && (
-        isAdmin() || 
-        (getUserData() != null && getUserData().role == 'tanod')
-      );
+    // We check roles based on the 'users' collection
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // ==========================================
-    // SECURITY RULES (Simplified to avoid blocking Prototype testing)
-    // ==========================================
+    function isAdmin() {
+      return isMasterAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole() == 'admin');
+    }
 
+    function isTanod() {
+      return isAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole() == 'tanod');
+    }
+
+    // Default deny
     match /{document=**} {
-      allow read, write: if isMasterAdmin();
+      allow read, write: if false;
     }
-    match /report_logs/{logId} {
-      allow create: if isSignedIn();
-      allow read: if isTanod() || (isSignedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isTanod() || (isSignedIn() && resource.data.uid == request.auth.uid);
-    }
+
+    // User Profiles
     match /users/{userId} {
-      allow read: if isTanod() || request.auth.uid == userId;
-      allow write: if isMasterAdmin() || request.auth.uid == userId;
+      allow read: if isSignedIn(); // Allow all signed in users to read profiles (needed for names/roles)
+      allow write: if isMasterAdmin() || isOwner(userId);
     }
+
+    // Resident Enrollment Details
+    match /residents/{userId} {
+      allow read: if isTanod() || isOwner(userId);
+      allow write: if isMasterAdmin() || isOwner(userId);
+    }
+
+    // Emergency Alerts
+    match /alerts/{alertId} {
+      allow read: if isTanod() || (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isTanod() || (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Patrol Tracking
+    match /patrols/{patrolId} {
+      allow read: if isSignedIn();
+      allow write: if isTanod() || isMasterAdmin();
+    }
+
+    // Shifts & Scheduling
+    match /shifts/{shiftId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Tanod Data (Mirror of Supabase)
     match /tanods/{tanodId} {
       allow read: if isSignedIn();
-      allow write: if isMasterAdmin() || request.auth.uid == tanodId;
+      allow write: if isTanod() || isOwner(tanodId);
     }
+    
+    // System Connection Test
     match /test/connection {
       allow read: if true;
     }

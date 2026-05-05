@@ -17,6 +17,7 @@ export default function DispatchModal({ alert, onClose }: DispatchModalProps) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!db) return;
     const q = query(collection(db, 'users'), where('role', '==', 'tanod'), where('status', '==', 'approved'));
     return onSnapshot(q, (snapshot) => {
       setTanods(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User)));

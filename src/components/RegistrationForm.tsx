@@ -94,10 +94,9 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
-  const currentUser = auth.currentUser;
+  const currentUser = auth?.currentUser;
   
   const [formData, setFormData] = useState({
-// ... (rest of form state remains)
     fullName: currentUser?.displayName || '',
     age: '',
     gender: 'Male',
@@ -121,6 +120,19 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     password: '',
     confirmPassword: ''
   });
+
+  if (!auth || !db) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-6 text-center">
+        <div className="glass-panel p-12 rounded-[40px] border-emergency/30 max-w-sm">
+           <Shield className="w-16 h-16 text-emergency mx-auto mb-6" />
+           <h3 className="text-xl font-black italic text-white uppercase tracking-tighter mb-4">SYSTEM OFFLINE</h3>
+           <p className="text-white/60 text-sm font-medium mb-8">The secure cloud link is not configured. Registration restricted to local mode.</p>
+           <button onClick={onCancel} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold uppercase tracking-widest text-xs">ABORT MISSION</button>
+        </div>
+      </div>
+    );
+  }
 
   const fillDemoData = () => {
     setFormData({

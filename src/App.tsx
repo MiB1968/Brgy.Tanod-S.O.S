@@ -145,41 +145,51 @@ export default function App() {
   } : null;
 
   useEffect(() => {
+    if (!auth || !db) {
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        const isAdminEmail = firebaseUser.email === 'rubenlleg12@gmail.com';
-        
-        // First check if they have a standard user profile
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        
-        if (userDoc.exists()) {
-          setProfile({ id: userDoc.id, ...userDoc.data() } as User);
-        } else if (isAdminEmail) {
-          // Auto-bootstrap master admin
-          const adminProfile: Partial<User> = {
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || 'Master Admin',
-            email: firebaseUser.email || '',
-            role: 'admin',
-            createdAt: new Date().toISOString(),
-            status: 'approved'
-          };
-          await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
-          setProfile(adminProfile as User);
+      try {
+        setUser(firebaseUser);
+        if (firebaseUser) {
+          const isAdminEmail = firebaseUser.email === 'rubenlleg12@gmail.com';
+          
+          // First check if they have a standard user profile
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
+          if (userDoc.exists()) {
+            setProfile({ id: userDoc.id, ...userDoc.data() } as User);
+          } else if (isAdminEmail) {
+            // Auto-bootstrap master admin
+            const adminProfile: Partial<User> = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Master Admin',
+              email: firebaseUser.email || '',
+              role: 'admin',
+              createdAt: new Date().toISOString(),
+              status: 'approved'
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
+            setProfile(adminProfile as User);
+          } else {
+            setProfile(null);
+          }
+
+          const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
+          if (resDoc.exists()) {
+            setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
+          }
         } else {
           setProfile(null);
+          setResidentProfile(null);
         }
-
-        const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
-        if (resDoc.exists()) {
-          setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
-        }
-      } else {
-        setProfile(null);
-        setResidentProfile(null);
+      } catch (err) {
+        console.error("FATAL: Auth Sync Error:", err);
+        toast.error("Security System Initialization Failed. Retrying...");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsubscribe;
   }, []);
@@ -323,15 +333,30 @@ export default function App() {
   if (isRegistering) return <RegistrationForm onCancel={() => setIsRegistering(false)} onComplete={() => { setIsRegistering(false); window.location.reload(); }} />;
 
   // If no user, show login
-  if (!user) return <LoginView onLogin={handleLogin} onRegister={() => setIsRegistering(true)} isLoggingIn={isLoggingIn} />;
+  if (!user) return (
+    <LoginView 
+      onLogin={handleLogin} 
+      onRegister={() => setIsRegistering(true)} 
+      isLoggingIn={isLoggingIn} 
+      deferredPrompt={deferredPrompt}
+      onInstall={handleInstallApp}
+    />
+  );
 
   // Special case: Resident Portal (Registration Flow)
-  if (user && !profile && !residentProfile) return <RoleSelection onSelect={handleSetRole} onRegister={() => setIsRegistering(true)} />;
+  if (user && !profile && !residentProfile) return (
+    <RoleSelection 
+      onSelect={handleSetRole} 
+      onRegister={() => setIsRegistering(true)} 
+      deferredPrompt={deferredPrompt}
+      onInstall={handleInstallApp}
+    />
+  );
 
   // Resident Pending/Rejected State
   if (effectiveRole === 'resident' && profile && !viewOverride) {
-    if (profile.status === 'pending') return <PendingApproval user={user} />;
-    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} />;
+    if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} />;
+    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} />;
   }
 
   const items = navItems.filter(item => {
@@ -356,20 +381,31 @@ export default function App() {
           <TanodLogo size={36} animated={false} />
           <span className="font-black italic tracking-tighter text-lg uppercase font-mono text-white leading-none">Brgy.TANOD <span className="text-emergency">🆘</span> ALERT</span>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-3 text-white/40 hover:text-white transition-colors bg-white/5 rounded-2xl border border-white/5 active:scale-90"
-        >
-          {isMobileMenuOpen ? (
-            <Plus className="w-6 h-6 rotate-45" />
-          ) : (
-            <div className="flex flex-col gap-1.5 w-6">
-              <span className="w-full h-0.5 bg-current rounded-full"></span>
-              <span className="w-2/3 h-0.5 bg-current rounded-full ml-auto"></span>
-              <span className="w-full h-0.5 bg-current rounded-full"></span>
-            </div>
+        <div className="flex items-center gap-2">
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallApp}
+              className="p-3 text-info hover:text-white transition-colors bg-info/10 rounded-2xl border border-info/20 active:scale-95"
+              title="Install App"
+            >
+              <Plus className="w-6 h-6" />
+            </button>
           )}
-        </button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-3 text-white/40 hover:text-white transition-colors bg-white/5 rounded-2xl border border-white/5 active:scale-90"
+          >
+            {isMobileMenuOpen ? (
+              <Plus className="w-6 h-6 rotate-45" />
+            ) : (
+              <div className="flex flex-col gap-1.5 w-6">
+                <span className="w-full h-0.5 bg-current rounded-full"></span>
+                <span className="w-2/3 h-0.5 bg-current rounded-full ml-auto"></span>
+                <span className="w-full h-0.5 bg-current rounded-full"></span>
+              </div>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Overlay */}
@@ -528,7 +564,7 @@ export default function App() {
                 profile={effectiveProfile} 
                 alerts={alerts} 
                 patrols={patrols} 
-                onTabChange={setActiveTab} 
+                onTabChange={(tab: any) => setActiveTab(tab as any)} 
                 isOnline={isOnline} 
                 deferredPrompt={deferredPrompt}
                 onInstall={handleInstallApp}
@@ -583,10 +619,18 @@ export default function App() {
   );
 }
 
-function RejectedScreen({ reason }: { reason: string }) {
+function RejectedScreen({ reason, deferredPrompt, onInstall }: { reason: string, deferredPrompt?: any, onInstall?: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
+      {deferredPrompt && (
+        <button
+          onClick={onInstall}
+          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 transition-all text-[10px] tracking-widest font-mono uppercase"
+        >
+          <span>📲 INSTALL APP</span>
+        </button>
+      )}
       <div className="w-24 h-24 bg-emergency/10 rounded-full flex items-center justify-center mb-8 border border-emergency/30 shadow-glow-red animate-pulse">
         <X className="w-12 h-12 text-emergency" />
       </div>
@@ -608,10 +652,18 @@ function RejectedScreen({ reason }: { reason: string }) {
   );
 }
 
-function PendingApproval({ user }: { user: FirebaseUser }) {
+function PendingApproval({ user, deferredPrompt, onInstall }: { user: FirebaseUser, deferredPrompt?: any, onInstall?: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
+      {deferredPrompt && (
+        <button
+          onClick={onInstall}
+          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 transition-all text-[10px] tracking-widest font-mono uppercase"
+        >
+          <span>📲 INSTALL APP</span>
+        </button>
+      )}
       <div className="w-24 h-24 bg-caution/10 rounded-[32px] flex items-center justify-center mb-8 border border-caution/30 shadow-lg animate-pulse">
         <Clock className="w-12 h-12 text-caution" />
       </div>
@@ -646,7 +698,7 @@ const navItems = [
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
 ];
 
-function LoginView({ onLogin, onRegister, isLoggingIn }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean }) {
+function LoginView({ onLogin, onRegister, isLoggingIn, deferredPrompt, onInstall }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, deferredPrompt?: any, onInstall?: () => void }) {
   const handleRegister = async () => {
     try {
       await onLogin();
@@ -672,6 +724,14 @@ function LoginView({ onLogin, onRegister, isLoggingIn }: { onLogin: () => void, 
       </p>
 
       <div className="space-y-4 w-full max-w-xs z-10">
+        {deferredPrompt && (
+          <button 
+            onClick={onInstall}
+            className="w-full bg-info text-white font-black py-4 rounded-3xl flex items-center justify-center gap-3 hover:bg-info/90 active:scale-95 transition-all shadow-xl uppercase tracking-widest font-mono text-xs italic mb-4"
+          >
+            <span>📲 INSTALL MOBILE LINK</span>
+          </button>
+        )}
         <button 
           disabled={isLoggingIn}
           onClick={onLogin}
@@ -703,10 +763,18 @@ function LoginView({ onLogin, onRegister, isLoggingIn }: { onLogin: () => void, 
   );
 }
 
-function RoleSelection({ onSelect, onRegister }: { onSelect: (role: UserRole) => void, onRegister: () => void }) {
+function RoleSelection({ onSelect, onRegister, deferredPrompt, onInstall }: { onSelect: (role: UserRole) => void, onRegister: () => void, deferredPrompt?: any, onInstall?: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
+      {deferredPrompt && (
+        <button 
+          onClick={onInstall}
+          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 transition-all text-[10px] tracking-widest font-mono uppercase"
+        >
+          <span>📲 INSTALL APP</span>
+        </button>
+      )}
       <h2 className="text-4xl font-black italic tracking-tighter mb-2 text-white uppercase font-mono z-10">ASSIGNMENT</h2>
       <p className="text-white/40 text-lg mb-16 uppercase tracking-[0.3em] font-mono z-10">Select operational profile</p>
       
@@ -760,6 +828,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!db) return;
     const q = query(
       collection(db, 'alerts'), 
       where('residentId', '==', profile.uid),
@@ -1270,6 +1339,7 @@ function TanodRosterView() {
   const [newUnitEmail, setNewUnitEmail] = useState('');
 
   useEffect(() => {
+    if (!db) return;
     const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
     return onSnapshot(q, (snap) => {
       setTanods(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));

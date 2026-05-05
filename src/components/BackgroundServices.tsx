@@ -52,7 +52,7 @@ export default function BackgroundServices() {
 
         tacticalChannel = supabase
           .channel(`tactical-command-${Math.random().toString(36).substring(2)}`)
-          .subscribe((status, err) => {
+          .subscribe((status, err: any) => {
             if (status === 'SUBSCRIBED') {
               console.log('✅ Tactical Live Link: ACTIVE');
             } else if (status === 'CHANNEL_ERROR') {
@@ -140,7 +140,7 @@ export default function BackgroundServices() {
             icon: '📋'
           });
         })
-        .subscribe((status, err) => {
+        .subscribe((status, err: any) => {
           if (status === 'SUBSCRIBED') {
             console.log('✅ Supabase Real-time: Connected (System Events)');
           } else if (status === 'CHANNEL_ERROR') {
@@ -175,7 +175,7 @@ export default function BackgroundServices() {
 
   // 3. Real-time Listeners (Firestore)
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !db) return;
 
     // A. Alerts Listener
     const alertsQ = profile.role === 'admin' || profile.role === 'tanod'
@@ -213,7 +213,7 @@ export default function BackgroundServices() {
 
   // 2. Continuous GPS Tracking for Tanods
   useEffect(() => {
-    if (!profile || profile.role !== 'tanod' || !auth.currentUser) return;
+    if (!profile || profile.role !== 'tanod' || !auth.currentUser || !db) return;
 
     const stopWatching = watchLocation(async (loc) => {
       try {
@@ -246,6 +246,7 @@ export default function BackgroundServices() {
 
   // 3. Offline Sync (Flush Queue)
   useEffect(() => {
+    if (!db) return;
     const handleOnline = () => {
       flushSOSQueue(async (data) => {
         await addDoc(collection(db, 'alerts'), data);

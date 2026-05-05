@@ -3,16 +3,31 @@ import { getAuth } from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+const isConfigEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey === "";
 
-// Use initializeFirestore with experimentalAutoDetectLongPolling to prevent iframe connection drops
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+let app;
+let db: any;
+let auth: any;
 
-export const auth = getAuth(app);
+if (!isConfigEmpty) {
+  app = initializeApp(firebaseConfig);
+  // Use initializeFirestore with experimentalAutoDetectLongPolling to prevent iframe connection drops
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  }, firebaseConfig.firestoreDatabaseId);
+  auth = getAuth(app);
+} else {
+  console.warn("⚠️ Firebase configuration is missing. Authentication and real-time features are disabled.");
+  // Provide partial mocks/nulls to prevent import crashes
+  app = null;
+  db = null;
+  auth = null;
+}
+
+export { db, auth };
 
 async function testConnection() {
+  if (!db) return;
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {

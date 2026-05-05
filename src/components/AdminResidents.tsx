@@ -15,7 +15,7 @@ export default function AdminResidents({ profile }: { profile: any }) {
   const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod')) return;
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod') || !db) return;
 
     const q = filter === 'all' 
       ? query(collection(db, 'residents'))
