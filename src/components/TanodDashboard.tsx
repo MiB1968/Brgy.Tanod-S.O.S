@@ -3,12 +3,13 @@ import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, 
 import { db } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { Alert, User } from '../types';
-import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info } from 'lucide-react';
+import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import { InstallAppButton } from './InstallAppButton';
+import IncidentForm from './IncidentForm';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { logIncidentAction } from '../services/logService';
@@ -18,6 +19,12 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   const [isFlashing, setIsFlashing] = useState(false);
   const [shiftLog, setShiftLog] = useState<Alert[]>([]);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isReportFormOpen, setIsReportFormOpen] = useState(false);
+
+  // Filtering State
+  const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
+  const [filterTime, setFilterTime] = useState<string>('ALL');
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -25,24 +32,61 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   // Filter alerts for this tanod: pending OR specifically assigned/responded by them
-  const filteredAlerts = alerts.filter(a => 
-    a.status !== 'resolved' && a.status !== 'cancelled' &&
-    (a.status === 'pending' || 
-     a.assignedTo === profile?.uid || 
-     a.respondedBy === profile?.uid)
-  );
+  const dashboardAlerts = alerts.filter(alert => {
+    // 1. Tanod specific constraint
+    const isRelevant = 
+      (alert.status === 'pending' || 
+       alert.assignedTo === profile?.uid || 
+       alert.respondedBy === profile?.uid);
+    
+    if (!isRelevant) return false;
+
+    // 2. Status Filter
+    if (filterStatus === 'ACTIVE') {
+      if (alert.status === 'resolved' || alert.status === 'cancelled') return false;
+    } else if (filterStatus !== 'ALL') {
+      if (alert.status !== filterStatus.toLowerCase()) return false;
+    }
+
+    // 3. Type Filter
+    const typeEnum: Record<string, string> = {
+      'MEDICAL': 'Medical Emergency',
+      'FIRE': 'Fire Alert',
+      'CRIME': 'Criminal Activity',
+      'DISASTER': 'Natural Disaster'
+    };
+    
+    if (filterType !== 'ALL') {
+      const match = typeEnum[filterType] || filterType;
+      if (!alert.type.toUpperCase().includes(filterType) && alert.type !== match) return false;
+    }
+
+    // 4. Time Filter
+    if (filterTime !== 'ALL') {
+      const alertDate = new Date(alert.timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - alertDate.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (filterTime === '1H' && diffHours > 1) return false;
+      if (filterTime === '4H' && diffHours > 4) return false;
+      if (filterTime === '24H' && diffHours > 24) return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     if (!profile || profile.role !== 'tanod') return;
 
     // Handle flashing lights only, sound is global in App.tsx
-    const hasPending = filteredAlerts.some(a => a.status === 'pending');
+    const hasPending = dashboardAlerts.some(a => a.status === 'pending');
     if (hasPending || sirenActive) {
       setIsFlashing(true);
     } else {
       setIsFlashing(false);
     }
-  }, [filteredAlerts, profile, sirenActive]);
+  }, [dashboardAlerts, profile, sirenActive]);
 
   useEffect(() => {
     if (!profile || profile.role !== 'tanod' || !db) return;
@@ -66,11 +110,14 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
     if (!db) return;
     try {
-      const updateData: any = { status };
+      const updateData: any = { 
+        status, 
+        updatedAt: new Date().toISOString() 
+      };
       
       if (status === 'responding') {
         updateData.respondedBy = profile?.uid || 'unknown';
-        if (profile?.name) updateData.respondedByName = profile.name;
+        updateData.respondedByName = profile?.name || 'Tanod Unit';
         updateData.respondedAt = new Date().toISOString();
       }
       
@@ -115,8 +162,17 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       if (profile?.uid) {
         try {
           // If resolved, go back to On-Duty, otherwise match alert status
-          const newStatus = updateData.status === 'resolved' ? 'On-Duty' : updateData.status;
-          await setDoc(doc(db, 'users', profile.uid), { status: newStatus }, { merge: true });
+          const isResolved = updateData.status === 'resolved' || updateData.status === 'cancelled';
+          const newStatus = isResolved ? 'On-Duty' : updateData.status;
+          
+          const userUpdate: any = { status: newStatus };
+          if (isResolved) {
+            userUpdate.activeAlertId = null;
+          } else if (updateData.status === 'responding') {
+            userUpdate.activeAlertId = alert.id;
+          }
+          
+          await setDoc(doc(db, 'users', profile.uid), userUpdate, { merge: true });
         } catch (e) {
           console.warn('[TanodDashboard] Failed to update Tanod roster status:', e);
         }
@@ -174,14 +230,24 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           </h2>
           <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mt-2 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Securing Brgy. Intelligence Network</p>
         </div>
-        <button
-          onClick={() => setIsAboutOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
-          id="tanod-about-btn"
-        >
-          <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-          <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">Project Vision & Guidelines</span>
-        </button>
+        <div className="flex flex-col md:flex-row items-center gap-3">
+          <button
+            onClick={() => setIsReportFormOpen(true)}
+            className="flex items-center gap-3 px-6 py-2.5 rounded-xl bg-emergency/10 border border-emergency/30 hover:bg-emergency/20 transition-all group shadow-glow-red"
+            id="file-report-btn"
+          >
+            <FilePlus className="w-4 h-4 text-emergency group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-black text-emergency uppercase tracking-[0.25em] font-mono">File Incident Report</span>
+          </button>
+          <button
+            onClick={() => setIsAboutOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
+            id="tanod-about-btn"
+          >
+            <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
+            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">Project Vision & Guidelines</span>
+          </button>
+        </div>
       </motion.div>
 
       <AboutModal 
@@ -189,6 +255,15 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         onClose={() => setIsAboutOpen(false)} 
         role={profile?.role} 
       />
+
+      <AnimatePresence>
+        {isReportFormOpen && profile && (
+          <IncidentForm 
+            profile={profile} 
+            onClose={() => setIsReportFormOpen(false)} 
+          />
+        )}
+      </AnimatePresence>
 
       {deferredPrompt && (
         <motion.button
@@ -258,28 +333,80 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       </motion.div>
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          <div className="flex items-center justify-between glass-panel p-4 rounded-3xl mb-2">
-            <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
-              <Zap className="w-5 h-5 text-emergency shadow-glow-red" />
-              LIVE INCIDENT FEED
-            </h3>
-            <div className="flex items-center gap-2">
-               <span className="w-2 h-2 bg-emergency rounded-full animate-pulse shadow-glow-red" />
-               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Real-time Stream</span>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
+              <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
+                <Zap className="w-5 h-5 text-emergency shadow-glow-red" />
+                LIVE INCIDENT FEED
+              </h3>
+              <div className="flex items-center gap-2">
+                 <span className="w-2 h-2 bg-emergency rounded-full animate-pulse shadow-glow-red" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Real-time Stream</span>
+              </div>
+            </div>
+
+            {/* Tactical Filter Bar */}
+            <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-[28px] border-white/5 backdrop-blur-md">
+              <div className="flex items-center gap-2 px-3">
+                <Filter className="w-3.5 h-3.5 text-white/30" />
+                <span className="text-[9px] font-black uppercase text-white/20 tracking-widest font-mono">Operational Sigs</span>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                <select 
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
+                >
+                  <option value="ACTIVE">ACTIVE_ONLY</option>
+                  <option value="ALL">ALL_STATUS</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="RESPONDING">RESPONDING</option>
+                </select>
+
+                <select 
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
+                >
+                  <option value="ALL">ALL_TYPES</option>
+                  <option value="MEDICAL">MEDICAL</option>
+                  <option value="FIRE">FIRE</option>
+                  <option value="CRIME">CRIME</option>
+                  <option value="DISASTER">DISASTER</option>
+                </select>
+
+                <select 
+                  value={filterTime}
+                  onChange={(e) => setFilterTime(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
+                >
+                  <option value="ALL">ALL_TIME</option>
+                  <option value="1H">LAST_1H</option>
+                  <option value="4H">LAST_4H</option>
+                  <option value="24H">LAST_24H</option>
+                </select>
+              </div>
+
+              <div className="ml-auto px-4 py-1.5 bg-white/5 rounded-lg border border-white/5 md:block hidden">
+                <span className="text-[9px] font-black text-white/40 uppercase font-mono tracking-tighter">
+                   {dashboardAlerts.length} <span className="text-white/20">TARGETS_FOUND</span>
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
-              {filteredAlerts.length === 0 ? (
+              {dashboardAlerts.length === 0 ? (
                 <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center relative overflow-hidden group">
                   <div className="scanline opacity-5" />
                   <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10 group-hover:opacity-20 transition-opacity" />
-                  <p className="text-white/30 font-black uppercase tracking-[0.3em] text-[10px] font-mono">No active incidents detected.</p>
+                  <p className="text-white/30 font-black uppercase tracking-[0.3em] text-[10px] font-mono">No matching incidents detected.</p>
                   <p className="text-white/10 text-[8px] font-mono mt-2 tracking-widest">AWAITING TRANSMISSION...</p>
                 </div>
               ) : (
-                filteredAlerts.map(alert => (
+                dashboardAlerts.map(alert => (
                   <motion.div
                     layout
                     initial={{ opacity: 0, x: -20 }}

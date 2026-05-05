@@ -191,7 +191,7 @@ export default function BackgroundServices() {
     // B. Patrols Listener (Admin/Tanod only)
     let unsubPatrols = () => {};
     if (profile.role === 'admin' || profile.role === 'superadmin' || profile.role === 'tanod') {
-      const patrolsQ = query(collection(db, 'patrols'), where('isActive', '==', true));
+      const patrolsQ = query(collection(db, 'patrols'));
       unsubPatrols = onSnapshot(patrolsQ, (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PatrolLocation));
         setPatrols(list);

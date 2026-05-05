@@ -1606,6 +1606,7 @@ function DirectoryView() {
 }
 
 function TanodRosterView() {
+  const { patrols } = useTanodStore();
   const [tanods, setTanods] = useState<User[]>([]);
   const [addingUnit, setAddingUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -1711,49 +1712,76 @@ function TanodRosterView() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {tanods.map((t) => (
-          <div key={t.uid} className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group hover:border-white/10 transition-all shadow-command">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2 transition-all group-hover:bg-success/15"></div>
-            
-            <div className="flex items-center gap-6 mb-8">
-              <div className="w-16 h-16 bg-brand-card rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-success/30 transition-colors shadow-lg">
-                <TanodLogo size={44} animated={false} className="drop-shadow-lg" />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-2xl font-black italic tracking-tighter text-white truncate uppercase font-mono leading-none mb-1">{t.name}</h4>
-                <p className="font-mono text-white/30 text-[9px] uppercase font-bold tracking-[0.2em]">{t.id || `UNIT-${t.uid.slice(0, 4).toUpperCase()}`}</p>
-              </div>
-            </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {tanods.map((t) => {
+          // Find patrol data for this tanod
+          const patrolMatch = patrols.find(p => p.tanodId === t.uid);
+          const isActuallyActive = patrolMatch?.isActive;
+          const lastSeen = patrolMatch?.lastUpdate;
 
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Deployment Status</span>
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase text-success italic font-mono">
-                   <span className="w-1.5 h-1.5 bg-success rounded-full animate-pulse shadow-glow-success" />
-                   ACTIVE_DUTY
-                </span>
+          return (
+            <div key={t.uid} className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group hover:border-white/10 transition-all shadow-command">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2 transition-all group-hover:bg-success/15"></div>
+              
+              <div className="flex items-center gap-6 mb-8">
+                <div className="w-16 h-16 bg-brand-card rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-success/30 transition-colors shadow-lg">
+                  <TanodLogo size={44} animated={false} className="drop-shadow-lg" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="text-2xl font-black italic tracking-tighter text-white truncate uppercase font-mono leading-none">{t.name}</h4>
+                    {isActuallyActive && <span className="w-2 h-2 bg-success rounded-full animate-pulse shadow-glow-success" />}
+                  </div>
+                  <p className="font-mono text-white/30 text-[9px] uppercase font-bold tracking-[0.2em]">{t.id || `UNIT-${t.uid.slice(0, 4).toUpperCase()}`}</p>
+                </div>
               </div>
-              <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Assigned Sector</span>
-                <span className="text-[10px] font-black uppercase text-white italic font-mono">QUADRANT_ALPHA</span>
-              </div>
-            </div>
 
-            <div className="flex gap-3">
-              <button 
-                onClick={() => alert(`Accessing tactical profile for ${t.name}`)}
-                className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
-                Logistics
-              </button>
-              <button 
-                onClick={() => alert(`Retrieving operational history for ${t.name}`)}
-                className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
-                History
-              </button>
+              <div className="space-y-3 mb-8">
+                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
+                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Duty Status</span>
+                  <div className="flex flex-col items-end">
+                    <span className={cn(
+                      "flex items-center gap-2 text-[10px] font-black uppercase italic font-mono",
+                      isActuallyActive ? "text-success" : "text-white/40"
+                    )}>
+                       {isActuallyActive ? 'ON_DUTY' : 'OFFLINE'}
+                    </span>
+                    {t.activeAlertId && (
+                      <span className="text-[7px] font-mono text-emergency font-black uppercase mt-1 tracking-tighter">
+                        REQ: {t.activeAlertId.slice(-8).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
+                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Last Location Ping</span>
+                  <span className="text-[10px] font-black uppercase text-white italic font-mono">
+                    {lastSeen ? new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'NEVER_SYNCED'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
+                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Last Sync Date</span>
+                  <span className="text-[10px] font-black uppercase text-white/60 italic font-mono">
+                    {lastSeen ? new Date(lastSeen).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '---'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => alert(`Accessing tactical profile for ${t.name}`)}
+                  className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
+                  Logistics
+                </button>
+                <button 
+                  onClick={() => alert(`Retrieving operational history for ${t.name}`)}
+                  className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
+                  History
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

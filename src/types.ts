@@ -1,7 +1,7 @@
 export type UserRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'guest';
 export type RegistryStatus = 'pending' | 'approved' | 'rejected';
 export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';
-export type IncidentStatus = 'resolved' | 'ongoing' | 'referred';
+export type IncidentStatus = 'pending' | 'ongoing' | 'resolved' | 'referred';
 export type EmergencyType = 'medical' | 'fire' | 'crime' | 'natural_disaster' | 'other' | 'violence' | 'flood';
 
 export interface User {
@@ -15,6 +15,7 @@ export interface User {
   createdAt: string;
   status: RegistryStatus;
   rejectionReason?: string;
+  activeAlertId?: string | null;
 }
 
 export interface ResidentProfile extends User {

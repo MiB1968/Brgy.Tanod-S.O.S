@@ -42,7 +42,8 @@ export default function DispatchModal({ alert, onClose }: DispatchModalProps) {
       // Update Tanod status in roster
       try {
         await setDoc(doc(db, 'users', selectedTanod), { 
-          status: 'responding' 
+          status: 'responding',
+          activeAlertId: alert.id
         }, { merge: true });
       } catch (e) {
         console.warn('Failed to update Tanod status in roster:', e);

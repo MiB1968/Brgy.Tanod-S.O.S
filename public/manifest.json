@@ -1,6 +1,20 @@
 {
   "short_name": "TanodSOS",
   "name": "Barangay Tanod S.O.S.",
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/0d0505/ef4444?text=TANOD+SOS",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://placehold.co/512x512/0d0505/ef4444?text=TANOD+SOS",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#0F172A",

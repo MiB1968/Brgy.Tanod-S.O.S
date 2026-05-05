@@ -242,7 +242,7 @@ export default function LiveMap() {
   const [showLegend,  setShowLegend]  = useState(false);
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
 
-  const activePatrols = patrols.filter(p=>p.location?.lat&&p.location?.lng).length;
+  const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
 
   // Inject global CSS once
@@ -384,7 +384,7 @@ export default function LiveMap() {
         )}
 
         {/* Active patrols */}
-        {showPatrols && patrols.map((p) =>
+        {showPatrols && patrols.filter(p => p.isActive).map((p) =>
           p.location?.lat && p.location?.lng ? (
             <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={makeOfficerIcon()} zIndexOffset={100}>
               <Popup>

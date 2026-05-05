@@ -268,7 +268,7 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
           </React.Fragment>
         ))}
 
-        {patrols.map(patrol => (
+        {patrols.filter(p => p.isActive).map(patrol => (
           <React.Fragment key={patrol.id}>
             <Marker 
               position={[patrol.location.lat, patrol.location.lng]} 

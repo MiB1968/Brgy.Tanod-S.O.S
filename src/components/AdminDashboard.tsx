@@ -13,7 +13,8 @@ import {
   ExternalLink,
   Zap,
   MoreVertical,
-  Info
+  Info,
+  Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -36,12 +37,18 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [stats, setStats] = useState({
-    residents: 0,
-    pendingReg: 0,
-    activeAlerts: 0,
-    resolvedToday: 0
-  });
+  
+  // Filtering State
+  const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
+  const [filterTime, setFilterTime] = useState<string>('ALL');
+
+  // derive stats from alerts store to ensure real-time consistency
+  const activeAlertsCount = alerts.filter(a => a.status === 'pending' || a.status === 'responding').length;
+  const pendingAlertsCount = alerts.filter(a => a.status === 'pending').length;
+  
+  const [residentsCount, setResidentsCount] = useState(0);
+  const [pendingRegCount, setPendingRegCount] = useState(0);
 
   useEffect(() => {
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
@@ -58,42 +65,71 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   useEffect(() => {
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
-    // Stats
-    const fetchStats = async () => {
-      try {
-        const residentsSnapshot = await getCountFromServer(query(collection(db, 'residents'), where('status', '==', 'approved')));
-        const pendingRegSnapshot = await getCountFromServer(query(collection(db, 'residents'), where('status', '==', 'pending')));
-        
-        setStats(prev => ({
-          ...prev,
-          residents: residentsSnapshot.data().count,
-          pendingReg: pendingRegSnapshot.data().count
-        }));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.GET, 'residents-stats');
-      }
-    };
-    
-    // Live Stats
-    const activeAlertsQ = query(collection(db, 'alerts'), where('status', '==', 'pending'));
-    const unsubActiveStats = onSnapshot(activeAlertsQ, (snapshot) => {
-      setStats(prev => ({ ...prev, activeAlerts: snapshot.size }));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'alerts-status-stats');
+    // Real-time Residents stats
+    const approvedQ = query(collection(db, 'residents'), where('status', '==', 'approved'));
+    const pendingQ = query(collection(db, 'residents'), where('status', '==', 'pending'));
+
+    const unsubApproved = onSnapshot(approvedQ, (snapshot) => {
+      setResidentsCount(snapshot.size);
     });
 
-    fetchStats();
+    const unsubPending = onSnapshot(pendingQ, (snapshot) => {
+      setPendingRegCount(snapshot.size);
+    });
+
     return () => {
-      unsubActiveStats();
+      unsubApproved();
+      unsubPending();
     };
-  }, []);
+  }, [profile]);
+
+  const filteredAlerts = alerts.filter(alert => {
+    // 1. Status Filter
+    if (filterStatus === 'ACTIVE') {
+      if (alert.status === 'resolved' || alert.status === 'cancelled') return false;
+    } else if (filterStatus !== 'ALL') {
+      if (alert.status !== filterStatus.toLowerCase()) return false;
+    }
+
+    // 2. Type Filter
+    const typeEnum: Record<string, string> = {
+      'MEDICAL': 'Medical Emergency',
+      'FIRE': 'Fire Alert',
+      'CRIME': 'Criminal Activity',
+      'DISASTER': 'Natural Disaster'
+    };
+    
+    if (filterType !== 'ALL') {
+      const match = typeEnum[filterType] || filterType;
+      // Partial match or direct match
+      if (!alert.type.toUpperCase().includes(filterType) && alert.type !== match) return false;
+    }
+
+    // 3. Time Filter
+    if (filterTime !== 'ALL') {
+      const alertDate = new Date(alert.timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - alertDate.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (filterTime === '1H' && diffHours > 1) return false;
+      if (filterTime === '4H' && diffHours > 4) return false;
+      if (filterTime === '24H' && diffHours > 24) return false;
+    }
+
+    return true;
+  });
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
     try {
-      const updateData: any = { status };
+      const updateData: any = { 
+        status, 
+        updatedAt: new Date().toISOString() 
+      };
       
       if (status === 'responding') {
         updateData.respondedBy = profile?.uid || 'unknown';
+        updateData.respondedByName = profile?.name || 'Admin Dispatch';
         updateData.respondedAt = new Date().toISOString();
       }
       
@@ -125,8 +161,17 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       const tanodId = alert.respondedBy || updateData.respondedBy;
       if (tanodId && tanodId !== 'unknown') {
         try {
-          const newRosterStatus = status === 'resolved' ? 'On-Duty' : status;
-          await setDoc(doc(db, 'users', tanodId), { status: newRosterStatus }, { merge: true });
+          const isResolved = status === 'resolved' || status === 'cancelled';
+          const newRosterStatus = isResolved ? 'On-Duty' : status;
+          const userUpdate: any = { status: newRosterStatus };
+          
+          if (isResolved) {
+            userUpdate.activeAlertId = null;
+          } else if (status === 'responding') {
+            userUpdate.activeAlertId = alert.id;
+          }
+          
+          await setDoc(doc(db, 'users', tanodId), userUpdate, { merge: true });
         } catch (e) {
           console.warn(`[AdminDashboard] Failed to update user roster status for ${tanodId}:`, e);
         }
@@ -214,30 +259,30 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           label="Approved Residents" 
-          value={stats.residents} 
+          value={residentsCount} 
           icon={Users} 
           color="text-info" 
           bg="bg-info/10" 
         />
         <StatCard 
           label="Pending Registration" 
-          value={stats.pendingReg} 
+          value={pendingRegCount} 
           icon={Clock} 
           color="text-caution" 
           bg="bg-caution/10" 
-          pulse={stats.pendingReg > 0}
+          pulse={pendingRegCount > 0}
         />
         <StatCard 
           label="Active SOS Alerts" 
-          value={stats.activeAlerts} 
+          value={activeAlertsCount} 
           icon={AlertTriangle} 
           color="text-emergency" 
           bg="bg-emergency/10" 
-          pulse={stats.activeAlerts > 0}
+          pulse={pendingAlertsCount > 0}
         />
         <StatCard 
           label="Online Tanods" 
-          value={onDutyTanods.length || 0} 
+          value={patrols.filter(p => p.isActive).length || 0} 
           icon={Shield}
           color="text-success" 
           bg="bg-success/10" 
@@ -247,23 +292,79 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Alerts Feed */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
-            <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
-              <Zap className="w-5 h-5 text-emergency shadow-glow-red" />
-              LIVE EMERGENCY FEED
-            </h3>
-            <span className="px-3 py-1 bg-emergency/10 text-emergency text-[8px] font-black rounded-full animate-pulse tracking-[0.2em]">MONITORING ACTIVE</span>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
+              <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
+                <Zap className="w-5 h-5 text-emergency shadow-glow-red" />
+                LIVE EMERGENCY FEED
+              </h3>
+              <span className="px-3 py-1 bg-emergency/10 text-emergency text-[8px] font-black rounded-full animate-pulse tracking-[0.2em]">MONITORING ACTIVE</span>
+            </div>
+
+            {/* Tactical Filter Bar */}
+            <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-[28px] border-white/5 backdrop-blur-md">
+              <div className="flex items-center gap-2 px-3">
+                <Filter className="w-3.5 h-3.5 text-white/30" />
+                <span className="text-[9px] font-black uppercase text-white/20 tracking-widest font-mono">Operations Filter</span>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {/* Status Filter */}
+                <select 
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg"
+                >
+                  <option value="ACTIVE">STATUS: ACTIVE_ONLY</option>
+                  <option value="ALL">STATUS: ALL_INTEL</option>
+                  <option value="PENDING">STATUS: PENDING</option>
+                  <option value="RESPONDING">STATUS: RESPONDING</option>
+                  <option value="RESOLVED">STATUS: ARCHIVED</option>
+                </select>
+
+                {/* Type Filter */}
+                <select 
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg"
+                >
+                  <option value="ALL">TYPE: ALL_SIGS</option>
+                  <option value="MEDICAL">TYPE: MEDICAL</option>
+                  <option value="FIRE">TYPE: FIRE</option>
+                  <option value="CRIME">TYPE: CRIME</option>
+                  <option value="DISASTER">TYPE: DISASTER</option>
+                </select>
+
+                {/* Time Filter */}
+                <select 
+                  value={filterTime}
+                  onChange={(e) => setFilterTime(e.target.value)}
+                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg"
+                >
+                  <option value="ALL">TIME: TOTAL_HIST</option>
+                  <option value="1H">TIME: LAST_1H</option>
+                  <option value="4H">TIME: LAST_4H</option>
+                  <option value="24H">TIME: LAST_24H</option>
+                </select>
+              </div>
+
+              <div className="ml-auto px-4 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                <span className="text-[9px] font-black text-white/40 uppercase font-mono tracking-tighter">
+                   {filteredAlerts.length} <span className="text-white/20">TARGETS_FOUND</span>
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
-              {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length === 0 ? (
+              {filteredAlerts.length === 0 ? (
                 <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center">
                   <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10" />
-                  <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono">No active emergency alerts detected.</p>
+                  <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono">No matching emergency alerts detected.</p>
                 </div>
               ) : (
-                alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').map(alert => (
+                filteredAlerts.map(alert => (
                   <motion.div
                     layout
                     initial={{ opacity: 0, x: -20 }}
@@ -398,32 +499,46 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                   <p className="text-[10px] text-white font-black uppercase tracking-widest font-mono text-center">Zero Units Detected</p>
                 </div>
               ) : (
-                onDutyTanods.map(t => (
-                  <div key={t.uid} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
-                    <div className="w-14 h-14 rounded-[20px] bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 group-hover:border-info/20 shadow-inner group-hover:shadow-info/10 transition-all relative z-10">
-                      <Shield className={cn(
-                        "w-7 h-7 transition-colors",
-                        (t.status as string) === 'responding' ? "text-emergency" : "text-white/20 group-hover:text-info"
-                      )} />
-                    </div>
-                    <div className="relative z-10">
-                      <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight">{t.name}</p>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className={cn(
-                          "w-1.5 h-1.5 rounded-full",
-                          (t.status as string) === 'responding' ? "bg-emergency animate-pulse" : "bg-success"
+                onDutyTanods.map(t => {
+                  const pMatch = patrols.find(p => p.tanodId === t.uid);
+                  const isOnline = pMatch?.isActive;
+                  const lastUpdate = pMatch?.lastUpdate;
+
+                  return (
+                    <div key={t.uid} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
+                      <div className="w-14 h-14 rounded-[20px] bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 group-hover:border-info/20 shadow-inner group-hover:shadow-info/10 transition-all relative z-10">
+                        <Shield className={cn(
+                          "w-7 h-7 transition-colors",
+                          isOnline ? "text-success" : "text-white/20 group-hover:text-info",
+                          (t.status as string) === 'responding' && "text-emergency"
                         )} />
-                        <p className={cn(
-                          "text-[9px] font-black uppercase tracking-[0.2em] font-mono",
-                          (t.status as string) === 'responding' ? "text-emergency" : "text-success/70"
-                        )}>{t.status || 'Active'}</p>
+                      </div>
+                      <div className="relative z-10 flex-1 min-w-0">
+                        <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight truncate">{t.name}</p>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            (t.status as string) === 'responding' ? "bg-emergency animate-pulse" : (isOnline ? "bg-success" : "bg-white/10")
+                          )} />
+                          <p className={cn(
+                            "text-[9px] font-black uppercase tracking-[0.2em] font-mono",
+                            (t.status as string) === 'responding' ? "text-emergency" : (isOnline ? "text-success/70" : "text-white/20")
+                          )}>{(t.status as string) === 'responding' ? 'RESPONDING' : (isOnline ? 'ON-DUTY' : 'OFFLINE')}</p>
+                          {t.activeAlertId && (
+                            <span className="text-[7px] px-1.5 py-0.5 rounded-md bg-emergency/10 text-emergency font-black border border-emergency/20">
+                              #{t.activeAlertId.slice(-6).toUpperCase()}
+                            </span>
+                          )}
+                          {lastUpdate && (
+                            <span className="text-[8px] font-mono text-white/20 uppercase ml-auto">
+                              Ping: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                       <MoreVertical className="w-4 h-4 text-white/20" />
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
             <div className="flex flex-col gap-4 mt-12">

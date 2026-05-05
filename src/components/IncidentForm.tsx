@@ -17,7 +17,7 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
     description: '',
     personsInvolved: '',
     actionsTaken: '',
-    status: 'resolved' as IncidentStatus
+    status: 'pending' as IncidentStatus
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -127,6 +127,17 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
           </div>
 
           <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Persons Involved</label>
+            <input 
+              type="text" 
+              placeholder="e.g. John Doe, Peter Parker"
+              value={formData.personsInvolved}
+              onChange={(e) => setFormData({...formData, personsInvolved: e.target.value})}
+              className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none" 
+            />
+          </div>
+
+          <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Incident Description</label>
             <textarea 
               required
@@ -138,16 +149,31 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Actions Taken</label>
-            <input 
-              required
-              type="text" 
-              placeholder="e.g. Pacified both parties, reported to PNP"
-              value={formData.actionsTaken}
-              onChange={(e) => setFormData({...formData, actionsTaken: e.target.value})}
-              className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none" 
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Actions Taken</label>
+              <input 
+                required
+                type="text" 
+                placeholder="e.g. Pacified both parties"
+                value={formData.actionsTaken}
+                onChange={(e) => setFormData({...formData, actionsTaken: e.target.value})}
+                className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none" 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Current Status</label>
+              <select 
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value as IncidentStatus})}
+                className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none capitalize"
+              >
+                <option value="pending">Pending Investigation</option>
+                <option value="ongoing">In Progress / Ongoing</option>
+                <option value="resolved">Resolved / Closed</option>
+                <option value="referred">Referred to PNP/BFP</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 pt-4">
