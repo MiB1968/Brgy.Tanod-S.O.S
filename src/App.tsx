@@ -147,6 +147,15 @@ export default function App() {
   } : null;
 
   useEffect(() => {
+    // Failsafe: if Firebase takes over 10s and still hasn't resolved, stop loading
+    // so the user isn't stuck forever.
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (!auth || !db) {
       setLoading(false);
       return;
@@ -167,7 +176,9 @@ export default function App() {
       new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout updating profile data (offline?)")), 8000))
     ]);
 
+    console.log("[App.tsx] Setting up onAuthStateChanged listener...", auth, db);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("[App.tsx] onAuthStateChanged fired:", firebaseUser);
       try {
         setUser(firebaseUser);
         if (firebaseUser) {
@@ -260,6 +271,12 @@ export default function App() {
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
         console.info('Login was cancelled by the user.');
+      } else if (error.code === 'auth/popup-blocked') {
+        console.error("Popup blocked:", error);
+        toast.error("Popup blocked! Please 'Open App in New Tab' (top right of preview) to login, or allow popups for this site.", { duration: 10000 });
+      } else if (error.code === 'auth/network-request-failed') {
+        console.error("Network request failed:", error);
+        toast.error("Network error! Please check your internet connection or disable adblockers/privacy extensions that might be blocking Google Auth.", { duration: 10000 });
       } else if (error.code === 'auth/unauthorized-domain') {
         const domain = window.location.hostname;
         toast.error(`Error: Unauthorized Domain. Please go to Firebase Console > Authentication > Settings > Authorized Domains and add: ${domain}`, { duration: 15000 });
@@ -365,7 +382,14 @@ export default function App() {
     try {
       console.log("Attempting setDoc with profile:", newProfile);
       
-      await setDoc(doc(db, 'users', user.uid), newProfile);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Database connection timed out. Is Cloud Firestore enabled in your Firebase project?")), 10000);
+      });
+      
+      await Promise.race([
+        setDoc(doc(db, 'users', user.uid), newProfile),
+        timeoutPromise
+      ]);
 
       console.log("setDoc successful, updating local profile state.");
       setProfile(newProfile as User);
@@ -1638,13 +1662,22 @@ function ScheduleView({ role, profile }: { role: UserRole, profile: User | null 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) { setLoading(false); return; }
+    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
+    if (!db) { 
+      clearTimeout(fallbackTimer);
+      setLoading(false); 
+      return; 
+    }
     const q = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
+      clearTimeout(fallbackTimer);
       setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
       setLoading(false);
     });
-    return () => unsub();
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsub();
+    };
   }, []);
 
   if (role === 'admin') return <PatrolScheduler profile={profile} />;
@@ -1711,15 +1744,26 @@ function ReportsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) { setLoading(false); return; }
+    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
+    if (!db) {
+      clearTimeout(fallbackTimer);
+      setLoading(false); 
+      return; 
+    }
     const q = query(collection(db, 'incidents'), orderBy('date', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
+      clearTimeout(fallbackTimer);
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (error) => {
+      clearTimeout(fallbackTimer);
       console.error("Incidents Reports listener error:", error);
+      setLoading(false);
     });
-    return unsub;
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsub();
+    };
   }, []);
 
   return (

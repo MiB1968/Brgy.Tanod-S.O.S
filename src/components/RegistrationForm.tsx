@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -96,6 +97,9 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
   const [successId, setSuccessId] = useState<string | null>(null);
   const currentUser = auth?.currentUser;
   
+  const [idPhoto, setIdPhoto] = useState<File | null>(null);
+  const [selfiePhoto, setSelfiePhoto] = useState<File | null>(null);
+
   const [formData, setFormData] = useState({
     fullName: currentUser?.displayName || '',
     age: '',
@@ -220,7 +224,6 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     setLoading(true);
     
     try {
-      // In a real app, we would upload images to Firebase Storage here
       const currentUser = auth.currentUser;
       if (!currentUser) {
         alert('You must be logged in with Google to complete registration.');
@@ -228,14 +231,28 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
         return;
       }
 
-      // For this demo, we'll use placeholder URLs
+      let uploadedIdUrl = 'https://placehold.co/600x400?text=NO+ID+UPLOADED';
+      let uploadedSelfieUrl = 'https://placehold.co/400x400?text=NO+SELFIE+UPLOADED';
+
+      if (idPhoto && storage) {
+        const idRef = ref(storage, `residents/${currentUser.uid}/id_photo_${Date.now()}`);
+        await uploadBytes(idRef, idPhoto);
+        uploadedIdUrl = await getDownloadURL(idRef);
+      }
+
+      if (selfiePhoto && storage) {
+        const selfieRef = ref(storage, `residents/${currentUser.uid}/selfie_${Date.now()}`);
+        await uploadBytes(selfieRef, selfiePhoto);
+        uploadedSelfieUrl = await getDownloadURL(selfieRef);
+      }
+
       const residentData = {
         ...formData,
         age: parseInt(formData.age) || 0,
         householdCount: parseInt(formData.householdCount) || 1,
         uid: currentUser.uid,
-        idPhotoUrl: 'https://placehold.co/600x400?text=ID+SKIP',
-        selfieUrl: 'https://placehold.co/400x400?text=SELFIE+SKIP',
+        idPhotoUrl: uploadedIdUrl,
+        selfieUrl: uploadedSelfieUrl,
         status: 'pending',
         registeredAt: new Date().toISOString()
       };
@@ -409,6 +426,22 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">ID Scan / Photo</label>
+                  <label className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus-within:border-emergency/50 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-all outline-none">
+                    <Upload className="w-6 h-6 text-white/40 mb-2" />
+                    <span className="text-[10px] text-white/60 font-mono tracking-widest uppercase truncate w-full text-center">{idPhoto ? idPhoto.name : 'Upload ID Image'}</span>
+                    <input type="file" accept="image/*" onChange={e => { if(e.target.files?.[0]) setIdPhoto(e.target.files[0]) }} className="hidden" />
+                  </label>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Biometric Selfie</label>
+                  <label className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus-within:border-emergency/50 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-all outline-none">
+                    <Upload className="w-6 h-6 text-white/40 mb-2" />
+                    <span className="text-[10px] text-white/60 font-mono tracking-widest uppercase truncate w-full text-center">{selfiePhoto ? selfiePhoto.name : 'Upload Selfie w/ ID'}</span>
+                    <input type="file" accept="image/*" onChange={e => { if(e.target.files?.[0]) setSelfiePhoto(e.target.files[0]) }} className="hidden" />
+                  </label>
+                </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Government ID Type</label>
                   <select value={formData.idType} onChange={e => setFormData({...formData, idType: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all">
