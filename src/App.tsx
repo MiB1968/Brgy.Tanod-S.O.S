@@ -57,6 +57,7 @@ import TanodDashboard from './components/TanodDashboard';
 import { Shift } from './types';
 import { format } from 'date-fns';
 import { queueSOS } from './lib/offlineQueue';
+import { InstallAppButton } from './components/InstallAppButton';
 import AdminResidents from './components/AdminResidents';
 import PatrolScheduler from './components/PatrolScheduler';
 import RegistrationForm from './components/RegistrationForm';
@@ -213,7 +214,7 @@ export default function App() {
   }, [alerts, profile?.role]);
 
   const handleLogin = async () => {
-    if (isLoggingIn) return;
+    if (isLoggingIn || !auth) return;
     setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     try {
@@ -231,6 +232,7 @@ export default function App() {
   };
 
   const handleDemoResidentLogin = async () => {
+    if (!auth) return;
     if (!auth.currentUser) {
       try {
         await handleLogin();
@@ -295,7 +297,7 @@ export default function App() {
   };
 
   const handleSetRole = async (role: UserRole) => {
-    if (!user) return;
+    if (!user || !db) return;
     const newProfile: Partial<User> = {
       uid: user.uid,
       name: user.displayName || 'Anonymous User',
@@ -306,6 +308,11 @@ export default function App() {
     };
     await setDoc(doc(db, 'users', user.uid), newProfile);
     setProfile(newProfile as User);
+  };
+
+  const handleSignOut = async () => {
+    if (!auth) return;
+    await auth.signOut();
   };
 
   if (loading) {
@@ -355,8 +362,8 @@ export default function App() {
 
   // Resident Pending/Rejected State
   if (effectiveRole === 'resident' && profile && !viewOverride) {
-    if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} />;
-    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} />;
+    if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
+    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
   }
 
   const items = navItems.filter(item => {
@@ -619,7 +626,7 @@ export default function App() {
   );
 }
 
-function RejectedScreen({ reason, deferredPrompt, onInstall }: { reason: string, deferredPrompt?: any, onInstall?: () => void }) {
+function RejectedScreen({ reason, deferredPrompt, onInstall, onLogout }: { reason: string, deferredPrompt?: any, onInstall?: () => void, onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
@@ -643,7 +650,7 @@ function RejectedScreen({ reason, deferredPrompt, onInstall }: { reason: string,
       </div>
 
       <button 
-        onClick={() => auth.signOut()}
+        onClick={onLogout}
         className="px-12 py-5 bg-brand-card border border-white/10 text-white font-black italic rounded-2xl hover:bg-brand-bg hover:border-emergency transition-all shadow-xl font-mono tracking-widest uppercase"
       >
         TERMINATE SESSION
@@ -652,7 +659,7 @@ function RejectedScreen({ reason, deferredPrompt, onInstall }: { reason: string,
   );
 }
 
-function PendingApproval({ user, deferredPrompt, onInstall }: { user: FirebaseUser, deferredPrompt?: any, onInstall?: () => void }) {
+function PendingApproval({ user, deferredPrompt, onInstall, onLogout }: { user: FirebaseUser, deferredPrompt?: any, onInstall?: () => void, onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
@@ -677,7 +684,7 @@ function PendingApproval({ user, deferredPrompt, onInstall }: { user: FirebaseUs
       </div>
 
       <button 
-        onClick={() => signOut(auth)} 
+        onClick={onLogout} 
         className="px-12 py-5 bg-brand-card border border-white/10 text-white font-black italic rounded-2xl hover:bg-brand-bg hover:border-caution transition-all shadow-xl font-mono tracking-widest uppercase flex items-center gap-3"
       >
         <LogOut className="w-5 h-5 text-caution" /> Sign Out
@@ -1027,11 +1034,12 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
           variants={itemVariants}
           className="glass-panel border-white/5 rounded-[48px] p-8 md:p-16 relative overflow-hidden group"
         >
+          <div className="scanline" />
           <div className="absolute top-0 right-0 w-96 h-96 bg-emergency/10 blur-[120px] -mr-48 -mt-48 transition-all group-hover:bg-emergency/20"></div>
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-info/5 blur-[100px] -ml-32 -mb-32"></div>
 
           <div className="relative z-10 flex flex-col items-center text-center">
-            <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-6 italic text-white uppercase font-mono leading-none">Command Ready</h2>
+            <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-6 italic text-white uppercase font-mono leading-none animate-pulse">Command Ready</h2>
             <p className="text-white/40 max-w-lg text-lg mb-16 font-medium leading-relaxed">
               Immediate connection to the Barangay Emergency Network. <span className="text-white font-bold italic">Push to neutralize risk.</span>
             </p>
@@ -1044,19 +1052,21 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                 sending ? "bg-emergency/50 scale-95" : "bg-emergency hover:bg-emergency/90"
               )}
             >
-              <div className="absolute inset-0 bg-emergency rounded-full filter blur-[40px] opacity-20 animate-pulse group-hover:opacity-40 transition-opacity"></div>
-              <div className="absolute inset-4 border-[1px] border-white/20 rounded-full border-dashed animate-[spin_10s_linear_infinite] opacity-50"></div>
+              <div className="absolute inset-0 bg-emergency rounded-full filter blur-[40px] opacity-10 group-hover:opacity-30 transition-opacity"></div>
+              <div className="absolute inset-4 border-[1px] border-white/20 rounded-full border-dashed animate-[spin_15s_linear_infinite] opacity-30"></div>
+              <div className="absolute inset-8 border-[1px] border-white/10 rounded-full border-dashed animate-[spin_10s_linear_infinite_reverse] opacity-20"></div>
               
-              <div className="z-10 group-hover:scale-110 transition-transform duration-500">
-                <TanodLogo size={140} animated={!sending} className="drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />
+              <div className="z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                <TanodLogo size={140} animated={!sending} className="drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]" />
               </div>
               
-              <span className="z-10 text-2xl font-black italic tracking-tighter text-white font-mono mt-2">
+              <span className="z-10 text-2xl font-black italic tracking-tighter text-white font-mono mt-2 drop-shadow-md">
                 {sending ? 'COMM LINK...' : 'INITIATE SOS'}
               </span>
 
               {/* Ping Ring */}
               <div className="absolute inset-0 rounded-full border-4 border-emergency/30 animate-[ping_2s_infinite]"></div>
+              <div className="absolute inset-0 rounded-full border-2 border-emergency/20 animate-[ping_3s_infinite_1s]"></div>
             </button>
           </div>
         </motion.div>
@@ -1079,24 +1089,30 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <h3 className="font-bold text-xl mb-6 text-white uppercase italic tracking-tighter">Emergency Hotlines</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-black text-xl text-white uppercase italic tracking-tighter font-mono">Tactical Comms</h3>
+          <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.3em] font-mono">External Hotlines</span>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { name: 'PNP', number: '117', color: 'bg-blue-500' },
-            { name: 'FIRE', number: '911', color: 'bg-orange-500' },
-            { name: 'RESCUE', number: '0917-SOS', color: 'bg-[#FF4B4B]' },
-            { name: 'HALL', number: '123-4567', color: 'bg-green-500' },
+            { name: 'Police (PNP)', number: '117', color: 'bg-info', icon: '🚨' },
+            { name: 'Fire (BFP)', number: '911', color: 'bg-caution', icon: '🔥' },
+            { name: 'Medical', number: '0917-SOS', color: 'bg-emergency', icon: '🚑' },
+            { name: 'Brgy. Hall', number: '123-4567', color: 'bg-success', icon: '🏢' },
           ].map(c => (
             <button 
               key={c.name} 
               onClick={() => window.location.href = `tel:${c.number}`}
-              className="flex flex-col items-center gap-2 p-6 bg-[#16191F] border border-[#2D3139] rounded-[32px] hover:border-white/20 transition-all group"
+              className="flex flex-col items-center gap-3 p-6 glass-panel rounded-[32px] hover:border-white/20 hover:bg-white/5 transition-all group active:scale-95 shadow-lg"
             >
-              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-lg", c.color)}>
-                <Phone className="w-6 h-6 text-white" />
+              <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-xl text-2xl relative", c.color)}>
+                <div className="absolute inset-0 bg-white/20 rounded-2xl animate-pulse" />
+                <span className="z-10">{c.icon}</span>
               </div>
-              <p className="text-[10px] font-black text-[#8E9299] uppercase tracking-widest leading-none">{c.name}</p>
-              <p className="text-sm font-black text-white italic tracking-tighter">{c.number}</p>
+              <div className="text-center">
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-1 font-mono">{c.name}</p>
+                <p className="text-base font-black text-white italic tracking-tighter font-mono">{c.number}</p>
+              </div>
             </button>
           ))}
         </div>
@@ -1106,20 +1122,27 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
         <RecentAlerts residentId={profile.uid} />
       </motion.div>
 
+      <motion.div variants={itemVariants}>
+        <InstallAppButton />
+      </motion.div>
+
       {/* SOS Category Modal */}
       <AnimatePresence>
         {isChoosingCategory && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#16191F] border border-[#2D3139] w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-6"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#16191F] border border-white/10 w-full max-w-lg rounded-[40px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col p-8 relative"
             >
-              <h3 className="font-black italic text-xl md:text-2xl tracking-tighter text-white mb-2 uppercase text-center">Select Emergency</h3>
-              <p className="text-[#8E9299] text-xs font-medium mb-6 text-center">What is the nature of the emergency?</p>
+              <div className="scanline" />
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-emergency/20 blur-3xl" />
               
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <h3 className="font-black italic text-2xl md:text-3xl tracking-tighter text-white mb-2 uppercase text-center font-mono">Select Protocol</h3>
+              <p className="text-white/40 text-xs font-bold mb-8 text-center uppercase tracking-[0.2em] font-mono">Mission-critical category required</p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-8">
                 {(['medical', 'fire', 'crime', 'flood'] as EmergencyType[]).map(type => {
                   const getIcon = (t: string) => {
                     switch(t) {
@@ -1134,23 +1157,23 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                      <button 
                       key={type}
                       onClick={() => { setIsChoosingCategory(false); setSosTypeToSubmit(type); }}
-                      className="p-6 bg-[#0F1115] border border-[#2D3139] rounded-3xl hover:bg-[#1A1D23] hover:border-[#FF4B4B] transition-all group flex flex-col items-center"
+                      className="p-6 bg-brand-bg border border-white/5 rounded-[32px] hover:bg-emergency/10 hover:border-emergency transition-all group flex flex-col items-center shadow-lg active:scale-95"
                     >
-                      <div className="w-16 h-16 bg-[#252932] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#FF4B4B] transition-colors text-3xl">
-                        <span>{getIcon(type)}</span>
+                      <div className="w-20 h-20 bg-brand-card rounded-2xl flex items-center justify-center mb-4 group-hover:bg-emergency group-hover:shadow-glow-red transition-all text-4xl">
+                        <span className="group-hover:scale-110 transition-transform">{getIcon(type)}</span>
                       </div>
-                      <p className="text-sm font-black uppercase text-[#8E9299] tracking-widest group-hover:text-white">{type}</p>
+                      <p className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em] group-hover:text-white font-mono">{type}</p>
                     </button>
                   );
                 })}
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button 
                   onClick={() => setIsChoosingCategory(false)}
-                  className="flex-1 py-4 bg-[#252932] text-white font-black rounded-2xl hover:bg-[#2D3139] transition-all text-sm uppercase italic tracking-tighter"
+                  className="flex-1 py-5 bg-brand-card border border-white/5 text-white/60 font-black rounded-2xl hover:text-white hover:bg-brand-bg transition-all text-[10px] uppercase italic tracking-[0.2em] font-mono shadow-md active:scale-95"
                 >
-                  Cancel Tracking
+                  ABORT REQUEST
                 </button>
               </div>
             </motion.div>
@@ -1161,35 +1184,38 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       {/* SOS Description Modal */}
       <AnimatePresence>
         {sosTypeToSubmit && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#16191F] border border-[#2D3139] w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-6"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-[#16191F] border border-white/10 w-full max-w-md rounded-[40px] overflow-hidden shadow-2xl flex flex-col p-8 relative"
             >
-              <h3 className="font-black italic text-xl md:text-2xl tracking-tighter text-white mb-2 uppercase">Describe Emergency</h3>
-              <p className="text-[#8E9299] text-xs font-medium mb-6">Briefly describe the situation to help Tanods prepare properly.</p>
+              <div className="scanline" />
+              <div className="absolute -top-24 -left-24 w-48 h-48 bg-info/20 blur-3xl" />
+              
+              <h3 className="font-black italic text-2xl tracking-tighter text-white mb-2 uppercase font-mono">Situation Intel</h3>
+              <p className="text-white/40 text-[10px] font-black mb-8 uppercase tracking-[0.2em] font-mono leading-relaxed">Provide critical context for arriving Tanod units.</p>
               
               <textarea 
                 value={sosDescription}
                 onChange={(e) => setSosDescription(e.target.value)}
-                placeholder="e.g. Accident near gate, Fire in kitchen"
-                className="w-full bg-[#0F1115] border border-[#2D3139] rounded-2xl p-4 text-white placeholder-[#8E9299] mb-6 focus:outline-none focus:border-[#FF4B4B] min-h-[120px]"
+                placeholder="DETAILS: Location, nature, casualties..."
+                className="w-full bg-brand-bg border border-white/5 rounded-3xl p-6 text-white placeholder:text-white/20 mb-8 focus:outline-none focus:border-emergency min-h-[160px] font-mono text-sm leading-relaxed shadow-inner"
               />
               
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button 
                   onClick={() => { setSosTypeToSubmit(null); setSosDescription(''); }}
-                  className="flex-1 py-3 bg-[#252932] text-white font-bold rounded-xl hover:bg-[#2D3139] transition-all text-sm uppercase"
+                  className="flex-1 py-5 bg-brand-card border border-white/5 text-white/50 font-black rounded-2xl hover:text-white transition-all text-[10px] uppercase tracking-widest font-mono italic active:scale-95"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={() => handleSOS(sosTypeToSubmit, sosDescription)}
-                  className="flex-1 py-3 bg-[#FF4B4B] text-white font-bold rounded-xl hover:bg-red-700 transition-all text-sm uppercase"
+                  className="flex-[2] py-5 bg-emergency text-white font-black rounded-2xl hover:bg-red-600 transition-all text-[10px] uppercase tracking-widest font-mono italic shadow-glow-red active:scale-95"
                 >
-                  Send Alert
+                  Transmit Alert
                 </button>
               </div>
             </motion.div>

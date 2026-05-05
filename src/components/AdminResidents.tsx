@@ -32,6 +32,7 @@ export default function AdminResidents({ profile }: { profile: any }) {
   }, [filter]);
 
   const handleApprove = async (id: string, name: string) => {
+    if (!db) return;
     try {
       await setDoc(doc(db, 'residents', id), {
         status: 'approved',
@@ -49,6 +50,7 @@ export default function AdminResidents({ profile }: { profile: any }) {
   };
 
   const handleReject = async (id: string, reason: string) => {
+    if (!db) return;
     try {
       await setDoc(doc(db, 'residents', id), {
         status: 'rejected',

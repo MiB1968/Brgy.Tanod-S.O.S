@@ -44,7 +44,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
 
   const handleCreateShift = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTanod || !sector || !startTime || !endTime) return;
+    if (!selectedTanod || !sector || !startTime || !endTime || !db) return;
 
     setLoading(true);
     try {
@@ -78,6 +78,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   };
 
   const updateShiftStatus = async (id: string, status: Shift['status']) => {
+    if (!db) return;
     try {
       await updateDoc(doc(db, 'shifts', id), { status });
     } catch (error) {
@@ -86,6 +87,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   };
 
   const deleteShift = async (id: string) => {
+    if (!db) return;
     if (window.confirm('Delete this patrol assignment?')) {
       try {
         await deleteDoc(doc(db, 'shifts', id));

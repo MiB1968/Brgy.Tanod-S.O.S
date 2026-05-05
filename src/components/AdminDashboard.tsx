@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Howl } from 'howler';
 import DispatchModal from './DispatchModal';
+import { InstallAppButton } from './InstallAppButton';
 import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { PoliceLights } from './PoliceLights';
@@ -189,10 +190,14 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         </motion.button>
       )}
       <PoliceLights active={isFlashing} />
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-6">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-10 relative">
+        <div className="scanline opacity-10 pointer-events-none" />
         <div>
-          <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Commander Overview</h2>
-          <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em] mt-2">Active Surveillance & Dispatch Interface</p>
+          <h2 className="text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4">
+            <TanodLogo size={48} animated={false} className="text-emergency shadow-glow-red" />
+            Commander Overview
+          </h2>
+          <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mt-3 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Active Surveillance & Dispatch Interface</p>
         </div>
         <ReviewArchivedLogsDrawer profile={profile} />
       </motion.div>
@@ -372,23 +377,42 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-8">
-          <div className="glass-panel border-white/5 rounded-[40px] p-8 shadow-command">
-            <h4 className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em] font-mono mb-8 lg:mb-12">Personnel Status</h4>
-            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
+          <div className="glass-panel border-white/5 rounded-[48px] p-10 shadow-command relative overflow-hidden">
+            <div className="scanline opacity-5" />
+            <div className="flex items-center justify-between mb-10">
+              <h4 className="text-[11px] font-black uppercase text-white/40 tracking-[0.4em] font-mono leading-none">Personnel Status</h4>
+              <span className="w-2 h-2 bg-success rounded-full animate-pulse shadow-[0_0_10px_rgba(52,199,89,0.5)]" />
+            </div>
+            <div className="space-y-5 max-h-[450px] overflow-y-auto pr-3 scrollbar-hide">
               {onDutyTanods.length === 0 ? (
-                <p className="text-[10px] text-white/30 italic font-mono text-center py-12 uppercase tracking-widest">No tanods online</p>
+                <div className="py-20 flex flex-col items-center justify-center opacity-10">
+                  <Shield className="w-16 h-16 mb-4" />
+                  <p className="text-[10px] text-white font-black uppercase tracking-widest font-mono text-center">Zero Units Detected</p>
+                </div>
               ) : (
                 onDutyTanods.map(t => (
-                  <div key={t.uid} className="flex items-center gap-4 p-4 bg-brand-bg rounded-2xl border border-white/5 hover:border-info/30 transition-all group">
-                    <div className="w-12 h-12 rounded-xl bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 transition-colors">
-                      <Shield className="w-6 h-6 text-white/40 group-hover:text-info transition-colors" />
+                  <div key={t.uid} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
+                    <div className="w-14 h-14 rounded-[20px] bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 group-hover:border-info/20 shadow-inner group-hover:shadow-info/10 transition-all relative z-10">
+                      <Shield className={cn(
+                        "w-7 h-7 transition-colors",
+                        (t.status as string) === 'responding' ? "text-emergency" : "text-white/20 group-hover:text-info"
+                      )} />
                     </div>
-                    <div>
-                      <p className="text-sm font-black text-white leading-tight font-mono uppercase italic">{t.name}</p>
-                      <p className={cn(
-                        "text-[9px] font-black uppercase tracking-[0.1em] font-mono mt-1",
-                        (t.status as string) === 'responding' ? "text-emergency animate-pulse" : "text-success"
-                      )}>{t.status || 'Active'}</p>
+                    <div className="relative z-10">
+                      <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight">{t.name}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          (t.status as string) === 'responding' ? "bg-emergency animate-pulse" : "bg-success"
+                        )} />
+                        <p className={cn(
+                          "text-[9px] font-black uppercase tracking-[0.2em] font-mono",
+                          (t.status as string) === 'responding' ? "text-emergency" : "text-success/70"
+                        )}>{t.status || 'Active'}</p>
+                      </div>
+                    </div>
+                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <MoreVertical className="w-4 h-4 text-white/20" />
                     </div>
                   </div>
                 ))
@@ -396,9 +420,9 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             </div>
             <button 
               onClick={() => onTabChange('roster')}
-              className="w-full mt-10 py-5 bg-brand-bg border border-white/10 rounded-2xl text-[9px] font-black uppercase tracking-[0.3em] text-white/40 hover:text-white hover:border-white/30 transition-all font-mono"
+              className="w-full mt-12 py-6 bg-brand-bg border border-white/5 rounded-[24px] text-[10px] font-black uppercase tracking-[0.4em] text-white/30 hover:text-info hover:border-info/30 hover:bg-info/5 transition-all font-mono shadow-inner group"
             >
-              UNIT MANAGEMENT
+              UNIT CONFIGURATION <span className="inline-block transform group-hover:translate-x-1 transition-transform ml-2">→</span>
             </button>
           </div>
           
@@ -427,21 +451,23 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           onClose={() => setSelectedAlertForDispatch(null)} 
         />
       )}
+      <InstallAppButton />
     </motion.div>
   );
 }
 
 function StatCard({ label, value, icon: Icon, color, bg, pulse }: any) {
   return (
-    <div className="glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden group">
-      <div className={cn("p-4 rounded-2xl inline-flex mb-6 transition-all group-hover:scale-110 shadow-lg", bg, color, pulse && "animate-pulse shadow-glow-red")}>
-        <Icon className="w-6 h-6" />
+    <div className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card active:scale-[0.98]">
+      <div className="scanline opacity-5" />
+      <div className={cn("p-5 rounded-[24px] inline-flex mb-8 transition-all group-hover:scale-110 shadow-2xl relative z-10", bg, color, pulse && "animate-pulse shadow-glow-red")}>
+        <Icon className="w-7 h-7" />
       </div>
-      <div>
-        <h4 className="text-[10px] font-black uppercase text-white/40 tracking-[0.2em] mb-1 font-mono">{label}</h4>
-        <p className="text-4xl font-black text-white italic tracking-tighter font-mono">{value}</p>
+      <div className="relative z-10">
+        <h4 className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] mb-2 font-mono">{label}</h4>
+        <p className="text-5xl font-black text-white italic tracking-tighter font-mono leading-none">{value}</p>
       </div>
-      <div className="absolute -bottom-4 -right-4 w-20 h-20 bg-white/5 rounded-full blur-2xl group-hover:scale-150 transition-all"></div>
+      <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/2 rounded-full blur-3xl group-hover:scale-150 transition-all duration-700"></div>
     </div>
   );
 }

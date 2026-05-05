@@ -93,7 +93,7 @@ export default function BackgroundServices() {
 
   // 2. Tanod Location heartbeat (Sync to Supabase maps)
   useEffect(() => {
-    if (profile?.role !== 'tanod' || !auth.currentUser) return;
+    if (profile?.role !== 'tanod' || !auth?.currentUser) return;
 
     const pushLocation = async () => {
       try {
@@ -102,7 +102,7 @@ export default function BackgroundServices() {
         );
 
         await supabase.from('tanods').upsert([{
-          id: auth.currentUser?.uid,
+          id: auth?.currentUser?.uid,
           name: profile.name,
           location_lat: pos.coords.latitude,
           location_lng: pos.coords.longitude,
@@ -213,7 +213,7 @@ export default function BackgroundServices() {
 
   // 2. Continuous GPS Tracking for Tanods
   useEffect(() => {
-    if (!profile || profile.role !== 'tanod' || !auth.currentUser || !db) return;
+    if (!profile || profile.role !== 'tanod' || !auth?.currentUser || !db) return;
 
     const stopWatching = watchLocation(async (loc) => {
       try {
@@ -238,7 +238,7 @@ export default function BackgroundServices() {
     return () => {
       stopWatching();
       // Optionally mark as inactive on unmount
-      if (auth.currentUser) {
+      if (auth?.currentUser) {
         setDoc(doc(db, 'patrols', profile.uid), { isActive: false }, { merge: true });
       }
     };

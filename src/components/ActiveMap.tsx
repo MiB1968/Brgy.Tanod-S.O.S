@@ -18,16 +18,23 @@ const DefaultIcon = L.icon({
 
 const SosIcon = L.divIcon({
   className: 'custom-div-icon',
-  html: `<div style="font-size: 24px; text-align: center; text-shadow: 0 0 10px rgba(255, 75, 75, 0.5);">🔴</div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  html: `<div class="relative flex items-center justify-center">
+    <div class="absolute w-12 h-12 bg-emergency/30 rounded-full animate-ping"></div>
+    <div class="absolute w-8 h-8 bg-emergency/40 rounded-full animate-pulse"></div>
+    <div class="z-10 text-2xl shadow-glow-red">🔴</div>
+  </div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
 });
 
 const TanodIcon = L.divIcon({
   className: 'custom-div-icon',
-  html: `<div style="font-size: 24px; text-align: center; text-shadow: 0 0 10px rgba(74, 175, 80, 0.5);">🟢</div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  html: `<div class="relative flex items-center justify-center">
+    <div class="absolute w-10 h-10 bg-success/20 rounded-full animate-pulse"></div>
+    <div class="z-10 text-2xl drop-shadow-[0_0_8px_rgba(52,199,89,0.5)]">🟢</div>
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom?: number }) {
@@ -195,6 +202,7 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
 
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative border border-[#2D3139]">
+      <div className="scanline z-[500] pointer-events-none opacity-5" />
       <MapContainer 
         center={mapCenter} 
         zoom={zoom} 

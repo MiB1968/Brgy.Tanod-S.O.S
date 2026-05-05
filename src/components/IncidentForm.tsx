@@ -23,7 +23,7 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    if (!auth?.currentUser || !db) return;
     
     setSubmitting(true);
     try {

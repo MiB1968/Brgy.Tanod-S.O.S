@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Howl } from 'howler';
 import { PoliceLights } from './PoliceLights';
+import { InstallAppButton } from './InstallAppButton';
 
 const alarm = new Howl({
   src: ['https://assets.mixkit.co/active_storage/sfx/1004/1004-preview.mp3'],
@@ -77,6 +78,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   }, [profile]);
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
+    if (!db) return;
     try {
       const updateData: any = { status };
       
@@ -186,6 +188,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         </motion.button>
       )}
       <PoliceLights active={isFlashing} />
+      <InstallAppButton />
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
           <div className="flex items-center justify-between glass-panel p-4 rounded-3xl mb-2">
@@ -202,9 +205,11 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           <div className="space-y-4">
             <AnimatePresence mode="popLayout">
               {filteredAlerts.length === 0 ? (
-                <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center">
-                  <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10" />
-                  <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono">No active incidents detected.</p>
+                <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center relative overflow-hidden group">
+                  <div className="scanline opacity-5" />
+                  <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10 group-hover:opacity-20 transition-opacity" />
+                  <p className="text-white/30 font-black uppercase tracking-[0.3em] text-[10px] font-mono">No active incidents detected.</p>
+                  <p className="text-white/10 text-[8px] font-mono mt-2 tracking-widest">AWAITING TRANSMISSION...</p>
                 </div>
               ) : (
                 filteredAlerts.map(alert => (
@@ -216,56 +221,62 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                     key={alert.id}
                     className={cn(
                       "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
-                      alert.status === 'pending' && "border-emergency/30 shadow-glow-red ring-1 ring-emergency/10"
+                      alert.status === 'pending' && "border-emergency/30 shadow-glow-red ring-1 ring-emergency/10 bg-emergency/5",
+                      alert.status === 'responding' && "border-info/30 shadow-lg bg-info/5"
                     )}
                   >
-                    <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+                    <div className="scanline opacity-10" />
+                    
+                    <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
                       <div className="flex-1 space-y-4">
                         <div className="flex items-start gap-4">
                           <div className={cn(
-                            "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg transition-transform group-hover:scale-105",
-                            alert.status === 'pending' ? "bg-emergency text-white sos-glow" : "bg-info text-white"
+                            "w-16 h-16 rounded-[24px] flex items-center justify-center shrink-0 shadow-2xl transition-all group-hover:scale-105",
+                            alert.status === 'pending' ? "bg-emergency text-white sos-glow shadow-glow-red" : "bg-info text-white"
                           )}>
-                            <AlertTriangle className="w-7 h-7" />
+                            <AlertTriangle className="w-8 h-8" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-3 mb-1">
-                              <h4 className="font-black text-xl text-white italic tracking-tighter uppercase font-mono">{alert.residentName}</h4>
-                              <span className={cn(
-                                "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm font-mono",
-                                alert.status === 'pending' ? "bg-emergency text-white" : "bg-info/20 text-info"
+                              <h4 className="font-black text-2xl text-white italic tracking-tighter uppercase font-mono leading-none">{alert.residentName}</h4>
+                              <div className={cn(
+                                "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm font-mono border",
+                                alert.status === 'pending' ? "bg-emergency/20 text-emergency border-emergency/30 animate-pulse" : "bg-info/20 text-info border-info/30"
                               )}>
                                 {alert.status}
-                              </span>
+                              </div>
                             </div>
-                            <p className="text-xs text-white/40 font-bold flex items-center gap-2 font-mono uppercase tracking-tight">
-                              <MapPin className="w-3 h-3 text-emergency" /> {new Date(alert.timestamp).toLocaleTimeString()} • ALERT T+{Math.floor((Date.now() - new Date(alert.timestamp).getTime()) / 60000)}M
+                            <p className="text-[10px] text-white/40 font-bold flex items-center gap-2 font-mono uppercase tracking-[0.1em]">
+                              <MapPin className="w-3 h-3 text-emergency" /> TRANSMISSION T+{Math.floor((Date.now() - new Date(alert.timestamp).getTime()) / 60000)}M • {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </p>
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">
-                           <div className="bg-brand-bg rounded-2xl p-4 border border-white/5">
-                              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Incident Type</p>
+                           <div className="bg-brand-bg/80 rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Incident Protocol</p>
                               <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono flex items-center gap-2">
-                                {alert.type === 'medical' && '🏥'}
-                                {alert.type === 'fire' && '🔥'}
-                                {alert.type === 'crime' && '🚨'}
-                                {alert.type === 'flood' && '🌊'}
+                                <span className="text-xl">
+                                  {alert.type === 'medical' && '🏥'}
+                                  {alert.type === 'fire' && '🔥'}
+                                  {alert.type === 'crime' && '🚨'}
+                                  {alert.type === 'flood' && '🌊'}
+                                </span>
                                 {alert.type}
                               </p>
                            </div>
-                           <div className="bg-brand-bg rounded-2xl p-4 border border-white/5">
-                              <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Citizen ID</p>
+                           <div className="bg-brand-bg/80 rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Mission ID</p>
                               <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono truncate">
-                                RES-{alert.residentId.slice(-6)}
+                                INC-{alert.id.slice(0, 8).toUpperCase()}
                               </p>
                            </div>
                         </div>
 
                         {alert.customMessage && (
-                          <div className="bg-emergency/5 rounded-2xl p-4 border border-emergency/10 italic text-white/80 text-sm leading-relaxed">
-                            "{alert.customMessage}"
+                          <div className="bg-emergency/5 rounded-2xl p-4 border border-white/5 italic text-white/90 text-sm leading-relaxed font-mono shadow-inner">
+                            <span className="text-emergency mr-2 font-black not-italic opacity-50">&gt;&gt;</span>
+                            {alert.customMessage}
                           </div>
                         )}
                       </div>
@@ -275,25 +286,25 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                           href={`https://www.google.com/maps?q=${alert.location.lat},${alert.location.lng}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center justify-center gap-3 px-8 py-4 bg-brand-bg border border-white/10 text-white text-xs font-black rounded-2xl hover:bg-brand-card hover:border-emergency/50 transition-all uppercase tracking-widest font-mono"
+                          className="flex items-center justify-center gap-3 px-8 py-5 bg-brand-bg border border-white/10 text-white text-[10px] font-black rounded-2xl hover:bg-brand-card hover:border-emergency/50 transition-all uppercase tracking-widest font-mono shadow-lg active:scale-95"
                         >
-                          <MapPin className="w-4 h-4 text-emergency" /> GPS ROUTE
+                          <MapPin className="w-4 h-4 text-emergency" /> INITIALIZE GPS
                         </a>
                         
                         {alert.status === 'pending' && (
                           <button 
                             onClick={() => handleUpdateStatus(alert, 'responding')}
-                            className="flex-1 py-4 px-8 bg-emergency text-white text-xs font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono select-none"
+                            className="flex-1 py-5 px-10 bg-emergency text-white text-[10px] font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-[0.2em] font-mono select-none italic"
                           >
-                            ACCEPT DEPLOYMENT
+                            DEPLOY RESPONDS
                           </button>
                         )}
                         {alert.status === 'responding' && alert.respondedBy === profile?.uid && (
                           <button 
                             onClick={() => handleUpdateStatus(alert, 'resolved')}
-                            className="flex-1 py-4 px-8 bg-success text-white text-xs font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg uppercase tracking-widest font-mono select-none"
+                            className="flex-1 py-5 px-10 bg-success text-white text-[10px] font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(52,199,89,0.3)] uppercase tracking-[0.2em] font-mono select-none italic"
                           >
-                            CLOSE INCIDENT
+                            MARK RESOLVED
                           </button>
                         )}
                       </div>

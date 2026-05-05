@@ -25,7 +25,7 @@ export default function DispatchModal({ alert, onClose }: DispatchModalProps) {
   }, []);
 
   const handleDispatch = async () => {
-    if (!selectedTanod) return;
+    if (!selectedTanod || !db) return;
     setSubmitting(true);
     try {
       const tanod = tanods.find(t => t.uid === selectedTanod);
