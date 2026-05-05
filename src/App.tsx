@@ -524,7 +524,15 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="flex-1">
             {activeTab === 'home' && effectiveProfile && (
-              <DashboardView profile={effectiveProfile} alerts={alerts} patrols={patrols} onTabChange={setActiveTab} isOnline={isOnline} />
+              <DashboardView 
+                profile={effectiveProfile} 
+                alerts={alerts} 
+                patrols={patrols} 
+                onTabChange={setActiveTab} 
+                isOnline={isOnline} 
+                deferredPrompt={deferredPrompt}
+                onInstall={handleInstallApp}
+              />
             )}
             {activeTab === 'map' && (
               <div className="h-full min-h-[500px] flex flex-col gap-4">
@@ -743,7 +751,7 @@ function RoleCard({ title, desc, icon: Icon, onClick, color }: any) {
   );
 }
 
-function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patrols: PatrolLocation[], isOnline: boolean }) {
+function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInstall }: { profile: User, patrols: PatrolLocation[], isOnline: boolean, deferredPrompt: any, onInstall: () => void }) {
   const [sending, setSending] = useState(false);
   const [activeAlert, setActiveAlert] = useState<Alert | null>(null);
   const [sosTypeToSubmit, setSosTypeToSubmit] = useState<EmergencyType | null>(null);
@@ -871,6 +879,16 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
       animate="show"
       className="space-y-8 pb-32 relative"
     >
+      {deferredPrompt && (
+        <motion.button
+          variants={itemVariants}
+          onClick={onInstall}
+          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
+        >
+          <span className="text-lg group-hover:scale-125 transition-transform">📲</span>
+          <span>INSTALL TANOD MOBILE APP</span>
+        </motion.button>
+      )}
       <AnimatePresence>
         {activeAlert && (
           <motion.div 
@@ -1194,10 +1212,10 @@ function RecentAlerts({ residentId }: { residentId: string }) {
   );
 }
 
-function DashboardView({ profile, alerts, patrols, onTabChange, isOnline }: { profile: User, alerts: Alert[], patrols: PatrolLocation[], onTabChange: (tab: string) => void, isOnline: boolean }) {
-  if (profile.role === 'resident') return <ResidentDashboard profile={profile} patrols={patrols} isOnline={isOnline} />;
-  if (profile.role === 'tanod') return <TanodDashboard profile={profile} onTabChange={onTabChange} />;
-  if (profile.role === 'admin') return <AdminDashboard profile={profile} onTabChange={onTabChange} />;
+function DashboardView({ profile, alerts, patrols, onTabChange, isOnline, deferredPrompt, onInstall }: { profile: User, alerts: Alert[], patrols: PatrolLocation[], onTabChange: (tab: string) => void, isOnline: boolean, deferredPrompt: any, onInstall: () => void }) {
+  if (profile.role === 'resident') return <ResidentDashboard profile={profile} patrols={patrols} isOnline={isOnline} deferredPrompt={deferredPrompt} onInstall={onInstall} />;
+  if (profile.role === 'tanod') return <TanodDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} />;
+  if (profile.role === 'admin') return <AdminDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} />;
   return <div className="text-center p-12 text-[#8E9299]">Unauthorized Access</div>;
 }
 

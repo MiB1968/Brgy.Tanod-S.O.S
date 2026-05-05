@@ -18,10 +18,15 @@ const alarm = new Howl({
 import { useIncidentStore } from '../store/useIncidentStore';
 import { logIncidentAction } from '../services/logService';
 
-export default function TanodDashboard({ profile, onTabChange }: { profile: User | null, onTabChange: (tab: string) => void }) {
+export default function TanodDashboard({ profile, onTabChange, deferredPrompt, onInstall }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void }) {
   const { alerts } = useIncidentStore();
   const [isFlashing, setIsFlashing] = useState(false);
   const [shiftLog, setShiftLog] = useState<Alert[]>([]);
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
 
   // Filter alerts for this tanod: pending OR specifically assigned/responded by them
   const filteredAlerts = alerts.filter(a => 
@@ -163,11 +168,6 @@ export default function TanodDashboard({ profile, onTabChange }: { profile: User
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
-
   return (
     <motion.div 
       variants={containerVariants}
@@ -175,6 +175,16 @@ export default function TanodDashboard({ profile, onTabChange }: { profile: User
       animate="show"
       className="space-y-6 md:space-y-8 pb-20"
     >
+      {deferredPrompt && (
+        <motion.button
+          variants={itemVariants}
+          onClick={onInstall}
+          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
+        >
+          <span className="text-lg group-hover:scale-125 transition-transform">📲</span>
+          <span>INSTALL TANOD MOBILE APP</span>
+        </motion.button>
+      )}
       <PoliceLights active={isFlashing} />
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">

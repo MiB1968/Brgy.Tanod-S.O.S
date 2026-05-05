@@ -32,7 +32,7 @@ import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
 
-export default function AdminDashboard({ profile, onTabChange }: { profile: User | null, onTabChange: (tab: string) => void }) {
+export default function AdminDashboard({ profile, onTabChange, deferredPrompt, onInstall }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void }) {
   const { alerts } = useIncidentStore();
   const { patrols } = useTanodStore();
   const [isFlashing, setIsFlashing] = useState(false);
@@ -178,6 +178,16 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
       animate="show"
       className="space-y-6 md:space-y-8 pb-20"
     >
+      {deferredPrompt && (
+        <motion.button
+          variants={itemVariants}
+          onClick={onInstall}
+          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
+        >
+          <span className="text-lg group-hover:scale-125 transition-transform">📲</span>
+          <span>INSTALL TANOD MOBILE APP</span>
+        </motion.button>
+      )}
       <PoliceLights active={isFlashing} />
       <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-6">
         <div>
