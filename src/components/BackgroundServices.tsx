@@ -119,7 +119,7 @@ export default function BackgroundServices() {
     pushLocation();
     const interval = setInterval(pushLocation, 30000);
     return () => clearInterval(interval);
-  }, [profile, auth.currentUser]);
+  }, [profile]);
 
   // 3. Daily Log Reset Listener (Supabase Broadcast + Mock Scheduler Fallback)
   useEffect(() => {

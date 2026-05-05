@@ -1,6 +1,6 @@
 export type UserRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'guest';
 export type RegistryStatus = 'pending' | 'approved' | 'rejected';
-export type AlertStatus = 'pending' | 'responding' | 'resolved';
+export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';
 export type IncidentStatus = 'resolved' | 'ongoing' | 'referred';
 export type EmergencyType = 'medical' | 'fire' | 'crime' | 'natural_disaster' | 'other' | 'violence' | 'flood';
 

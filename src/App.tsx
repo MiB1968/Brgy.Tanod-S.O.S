@@ -151,6 +151,22 @@ export default function App() {
       setLoading(false);
       return;
     }
+
+    const fetchDocWithTimeout = (docRef: any) => Promise.race([
+      getDoc(docRef),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout reading profile data (offline?)")), 8000))
+    ]);
+
+    const setDocWithTimeout = (docRef: any, data: any) => Promise.race([
+      setDoc(docRef, data),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout setting profile data (offline?)")), 8000))
+    ]);
+    
+    const updateDocWithTimeout = (docRef: any, data: any) => Promise.race([
+      updateDoc(docRef, data),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error("Timeout updating profile data (offline?)")), 8000))
+    ]);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         setUser(firebaseUser);
@@ -158,13 +174,13 @@ export default function App() {
           const isSuperAdminEmail = firebaseUser.email === 'rubenlleg12@gmail.com';
           
           // First check if they have a standard user profile
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userDoc = await fetchDocWithTimeout(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
             const data = userDoc.data();
             // Force superadmin role if email matches
             if (isSuperAdminEmail && data.role !== 'superadmin') {
-              await updateDoc(doc(db, 'users', firebaseUser.uid), { role: 'superadmin' });
+              try { await updateDocWithTimeout(doc(db, 'users', firebaseUser.uid), { role: 'superadmin' }); } catch(e){}
               setProfile({ id: userDoc.id, ...data, role: 'superadmin' } as User);
             } else {
               setProfile({ id: userDoc.id, ...data } as User);
@@ -179,23 +195,26 @@ export default function App() {
               createdAt: new Date().toISOString(),
               status: 'approved'
             };
-            await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
+            try { await setDocWithTimeout(doc(db, 'users', firebaseUser.uid), adminProfile); } catch(e) {}
             setProfile(adminProfile as User);
           } else {
             setProfile(null);
           }
 
-          const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
-          if (resDoc.exists()) {
-            setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
-          }
+          try {
+            const resDoc = await fetchDocWithTimeout(doc(db, 'residents', firebaseUser.uid));
+            if (resDoc.exists()) {
+              setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
+            }
+          } catch(e) { }
         } else {
           setProfile(null);
           setResidentProfile(null);
         }
       } catch (err: any) {
-        if (err?.message?.includes('offline')) {
+        if (err?.message?.includes('offline') || err?.message?.includes('Timeout')) {
           console.warn("Auth Sync: Client is offline. Profile data may be delayed.");
+          toast.error("Database connection timeout. Features may be limited.", { id: 'db-timeout' });
         } else if (err?.message?.includes('permission')) {
           console.error("CRITICAL: Permission Denied. This usually happens if your AUTH project and DATABASE project do not match.");
           toast.error("Security System: Permission Denied. Check project configuration.");
@@ -229,7 +248,11 @@ export default function App() {
   }, [alerts, profile?.role]);
 
   const handleLogin = async () => {
-    if (isLoggingIn || !auth) return;
+    if (isLoggingIn) return;
+    if (!auth) {
+      toast.error('Auth system is disconnected or improperly configured.');
+      return;
+    }
     setIsLoggingIn(true);
     const provider = new GoogleAuthProvider();
     try {
@@ -237,8 +260,13 @@ export default function App() {
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
         console.info('Login was cancelled by the user.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        const domain = window.location.hostname;
+        toast.error(`Error: Unauthorized Domain. Please go to Firebase Console > Authentication > Settings > Authorized Domains and add: ${domain}`, { duration: 15000 });
+        console.error("Unauthorized domain:", domain);
       } else {
         console.error("Login failed", error);
+        toast.error(`Login failed: ${error.message}`);
       }
       throw error;
     } finally {
@@ -247,20 +275,12 @@ export default function App() {
   };
 
   const handleDemoResidentLogin = async () => {
-    if (!auth) return;
-    if (!auth.currentUser) {
-      try {
-        await handleLogin();
-      } catch (error) {
-        return; // User cancelled login
-      }
-    }
-
-    const realUid = auth.currentUser?.uid || 'demo-resident-123';
+    // True bypass mode
+    const realUid = 'demo-resident-123';
     
     // Mock user for demo purposes
     const mockUser = {
-      ...(auth.currentUser || {}),
+      ...(auth?.currentUser || {}),
       uid: realUid,
       displayName: 'Juan Dela Cruz (Demo)',
       email: 'juan.demo@example.com',
@@ -311,8 +331,21 @@ export default function App() {
     setLoading(false);
   };
 
+  const [isSettingRole, setIsSettingRole] = useState(false);
+
   const handleSetRole = async (role: UserRole) => {
-    if (!user || !db) return;
+    console.log("handleSetRole triggered with:", role);
+    console.log("user:", user, "db:", db);
+    if (!user) {
+      alert("Error: User is not authenticated.");
+      return;
+    }
+    if (!db) {
+      alert("Error: Database connection is missing.");
+      return;
+    }
+    
+    setIsSettingRole(true);
     const newProfile: Partial<User> = {
       uid: user.uid,
       name: user.displayName || 'Anonymous User',
@@ -321,11 +354,33 @@ export default function App() {
       createdAt: new Date().toISOString(),
       status: role === 'resident' ? 'pending' : 'approved'
     };
-    await setDoc(doc(db, 'users', user.uid), newProfile);
-    setProfile(newProfile as User);
+
+    if (user.uid === 'demo-resident-123') {
+      console.log("Demo user detected, skipping Firebase write.");
+      setProfile(newProfile as User);
+      setIsSettingRole(false);
+      return;
+    }
+
+    try {
+      console.log("Attempting setDoc with profile:", newProfile);
+      
+      await setDoc(doc(db, 'users', user.uid), newProfile);
+
+      console.log("setDoc successful, updating local profile state.");
+      setProfile(newProfile as User);
+    } catch (error: any) {
+      console.error("Failed to set role:", error);
+      alert("Failed to set role: " + error.message);
+    } finally {
+      setIsSettingRole(false);
+    }
   };
 
   const handleSignOut = async () => {
+    setUser(null);
+    setProfile(null);
+    setResidentProfile(null);
     if (!auth) return;
     await auth.signOut();
   };
@@ -360,6 +415,7 @@ export default function App() {
       onLogin={handleLogin} 
       onRegister={() => setIsRegistering(true)} 
       isLoggingIn={isLoggingIn} 
+      onDemoLogin={handleDemoResidentLogin}
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
     />
@@ -370,6 +426,7 @@ export default function App() {
     <RoleSelection 
       onSelect={handleSetRole} 
       onRegister={() => setIsRegistering(true)} 
+      isSettingRole={isSettingRole}
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
     />
@@ -512,7 +569,7 @@ export default function App() {
             </div>
           </div>
           <button 
-            onClick={() => signOut(auth)} 
+            onClick={() => { if (auth) signOut(auth); }} 
             className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-white/40 hover:text-emergency hover:bg-emergency/5 transition-all text-[10px] font-black uppercase tracking-[0.2em] font-mono border border-transparent hover:border-emergency/10"
           >
             <LogOut className="w-4 h-4" />
@@ -749,7 +806,7 @@ const navItems = [
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
 ];
 
-function LoginView({ onLogin, onRegister, isLoggingIn, deferredPrompt, onInstall }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, deferredPrompt?: any, onInstall?: () => void }) {
+function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, deferredPrompt, onInstall }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, deferredPrompt?: any, onInstall?: () => void }) {
   const handleRegister = async () => {
     try {
       await onLogin();
@@ -803,6 +860,13 @@ function LoginView({ onLogin, onRegister, isLoggingIn, deferredPrompt, onInstall
         >
           Resident Registration
         </button>
+
+        <button 
+          onClick={onDemoLogin}
+          className="w-full text-white/20 hover:text-white/40 transition-all uppercase tracking-[0.3em] font-mono text-[8px] mt-4"
+        >
+          [ Bypass Authentication — Test Mode ]
+        </button>
       </div>
       
       <div className="absolute bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.5em] font-mono">
@@ -812,7 +876,7 @@ function LoginView({ onLogin, onRegister, isLoggingIn, deferredPrompt, onInstall
   );
 }
 
-function RoleSelection({ onSelect, onRegister, deferredPrompt, onInstall }: { onSelect: (role: UserRole) => void, onRegister: () => void, deferredPrompt?: any, onInstall?: () => void }) {
+function RoleSelection({ onSelect, onRegister, isSettingRole, deferredPrompt, onInstall }: { onSelect: (role: UserRole) => void, onRegister: () => void, isSettingRole?: boolean, deferredPrompt?: any, onInstall?: () => void }) {
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
@@ -834,6 +898,7 @@ function RoleSelection({ onSelect, onRegister, deferredPrompt, onInstall }: { on
           icon={UserIcon} 
           onClick={() => onSelect('resident')}
           color="emergency"
+          disabled={isSettingRole}
         />
         <RoleCard 
           title="Tanod Officer" 
@@ -841,6 +906,7 @@ function RoleSelection({ onSelect, onRegister, deferredPrompt, onInstall }: { on
           icon={Shield} 
           onClick={() => onSelect('tanod')}
           color="info"
+          disabled={isSettingRole}
         />
         <RoleCard 
           title="Admin Command" 
@@ -848,18 +914,25 @@ function RoleSelection({ onSelect, onRegister, deferredPrompt, onInstall }: { on
           icon={LayoutDashboard} 
           onClick={() => onSelect('admin')}
           color="caution"
+          disabled={isSettingRole}
         />
       </div>
+      {isSettingRole && (
+        <div className="mt-8 text-amber-400 font-mono text-sm animate-pulse">
+          CONFIGURING CLEARANCE... PLEASE WAIT
+        </div>
+      )}
     </div>
   );
 }
 
-function RoleCard({ title, desc, icon: Icon, onClick, color }: any) {
+function RoleCard({ title, desc, icon: Icon, onClick, color, disabled }: any) {
   const isEmergency = color === 'emergency';
   return (
     <button 
       onClick={onClick} 
-      className="p-12 glass-panel border-white/5 rounded-[48px] hover:border-white/20 hover:bg-white/5 transition-all text-left group active:scale-95 flex flex-col relative overflow-hidden"
+      disabled={disabled}
+      className={`p-12 glass-panel border-white/5 rounded-[48px] hover:border-white/20 hover:bg-white/5 transition-all text-left group active:scale-95 flex flex-col relative overflow-hidden ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl group-hover:bg-white/10 transition-colors" />
       
@@ -1313,6 +1386,7 @@ function RecentAlerts({ residentId }: { residentId: string }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
+    if (!db) return;
     const q = query(
       collection(db, 'alerts'),
       where('residentId', '==', residentId),
@@ -1564,6 +1638,7 @@ function ScheduleView({ role, profile }: { role: UserRole, profile: User | null 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!db) { setLoading(false); return; }
     const q = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
     const unsub = onSnapshot(q, (snap) => {
       setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
@@ -1636,6 +1711,7 @@ function ReportsView() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!db) { setLoading(false); return; }
     const q = query(collection(db, 'incidents'), orderBy('date', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));

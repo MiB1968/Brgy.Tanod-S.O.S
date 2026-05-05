@@ -9,6 +9,8 @@ export const startGPSTracking = (
   role: 'resident' | 'tanod' | 'admin',
   onUpdate: (data: any) => void
 ) => {
+  if (!db) return () => {};
+
   // Map 'resident' or 'citizen' to 'residents'
   const collectionName = role === 'tanod' ? 'tanods' : 'residents';
   

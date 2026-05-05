@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { downloadRegion } from '../lib/mapDownloader';
 import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
@@ -225,7 +225,7 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
         </div>
         
         {alerts.map(alert => (
-          <div key={alert.id}>
+          <React.Fragment key={alert.id}>
             {showHeatmap && alert.aiAnalysis && alert.aiAnalysis.severityScore > 6 && (
               <Circle 
                 center={[alert.location.lat, alert.location.lng]}
@@ -265,11 +265,11 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
                 }}
               />
             )}
-          </div>
+          </React.Fragment>
         ))}
 
         {patrols.map(patrol => (
-          <div key={patrol.id}>
+          <React.Fragment key={patrol.id}>
             <Marker 
               position={[patrol.location.lat, patrol.location.lng]} 
               icon={TanodIcon}
@@ -321,7 +321,7 @@ export default function ActiveMap({ alerts, patrols, center: propCenter, showHea
                 }}
               />
             )}
-          </div>
+          </React.Fragment>
         ))}
       </MapContainer>
 
