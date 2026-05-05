@@ -155,10 +155,28 @@ export default function TanodDashboard({ profile, onTabChange }: { profile: User
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="space-y-6 md:space-y-8 pb-20">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 md:space-y-8 pb-20"
+    >
       <PoliceLights active={isFlashing} />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
           <div className="flex items-center justify-between glass-panel p-4 rounded-3xl mb-2">
             <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
@@ -312,7 +330,7 @@ export default function TanodDashboard({ profile, onTabChange }: { profile: User
              <Shield className="absolute -bottom-6 -right-6 w-32 h-32 opacity-10 group-hover:rotate-12 transition-transform" />
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

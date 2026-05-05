@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Brgy. Tanod S.O.S. System
 
-# Run and deploy your AI Studio app
+A mobile-first emergency response web app for Philippine barangay operations. The system connects citizens, Tanod patrol officers, and barangay admins in a real-time SOS and deployment coordination platform.
 
-This contains everything you need to run your app locally.
+## Architecture
 
-View your app in AI Studio: https://ai.studio/apps/37ed8b27-c910-4fb8-ab56-cdbfc4be2c1b
+This project is a React/TypeScript frontend (Vite) with a Node.js Express backend (`server.ts`).
+It uses Supabase for Postgres and Realtime features, and Firebase for Authentication and Firestore.
 
-## Run Locally
+### Security Best Practices Implemented:
+- Firebase config and API keys (`GEMINI_API_KEY`, `SEMAPHORE_API_KEY`) are kept out of tracking/client-side where possible.
+- SMS dispatch calls are proxied through the backend (`/api/sms`).
+- Input validation on WebSocket and SOS HTTP endpoints is handled via Zod on the server.
+- Supabase Row Level Security (RLS) is enabled (see `SUPABASE_SETUP.sql`).
 
-**Prerequisites:**  Node.js
-
+## Running the Application
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```sh
+   npm install
+   ```
+
+2. Environment Setup:
+   Copy `.env.example` to `.env` and fill in necessary keys.
+
+3. Run Development Server:
+   ```sh
+   npm run dev
+   ```
+
+## Integrations
+
+- **GPS/Maps:** `react-leaflet` combined with real-time websocket updates (`/ws/gps`) on the Express backend.
+- **SMS Notifications:** Handled by [Semaphore API](https://semaphore.co), configured in `.env` and proxied via `server.ts`.
+- **AI Triage:** Configured with Gemini 2.5 (`GEMINI_API_KEY`) for summarizing and triaging emergency reports.

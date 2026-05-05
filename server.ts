@@ -1,7 +1,7 @@
 import express from "express";
-import { WebSocketServer, WebSocket } from "ws";
 import * as http from "http";
 import path from "path";
+import { z } from "zod";
 
 async function startServer() {
   const app = express();
@@ -10,76 +10,47 @@ async function startServer() {
   // Create HTTP server
   const server = http.createServer(app);
 
-  // Setup WebSocket server
-  const wss = new WebSocketServer({ server, path: '/ws/gps' });
-
   app.use(express.json());
-
-  // -----------------------------
-  // Backend State (From Python)
-  // -----------------------------
-  const locations: Record<string, any> = {};
-
-  function distance(a: any, b: any) {
-    if (!a.lat || !a.lng || !b.lat || !b.lng) return 999999;
-    return Math.sqrt(Math.pow(a.lat - b.lat, 2) + Math.pow(a.lng - b.lng, 2));
-  }
-
-  function findNearestTanod(citizen: any) {
-    let nearest = null;
-    let minD = 999999;
-
-    for (const [uid, loc] of Object.entries(locations)) {
-      if (loc.role === "tanod") {
-        const d = distance(citizen, loc);
-        if (d < minD) {
-          minD = d;
-          nearest = loc;
-        }
-      }
-    }
-    return nearest;
-  }
-
-  wss.on("connection", (ws) => {
-    ws.on("message", (message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        if (data.user_id) {
-          locations[data.user_id] = data;
-
-          // Broadcast to all clients
-          const payload = JSON.stringify({
-            type: "location_update",
-            data: locations
-          });
-
-          wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-              client.send(payload);
-            }
-          });
-        }
-      } catch (err) {
-        console.error("WS Parse error", err);
-      }
-    });
-
-    ws.on("close", () => {
-      // Could logic here if disconnected
-    });
-  });
 
   // -----------------------------
   // HTTP Endpoints
   // -----------------------------
-  app.post("/api/sos", (req, res) => {
-    const data = req.body;
-    const nearest = findNearestTanod(data);
-    res.json({
-      status: "SOS_RECEIVED",
-      nearest_tanod: nearest
-    });
+  
+  const smsSchema = z.object({
+    to: z.string(),
+    message: z.string()
+  });
+
+  app.post("/api/sms", async (req, res) => {
+    const result = smsSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    const { to, message } = result.data;
+    const apiKey = process.env.SEMAPHORE_API_KEY;
+
+    if (!apiKey) {
+      console.log('SMS Simulation (No Key):', { to, message });
+      return res.json({ success: true, simulated: true });
+    }
+
+    try {
+      const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          apikey: apiKey,
+          number: to,
+          message: message,
+        }),
+      });
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
   });
 
   app.get("/api/health", (req, res) => {

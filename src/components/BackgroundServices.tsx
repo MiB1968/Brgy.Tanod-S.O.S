@@ -9,7 +9,7 @@ import { useLogStore } from '../store/useLogStore';
 import { watchLocation } from '../lib/gps';
 import { flushSOSQueue } from '../lib/offlineQueue';
 import { Alert, PatrolLocation, Shift } from '../types';
-import { scheduleDailyLogReset } from '../lib/scheduler.mock';
+import { scheduleDailyLogReset } from '../lib/scheduler';
 import toast from 'react-hot-toast';
 
 export default function BackgroundServices() {
@@ -52,57 +52,17 @@ export default function BackgroundServices() {
 
         tacticalChannel = supabase
           .channel(`tactical-command-${Math.random().toString(36).substring(2)}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'report_logs' },
-            (payload) => {
-              console.log('📡 Tactical Update (Logs):', payload.eventType, payload.new || payload.old);
-              if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                const data = payload.new as any;
-                addAlert({
-                  id: data.id || data.incident_id,
-                  type: data.type,
-                  status: data.status,
-                  location: { lat: data.location_lat || data.lat, lng: data.location_lng || data.lng },
-                  timestamp: data.created_at || new Date().toISOString(),
-                  residentName: 'Field Unit',
-                  residentId: data.uid || 'unknown'
-                });
-              } else if (payload.eventType === 'DELETE') {
-                removeAlert(payload.old.id);
-              }
-            }
-          )
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'tanods' },
-            (payload) => {
-              console.log('📡 Tactical Update (Tanods):', payload.eventType, payload.new || payload.old);
-              if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-                const data = payload.new as any;
-                const mappedPatrol: PatrolLocation = {
-                  id: data.id,
-                  tanodId: data.id,
-                  tanodName: data.name,
-                  location: {
-                    lat: data.location_lat || data.lat,
-                    lng: data.location_lng || data.lng,
-                  },
-                  isActive: true,
-                  lastUpdate: data.updated_at
-                };
-                const currentPatrols = (useTanodStore.getState() as any).patrols;
-                const others = currentPatrols.filter((p: any) => p.tanodId !== data.id);
-                setPatrols([...others, mappedPatrol]);
-              }
-            }
-          )
           .subscribe((status, err) => {
             if (status === 'SUBSCRIBED') {
               console.log('✅ Tactical Live Link: ACTIVE');
             } else if (status === 'CHANNEL_ERROR') {
               const transportError = err?.message?.includes('transport failure') || !err;
-              console.error(`❌ Tactical Link Error (CHANNEL_ERROR):`, err);
+              const is1006 = err?.message?.includes('1006') || err?.code === 1006 || String(err).includes('1006');
+              if (!is1006) {
+                console.error(`❌ Tactical Link Error (CHANNEL_ERROR):`, err);
+              } else {
+                console.warn(`⏳ Tactical Link reconnecting (1006)...`);
+              }
               
               if (transportError) {
                 console.warn('💡 TROUBLESHOOTING "transport failure":');
@@ -180,7 +140,7 @@ export default function BackgroundServices() {
           if (status === 'SUBSCRIBED') {
             console.log('✅ Supabase Real-time: Connected (System Events)');
           } else if (status === 'CHANNEL_ERROR') {
-            const is1006 = err?.message?.includes('1006') || err?.code === 1006;
+            const is1006 = err?.message?.includes('1006') || err?.code === 1006 || String(err).includes('1006');
             if (!is1006) {
               console.error('❌ Supabase Real-time Error (System Events):', err);
             }

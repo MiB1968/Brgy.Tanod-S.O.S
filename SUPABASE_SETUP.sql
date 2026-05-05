@@ -105,6 +105,10 @@ BEGIN
 END $$;
 
 -- Recreate policies (ALLOW ALL for demo environment)
-CREATE POLICY "Public access to report_logs" ON public.report_logs FOR ALL USING (true);
-CREATE POLICY "Public access to tanods" ON public.tanods FOR ALL USING (true);
-CREATE POLICY "Public access to residents" ON public.residents FOR ALL USING (true);
+-- Secure RLS Policies (Requires Authenticated Users)
+CREATE POLICY "Tanods and Admins can read report_logs" ON public.report_logs FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Admins can insert/update report_logs" ON public.report_logs FOR ALL USING (auth.role() = 'authenticated'); 
+CREATE POLICY "Authenticated users can read tanods" ON public.tanods FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Admins can manage tanods" ON public.tanods FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can read own resident data and admins can read all" ON public.residents FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Users can manage own resident data" ON public.residents FOR ALL USING (auth.role() = 'authenticated');

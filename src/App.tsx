@@ -67,7 +67,7 @@ import { analyzeIncident } from './services/aiService';
 import { db as dexieDb } from './lib/mapDb';
 import { startGPSTracking, calculateDistance } from './services/gpsService';
 import { Toaster, toast } from 'react-hot-toast';
-import { scheduleDailyLogReset } from './lib/scheduler.mock';
+import { scheduleDailyLogReset } from './lib/scheduler';
 
 // Siren sound
 const siren = new Howl({
@@ -114,6 +114,27 @@ export default function App() {
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [viewOverride, setViewOverride] = useState<'admin' | 'tanod' | 'resident' | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success('App installation initiated.', { icon: '📲' });
+      }
+      setDeferredPrompt(null);
+    }
+  };
 
   const isRuben = user?.email === 'rubenlleg12@gmail.com';
   const effectiveRole = viewOverride || profile?.role;
@@ -302,7 +323,7 @@ export default function App() {
   if (isRegistering) return <RegistrationForm onCancel={() => setIsRegistering(false)} onComplete={() => { setIsRegistering(false); window.location.reload(); }} />;
 
   // If no user, show login
-  if (!user) return <LoginView onLogin={handleLogin} onRegister={() => setIsRegistering(true)} isLoggingIn={isLoggingIn} onDemoResident={handleDemoResidentLogin} />;
+  if (!user) return <LoginView onLogin={handleLogin} onRegister={() => setIsRegistering(true)} isLoggingIn={isLoggingIn} />;
 
   // Special case: Resident Portal (Registration Flow)
   if (user && !profile && !residentProfile) return <RoleSelection onSelect={handleSetRole} onRegister={() => setIsRegistering(true)} />;
@@ -324,6 +345,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
+      <div className={cn("absolute top-0 left-0 w-full z-[100] px-4 py-1 text-center text-[10px] font-bold uppercase tracking-widest transition-all", isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse")}>
+        {isOnline ? "System Online — Neural Sync Active" : "Offline Mode — Operating on Local Storage"}
+      </div>
       <Toaster />
       <BackgroundPattern />
       {/* Mobile Top Bar */}
@@ -398,6 +422,15 @@ export default function App() {
               </button>
             );
           })}
+          
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallApp}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mt-8 transition-all hover:scale-[1.02] uppercase tracking-[0.2em] font-mono shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+            >
+              <span>INSTALL MOBILE APP</span>
+            </button>
+          )}
         </div>
 
         <div className="p-6 mt-auto border-t border-white/5 bg-brand-bg/30">
@@ -438,7 +471,11 @@ export default function App() {
                 {activeTab}
               </h1>
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black tracking-widest text-emergency uppercase mt-1">Brgy.TANOD DashBoard Panel</span>
+                <span className="text-[10px] font-black tracking-widest text-emergency uppercase mt-1">
+                  {effectiveRole === 'resident' && "Resident view panel"}
+                  {effectiveRole === 'admin' && "Admin view panel"}
+                  {effectiveRole === 'tanod' && "Tanod view panel"}
+                </span>
                 <span className="text-[8px] font-mono text-white/40 uppercase tracking-[0.2em]">SECURE SYSTEM v2.4.0</span>
               </div>
             </div>
@@ -601,7 +638,7 @@ const navItems = [
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
 ];
 
-function LoginView({ onLogin, onRegister, isLoggingIn, onDemoResident }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoResident: () => void }) {
+function LoginView({ onLogin, onRegister, isLoggingIn }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean }) {
   const handleRegister = async () => {
     try {
       await onLogin();
@@ -648,16 +685,7 @@ function LoginView({ onLogin, onRegister, isLoggingIn, onDemoResident }: { onLog
           Resident Registration
         </button>
 
-        <div className="pt-8 relative">
-           <div className="absolute left-0 right-0 top-12 h-px bg-white/5" />
-           <button 
-             disabled={isLoggingIn}
-             onClick={onDemoResident}
-             className="w-full bg-emergency/10 border border-emergency/30 text-emergency font-black py-5 rounded-2xl hover:bg-emergency/20 transition-all shadow-glow-red disabled:opacity-50 uppercase tracking-widest font-mono text-[10px] italic flex items-center justify-center gap-2"
-           >
-             <span className="animate-pulse">✨</span> PREVIEW RESIDENT MODE
-           </button>
-        </div>
+
       </div>
       
       <div className="absolute bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.5em] font-mono">
@@ -823,8 +851,26 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="space-y-8 pb-32 relative">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-8 pb-32 relative"
+    >
       <AnimatePresence>
         {activeAlert && (
           <motion.div 
@@ -891,8 +937,7 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
 
       {!activeAlert && (
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          variants={itemVariants}
           className="glass-panel border-white/5 rounded-[48px] p-8 md:p-16 relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 w-96 h-96 bg-emergency/10 blur-[120px] -mr-48 -mt-48 transition-all group-hover:bg-emergency/20"></div>
@@ -930,7 +975,7 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
         </motion.div>
       )}
 
-      <div className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-8">
+      <motion.div variants={itemVariants} className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h3 className="font-bold text-xl flex items-center gap-2 text-white uppercase italic tracking-tighter">
             <MapIcon className="w-5 h-5 text-[#FF4B4B]" /> LIVE PATROL STATUS
@@ -944,9 +989,9 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
           <ActiveMap alerts={activeAlert ? [activeAlert] : []} patrols={patrols} />
         </div>
         <p className="text-[#8E9299] text-xs mt-4 text-center">There are {patrols.length} Tanod units currently patrolling the Barangay.</p>
-      </div>
+      </motion.div>
 
-      <div>
+      <motion.div variants={itemVariants}>
         <h3 className="font-bold text-xl mb-6 text-white uppercase italic tracking-tighter">Emergency Hotlines</h3>
         <div className="grid grid-cols-2 gap-4">
           {[
@@ -968,9 +1013,11 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <RecentAlerts residentId={profile.uid} />
+      <motion.div variants={itemVariants} className="pb-16">
+        <RecentAlerts residentId={profile.uid} />
+      </motion.div>
 
       {/* SOS Category Modal */}
       <AnimatePresence>
@@ -1096,7 +1143,7 @@ function ResidentDashboard({ profile, patrols, isOnline }: { profile: User, patr
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 

@@ -35,9 +35,21 @@ service cloud.firestore {
     // ==========================================
 
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isMasterAdmin();
     }
-    
+    match /report_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isTanod() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isTanod() || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+    match /users/{userId} {
+      allow read: if isTanod() || request.auth.uid == userId;
+      allow write: if isMasterAdmin() || request.auth.uid == userId;
+    }
+    match /tanods/{tanodId} {
+      allow read: if isSignedIn();
+      allow write: if isMasterAdmin() || request.auth.uid == tanodId;
+    }
     match /test/connection {
       allow read: if true;
     }

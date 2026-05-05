@@ -1,32 +1,20 @@
 /**
- * SMS Utility for Semaphore API
+ * SMS Utility for Semaphore API via Backend
  */
 
 export async function sendSMS(to: string, message: string) {
-  // @ts-ignore
-  const apiKey = import.meta.env.VITE_SEMAPHORE_API_KEY || 'YOUR_SEMAPHORE_API_KEY';
-  
-  if (apiKey === 'YOUR_SEMAPHORE_API_KEY') {
-    console.log('SMS Simulation:', { to, message });
-    return { success: true, simulated: true };
-  }
-
   try {
-    const response = await fetch('https://api.semaphore.co/api/v4/messages', {
+    const response = await fetch('/api/sms', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: new URLSearchParams({
-        apikey: apiKey,
-        number: to,
-        message: message,
-      }),
+      body: JSON.stringify({ to, message }),
     });
 
     const data = await response.json();
     console.log('Semaphore API Response:', data);
-    return { success: true, data };
+    return { success: response.ok, data };
   } catch (error) {
     console.error('SMS Send Failed:', error);
     return { success: false, error };

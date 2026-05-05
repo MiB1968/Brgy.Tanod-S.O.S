@@ -158,19 +158,37 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
     });
   }, [profile]);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="space-y-6 md:space-y-8 pb-20">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 md:space-y-8 pb-20"
+    >
       <PoliceLights active={isFlashing} />
-      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-6">
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-6">
         <div>
           <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Commander Overview</h2>
           <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em] mt-2">Active Surveillance & Dispatch Interface</p>
         </div>
         <ReviewArchivedLogsDrawer profile={profile} />
-      </div>
+      </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           label="Approved Residents" 
           value={stats.residents} 
@@ -201,9 +219,9 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
           color="text-success" 
           bg="bg-success/10" 
         />
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Alerts Feed */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
           <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
@@ -391,7 +409,7 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
             <AlertTriangle className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700" />
           </div>
         </div>
-      </div>
+      </motion.div>
       
       {selectedAlertForDispatch && (
         <DispatchModal 
@@ -399,7 +417,7 @@ export default function AdminDashboard({ profile, onTabChange }: { profile: User
           onClose={() => setSelectedAlertForDispatch(null)} 
         />
       )}
-    </div>
+    </motion.div>
   );
 }
 
