@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { 
+  IconOnlineTanods, 
+  IconNewIncident,
+  IconActiveSOS,
+  IconRadar
+} from './TacticalIcons';
 import { Alert, User } from '../types';
 import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +22,21 @@ import FlameAnimation from './FlameAnimation';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { logIncidentAction } from '../services/logService';
+
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
+};
 
 export default function TanodDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
   const { alerts } = useIncidentStore();
@@ -32,11 +53,6 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
   const [filterTime, setFilterTime] = useState<string>('ALL');
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
 
   // Filter alerts for this tanod: pending OR specifically assigned/responded by them
   const dashboardAlerts = alerts.filter(alert => {
@@ -207,22 +223,24 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       }
 
       // Sync to Supabase
-      try {
-        await supabase
-          .from('report_logs')
-          .upsert([{ 
-            id: alert.id,
-            incident_id: alert.id,
-            type: alert.type,
-            location_lat: alert.location.lat,
-            location_lng: alert.location.lng,
-            lat: alert.location.lat, 
-            lng: alert.location.lng,
-            status: status,
-            tanod_id: profile?.uid || null 
-          }]);
-      } catch (suErr) {
-        console.error('Supabase status sync failed:', suErr);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase
+            .from('report_logs')
+            .upsert([{ 
+              id: alert.id,
+              incident_id: alert.id,
+              type: alert.type,
+              location_lat: alert.location.lat,
+              location_lng: alert.location.lng,
+              lat: alert.location.lat, 
+              lng: alert.location.lng,
+              status: status,
+              tanod_id: profile?.uid || null 
+            }]);
+        } catch (suErr) {
+          console.error('Supabase status sync failed:', suErr);
+        }
       }
       
       await logIncidentAction({ ...alert, ...updateData });
@@ -285,47 +303,47 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
   return (
     <motion.div 
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6 md:space-y-8 pb-20"
+      className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8"
     >
       <PoliceLights active={isFlashing} />
+      <div className="scanline opacity-10 pointer-events-none" />
       
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h2 className="text-3xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-3">
-            <Shield className="w-8 h-8 text-success shadow-glow-green" />
-            Tanod Responder Portal
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-6 mb-8 glass-panel p-8 rounded-[48px] border-white/5 skew-card relative overflow-hidden">
+        <div className="absolute inset-0 tactical-bg-glow opacity-30" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
+            <span className="text-[9px] font-mono text-success font-black uppercase tracking-[0.4em]">Unit Identity: Verified</span>
+          </div>
+          <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4 outline-text">
+            <IconRadar className="w-10 h-10 text-success animate-pulse" />
+            RESPONDER<span className="text-success">PORTAL</span>
           </h2>
-          <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mt-2 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Securing Brgy. Intelligence Network</p>
+          <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em] mt-3 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Tactical Surveillance & Force Deployment Interface</p>
         </div>
-        <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          <button
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto relative z-10">
+          <motion.button
+            whileHover={{ scale: 1.02, backgroundColor: 'rgba(239, 68, 68, 0.9)' }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setIsReportFormOpen(true)}
-            className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 rounded-2xl bg-emergency text-white hover:bg-red-600 transition-all group shadow-glow-red active:scale-95"
+            className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-5 rounded-2xl bg-emergency text-white transition-all group shadow-glow-red active:scale-95 border-b-4 border-emergency/30"
             id="file-report-btn"
           >
             <FilePlus className="w-5 h-5 text-white group-hover:rotate-12 transition-transform" />
-            <span className="text-[12px] font-black uppercase tracking-[0.2em] font-mono italic">File Incident Report</span>
-          </button>
+            <span className="text-[14px] font-black uppercase tracking-[0.2em] font-mono italic">FILE_INTEL_REPORT</span>
+          </motion.button>
           <button
             onClick={() => setIsAboutOpen(true)}
-            className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
+            className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
             id="tanod-about-btn"
           >
             <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">Mission Guidelines</span>
+            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">MISSION_BRIEF</span>
           </button>
         </div>
       </motion.div>
@@ -377,7 +395,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
              <div className="mt-8 flex items-center justify-between">
                <div className="flex items-center gap-3">
                  <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                   <Shield className="w-5 h-5 text-success/60" />
+                   <IconOnlineTanods className="w-5 h-5 text-success/60" />
                  </div>
                  <div>
                    <p className="text-[10px] opacity-40 uppercase tracking-widest font-mono font-black border-l border-success/30 pl-2">Designated Officer</p>
@@ -416,7 +434,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
               <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
-                <Zap className="w-5 h-5 text-emergency shadow-glow-red" />
+                <IconNewIncident className="w-5 h-5 text-emergency shadow-glow-red" glow />
                 LIVE INCIDENT FEED
               </h3>
               <div className="flex items-center gap-2">

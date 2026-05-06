@@ -1,15 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const getApiKey = () => {
-  try {
-    // @ts-ignore
-    return import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "missing-key";
-  } catch (e) {
-    return import.meta.env.VITE_GEMINI_API_KEY || "missing-key";
-  }
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "missing-key" });
 
 export interface AIAnalysis {
   incidentType: "MEDICAL" | "FIRE" | "CRIME" | "DISTURBANCE" | "OTHER";
@@ -34,7 +25,7 @@ export async function analyzeIncident(description: string, initialType?: string)
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: `Analyze the following emergency SOS description and categorize it. 
       Initial reported type: ${initialType || 'Unknown'}
       Description: ${description}

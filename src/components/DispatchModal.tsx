@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, Alert, PatrolLocation } from '../types';
 import { X, Shield, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -59,21 +59,23 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
       }
 
       // Sync to Supabase
-      try {
-        await supabase.from('report_logs').upsert([{
-          id: alert.id,
-          incident_id: alert.id,
-          type: alert.type,
-          status: 'responding',
-          tanod_assigned: tanod?.name || 'Assigned Tanod',
-          tanod_id: selectedTanod,
-          location_lat: alert.location.lat,
-          location_lng: alert.location.lng,
-          lat: alert.location.lat,
-          lng: alert.location.lng
-        }]);
-      } catch (suErr) {
-        console.error('Supabase dispatch sync failed:', suErr);
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('report_logs').upsert([{
+            id: alert.id,
+            incident_id: alert.id,
+            type: alert.type,
+            status: 'responding',
+            tanod_assigned: tanod?.name || 'Assigned Tanod',
+            tanod_id: selectedTanod,
+            location_lat: alert.location.lat,
+            location_lng: alert.location.lng,
+            lat: alert.location.lat,
+            lng: alert.location.lng
+          }]);
+        } catch (suErr) {
+          console.error('Supabase dispatch sync failed:', suErr);
+        }
       }
 
       onClose();

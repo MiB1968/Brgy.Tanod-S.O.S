@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getCountFromServer, addDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getCountFromServer, addDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Alert, User } from '../types';
 import { 
@@ -29,14 +29,33 @@ import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { 
+  IconApprovedResidents, 
+  IconPendingRegistration, 
+  IconActiveSOS, 
+  IconOnlineTanods 
+} from './TacticalIcons';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
 
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
+};
 
 export default function AdminDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
   const { alerts } = useIncidentStore();
@@ -235,7 +254,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       }, { merge: true });
 
       // 2. Update Supabase for live map status
-      if (supabase) {
+      if (isSupabaseConfigured) {
         const { error } = await supabase
           .from('tanods')
           .update({ status: newStatus })
@@ -283,54 +302,49 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
     });
   }, [profile]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
-  };
-
   return (
     <motion.div 
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6 md:space-y-8 pb-20"
+      className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8"
     >
       {deferredPrompt && (
         <motion.button
           variants={itemVariants}
           onClick={onInstall}
-          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
+          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group relative overflow-hidden"
         >
-          <span className="text-lg group-hover:scale-125 transition-transform">📲</span>
-          <span>INSTALL TANOD MOBILE APP</span>
+          <div className="absolute inset-0 bg-info/5 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+          <span className="text-lg group-hover:rotate-12 transition-transform">📲</span>
+          <span className="relative z-10">INSTALL TANOD TACTICAL MOBILE</span>
         </motion.button>
       )}
       <PoliceLights active={isFlashing} />
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-4 mb-10 relative">
-        <div className="scanline opacity-10 pointer-events-none" />
-        <div>
-          <h2 className="text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4">
-            <TanodLogo size={48} animated={false} className="text-emergency shadow-glow-red" />
-            Commander Overview
+      
+      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-6 mb-10 relative glass-panel p-8 rounded-[48px] border-white/10 skew-card">
+        <div className="scanline opacity-20 pointer-events-none" />
+        <div className="tactical-bg-glow absolute inset-0 rounded-[48px] pointer-events-none" />
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-2 h-2 rounded-full bg-emergency animate-pulse" />
+            <span className="text-[10px] font-mono text-emergency font-black uppercase tracking-[0.4em]">Signal: Secure Encryption Active</span>
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4 outline-text">
+            <TanodLogo size={64} animated={true} className="text-emergency shadow-glow-red" />
+            COMMAND<span className="text-emergency">CENTER</span>
           </h2>
-          <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mt-3 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Active Surveillance & Dispatch Interface</p>
+          <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.4em] mt-4 bg-white/5 inline-block px-4 py-1.5 rounded-full border border-white/5">Strategic Surveillance & Tactical Response Matrix</p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-3 relative z-10">
           <button
             onClick={() => setIsAboutOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
-            id="admin-about-btn"
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group hover:border-info/50"
           >
-            <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-widest font-mono">System Overview & Mission</span>
+            <Info className="w-4 h-4 text-info group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] font-black text-white/50 group-hover:text-white uppercase tracking-widest font-mono">MISSION BRIEF</span>
           </button>
           <ReviewArchivedLogsDrawer profile={profile} />
         </div>
@@ -342,12 +356,84 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         role={profile?.role} 
       />
 
+      {/* Broadcast System SOS Panel */}
+      <motion.div variants={itemVariants} className="glass-panel border-white/10 rounded-[40px] p-8 overflow-hidden relative group">
+        <div className="scanline opacity-10 pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-6">
+            <div className="p-6 rounded-[32px] bg-emergency/10 border border-emergency/20 text-emergency shadow-[0_0_30px_rgba(239,68,68,0.2)] animate-pulse">
+              <IconActiveSOS className="w-10 h-10" glow />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black italic tracking-tighter uppercase text-white font-mono">Tactical Broadcast Center</h3>
+              <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em] mt-1">Deploy high-priority alerts to all active units and residents</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4 w-full md:w-auto">
+            <button 
+              onClick={async () => {
+                const message = window.prompt('Enter SOS Broadcast Message (e.g., Extreme Flood Evacuation):');
+                if (!message) return;
+                
+                try {
+                  const broadcastId = `SOS-${Date.now()}`;
+                  await setDoc(doc(db, 'system_broadcasts', broadcastId), {
+                    adminId: profile?.uid,
+                    adminName: profile?.name,
+                    type: 'security',
+                    message: message.toUpperCase(),
+                    isActive: true,
+                    timestamp: new Date().toISOString()
+                  });
+                  toast.success('SOS BROADCAST DEPLOYED SYSTEM-WIDE');
+                } catch (error) {
+                  toast.error('Tactical failure deploying broadcast');
+                }
+              }}
+              className="flex-1 md:flex-none items-center justify-center gap-3 px-8 py-5 rounded-[28px] bg-emergency text-black font-black hover:bg-emergency/90 transition-all hover:scale-[1.02] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_40px_rgba(239,68,68,0.4)] flex"
+            >
+              <Radio className="w-5 h-5 animate-pulse" />
+              BROADCAST SYSTEM SOS
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  const q = query(collection(db, 'system_broadcasts'), where('isActive', '==', true));
+                  const snapshot = await getDocs(q);
+                  if (snapshot.empty) {
+                    toast.error('NO ACTIVE BROADCASTS FOUND');
+                    return;
+                  }
+                  
+                  const batchPromises = snapshot.docs.map(broadcastDoc => 
+                    updateDoc(doc(db, 'system_broadcasts', broadcastDoc.id), { isActive: false })
+                  );
+                  
+                  // Also clear global siren
+                  batchPromises.push(updateDoc(doc(db, 'system', 'siren'), { sirenActive: false }));
+                  
+                  await Promise.all(batchPromises);
+                  toast.success('ALL ACTIVE BROADCASTS TERMINATED');
+                } catch (error) {
+                  console.error('Broadcast termination failed:', error);
+                  toast.error('Cleanup failed');
+                }
+              }}
+              className="flex-1 md:flex-none px-8 py-5 rounded-[28px] bg-white/5 border border-white/10 text-white/60 font-black hover:bg-white/10 transition-all uppercase tracking-[0.1em] font-mono text-xs"
+            >
+              TERMINAL CLEAR
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard 
           label="Approved Residents" 
           value={residentsCount} 
-          icon={Users} 
+          icon={IconApprovedResidents} 
           color="text-info" 
           bg="bg-info/10" 
           onClick={() => onTabChange('residents')}
@@ -355,7 +441,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         <StatCard 
           label="Pending Registration" 
           value={pendingRegCount} 
-          icon={Clock} 
+          icon={IconPendingRegistration} 
           color="text-caution" 
           bg="bg-caution/10" 
           pulse={pendingRegCount > 0}
@@ -364,7 +450,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         <StatCard 
           label="Active SOS Alerts" 
           value={activeAlertsCount} 
-          icon={AlertTriangle} 
+          icon={IconActiveSOS} 
           color="text-emergency" 
           bg="bg-emergency/10" 
           pulse={pendingAlertsCount > 0}
@@ -372,7 +458,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         <StatCard 
           label="Online Tanods" 
           value={onDutyTanods.filter(t => (t.status as string)?.toLowerCase() === 'on-duty' || (t.status as string)?.toLowerCase() === 'responding').length} 
-          icon={Shield}
+          icon={IconOnlineTanods}
           color="text-success" 
           bg="bg-success/10" 
         />
@@ -445,26 +531,34 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             </div>
           </div>
 
-          <div className="space-y-4">
-            <AnimatePresence mode="popLayout">
+          <div className="space-y-4 staggered-list">
+            <AnimatePresence mode="popLayout" initial={false}>
               {filteredAlerts.length === 0 ? (
-                <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="glass-panel border-white/5 rounded-[40px] p-24 text-center relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 tactical-grid opacity-5" />
                   <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10" />
-                  <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono">No matching emergency alerts detected.</p>
-                </div>
+                  <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono relative z-10">No matching emergency alerts detected.</p>
+                </motion.div>
               ) : (
                 filteredAlerts.map(alert => (
                   <motion.div
                     layout
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: -30 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                    whileHover={{ x: 10, backgroundColor: 'rgba(255, 255, 255, 0.03)', transition: { duration: 0.2 } }}
                     key={alert.id}
                     className={cn(
-                      "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
-                      alert.status === 'pending' && "border-emergency/30 shadow-glow-red ring-1 ring-emergency/10"
+                      "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group border-l-4",
+                      alert.status === 'pending' ? "border-l-emergency border-emergency/30 shadow-glow-red ring-1 ring-emergency/10" : 
+                      alert.status === 'responding' ? "border-l-info" : "border-l-success"
                     )}
                   >
+                    <div className="absolute inset-0 tactical-grid opacity-5 pointer-events-none" />
                     {alert.status === 'pending' && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
                       <div className="absolute -bottom-8 -right-8 opacity-10 pointer-events-none rotate-12 group-hover:opacity-20 transition-opacity">
                         <FlameAnimation size="lg" />
@@ -903,22 +997,27 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
 function StatCard({ label, value, icon: Icon, color, bg, pulse, onClick }: any) {
   return (
-    <div 
+    <motion.div 
+      variants={itemVariants}
+      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card active:scale-[0.98]",
+        "glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card hover:border-white/10 active:shadow-inner",
         onClick ? "cursor-pointer" : ""
       )}
     >
+      <div className="absolute inset-0 tactical-grid opacity-10" />
       <div className="scanline opacity-5" />
       <div className={cn("p-5 rounded-[24px] inline-flex mb-8 transition-all group-hover:scale-110 shadow-2xl relative z-10", bg, color, pulse && "animate-pulse shadow-glow-red")}>
-        <Icon className="w-7 h-7" />
+        <Icon className="w-7 h-7" glow={pulse} />
       </div>
       <div className="relative z-10">
-        <h4 className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] mb-2 font-mono">{label}</h4>
-        <p className="text-5xl font-black text-white italic tracking-tighter font-mono leading-none">{value}</p>
+        <h4 className="text-[10px] font-black uppercase text-white/30 tracking-[0.4em] mb-3 font-mono">{label}</h4>
+        <p className="text-5xl font-black text-white italic tracking-tighter font-mono leading-none outline-text">{value}</p>
       </div>
       <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/2 rounded-full blur-3xl group-hover:scale-150 transition-all duration-700"></div>
-    </div>
+    </motion.div>
   );
 }
+

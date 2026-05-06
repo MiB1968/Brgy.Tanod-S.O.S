@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { collection, addDoc, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, IncidentStatus } from '../types';
 import { X, Send } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
@@ -57,26 +57,28 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
       await setDoc(doc(db, 'incidents', incidentId), incidentData);
 
       // Sync to Supabase
-      try {
-        let coords = { lat: 0, lng: 0 };
+      if (isSupabaseConfigured) {
         try {
-          const pos = await new Promise<GeolocationPosition>((res, rej) => 
-            navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
-          );
-          coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        } catch (e) { /* ignore location error */ }
+          let coords = { lat: 0, lng: 0 };
+          try {
+            const pos = await new Promise<GeolocationPosition>((res, rej) => 
+              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
+            );
+            coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          } catch (e) { /* ignore location error */ }
 
-        await supabase.from('report_logs').upsert([{
-          id: incidentId,
-          incident_id: incidentId,
-          type: formData.type,
-          status: formData.status,
-          tanod_assigned: profile.name,
-          location_lat: coords.lat,
-          location_lng: coords.lng
-        }]);
-      } catch (supaErr) {
-        console.error('Supabase incident sync failed:', supaErr);
+          await supabase.from('report_logs').upsert([{
+            id: incidentId,
+            incident_id: incidentId,
+            type: formData.type,
+            status: formData.status,
+            tanod_assigned: profile.name,
+            location_lat: coords.lat,
+            location_lng: coords.lng
+          }]);
+        } catch (supaErr) {
+          console.error('Supabase incident sync failed:', supaErr);
+        }
       }
 
       setIsSuccess(true);

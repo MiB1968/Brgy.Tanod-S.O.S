@@ -3,7 +3,7 @@ import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db, storage } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation } from 'lucide-react';
@@ -278,24 +278,26 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       await setDoc(doc(db, 'residents', uid), firestoreData);
       
       // Sync to Supabase for Tactical Command link
-      try {
-        const { error: supaErr } = await supabase.from('residents').upsert([{
-          id: uid,
-          name: formData.fullName,
-          age: parseInt(formData.age) || 0,
-          gender: formData.gender,
-          mobile: formData.mobileNumber,
-          address: formData.address,
-          house_number: formData.houseNumber,
-          street: formData.street,
-          location_lat: formData.gpsLat,
-          location_lng: formData.gpsLng,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }]);
-        if (supaErr) throw supaErr;
-      } catch (err) {
-        console.error('Supabase resident sync failed:', err);
+      if (isSupabaseConfigured) {
+        try {
+          const { error: supaErr } = await supabase.from('residents').upsert([{
+            id: uid,
+            name: formData.fullName,
+            age: parseInt(formData.age) || 0,
+            gender: formData.gender,
+            mobile: formData.mobileNumber,
+            address: formData.address,
+            house_number: formData.houseNumber,
+            street: formData.street,
+            location_lat: formData.gpsLat,
+            location_lng: formData.gpsLng,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          }]);
+          if (supaErr) throw supaErr;
+        } catch (err) {
+          console.error('Supabase resident sync failed:', err);
+        }
       }
       
       // Also create a basic user entry so they are recognized by auth flow

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AuditLogArchive } from '../../types/auditLog';
 import { mockArchives } from '../../data/mock/auditLogArchives';
 import { User } from '../../types';
-import { supabase } from '../../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 
 export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,6 +16,9 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
   const fetchArchives = async () => {
     setIsLoading(true);
     try {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase not configured');
+      }
       const { data, error } = await supabase
         .from('audit_log_archives')
         .select('*')

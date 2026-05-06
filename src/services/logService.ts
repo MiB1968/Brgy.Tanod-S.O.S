@@ -1,6 +1,6 @@
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AuditLogEntry } from '../types/auditLog';
 import { Alert } from '../types';
 
@@ -22,20 +22,22 @@ export const logIncidentAction = async (alert: Alert, actionNotes?: string) => {
     await addDoc(collection(db, 'audit_logs'), entry);
 
     // 2. Save to Supabase (Sync for Daily Audit Log system)
-    try {
-      await supabase.from('report_logs').upsert([{
-        id: alert.id,
-        incident_id: alert.id,
-        type: alert.type,
-        status: alert.status,
-        tanod_assigned: entry.tanod_assigned,
-        location_lat: alert.location.lat,
-        location_lng: alert.location.lng,
-        lat: alert.location.lat,
-        lng: alert.location.lng
-      }]);
-    } catch (supErr) {
-      console.error('Supabase Audit Log sync failed:', supErr);
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('report_logs').upsert([{
+          id: alert.id,
+          incident_id: alert.id,
+          type: alert.type,
+          status: alert.status,
+          tanod_assigned: entry.tanod_assigned,
+          location_lat: alert.location.lat,
+          location_lng: alert.location.lng,
+          lat: alert.location.lat,
+          lng: alert.location.lng
+        }]);
+      } catch (supErr) {
+        console.error('Supabase Audit Log sync failed:', supErr);
+      }
     }
   } catch (error) {
     console.error('Failed to log incident action:', error);

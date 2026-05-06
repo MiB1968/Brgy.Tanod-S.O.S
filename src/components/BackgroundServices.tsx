@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { doc, setDoc, collection, onSnapshot, query, where, orderBy, addDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -23,8 +23,7 @@ export default function BackgroundServices() {
 
     // 2. Supabase Real-time Listener (The "Tactical Command" Feed)
     useEffect(() => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      if (!isSupabaseConfigured) {
         console.warn('⚡ Tactical Link: Delayed - Supabase credentials not set in environment.');
         return;
       }
@@ -96,7 +95,7 @@ export default function BackgroundServices() {
 
   // 2. Tanod Location heartbeat (Sync to Supabase maps)
   useEffect(() => {
-    if (profile?.role !== 'tanod' || !auth?.currentUser) return;
+    if (!isSupabaseConfigured || profile?.role !== 'tanod' || !auth?.currentUser) return;
 
     const pushLocation = async () => {
       try {
@@ -127,12 +126,9 @@ export default function BackgroundServices() {
   // 3. Daily Log Reset Listener (Supabase Broadcast + Mock Scheduler Fallback)
   useEffect(() => {
     let mockCleanup = () => {};
-
-    // Check if Supabase URL is present before trying connection
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     let channel: any = null;
 
-    if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+    if (isSupabaseConfigured) {
       channel = supabase
         .channel(`system-events-${Math.random().toString(36).substring(2)}`)
         .on('broadcast', { event: 'logs_reset' }, (payload) => {

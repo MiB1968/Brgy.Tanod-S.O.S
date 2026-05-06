@@ -14,8 +14,11 @@ let storage: any;
 
 if (!isConfigEmpty) {
   app = initializeApp(firebaseConfig);
+  // Using experimentalAutoDetectLongPolling is generally more stable than forcing it
+  // and we explicitly set databaseId if it exists in the config
   db = initializeFirestore(app, {
-    experimentalForceLongPolling: true
+    experimentalAutoDetectLongPolling: true,
+    ignoreUndefinedProperties: true
   }, firebaseConfig.firestoreDatabaseId);
   auth = getAuth(app);
   storage = getStorage(app);

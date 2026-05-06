@@ -154,3 +154,14 @@ export interface TanodPatrolSession {
   route: TanodRoutePoint[];
   distanceCovered?: number; // optional, for future analytics
 }
+
+export interface SystemBroadcast {
+  id: string;
+  adminId: string;
+  adminName: string;
+  type: 'evacuation' | 'calamity' | 'security' | 'other';
+  message: string;
+  isActive: boolean;
+  timestamp: string;
+  expiresAt?: string;
+}
