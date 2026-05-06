@@ -1840,14 +1840,27 @@ function TanodRosterView() {
                 </div>
                 <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
                   <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Last Location Ping</span>
-                  <span className="text-[10px] font-black uppercase text-white italic font-mono">
-                    {lastSeen ? new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'NEVER_SYNCED'}
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className={cn(
+                      "text-[10px] font-black uppercase italic font-mono",
+                      lastSeen && (new Date().getTime() - new Date(lastSeen).getTime() < 300000) ? "text-success" : "text-white/60"
+                    )}>
+                      {lastSeen ? new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'NEVER_SYNCED'}
+                    </span>
+                    {lastSeen && (
+                      <span className="text-[7px] font-mono text-white/20 uppercase font-black mt-1">
+                        {Math.floor((new Date().getTime() - new Date(lastSeen).getTime()) / 60000)} MINS AGO
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Last Sync Date</span>
-                  <span className="text-[10px] font-black uppercase text-white/60 italic font-mono">
-                    {lastSeen ? new Date(lastSeen).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '---'}
+                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Tactical Status</span>
+                  <span className={cn(
+                    "text-[10px] font-black uppercase italic font-mono",
+                    isActuallyActive ? "text-success" : "text-caution"
+                  )}>
+                    {isActuallyActive ? 'ACTIVE_ON_GRID' : 'SIGNAL_LOST'}
                   </span>
                 </div>
               </div>

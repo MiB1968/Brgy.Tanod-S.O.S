@@ -231,17 +231,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
               {/* Developer Credentials - Interactive Avatar Upload */}
               <section className="pt-8 border-t border-white/5">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-8 font-mono">Project Leadership</h3>
-                <div 
-                  className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[40px] bg-[#161B22] border border-white/5 relative overflow-hidden group/dev"
-                  style={{ 
-                    backgroundImage: "url('/SuperAdmin-bg.png')",
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundBlendMode: 'overlay'
-                  }}
-                >
-                  {/* Background Overlay (Accurate Low Visibility) */}
-                  <div className="absolute inset-0 bg-[#161B22]/90 backdrop-blur-[1px]" />
+                <div className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[40px] bg-[#161B22] border border-white/5 relative overflow-hidden group/dev">
                   
                   <input 
                     type="file" 
