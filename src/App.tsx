@@ -37,6 +37,7 @@ import {
   LogOut, 
   User as UserIcon, 
   AlertTriangle, 
+  ClipboardList,
   FileText, 
   Phone,
   LayoutDashboard,
@@ -68,8 +69,10 @@ import FlameAnimation from './components/FlameAnimation';
 import AdminResidents from './components/AdminResidents';
 import PatrolScheduler from './components/PatrolScheduler';
 import RegistrationForm from './components/RegistrationForm';
+import { TanodActivityLogs } from './components/Admin/TanodActivityLogs';
 import IncidentForm from './components/IncidentForm';
 import ReportMap from './components/ReportMap';
+import { BrgyTanodQR } from './components/BrgyTanodQR';
 import { TanodLogo, TanodWordmark, BackgroundPattern, AppIcon } from './components/Branding';
 import { analyzeIncident } from './services/aiService';
 import { db as dexieDb } from './lib/mapDb';
@@ -118,7 +121,7 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'roster' | 'settings'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'roster' | 'settings' | 'logs'>('home');
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
 
   const [isRegistering, setIsRegistering] = useState(false);
@@ -498,7 +501,7 @@ export default function App() {
       return item.id !== 'map'; // Admins use Command & Tracker
     }
     if (effectiveRole === 'tanod') {
-      return !['residents', 'settings', 'map'].includes(item.id); // Tanods use Command & Tracker
+      return !['residents', 'settings', 'map', 'logs'].includes(item.id); // Tanods use Command & Tracker
     }
     // Residents see Dashboard (home), Map (map), Tracker (tracker), Comms (directory), Profile (settings)
     return ['home', 'map', 'tracker', 'directory', 'settings'].includes(item.id);
@@ -513,12 +516,12 @@ export default function App() {
       <BackgroundPattern />
       {/* Background Official Logo (Low Visibility) */}
       <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-[0.02] select-none">
-        <TanodLogo size={800} animated={false} className="grayscale contrast-150 rotate-[-15deg] blur-[2px]" />
+        <TanodLogo size={800} animated={false} useImage={false} className="grayscale contrast-150 rotate-[-15deg] blur-[2px]" />
       </div>
       {/* Mobile Top Bar */}
       <div className="md:hidden flex items-center justify-between p-5 glass-panel border-b border-white/5 shrink-0 z-[60] shadow-command">
         <div className="flex items-center gap-3">
-          <TanodLogo size={36} animated={false} />
+          <TanodLogo size={36} animated={false} useImage={false} />
           <span className="font-black italic tracking-tighter text-lg uppercase font-mono text-white leading-none">Brgy.TANOD <span className="text-emergency">🆘</span> ALERT</span>
         </div>
         <div className="flex items-center gap-2">
@@ -765,6 +768,7 @@ export default function App() {
             {activeTab === 'reports' && <ReportsView />}
             {activeTab === 'settings' && <SettingsView />}
             {activeTab === 'roster' && <TanodRosterView />}
+            {activeTab === 'logs' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <TanodActivityLogs />}
           </motion.div>
         </AnimatePresence>
 
@@ -876,6 +880,7 @@ function PendingApproval({ user, deferredPrompt, onInstall, onLogout }: { user: 
 
 const navItems = [
   { id: 'home', label: '📡 Command', icon: LayoutDashboard },
+  { id: 'logs', label: '📋 Activity Logs', icon: ClipboardList },
   { id: 'map', label: '🗺 Offline Map', icon: MapIcon },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
   { id: 'residents', label: '👥 Residents', icon: Users },
@@ -1376,6 +1381,10 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
 
       <motion.div variants={itemVariants} className="pb-16">
         <RecentAlerts residentId={profile.uid} />
+      </motion.div>
+
+      <motion.div variants={itemVariants} className="mb-16">
+        <BrgyTanodQR />
       </motion.div>
 
       <motion.div variants={itemVariants}>

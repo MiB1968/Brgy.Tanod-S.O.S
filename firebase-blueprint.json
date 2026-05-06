@@ -130,6 +130,52 @@
         "sirenTriggeredBy": { "type": "string" },
         "sirenTriggeredAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "TanodActivityLog": {
+      "title": "Tanod Activity Log",
+      "description": "Individual event logs for Tanod actions",
+      "type": "object",
+      "properties": {
+        "tanodId": { "type": "string" },
+        "tanodName": { "type": "string" },
+        "type": { "type": "string", "enum": ["duty_start", "duty_end", "alert_response", "patrol_marker", "status_change"] },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "alertId": { "type": "string" },
+        "responseTime": { "type": "number" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        }
+      },
+      "required": ["tanodId", "tanodName", "type", "details", "timestamp"]
+    },
+    "TanodPatrolSession": {
+      "title": "Tanod Patrol Session",
+      "description": "Aggregated patrol session data",
+      "type": "object",
+      "properties": {
+        "tanodId": { "type": "string" },
+        "tanodName": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "route": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lat": { "type": "number" },
+              "lng": { "type": "number" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "distanceCovered": { "type": "number" }
+      },
+      "required": ["tanodId", "tanodName", "startTime", "route"]
     }
   },
   "firestore": {
@@ -160,6 +206,14 @@
     "patrols": {
       "schema": "PatrolLocation",
       "description": "Live GPS tracking of tanods"
+    },
+    "tanod_activity_logs": {
+      "schema": "TanodActivityLog",
+      "description": "History of tanod operational activities"
+    },
+    "patrol_sessions": {
+      "schema": "TanodPatrolSession",
+      "description": "Recorded patrol routes and sessions"
     }
   }
 }

@@ -16,7 +16,7 @@ import toast from 'react-hot-toast';
 export default function BackgroundServices() {
   const { profile } = useAuthStore();
   const { setAlerts, addAlert, removeAlert, updateAlertStatus } = useIncidentStore();
-  const { setPatrols, setShifts } = useTanodStore();
+  const { setPatrols, setShifts, setActivityLogs, setPatrolSessions } = useTanodStore();
   const { clearActiveLogs } = useLogStore();
 
     // 2. Supabase Real-time Listener (The "Tactical Command" Feed)
@@ -205,19 +205,74 @@ export default function BackgroundServices() {
       setShifts(list);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'shifts'));
 
+    // D. Tanod Activity Logs Listener (Admin/SuperAdmin only)
+    let unsubActivity = () => {};
+    if (profile.role === 'admin' || profile.role === 'superadmin') {
+      const activityQ = query(collection(db, 'tanod_activity_logs'), orderBy('timestamp', 'desc'));
+      unsubActivity = onSnapshot(activityQ, (snapshot) => {
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        setActivityLogs(list);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'tanod_activity_logs'));
+    }
+
+    // E. Patrol Sessions Listener (Admin/SuperAdmin only)
+    let unsubSessions = () => {};
+    if (profile.role === 'admin' || profile.role === 'superadmin') {
+      const sessionsQ = query(collection(db, 'patrol_sessions'), orderBy('startTime', 'desc'));
+      unsubSessions = onSnapshot(sessionsQ, (snapshot) => {
+        const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        setPatrolSessions(list);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, 'patrol_sessions'));
+    }
+
     return () => {
       unsubAlerts();
       unsubPatrols();
       unsubShifts();
+      unsubActivity();
+      unsubSessions();
     };
   }, [profile]);
 
-  // 2. Continuous GPS Tracking for Tanods
+  // 2. Continuous GPS Tracking for Tanods & Patrol Route Recording
   useEffect(() => {
     if (!profile || profile.role !== 'tanod' || !auth?.currentUser || !db) return;
 
+    let sessionStartTime = new Date().toISOString();
+    const sessionId = `session_${profile.uid}_${new Date().getTime()}`;
+
+    // Start a new session in Firestore
+    const startSession = async () => {
+      try {
+        await setDoc(doc(db, 'patrol_sessions', sessionId), {
+          id: sessionId,
+          tanodId: profile.uid,
+          tanodName: profile.name,
+          startTime: sessionStartTime,
+          route: []
+        });
+        
+        // Log duty start
+        await addDoc(collection(db, 'tanod_activity_logs'), {
+          tanodId: profile.uid,
+          tanodName: profile.name,
+          type: 'duty_start',
+          timestamp: sessionStartTime,
+          details: 'Tanod went on duty and started patrol session.'
+        });
+      } catch (err) {
+        console.error('Failed to start patrol session:', err);
+      }
+    };
+
+    startSession();
+
+    let lastLoggedTime = 0;
     const stopWatching = watchLocation(async (loc) => {
       try {
+        const now = new Date().getTime();
+        
+        // Update active patrol status
         await setDoc(doc(db, 'patrols', profile.uid), {
           tanodId: profile.uid,
           tanodName: profile.name,
@@ -229,8 +284,34 @@ export default function BackgroundServices() {
           isActive: true,
           lastUpdate: new Date().toISOString()
         }, { merge: true });
+
+        // Log route point every 2 minutes or if distance is significant (simplified to 2 mins here)
+        if (now - lastLoggedTime > 120000) {
+          lastLoggedTime = now;
+          const timestamp = new Date().toISOString();
+          
+          // Use arrayUnion to append to the route
+          const { arrayUnion } = await import('firebase/firestore');
+          await setDoc(doc(db, 'patrol_sessions', sessionId), {
+            route: arrayUnion({
+              lat: loc.lat,
+              lng: loc.lng,
+              timestamp
+            })
+          }, { merge: true });
+
+          // Also log a patrol marker activity
+          await addDoc(collection(db, 'tanod_activity_logs'), {
+            tanodId: profile.uid,
+            tanodName: profile.name,
+            type: 'patrol_marker',
+            timestamp,
+            location: { lat: loc.lat, lng: loc.lng },
+            details: `Patrol marker recorded at ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+          });
+        }
       } catch (err) {
-        console.error('Failed to update patrol location:', err);
+        console.error('Failed to update patrol location/route:', err);
       }
     }, (err) => {
       console.warn('GPS tracking error:', err.message);
@@ -238,9 +319,19 @@ export default function BackgroundServices() {
 
     return () => {
       stopWatching();
-      // Optionally mark as inactive on unmount
       if (auth?.currentUser) {
+        const endTime = new Date().toISOString();
         setDoc(doc(db, 'patrols', profile.uid), { isActive: false }, { merge: true });
+        setDoc(doc(db, 'patrol_sessions', sessionId), { endTime }, { merge: true });
+        
+        // Log duty end
+        addDoc(collection(db, 'tanod_activity_logs'), {
+          tanodId: profile.uid,
+          tanodName: profile.name,
+          type: 'duty_end',
+          timestamp: endTime,
+          details: 'Tanod went offline/duty ended.'
+        });
       }
     };
   }, [profile]);

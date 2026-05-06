@@ -7,6 +7,7 @@ import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { PoliceLights } from './PoliceLights';
+import { BrgyTanodQR } from './BrgyTanodQR';
 import AboutModal from './AboutModal';
 import { InstallAppButton } from './InstallAppButton';
 import IncidentForm from './IncidentForm';
@@ -168,6 +169,26 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       }
 
       await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+
+      // Log Tanod Activity
+      if (status === 'responding' || status === 'resolved') {
+        const responseTime = status === 'responding' 
+          ? Math.floor((new Date(updateData.respondedAt).getTime() - new Date(alert.timestamp).getTime()) / 1000)
+          : undefined;
+
+        await addDoc(collection(db, 'tanod_activity_logs'), {
+          tanodId: profile?.uid || 'unknown',
+          tanodName: profile?.name || 'Unknown Tanod',
+          type: status === 'responding' ? 'alert_response' : 'status_change',
+          details: status === 'responding' 
+            ? `Responding to ${alert.type} alert from ${alert.residentName}`
+            : `Resolved alert from ${alert.residentName}`,
+          timestamp: new Date().toISOString(),
+          alertId: alert.id,
+          responseTime: responseTime,
+          location: alert.location
+        });
+      }
 
       if (profile?.uid) {
         try {
@@ -728,6 +749,10 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
              </div>
           </div>
           
+          <div className="pt-2 mb-8">
+            <BrgyTanodQR />
+          </div>
+
           <div className="pt-2">
             <InstallAppButton />
           </div>

@@ -25,6 +25,7 @@ import { InstallAppButton } from './InstallAppButton';
 import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { PoliceLights } from './PoliceLights';
+import { BrgyTanodQR } from './BrgyTanodQR';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -164,6 +165,25 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
       // Use setDoc merge true to be robust against missing documents
       await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+
+      // Log Tanod Activity
+      if (status === 'responding' || status === 'resolved') {
+        const responseTime = status === 'responding' 
+          ? Math.floor((new Date(updateData.respondedAt).getTime() - new Date(alert.timestamp).getTime()) / 1000)
+          : undefined;
+
+        await addDoc(collection(db, 'tanod_activity_logs'), {
+          tanodId: profile?.uid || 'admin-system',
+          tanodName: profile?.name || 'Admin Dispatch',
+          type: status === 'responding' ? 'alert_response' : 'status_change',
+          details: status === 'responding' 
+            ? `Responding to ${alert.type} alert from ${alert.residentName}`
+            : `Resolved alert from ${alert.residentName}`,
+          timestamp: new Date().toISOString(),
+          alertId: alert.id,
+          responseTime: responseTime
+        });
+      }
       
       // Update Tanod status in roster if we know who they are
       const tanodId = alert.respondedBy || updateData.respondedBy;
@@ -695,6 +715,10 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           patrols={patrols}
         />
       )}
+      <div className="mt-12 mb-16">
+        <BrgyTanodQR />
+      </div>
+
       <InstallAppButton />
     </motion.div>
   );

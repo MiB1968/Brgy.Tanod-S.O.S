@@ -6,6 +6,8 @@ import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import toast from 'react-hot-toast';
 
+import { TanodLogo } from './Branding';
+
 interface AboutModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -124,13 +126,14 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
           >
             {/* Header */}
             <div className="p-6 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-brand-red/10 to-transparent">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-brand-red/20 flex items-center justify-center border border-brand-red/30">
-                  <Shield className="w-6 h-6 text-brand-red animate-pulse" />
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-brand-red/20 blur-xl rounded-full" />
+                  <TanodLogo size={56} className="relative z-10 drop-shadow-[0_0_10px_rgba(255,75,75,0.5)]" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-black uppercase tracking-widest text-white italic leading-none">Brgy. Tanod S.O.S.</h2>
-                  <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">Secure Response Framework</p>
+                  <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">SECURE RESPONSE SYSTEM</p>
                 </div>
               </div>
               <button 

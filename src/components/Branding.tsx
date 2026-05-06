@@ -1,7 +1,24 @@
+import React from 'react';
 import { cn } from '../lib/utils';
 
 /* ── LOGO SVG COMPONENT ───────────────────────────────────── */
-export function TanodLogo({ size = 200, animated = true, className }: { size?: number, animated?: boolean, className?: string }) {
+export function TanodLogo({ size = 200, animated = true, className, useImage = true }: { size?: number, animated?: boolean, className?: string, useImage?: boolean }) {
+  const [imgError, setImgError] = React.useState(false);
+  const logoUrl = '/logo.png';
+
+  if (useImage && !imgError) {
+    return (
+      <div className={cn("relative overflow-hidden", className)} style={{ width: size, height: size }}>
+        <img 
+          src={logoUrl} 
+          alt="Official Logo" 
+          className="w-full h-full object-contain"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <svg width={size} height={size} viewBox="0 0 400 460" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>

@@ -3,13 +3,13 @@
   "name": "Barangay Tanod S.O.S.",
   "icons": [
     {
-      "src": "https://placehold.co/192x192/0d0505/ef4444?text=TANOD+SOS",
+      "src": "/logo.png",
       "type": "image/png",
       "sizes": "192x192",
       "purpose": "any maskable"
     },
     {
-      "src": "https://placehold.co/512x512/0d0505/ef4444?text=TANOD+SOS",
+      "src": "/logo.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"

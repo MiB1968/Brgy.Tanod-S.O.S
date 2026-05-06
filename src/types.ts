@@ -123,3 +123,34 @@ export interface Shift {
   notes?: string;
   createdAt: string;
 }
+
+export interface TanodActivityLog {
+  id: string;
+  tanodId: string;
+  tanodName: string;
+  type: 'duty_start' | 'duty_end' | 'alert_response' | 'patrol_marker' | 'status_change';
+  timestamp: string;
+  location?: {
+    lat: number;
+    lng: number;
+  };
+  details: string;
+  alertId?: string; // If it's an alert response
+  responseTime?: number; // In seconds, if applicable
+}
+
+export interface TanodRoutePoint {
+  lat: number;
+  lng: number;
+  timestamp: string;
+}
+
+export interface TanodPatrolSession {
+  id: string;
+  tanodId: string;
+  tanodName: string;
+  startTime: string;
+  endTime?: string;
+  route: TanodRoutePoint[];
+  distanceCovered?: number; // optional, for future analytics
+}

@@ -88,6 +88,47 @@ service cloud.firestore {
       allow read: if isTanod();
       allow write: if isTanod();
     }
+
+    // ==========================================
+    // VALIDATION HELPERS
+    // ==========================================
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['tanodId', 'tanodName', 'type', 'details', 'timestamp']) &&
+             data.tanodId is string && data.tanodId == request.auth.uid &&
+             data.tanodName is string && data.tanodName.size() <= 100 &&
+             data.type in ['duty_start', 'duty_end', 'alert_response', 'patrol_marker', 'status_change'] &&
+             data.timestamp is string;
+    }
+
+    function isValidPatrolSession(data) {
+      return data.keys().hasAll(['tanodId', 'tanodName', 'startTime', 'route']) &&
+             data.tanodId is string && data.tanodId == request.auth.uid &&
+             data.tanodName is string &&
+             data.startTime is string &&
+             data.route is list && data.route.size() <= 5000;
+    }
+
+    // Tanod Activity Logs
+    match /tanod_activity_logs/{logId} {
+      // Admins see all, Tanods only see their own (if they query correctly)
+      allow read: if isAdmin() || (isTanod() && resource.data.tanodId == request.auth.uid);
+      allow create: if isTanod() && isValidActivityLog(incoming());
+      allow update, delete: if isAdmin();
+    }
+
+    // Patrol Sessions
+    match /patrol_sessions/{sessionId} {
+      allow read: if isAdmin() || (isTanod() && resource.data.tanodId == request.auth.uid);
+      allow create: if isTanod() && isValidPatrolSession(incoming());
+      allow update: if isTanod() && incoming().tanodId == existing().tanodId && incoming().tanodId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
     
     // System Connection Test
     match /test/connection {
