@@ -23,12 +23,16 @@ export function BrgyTanodQR({ className }: { className?: string }) {
         </div>
 
         <div className="flex flex-col md:flex-row gap-6 items-center">
-          <div className="relative p-3 bg-white rounded-3xl group-hover:scale-105 transition-transform duration-500 shadow-2xl">
-            {/* The QR Code - using a generated one for now until the user confirms the image path */}
+          <div className="relative p-3 bg-white rounded-3xl group-hover:scale-105 transition-transform duration-500 shadow-2xl overflow-hidden">
             <img 
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=000000`}
+              src="/Official-Url-QR.png"
               alt="Scan to Access"
-              className="w-32 h-32 md:w-40 md:h-40"
+              className="w-32 h-32 md:w-40 md:h-40 object-contain"
+              onError={(e) => {
+                // Fallback to generated QR if the image is missing
+                const target = e.target as HTMLImageElement;
+                target.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=ffffff&color=000000`;
+              }}
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                <div className="bg-brand-bg/80 backdrop-blur-sm p-4 rounded-full border border-white/10">

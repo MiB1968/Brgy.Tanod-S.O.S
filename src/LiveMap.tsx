@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
+import { cn } from "./lib/utils";
 import { startGPS } from "./gpsSystem";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
@@ -231,17 +232,104 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
   );
 }
 
+import { downloadRegion, Bounds } from "./lib/mapDownloader";
+import { Download, HardDrive, ShieldCheck } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+
+function MapDownloadControl() {
+  const map = useMap();
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    
+    const b = map.getBounds();
+    const bounds: Bounds = {
+      minLat: b.getSouth(),
+      maxLat: b.getNorth(),
+      minLng: b.getWest(),
+      maxLng: b.getEast()
+    };
+
+    setDownloading(true);
+    try {
+      await downloadRegion(bounds, [14, 15, 16], (current, total) => {
+        setProgress({ current, total });
+      });
+      alert(`Success! Cached ${progress.total} map tiles for offline use.`);
+    } catch (err) {
+      console.error("Download failed", err);
+      alert("Map download interrupted. Please check connection.");
+    } finally {
+      setDownloading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
+
+  return (
+    <div className="absolute top-3 right-3 z-[401] flex flex-col items-end gap-2">
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        className={cn(
+          "flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border transition-all shadow-lg",
+          downloading 
+            ? "bg-amber-500/20 border-amber-400/40 text-amber-300"
+            : "bg-black/65 border-white/10 text-white hover:bg-white/10"
+        )}
+      >
+        {downloading ? (
+          <div className="flex items-center gap-3">
+             <div className="w-4 h-4 border-2 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
+             <span className="text-[11px] font-black font-mono">
+               CACHING: {Math.round((progress.current / progress.total) * 100)}%
+             </span>
+          </div>
+        ) : (
+          <>
+            <HardDrive size={14} className="text-info" />
+            <span className="text-[11px] font-black font-mono uppercase tracking-widest">Cache Region</span>
+          </>
+        )}
+      </button>
+      
+      <AnimatePresence>
+        {downloading && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-black/80 backdrop-blur-xl border border-white/5 p-4 rounded-2xl w-48 shadow-2xl"
+          >
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Mission Progress</span>
+              <span className="text-[10px] font-mono text-amber-400">{progress.current}/{progress.total}</span>
+            </div>
+            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+              <motion.div 
+                className="h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                initial={{ width: 0 }}
+                animate={{ width: `${(progress.current / progress.total) * 100}%` }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ─── LiveMap ──────────────────────────────────────────────────────────────────
 export default function LiveMap() {
   const { alerts }  = useIncidentStore();
   const { patrols } = useTanodStore();
-
   const [showPatrols, setShowPatrols] = useState(true);
   const [showSOS,     setShowSOS]     = useState(true);
   const [showRoutes,  setShowRoutes]  = useState(true);
   const [showLegend,  setShowLegend]  = useState(false);
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
-
+  
   const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
 
@@ -257,7 +345,7 @@ export default function LiveMap() {
 
   return (
     <div className="w-full h-full min-h-[400px] rounded-[32px] overflow-hidden border border-white/5 shadow-2xl relative bg-[#0F1115]">
-
+      
       {/* ── Status badges ── */}
       <div className="absolute top-3 left-3 z-[401] flex flex-wrap gap-2 items-center">
         {/* Patrols count */}
@@ -423,6 +511,7 @@ export default function LiveMap() {
         })}
 
         <LocateBtn onLocated={setUserPos} />
+        <MapDownloadControl />
       </MapContainer>
     </div>
   );

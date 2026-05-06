@@ -23,9 +23,17 @@
   --color-info: #007AFF;
   
   --shadow-command: 0 0 20px 0 rgba(0, 0, 0, 0.5);
-  --shadow-glow-red: 0 0 15px rgba(255, 59, 48, 0.3);
+  --shadow-glow-red: 0 0 15px rgba(239, 68, 68, 0.5);
+  --shadow-glow-white: 0 0 20px rgba(255, 255, 255, 0.4);
   --shadow-glow-orange: 0 0 15px rgba(255, 149, 0, 0.3);
   --shadow-glow-amber: 0 0 15px rgba(255, 214, 10, 0.3);
+}
+
+@layer utilities {
+  .pattern-diagonal {
+    background-image: repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%);
+    background-size: 10px 10px;
+  }
 }
 
 @layer base {

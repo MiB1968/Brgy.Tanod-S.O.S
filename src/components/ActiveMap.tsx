@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-le
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
 import React, { useEffect, useState, useCallback } from 'react';
-import { downloadRegion } from '../lib/mapDownloader';
+import { downloadRegion, OCCIDENTAL_MINDORO_BOUNDS } from '../lib/mapDownloader';
 import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -129,7 +129,7 @@ export default function ActiveMap({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      await downloadRegion((current, total) => {
+      await downloadRegion(OCCIDENTAL_MINDORO_BOUNDS, [14, 15, 16], (current, total) => {
         setProgress({ current, total });
       });
       setIsDownloaded(true);

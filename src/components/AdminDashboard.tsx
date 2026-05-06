@@ -14,7 +14,10 @@ import {
   Zap,
   MoreVertical,
   Info,
-  Filter
+  Filter,
+  Radio,
+  Megaphone,
+  Locate
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -687,23 +690,127 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             </div>
           </div>
           
-          <div className="bg-emergency rounded-[40px] p-10 text-white shadow-glow-red relative overflow-hidden group">
-            <div className="relative z-10">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-3 opacity-60 font-mono">Panic Protocol</p>
-              <p className="text-3xl font-black italic tracking-tighter mb-8 font-mono leading-none">GLOBAL AUDIO BROADCAST</p>
-              <button 
-                onClick={onToggleSiren}
-                className={cn(
-                  "w-full py-5 font-black rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl uppercase italic tracking-[0.2em] text-xs font-mono border",
-                  sirenActive 
-                    ? "bg-white text-emergency border-white animate-pulse" 
-                    : "bg-emergency/50 text-white border-white/30 hover:bg-emergency hover:border-white"
+          {/* Redesigned Panic Protocol */}
+          <div className={cn(
+            "rounded-[48px] p-[2px] transition-all duration-500 overflow-hidden relative group",
+            sirenActive ? "bg-emergency shadow-[0_0_50px_rgba(239,68,68,0.4)]" : "bg-white/5"
+          )}>
+            <div className={cn(
+              "glass-panel rounded-[46px] p-10 h-full relative overflow-hidden transition-all duration-500",
+              sirenActive ? "bg-emergency/20" : "bg-brand-bg/40"
+            )}>
+              {/* Tactical Background Elements */}
+              <div className="absolute inset-0 pointer-events-none opacity-[0.03] pattern-diagonal" />
+              <div className="scanline opacity-[0.07]" />
+              
+              {/* Functional Siren Light System */}
+              {sirenActive && (
+                <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+                  <motion.div 
+                    animate={{ opacity: [0, 0.4, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.15, ease: "linear" }}
+                    className="absolute inset-0 bg-white"
+                  />
+                  <motion.div 
+                    animate={{ opacity: [0, 0.4, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.15, delay: 0.075, ease: "linear" }}
+                    className="absolute inset-0 bg-emergency"
+                  />
+                  {/* Volumetric Sweeping Beam */}
+                  <motion.div 
+                    initial={{ top: "-100%" }}
+                    animate={{ top: "200%" }}
+                    transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                    className="absolute left-0 right-0 h-32 bg-white/20 blur-[60px] -skew-y-12"
+                  />
+                  {/* High-Energy Glow */}
+                  <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(255,255,255,0.2)] animate-pulse" />
+                </div>
+              )}
+              
+              {/* Dangerous Area Indicator */}
+              <div className={cn(
+                "absolute top-0 left-0 w-full h-1 transition-all duration-500",
+                sirenActive ? "bg-white animate-pulse" : "bg-emergency/30"
+              )} />
+
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-10 h-10 rounded-2xl flex items-center justify-center border transition-all duration-500",
+                      sirenActive ? "bg-white border-white shadow-glow-white text-emergency" : "bg-emergency/10 border-emergency/20 text-emergency"
+                    )}>
+                      <Radio size={20} className={cn(sirenActive && "animate-bounce")} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 font-mono leading-none mb-1">Authorization Layer 4</p>
+                      <h4 className="text-sm font-black text-white font-mono uppercase tracking-widest italic">Panic Protocol</h4>
+                    </div>
+                  </div>
+                  {sirenActive && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emergency text-white rounded-lg animate-pulse">
+                      <Zap size={10} fill="currentColor" />
+                      <span className="text-[9px] font-black uppercase font-mono tracking-tighter">Broadcasting</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-10 min-h-[80px]">
+                  <p className={cn(
+                    "text-3xl font-black italic tracking-tighter font-mono leading-[0.9] transition-all duration-500",
+                    sirenActive ? "text-white scale-105" : "text-white/80 group-hover:text-white"
+                  )}>
+                    GLOBAL AUDIO <br />
+                    <span className={cn(sirenActive ? "text-white" : "text-emergency")}>BROADCAST</span>
+                  </p>
+                  <p className="text-[9px] font-mono text-white/30 mt-4 leading-relaxed uppercase tracking-tight">
+                    Synchronous siren activation across all <br />
+                    active resident mobile nodes in cluster.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={onToggleSiren}
+                  className={cn(
+                    "w-full py-6 font-black rounded-3xl transition-all duration-300 shadow-xl uppercase italic tracking-[0.3em] text-xs font-mono border-2 flex items-center justify-center gap-4 group/btn relative overflow-hidden",
+                    sirenActive 
+                      ? "bg-white text-emergency border-white hover:bg-white/90 active:scale-95" 
+                      : "bg-emergency/10 text-emergency border-emergency/40 hover:bg-emergency hover:text-white hover:border-emergency active:scale-95 shadow-lg shadow-emergency/20"
+                  )}
+                >
+                  <div className="relative z-10 flex items-center gap-3">
+                    {sirenActive ? (
+                      <>
+                        <div className="w-2 h-2 bg-emergency rounded-full animate-ping" />
+                        TERMINATE BROADCAST
+                      </>
+                    ) : (
+                      <>
+                        <Megaphone size={16} className="group-hover/btn:rotate-12 transition-transform" />
+                        ARM & INITIATE SIREN
+                      </>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none" />
+                </button>
+                
+                {!sirenActive && (
+                  <div className="mt-6 flex items-center justify-center gap-2 opacity-20 group-hover:opacity-40 transition-opacity">
+                    <Shield size={10} />
+                    <span className="text-[8px] font-mono font-black uppercase tracking-[0.2em]">Verified Ops Only</span>
+                  </div>
                 )}
-              >
-                {sirenActive ? "STOP GLOBAL SIREN" : "TRIGGER GLOBAL BROADCAST"}
-              </button>
+              </div>
+              
+              {/* Decorative Large Background Icon */}
+              <AlertTriangle 
+                className={cn(
+                  "absolute -bottom-16 -right-16 w-64 h-64 transition-all duration-700 pointer-events-none",
+                  sirenActive ? "text-white opacity-10 rotate-0 scale-110" : "text-emergency opacity-5 -rotate-12 group-hover:rotate-0"
+                )} 
+              />
             </div>
-            <AlertTriangle className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700" />
           </div>
         </div>
       </motion.div>

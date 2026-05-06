@@ -1,6 +1,6 @@
 import { cacheTile } from './mapDb';
 
-const OCCIDENTAL_MINDORO_BOUNDS = {
+export const OCCIDENTAL_MINDORO_BOUNDS = {
   minLat: 13.10, // Mamburao specific bounds
   maxLat: 13.35,
   minLng: 120.50,
@@ -15,19 +15,28 @@ function lng2tile(lon: number, zoom: number) {
   return (Math.floor((lon + 180) / 360 * Math.pow(2, zoom)));
 }
 
-export async function downloadRegion(onProgress: (current: number, total: number) => void) {
-  const zoomLevels = [9, 10, 11, 12, 13, 14, 15, 16];
+export interface Bounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+export async function downloadRegion(
+  bounds: Bounds,
+  zoomLevels: number[] = [12, 13, 14, 15, 16],
+  onProgress: (current: number, total: number) => void
+) {
   const tasks: { url: string }[] = [];
 
   for (const zoom of zoomLevels) {
-    const startX = lng2tile(OCCIDENTAL_MINDORO_BOUNDS.minLng, zoom);
-    const endX = lng2tile(OCCIDENTAL_MINDORO_BOUNDS.maxLng, zoom);
-    const startY = lat2tile(OCCIDENTAL_MINDORO_BOUNDS.maxLat, zoom);
-    const endY = lat2tile(OCCIDENTAL_MINDORO_BOUNDS.minLat, zoom);
+    const startX = lng2tile(bounds.minLng, zoom);
+    const endX = lng2tile(bounds.maxLng, zoom);
+    const startY = lat2tile(bounds.maxLat, zoom);
+    const endY = lat2tile(bounds.minLat, zoom);
 
     for (let x = startX; x <= endX; x++) {
       for (let y = startY; y <= endY; y++) {
-        // Use OpenStreetMap to follow guidelines and avoid black/dark tiles
         tasks.push({ url: `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png` });
       }
     }

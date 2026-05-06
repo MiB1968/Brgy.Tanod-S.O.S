@@ -1267,42 +1267,102 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       {!activeAlert && (
         <motion.div 
           variants={itemVariants}
-          className="glass-panel border-white/5 rounded-[48px] p-8 md:p-16 relative overflow-hidden group"
+          className="relative max-w-2xl mx-auto"
         >
-          <div className="scanline" />
-          <div className="absolute top-0 right-0 w-96 h-96 bg-emergency/10 blur-[120px] -mr-48 -mt-48 transition-all group-hover:bg-emergency/20"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-info/5 blur-[100px] -ml-32 -mb-32"></div>
-
-          <div className="relative z-10 flex flex-col items-center text-center">
-            <h2 className="text-5xl md:text-7xl font-black tracking-tighter mb-6 italic text-white uppercase font-mono leading-none animate-pulse">Command Ready</h2>
-            <p className="text-white/40 max-w-lg text-lg mb-16 font-medium leading-relaxed">
-              Immediate connection to the Barangay Emergency Network. <span className="text-white font-bold italic">Push to neutralize risk.</span>
-            </p>
+          {/* Tactical Frame */}
+          <div className="absolute -inset-4 border border-white/5 rounded-[64px] pointer-events-none opacity-50" />
+          <div className="absolute -inset-2 border border-white/10 rounded-[56px] pointer-events-none opacity-20" />
+          
+          <div className="glass-panel border-white/5 rounded-[48px] p-10 md:p-16 relative overflow-hidden group shadow-2xl bg-brand-bg/40">
+            {/* Tactical Details */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emergency/30 to-transparent" />
+            <div className="absolute inset-0 pattern-diagonal opacity-[0.03] pointer-events-none" />
+            <div className="scanline" />
             
-            <button 
-              disabled={sending}
-              onClick={() => setIsChoosingCategory(true)}
-              className={cn(
-                "relative w-64 h-64 md:w-80 md:h-80 rounded-full flex flex-col items-center justify-center gap-4 transition-all duration-700 shadow-glow-red group active:scale-90",
-                sending ? "bg-emergency/50 scale-95" : "bg-emergency hover:bg-emergency/90"
-              )}
-            >
-              <div className="absolute inset-0 bg-emergency rounded-full filter blur-[40px] opacity-10 group-hover:opacity-30 transition-opacity"></div>
-              <div className="absolute inset-4 border-[1px] border-white/20 rounded-full border-dashed animate-[spin_15s_linear_infinite] opacity-30"></div>
-              <div className="absolute inset-8 border-[1px] border-white/10 rounded-full border-dashed animate-[spin_10s_linear_infinite_reverse] opacity-20"></div>
-              
-              <div className="z-10 group-hover:scale-110 transition-transform duration-500 shadow-xl">
-                <TanodLogo size={140} animated={!sending} className="drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]" />
+            <div className="absolute top-8 left-8 flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
+                <span className="text-[8px] font-mono font-black text-white/20 uppercase tracking-[0.4em]">Auth Layer 1</span>
+              </div>
+              <span className="text-[10px] font-mono font-black text-white/40 uppercase tracking-[0.2em] italic">Resident SOS Protocol</span>
+            </div>
+
+            <div className="absolute top-8 right-8 text-right opacity-20 group-hover:opacity-40 transition-opacity">
+              <Shield size={12} className="text-white ml-auto mb-1" />
+              <span className="text-[7px] font-mono font-black text-white uppercase tracking-tighter">SECURED_LINK</span>
+            </div>
+
+            <div className="relative z-10 flex flex-col items-center text-center mt-8">
+              <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-4 italic text-white uppercase font-mono leading-none">
+                COMMAND <span className="text-emergency">STATUS</span>
+              </h2>
+              <div className="flex items-center gap-2 mb-12">
+                <span className="h-[1px] w-8 bg-white/20" />
+                <p className="text-white/30 text-[9px] font-black uppercase tracking-[0.4em] font-mono">Standby / Network Ready</p>
+                <span className="h-[1px] w-8 bg-white/20" />
               </div>
               
-              <span className="z-10 text-2xl font-black italic tracking-tighter text-white font-mono mt-2 drop-shadow-md">
-                {sending ? 'COMM LINK...' : 'INITIATE SOS'}
-              </span>
+              <div className="relative">
+                {/* Visual Feedback Rings */}
+                <div className="absolute inset-0 -m-8 border border-emergency/10 rounded-full animate-[spin_20s_linear_infinite] opacity-20" />
+                <div className="absolute inset-0 -m-4 border border-emergency/20 rounded-full animate-[spin_10s_linear_infinite_reverse] opacity-30" />
+                
+                <button 
+                  disabled={sending}
+                  onClick={() => setIsChoosingCategory(true)}
+                  className={cn(
+                    "relative w-64 h-64 md:w-80 md:h-80 rounded-full flex flex-col items-center justify-center gap-4 transition-all duration-700 shadow-glow-red group active:scale-95 z-10 relative overflow-hidden",
+                    sending ? "bg-emergency/50 scale-95" : "bg-emergency/10 border-4 border-emergency/40 hover:bg-emergency group-hover:border-white/50"
+                  )}
+                >
+                  {/* Internal Glows */}
+                  <div className="absolute inset-0 bg-emergency/20 blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  <div className="z-10 group-hover:scale-110 transition-transform duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                    <TanodLogo 
+                      size={140} 
+                      animated={!sending} 
+                      className={cn(
+                        "transition-all duration-500",
+                        !sending && "text-emergency group-hover:text-white"
+                      )} 
+                    />
+                  </div>
+                  
+                  <div className="z-10 flex flex-col items-center gap-1 mt-2">
+                    <span className={cn(
+                      "text-2xl font-black italic tracking-tighter uppercase font-mono transition-colors",
+                      sending ? "text-white/50" : "text-white group-hover:text-white"
+                    )}>
+                      {sending ? 'COMM LINK...' : 'INITIATE SOS'}
+                    </span>
+                    <span className="text-[8px] font-black font-mono text-white/20 uppercase tracking-[0.2em] group-hover:text-white/40">Transmit Emergency</span>
+                  </div>
 
-              {/* Ping Ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-emergency/30 animate-[ping_2s_infinite]"></div>
-              <div className="absolute inset-0 rounded-full border-2 border-emergency/20 animate-[ping_3s_infinite_1s]"></div>
-            </button>
+                  {/* Pulsing Core */}
+                  {!sending && (
+                    <div className="absolute inset-0 rounded-full border-4 border-emergency/30 animate-[ping_3s_infinite] opacity-50" />
+                  )}
+                </button>
+              </div>
+
+              <div className="mt-16 flex flex-col items-center gap-4">
+                <div className="flex gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="w-6 h-1 rounded-full bg-emergency/20 overflow-hidden">
+                      <motion.div 
+                        initial={{ x: "-100%" }}
+                        animate={{ x: "100%" }}
+                        transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2, ease: "linear" }}
+                        className="h-full w-full bg-emergency"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-white/20 text-[8px] font-mono font-black uppercase tracking-[0.3em]">Neural Sync Active • Cluster: Mamburao_Main</p>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}
