@@ -25,17 +25,31 @@ export function PoliceLights({ active }: { active: boolean }) {
             />
           </div>
           
-          {/* Screen Vignette Flash */}
+          {/* Screen Vignette Flash with Rings */}
           <motion.div 
-            className="absolute inset-0 border-[20px] border-red-600/20"
-            animate={{ opacity: [0, 1, 0, 0, 0] }}
+            className="absolute inset-0 border-[40px] border-red-600/20"
+            animate={{ opacity: [0, 1, 0, 0, 0], scale: [1, 1.02, 1] }}
             transition={{ duration: 0.8, repeat: Infinity }}
           />
           <motion.div 
-            className="absolute inset-0 border-[20px] border-blue-600/20"
-            animate={{ opacity: [0, 0, 0, 1, 0] }}
+            className="absolute inset-0 border-[40px] border-blue-600/20"
+            animate={{ opacity: [0, 0, 0, 1, 0], scale: [1, 1.02, 1] }}
             transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
           />
+          
+          {/* Pulsing Central Rings (Codepen rggjXp inspiration) */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-30">
+            <motion.div 
+              className="absolute w-[30vw] h-[30vw] border-8 border-red-600 rounded-full"
+              animate={{ scale: [0.5, 2], opacity: [0.8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+            />
+            <motion.div 
+              className="absolute w-[30vw] h-[30vw] border-8 border-blue-600 rounded-full"
+              animate={{ scale: [0.5, 2], opacity: [0.8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut", delay: 0.75 }}
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

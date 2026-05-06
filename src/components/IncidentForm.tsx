@@ -50,6 +50,7 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
         tanodName: profile.name,
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString(),
+        createdAt: new Date().toISOString(),
         adminOnDuty: adminName
       };
 

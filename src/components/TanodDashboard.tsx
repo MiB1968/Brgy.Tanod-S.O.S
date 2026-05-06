@@ -289,22 +289,22 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           </h2>
           <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.3em] mt-2 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Securing Brgy. Intelligence Network</p>
         </div>
-        <div className="flex flex-col md:flex-row items-center gap-3">
+        <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
           <button
             onClick={() => setIsReportFormOpen(true)}
-            className="flex items-center gap-3 px-6 py-2.5 rounded-xl bg-emergency/10 border border-emergency/30 hover:bg-emergency/20 transition-all group shadow-glow-red"
+            className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 rounded-2xl bg-emergency text-white hover:bg-red-600 transition-all group shadow-glow-red active:scale-95"
             id="file-report-btn"
           >
-            <FilePlus className="w-4 h-4 text-emergency group-hover:scale-110 transition-transform" />
-            <span className="text-[10px] font-black text-emergency uppercase tracking-[0.25em] font-mono">File Incident Report</span>
+            <FilePlus className="w-5 h-5 text-white group-hover:rotate-12 transition-transform" />
+            <span className="text-[12px] font-black uppercase tracking-[0.2em] font-mono italic">File Incident Report</span>
           </button>
           <button
             onClick={() => setIsAboutOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
+            className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
             id="tanod-about-btn"
           >
             <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">Project Vision & Guidelines</span>
+            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">Mission Guidelines</span>
           </button>
         </div>
       </motion.div>

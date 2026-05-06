@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Shield, Zap, MapPin, Users, Globe, Github, BookOpen, User, Award, Info, CheckCircle, Camera, Quote, ExternalLink, Plus } from 'lucide-react';
+import { X, Shield, Zap, MapPin, Users, Globe, BookOpen, User, Award, Info, CheckCircle, Camera, Quote, Plus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -222,7 +222,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                     <CheckCircle className="w-5 h-5 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase text-white tracking-[0.2em] font-mono leading-none">GitHub Community Review</p>
+                    <p className="text-[10px] font-black uppercase text-white tracking-[0.2em] font-mono leading-none">Systems Architect Review</p>
                     <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest font-mono mt-1">International Full-Stack Architect</p>
                   </div>
                 </div>
@@ -231,7 +231,17 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
               {/* Developer Credentials - Interactive Avatar Upload */}
               <section className="pt-8 border-t border-white/5">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-8 font-mono">Project Leadership</h3>
-                <div className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[40px] bg-[#161B22] border border-white/5 relative overflow-hidden group/dev">
+                <div 
+                  className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[40px] bg-[#161B22] border border-white/5 relative overflow-hidden group/dev"
+                  style={{ 
+                    backgroundImage: "url('/SuperAdmin-bg.png')",
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundBlendMode: 'overlay'
+                  }}
+                >
+                  {/* Background Overlay (Accurate Low Visibility) */}
+                  <div className="absolute inset-0 bg-[#161B22]/90 backdrop-blur-[1px]" />
                   
                   <input 
                     type="file" 
@@ -290,19 +300,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
               {(role === 'admin' || role === 'superadmin') && (
                 <section className="space-y-4">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 font-mono">System Maintenance</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <a 
-                      href="https://github.com/MiB1968/Brgy.Tanod-S.O.S" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/[0.08] hover:border-brand-red/30 transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Github className="w-5 h-5 text-white/40 group-hover:text-brand-red transition-colors" />
-                        <span className="text-[10px] font-black text-white/40 group-hover:text-white uppercase tracking-widest font-mono">Source Code</span>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-white/10" />
-                    </a>
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="flex items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 opacity-50 cursor-not-allowed">
                       <div className="flex items-center gap-3">
                         <BookOpen className="w-5 h-5 text-white/20" />

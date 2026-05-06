@@ -511,6 +511,10 @@ export default function App() {
       </div>
       <Toaster />
       <BackgroundPattern />
+      {/* Background Official Logo (Low Visibility) */}
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-[0.02] select-none">
+        <TanodLogo size={800} animated={false} className="grayscale contrast-150 rotate-[-15deg] blur-[2px]" />
+      </div>
       {/* Mobile Top Bar */}
       <div className="md:hidden flex items-center justify-between p-5 glass-panel border-b border-white/5 shrink-0 z-[60] shadow-command">
         <div className="flex items-center gap-3">
@@ -638,7 +642,7 @@ export default function App() {
       <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 flex flex-col">
       <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
           <div className="flex-1 w-full">
-            <div className="flex justify-between items-start w-full">
+            <div className="flex justify-between items-start w-full transition-all">
               <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white">
                 {activeTab}
               </h1>
@@ -678,18 +682,35 @@ export default function App() {
                 </button>
               </div>
             )}
-            {(effectiveRole === 'tanod' || effectiveRole === 'admin' || effectiveRole === 'superadmin') && (
+            
+            <div className="flex items-center gap-2">
               <button 
-                onClick={() => setIsIncidentFormOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-emergency rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-xs tracking-widest"
+                onClick={toggleGlobalSiren}
+                className={cn(
+                  "p-3 rounded-2xl border transition-all group relative",
+                  globalSirenActive 
+                    ? "bg-emergency border-white/20 text-white animate-pulse shadow-glow-red" 
+                    : "bg-brand-card border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20"
+                )}
+                title={globalSirenActive ? "Stop Global Emergency Broadcast" : "Activate Global Siren"}
               >
-                <Plus className="w-4 h-4 stroke-[3px]" /> NEW INCIDENT
+                {globalSirenActive ? <VolumeX className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Volume2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
               </button>
-            )}
-            <button className="p-3 bg-brand-card border border-white/10 rounded-2xl hover:bg-brand-card/80 relative transition-all group">
-              <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emergency border-2 border-brand-bg rounded-full animate-ping"></span>}
-            </button>
+
+              {(effectiveRole === 'tanod' || effectiveRole === 'admin' || effectiveRole === 'superadmin') && (
+                <button 
+                  onClick={() => setIsIncidentFormOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-emergency rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-xs tracking-widest"
+                >
+                  <Plus className="w-4 h-4 stroke-[3px]" /> NEW INCIDENT
+                </button>
+              )}
+              
+              <button className="p-3 bg-brand-card border border-white/10 rounded-2xl hover:bg-brand-card/80 relative transition-all group">
+                <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emergency border-2 border-brand-bg rounded-full animate-ping"></span>}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -1164,22 +1185,6 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       animate="show"
       className="space-y-8 pb-32 relative"
     >
-      {/* Siren Control (Manual Override) */}
-      <motion.div variants={itemVariants} className="flex justify-center -mb-4">
-        <button 
-          onClick={onToggleSiren}
-          className={cn(
-            "px-6 py-3 rounded-2xl border text-[10px] font-black uppercase tracking-[0.2em] font-mono transition-all flex items-center gap-2 shadow-xl",
-            sirenActive 
-              ? "bg-emergency border-white/30 text-white animate-pulse" 
-              : "bg-white/5 border-white/5 text-white/30 hover:bg-white/10 hover:border-white/10"
-          )}
-        >
-          {sirenActive ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          {sirenActive ? "STOP EMERGENCY BROADCAST" : "ACTIVATE EMERGENCY SIREN"}
-        </button>
-      </motion.div>
-
       {deferredPrompt && (
         <motion.button
           variants={itemVariants}
