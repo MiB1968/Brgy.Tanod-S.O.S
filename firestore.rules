@@ -8,7 +8,7 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     
     function isMasterAdmin() { 
-      return isSignedIn() && request.auth.token.email == 'rubenlleg12@gmail.com';
+      return isSignedIn() && (request.auth.token.email == 'rubenlleg12@gmail.com' || request.auth.token.email == 'ronniecantuba420@gmail.com');
     }
 
     function isOwner(userId) {

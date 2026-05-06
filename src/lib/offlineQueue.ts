@@ -1,33 +1,38 @@
-const SOS_QUEUE_KEY = 'brgy_tanod_sos_queue';
+import { db } from './mapDb';
 
 export interface QueuedSOS {
-  id: string;
+  id?: number;
   data: any;
   timestamp: number;
 }
 
-export function queueSOS(data: any) {
+export async function queueSOS(data: any) {
   try {
-    const queue: QueuedSOS[] = JSON.parse(localStorage.getItem(SOS_QUEUE_KEY) || '[]');
-    const newItem: QueuedSOS = {
-      id: crypto.randomUUID(),
+    const id = await db.pendingAlerts.add({
       data,
       timestamp: Date.now(),
-    };
-    queue.push(newItem);
-    localStorage.setItem(SOS_QUEUE_KEY, JSON.stringify(queue));
-    return newItem.id;
+    });
+    console.log('SOS queued in IndexedDB:', id);
+    return id.toString();
   } catch (error) {
-    console.error('Failed to queue SOS:', error);
+    console.error('Failed to queue SOS in IndexedDB:', error);
     return null;
   }
 }
 
-export function removeQueuedSOS(idToRemove: string) {
+export async function removeQueuedSOS(idToRemove: string) {
   try {
-    const queue: QueuedSOS[] = JSON.parse(localStorage.getItem(SOS_QUEUE_KEY) || '[]');
-    const filtered = queue.filter(item => item.id !== idToRemove && item.data.id !== idToRemove);
-    localStorage.setItem(SOS_QUEUE_KEY, JSON.stringify(filtered));
+    // If it's a numeric ID from Dexie
+    if (!isNaN(Number(idToRemove))) {
+      await db.pendingAlerts.delete(Number(idToRemove));
+      return;
+    }
+    
+    // Otherwise search by data.id (the UUID)
+    const item = await db.pendingAlerts.filter(item => item.data.id === idToRemove).first();
+    if (item && item.id) {
+      await db.pendingAlerts.delete(item.id);
+    }
   } catch (error) {
     console.error('Failed to remove queued SOS:', error);
   }
@@ -35,33 +40,38 @@ export function removeQueuedSOS(idToRemove: string) {
 
 export async function flushSOSQueue(processFn: (data: any) => Promise<void>) {
   try {
-    const queue: QueuedSOS[] = JSON.parse(localStorage.getItem(SOS_QUEUE_KEY) || '[]');
+    const queue = await db.pendingAlerts.toArray();
     if (queue.length === 0) return;
 
-    console.log(`Flushing ${queue.length} queued SOS messages...`);
-    
-    const remainingQueue: QueuedSOS[] = [];
+    console.log(`[IndexedDB] Flushing ${queue.length} queued SOS messages...`);
     
     for (const item of queue) {
       try {
         await processFn(item.data);
+        // If successful, remove it
+        if (item.id) await db.pendingAlerts.delete(item.id);
       } catch (error) {
         console.error(`Failed to process queued SOS ${item.id}:`, error);
-        remainingQueue.push(item); // Keep it in the queue for next retry
+        // Keep it in queue for next retry
       }
     }
-
-    localStorage.setItem(SOS_QUEUE_KEY, JSON.stringify(remainingQueue));
   } catch (error) {
-    console.error('Failed to flush SOS queue:', error);
+    console.error('Failed to flush SOS queue from IndexedDB:', error);
   }
 }
 
-export function getQueueSize(): number {
+export async function getQueueSize(): Promise<number> {
   try {
-    const queue: QueuedSOS[] = JSON.parse(localStorage.getItem(SOS_QUEUE_KEY) || '[]');
-    return queue.length;
+    return await db.pendingAlerts.count();
   } catch {
     return 0;
+  }
+}
+
+export async function getQueuedItems(): Promise<QueuedSOS[]> {
+  try {
+    return await db.pendingAlerts.toArray();
+  } catch {
+    return [];
   }
 }

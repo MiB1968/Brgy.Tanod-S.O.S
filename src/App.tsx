@@ -63,7 +63,7 @@ import TanodDashboard from './components/TanodDashboard';
 import AboutModal from './components/AboutModal';
 import { Shift } from './types';
 import { format } from 'date-fns';
-import { queueSOS, removeQueuedSOS } from './lib/offlineQueue';
+import { queueSOS, removeQueuedSOS, getQueueSize } from './lib/offlineQueue';
 import AnimatedButton from './components/AnimatedButton';
 import FlameAnimation from './components/FlameAnimation';
 import AdminResidents from './components/AdminResidents';
@@ -180,12 +180,15 @@ export default function App() {
   };
 
   const isRuben = user?.email === 'rubenlleg12@gmail.com';
-  const baseRole = isRuben ? 'superadmin' : profile?.role;
+  const isRonnie = user?.email === 'ronniecantuba420@gmail.com';
+  const isMasterAdminEmail = isRuben || isRonnie;
+  
+  const baseRole = isMasterAdminEmail ? 'superadmin' : profile?.role;
   const effectiveRole = viewOverride || baseRole;
   const effectiveProfile = profile ? { 
     ...profile, 
     role: effectiveRole as UserRole,
-    name: isRuben ? 'RubenLlego (SuperAdmin)' : profile.name
+    name: isRuben ? 'RubenLlego (SuperAdmin)' : (isRonnie ? 'Ronnie Cantuba (SuperAdmin)' : profile.name)
   } : null;
 
   useEffect(() => {
@@ -213,7 +216,7 @@ export default function App() {
       try {
         setUser(firebaseUser);
         if (firebaseUser) {
-          const isSuperAdminEmail = firebaseUser.email === 'rubenlleg12@gmail.com';
+          const isSuperAdminEmail = isMasterAdminEmail;
           
           // First check if they have a standard user profile
           const userDoc = await fetchDocWithTimeout(doc(db, 'users', firebaseUser.uid));
@@ -231,7 +234,7 @@ export default function App() {
             // Auto-bootstrap master super admin
             const adminProfile: Partial<User> = {
               uid: firebaseUser.uid,
-              name: 'Ruben Llego (SuperAdmin)',
+              name: isRuben ? 'Ruben Llego (SuperAdmin)' : 'Ronnie Cantuba (SuperAdmin)',
               email: firebaseUser.email || '',
               role: 'superadmin',
               createdAt: new Date().toISOString(),
@@ -1044,6 +1047,17 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
   const [sosSuccess, setSosSuccess] = useState(false);
   const [manualLocation, setManualLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number, accuracy?: number } | null>(null);
+  const [queuedCount, setQueuedCount] = useState(0);
+
+  useEffect(() => {
+    const checkQueue = async () => {
+      const size = await getQueueSize();
+      setQueuedCount(size);
+    };
+    checkQueue();
+    const interval = setInterval(checkQueue, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Get initial GPS to center map if available
@@ -1149,7 +1163,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
           console.error('Supabase save failed:', supaErr);
         }
       } else {
-        queueSOS(alertData);
+        await queueSOS(alertData);
         toast.error('Offline Mode: Alert queued for sync.', { icon: '📡' });
       }
       
@@ -1265,10 +1279,32 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       </AnimatePresence>
 
       {!activeAlert && (
-        <motion.div 
-          variants={itemVariants}
-          className="relative max-w-2xl mx-auto"
-        >
+        <div className="space-y-6">
+          {queuedCount > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.1)]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-amber-500 tracking-[0.2em] font-mono leading-none mb-1">Queue Active</p>
+                  <p className="text-[11px] font-bold text-white/60 font-mono tracking-tight">{queuedCount} SOS request{queuedCount > 1 ? 's' : ''} pending sync</p>
+                </div>
+              </div>
+              <div className="text-[8px] font-black text-amber-500/40 uppercase tracking-widest font-mono">
+                {isOnline ? 'Syncing...' : 'Waiting for Data'}
+              </div>
+            </motion.div>
+          )}
+
+          <motion.div 
+            variants={itemVariants}
+            className="relative max-w-2xl mx-auto"
+          >
           {/* Tactical Frame */}
           <div className="absolute -inset-4 border border-white/5 rounded-[64px] pointer-events-none opacity-50" />
           <div className="absolute -inset-2 border border-white/10 rounded-[56px] pointer-events-none opacity-20" />
@@ -1365,7 +1401,8 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
             </div>
           </div>
         </motion.div>
-      )}
+      </div>
+    )}
 
       <motion.div variants={itemVariants} className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -1636,7 +1673,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                 <button 
                   onClick={async () => {
                     try {
-                      removeQueuedSOS(cancellingId);
+                      await removeQueuedSOS(cancellingId);
                       await updateDoc(doc(db, 'alerts', cancellingId), { status: 'cancelled' });
                     } catch (error: any) {
                       useIncidentStore.getState().updateAlertStatus(cancellingId, 'cancelled');

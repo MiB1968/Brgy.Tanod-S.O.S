@@ -7,7 +7,7 @@ import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { useLogStore } from '../store/useLogStore';
 import { watchLocation } from '../lib/gps';
-import { flushSOSQueue } from '../lib/offlineQueue';
+import { flushSOSQueue, getQueueSize } from '../lib/offlineQueue';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, PatrolLocation, Shift } from '../types';
 import { scheduleDailyLogReset } from '../lib/scheduler';
@@ -339,10 +339,19 @@ export default function BackgroundServices() {
   // 3. Offline Sync (Flush Queue)
   useEffect(() => {
     if (!db) return;
-    const handleOnline = () => {
-      flushSOSQueue(async (data) => {
-        await addDoc(collection(db, 'alerts'), data);
-      });
+    const handleOnline = async () => {
+      const queueSize = await getQueueSize();
+      if (queueSize > 0) {
+        toast.loading(`Syncing ${queueSize} queued SOS alerts...`, { id: 'sync-sos' });
+        await flushSOSQueue(async (data) => {
+          if (data.id) {
+            await setDoc(doc(db, 'alerts', data.id), data);
+          } else {
+            await addDoc(collection(db, 'alerts'), data);
+          }
+        });
+        toast.success('Offline alerts synchronized successfully!', { id: 'sync-sos', icon: '📡' });
+      }
     };
 
     window.addEventListener('online', handleOnline);
