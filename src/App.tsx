@@ -90,6 +90,13 @@ import { startGPSTracking, calculateDistance } from './services/gpsService';
 import { Toaster, toast } from 'react-hot-toast';
 import { scheduleDailyLogReset } from './lib/scheduler';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
+import TanodCommandAlert from './components/TanodCommandAlert';
+import { JarvisAssistant } from './components/JarvisAssistant';
+import BackgroundServices from './components/BackgroundServices';
+import { useAuthStore } from './store/useAuthStore';
+import { useIncidentStore } from './store/useIncidentStore';
+import { useTanodStore } from './store/useTanodStore';
+import { useSystemStore } from './store/useSystemStore';
 
 // Siren sound
 const siren = new Howl({
@@ -97,13 +104,6 @@ const siren = new Howl({
   loop: true,
   volume: 0.5,
 });
-
-import TanodCommandAlert from './components/TanodCommandAlert';
-import BackgroundServices from './components/BackgroundServices';
-import { useAuthStore } from './store/useAuthStore';
-import { useIncidentStore } from './store/useIncidentStore';
-import { useTanodStore } from './store/useTanodStore';
-import { useSystemStore } from './store/useSystemStore';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -912,6 +912,18 @@ export default function App() {
         )}
         {effectiveProfile && effectiveRole === 'tanod' && <TanodCommandAlert profile={effectiveProfile} isTestMode={viewOverride === 'tanod'} />}
         <BackgroundServices />
+        <JarvisAssistant 
+          onCommand={(cmd, action, payload) => {
+            if (action === 'TOGGLE_SIREN') {
+              const targetState = payload?.value ?? !globalSirenActive;
+              if (globalSirenActive !== targetState) toggleGlobalSiren();
+            } else if (action === 'REQUEST_BACKUP') {
+              toast.error("BACKUP REQUEST INITIATED", { icon: '🚨' });
+            } else if (action === 'STATUS_CHECK') {
+              toast.success("SYSTEM STATUS: ONLINE", { icon: '🛡️' });
+            }
+          }} 
+        />
       </main>
     </div>
   );

@@ -2,10 +2,14 @@ import express from "express";
 import * as http from "http";
 import path from "path";
 import { z } from "zod";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   // Create HTTP server
   const server = http.createServer(app);
@@ -15,6 +19,47 @@ async function startServer() {
   // -----------------------------
   // HTTP Endpoints
   // -----------------------------
+
+  const jarvisSchema = z.object({
+    transcript: z.string(),
+    userId: z.string(),
+    role: z.string()
+  });
+
+  app.post("/api/jarvis/command", async (req, res) => {
+    const check = jarvisSchema.safeParse(req.body);
+    if (!check.success) return res.status(400).json({ error: check.error });
+
+    const { transcript, role } = check.data;
+
+    const prompt = `
+      You are JARVIS, an AI Emergency Response Assistant for Brgy. Tanod S.O.S.
+      The user (Role: ${role}) said: "${transcript}"
+
+      Analyze the intent and return a JSON object with:
+      - action: "TOGGLE_SIREN" | "REQUEST_BACKUP" | "RESOLVE_INCIDENT" | "STATUS_CHECK" | "ESCALATE" | "UNKNOWN"
+      - response: A concise, professional voice response in English (e.g. "Siren activated, sir.")
+      - payload: Any relevant data (e.g. { value: true/false } for siren)
+
+      Constraint: 
+      - Only 'admin' or 'tanod' can TOGGLE_SIREN or ESCALATE.
+      - If unauthorized, return action: "UNKNOWN" and response: "I am sorry, you do not have permission for that protocol."
+
+      Return ONLY pure JSON.
+    `;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      // Simple JSON extraction from markdown
+      const jsonStr = text.replace(/```json|```/g, "").trim();
+      const jarvisResponse = JSON.parse(jsonStr);
+      res.json(jarvisResponse);
+    } catch (error) {
+      console.error("Jarvis Error:", error);
+      res.status(500).json({ error: "Jarvis brain is offline" });
+    }
+  });
   
   const smsSchema = z.object({
     to: z.string(),

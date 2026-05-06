@@ -19,8 +19,18 @@ service cloud.firestore {
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     
     // Roles - Look up from trusted 'users' collection
-    function getRole() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
-    function isAdmin() { return isVerified() && (getRole() == 'admin' || getRole() == 'superadmin' || request.auth.token.email == 'rubenlleg12@gmail.com' || request.auth.token.email == 'ronniecantuba420@gmail.com'); }
+    function getRole() { 
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userPath) ? get(userPath).data.role : 'resident'; 
+    }
+    function isAdmin() { 
+      return isVerified() && (
+        getRole() == 'admin' || 
+        getRole() == 'superadmin' || 
+        request.auth.token.email == 'rubenlleg12@gmail.com' || 
+        request.auth.token.email == 'ronniecantuba420@gmail.com'
+      ); 
+    }
     function isTanod() { return isVerified() && (getRole() == 'tanod' || isAdmin()); }
     function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
 
@@ -31,16 +41,15 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'name', 'role', 'email']) &&
              data.uid == request.auth.uid &&
              data.name is string && data.name.size() <= 100 &&
-             data.role == 'resident' &&
              data.email == request.auth.token.email;
     }
 
     match /users/{userId} {
-      allow get: if isVerified();
-      allow list: if isAdmin();
+      allow get: if isSignedIn(); // Allow get for boot lookup
+      allow list: if isTanod(); // Tanods and Admins can list
       allow create: if isVerified() && isValidUser(incoming());
       allow update: if isVerified() && (
-        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone'])) ||
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'fcmToken', 'status', 'activeAlertId'])) ||
         isAdmin()
       );
     }
@@ -87,14 +96,35 @@ service cloud.firestore {
         (isOwner(existing().residentId) && existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status == 'cancelled') ||
         // Tanod responds or resolves
         (isTanod() && (
-          (existing().status in ['pending', 'responding'] && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'respondedBy', 'resolutionNotes', 'resolvedAt']))
+          (existing().status in ['pending', 'responding'] && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'respondedBy', 'resolutionNotes', 'resolvedAt', 'updatedAt']))
         ))
       );
       allow delete: if isAdmin();
     }
 
     // ==========================================
-    // 4. TANODS (Status & Real-time GPS)
+    // 4. SHIFTS (Patrol Assignments)
+    // ==========================================
+    function isValidShift(data) {
+      return data.keys().hasAll(['tanodId', 'tanodName', 'startTime', 'endTime', 'sector', 'status', 'tanodResponse', 'createdAt']) &&
+             data.tanodId is string &&
+             data.tanodName is string &&
+             data.status in ['scheduled', 'active', 'completed'] &&
+             data.tanodResponse in ['pending', 'accepted', 'declined'];
+    }
+
+    match /shifts/{shiftId} {
+      allow get, list: if isSignedIn(); // Allow reading shifts for all authenticated users
+      allow create: if isAdmin() && isValidShift(incoming());
+      allow update: if (isAdmin() || (isTanod() && existing().tanodId == request.auth.uid)) && (
+        incoming().diff(existing()).affectedKeys().hasAll(['updatedAt']) || // allow timestamp updates
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'tanodResponse', 'notes', 'updatedAt'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // 5. TANODS (Status & Real-time GPS)
     // ==========================================
     match /tanods/{tanodId} {
       allow read: if isVerified();
@@ -102,38 +132,58 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // 5. PATROLS (Live Tracking)
+    // 6. PATROLS (Live Tracking Status)
     // ==========================================
     match /patrols/{patrolId} {
       allow read: if isVerified();
-      allow create: if isTanod() && incoming().tanodId == request.auth.uid;
-      allow update: if isTanod() && existing().tanodId == request.auth.uid;
-      allow delete: if isAdmin();
+      allow write: if isTanod() && isOwner(patrolId);
     }
 
     // ==========================================
-    // 6. SYSTEM (Siren, etc)
+    // 7. PATROL SESSIONS (Detailed Route)
+    // ==========================================
+    match /patrol_sessions/{sessionId} {
+      allow read: if isTanod();
+      allow write: if isTanod() && (incoming().tanodId == request.auth.uid || existing().tanodId == request.auth.uid);
+    }
+
+    // ==========================================
+    // 8. TANOD ACTIVITY LOGS
+    // ==========================================
+    match /tanod_activity_logs/{logId} {
+      allow read: if isTanod();
+      allow create: if isTanod() && (incoming().tanodId == request.auth.uid);
+    }
+
+    // ==========================================
+    // 9. SYSTEM CONFIG (Siren, etc)
     // ==========================================
     match /system/{docId} {
-      allow read: if isVerified();
+      allow read: if isSignedIn();
       allow update: if isTanod() && incoming().diff(existing()).affectedKeys().hasOnly(['sirenActive', 'sirenTriggeredBy', 'sirenTriggeredAt']);
     }
 
     // ==========================================
-    // 7. ACTIVITY LOGS & SESSIONS
+    // 10. SYSTEM BROADCASTS
     // ==========================================
-    match /tanod_activity_logs/{logId} {
-      allow read: if isTanod();
-      allow create: if isTanod() && incoming().tanodId == request.auth.uid;
+    match /system_broadcasts/{broadcastId} {
+      allow read: if isSignedIn();
+      allow create: if isTanod();
+      allow update: if isTanod();
+      allow delete: if isAdmin();
     }
 
-    match /patrol_sessions/{sessionId} {
-      allow read: if isTanod();
-      allow create, update: if isTanod() && incoming().tanodId == request.auth.uid;
+    // ==========================================
+    // 11. INCIDENTS (Archives)
+    // ==========================================
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn();
+      allow create: if isTanod();
+      allow update, delete: if isAdmin();
     }
     
     // ==========================================
-    // 8. TEST CONNECTION
+    // 12. TEST CONNECTION
     // ==========================================
     match /test/connection {
       allow read: if true;
