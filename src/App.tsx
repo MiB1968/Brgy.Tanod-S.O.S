@@ -93,6 +93,7 @@ import BackgroundServices from './components/BackgroundServices';
 import { useAuthStore } from './store/useAuthStore';
 import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
+import { useSystemStore } from './store/useSystemStore';
 
 export default function App() {
   const { 
@@ -105,11 +106,11 @@ export default function App() {
   } = useAuthStore();
   const { alerts } = useIncidentStore();
   const { patrols } = useTanodStore();
+  const { isOnline, setIsOnline, queuedSOSCount, setQueuedSOSCount, triggerSync } = useSystemStore();
   
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -512,7 +513,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
-      <div className={cn("absolute top-0 left-0 w-full z-[100] px-4 py-1 text-center text-[10px] font-bold uppercase tracking-widest transition-all", isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse")}>
+      <div className={cn("absolute top-0 left-0 w-full z-[100] px-4 py-1 text-center text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer hover:brightness-125", isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse")} onClick={() => setIsOnline(!isOnline)}>
         {isOnline ? "System Online — Neural Sync Active" : "Offline Mode — Operating on Local Storage"}
       </div>
       <Toaster />
@@ -895,13 +896,8 @@ const navItems = [
 ];
 
 function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, deferredPrompt, onInstall }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, deferredPrompt?: any, onInstall?: () => void }) {
-  const handleRegister = async () => {
-    try {
-      await onLogin();
-      onRegister();
-    } catch (error) {
-      console.error('Login failed during registration flow:', error);
-    }
+  const handleRegister = () => {
+    onRegister();
   };
 
   return (
@@ -1037,6 +1033,7 @@ function RoleCard({ title, desc, icon: Icon, onClick, color, disabled }: any) {
 }
 
 function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInstall, onTabChange, sirenActive, onToggleSiren }: { profile: User, patrols: PatrolLocation[], isOnline: boolean, deferredPrompt: any, onInstall: () => void, onTabChange: (tab: string) => void, sirenActive: boolean, onToggleSiren: () => void }) {
+  const { queuedSOSCount, setQueuedSOSCount, triggerSync } = useSystemStore();
   const [sending, setSending] = useState(false);
   const [activeAlert, setActiveAlert] = useState<Alert | null>(null);
   const [sosTypeToSubmit, setSosTypeToSubmit] = useState<EmergencyType | null>(null);
@@ -1047,12 +1044,11 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
   const [sosSuccess, setSosSuccess] = useState(false);
   const [manualLocation, setManualLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number, accuracy?: number } | null>(null);
-  const [queuedCount, setQueuedCount] = useState(0);
 
   useEffect(() => {
     const checkQueue = async () => {
       const size = await getQueueSize();
-      setQueuedCount(size);
+      setQueuedSOSCount(size);
     };
     checkQueue();
     const interval = setInterval(checkQueue, 5000);
@@ -1280,7 +1276,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
 
       {!activeAlert && (
         <div className="space-y-6">
-          {queuedCount > 0 && (
+          {queuedSOSCount > 0 && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1292,11 +1288,21 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase text-amber-500 tracking-[0.2em] font-mono leading-none mb-1">Queue Active</p>
-                  <p className="text-[11px] font-bold text-white/60 font-mono tracking-tight">{queuedCount} SOS request{queuedCount > 1 ? 's' : ''} pending sync</p>
+                  <p className="text-[11px] font-bold text-white/60 font-mono tracking-tight">{queuedSOSCount} SOS request{queuedSOSCount > 1 ? 's' : ''} pending sync</p>
                 </div>
               </div>
-              <div className="text-[8px] font-black text-amber-500/40 uppercase tracking-widest font-mono">
-                {isOnline ? 'Syncing...' : 'Waiting for Data'}
+              <div className="flex flex-col items-end gap-2">
+                <div className="text-[8px] font-black text-amber-500/40 uppercase tracking-widest font-mono">
+                  {isOnline ? 'Syncing...' : 'Waiting for Data'}
+                </div>
+                {isOnline && (
+                  <button 
+                    onClick={triggerSync}
+                    className="bg-amber-500 text-black text-[9px] font-black px-3 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-amber-500/20 uppercase tracking-widest"
+                  >
+                    Sync Now
+                  </button>
+                )}
               </div>
             </motion.div>
           )}

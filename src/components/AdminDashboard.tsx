@@ -29,6 +29,8 @@ import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
+import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -217,6 +219,60 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
   const [onDutyTanods, setOnDutyTanods] = useState<User[]>([]);
 
+  const handleUpdateTanodStatus = async (tanodId: string, newStatus: string) => {
+    try {
+      // 1. Update Firestore Users collection
+      await setDoc(doc(db, 'users', tanodId), {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // 1b. Sync to Patrols collection for map visibility
+      const isActuallyOnline = newStatus.toLowerCase() === 'on-duty' || newStatus.toLowerCase() === 'responding';
+      await setDoc(doc(db, 'patrols', tanodId), {
+        isActive: isActuallyOnline,
+        lastUpdate: new Date().toISOString()
+      }, { merge: true });
+
+      // 2. Update Supabase for live map status
+      if (supabase) {
+        const { error } = await supabase
+          .from('tanods')
+          .update({ status: newStatus })
+          .eq('id', tanodId);
+        
+        if (error) console.warn('Supabase status sync error:', error);
+      }
+
+      // 3. Log activity
+      await addDoc(collection(db, 'tanod_activity_logs'), {
+        tanodId: profile?.uid || 'admin',
+        tanodName: profile?.name || 'Admin',
+        targetTanodId: tanodId,
+        type: 'status_change',
+        details: `Administrator updated unit status to ${newStatus}`,
+        timestamp: new Date().toISOString()
+      });
+
+      toast.success(`Unit status updated to ${newStatus}`, {
+        icon: '🛡️',
+        style: {
+          borderRadius: '20px',
+          background: '#0D0D12',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)',
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update Tanod status:', error);
+      toast.error('Tactical failure updating status');
+    }
+  };
+
   useEffect(() => {
     if (!profile) return;
     const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
@@ -294,6 +350,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           icon={Users} 
           color="text-info" 
           bg="bg-info/10" 
+          onClick={() => onTabChange('residents')}
         />
         <StatCard 
           label="Pending Registration" 
@@ -302,6 +359,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           color="text-caution" 
           bg="bg-caution/10" 
           pulse={pendingRegCount > 0}
+          onClick={() => onTabChange('residents')}
         />
         <StatCard 
           label="Active SOS Alerts" 
@@ -313,7 +371,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         />
         <StatCard 
           label="Online Tanods" 
-          value={patrols.filter(p => p.isActive).length || 0} 
+          value={onDutyTanods.filter(t => (t.status as string)?.toLowerCase() === 'on-duty' || (t.status as string)?.toLowerCase() === 'responding').length} 
           icon={Shield}
           color="text-success" 
           bg="bg-success/10" 
@@ -643,20 +701,32 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                         <Shield className={cn(
                           "w-7 h-7 transition-colors",
                           isOnline ? "text-success" : "text-white/20 group-hover:text-info",
-                          (t.status as string) === 'responding' && "text-emergency"
+                          (t.status as string)?.toLowerCase() === 'responding' && "text-emergency"
                         )} />
                       </div>
                       <div className="relative z-10 flex-1 min-w-0">
-                        <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight truncate">{t.name}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight truncate">{t.name}</p>
+                          <select
+                            value={t.status || 'Off-Duty'}
+                            onChange={(e) => handleUpdateTanodStatus(t.uid, e.target.value)}
+                            className="bg-brand-bg/80 border border-white/10 rounded-lg px-2 py-1 text-[8px] font-black text-white/40 font-mono outline-none focus:border-info/30 transition-all uppercase tracking-wider cursor-pointer hover:bg-brand-bg hover:text-white"
+                          >
+                            <option value="On-Duty">ST: ON-DUTY</option>
+                            <option value="Responding">ST: RESPONDING</option>
+                            <option value="Off-Duty">ST: OFF-DUTY</option>
+                            <option value="Break">ST: ON-BREAK</option>
+                          </select>
+                        </div>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <span className={cn(
                             "w-1.5 h-1.5 rounded-full",
-                            (t.status as string) === 'responding' ? "bg-emergency animate-pulse" : (isOnline ? "bg-success" : "bg-white/10")
+                            (t.status as string)?.toLowerCase() === 'responding' ? "bg-emergency animate-pulse" : (isOnline ? "bg-success" : "bg-white/10")
                           )} />
                           <p className={cn(
                             "text-[9px] font-black uppercase tracking-[0.2em] font-mono",
-                            (t.status as string) === 'responding' ? "text-emergency" : (isOnline ? "text-success/70" : "text-white/20")
-                          )}>{(t.status as string) === 'responding' ? 'RESPONDING' : (isOnline ? 'ON-DUTY' : 'OFFLINE')}</p>
+                            (t.status as string)?.toLowerCase() === 'responding' ? "text-emergency" : (isOnline ? "text-success/70" : "text-white/20")
+                          )}>{(t.status as string)?.toLowerCase() === 'responding' ? 'RESPONDING' : (isOnline ? (t.status || 'ON-DUTY') : 'OFFLINE')}</p>
                           {t.activeAlertId && (
                             <span className="text-[7px] px-1.5 py-0.5 rounded-md bg-emergency/10 text-emergency font-black border border-emergency/20">
                               #{t.activeAlertId.slice(-6).toUpperCase()}
@@ -831,9 +901,15 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   );
 }
 
-function StatCard({ label, value, icon: Icon, color, bg, pulse }: any) {
+function StatCard({ label, value, icon: Icon, color, bg, pulse, onClick }: any) {
   return (
-    <div className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card active:scale-[0.98]">
+    <div 
+      onClick={onClick}
+      className={cn(
+        "glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card active:scale-[0.98]",
+        onClick ? "cursor-pointer" : ""
+      )}
+    >
       <div className="scanline opacity-5" />
       <div className={cn("p-5 rounded-[24px] inline-flex mb-8 transition-all group-hover:scale-110 shadow-2xl relative z-10", bg, color, pulse && "animate-pulse shadow-glow-red")}>
         <Icon className="w-7 h-7" />

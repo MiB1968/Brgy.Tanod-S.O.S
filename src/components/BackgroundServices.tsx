@@ -8,6 +8,7 @@ import { useTanodStore } from '../store/useTanodStore';
 import { useLogStore } from '../store/useLogStore';
 import { watchLocation } from '../lib/gps';
 import { flushSOSQueue, getQueueSize } from '../lib/offlineQueue';
+import { useSystemStore } from '../store/useSystemStore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, PatrolLocation, Shift } from '../types';
 import { scheduleDailyLogReset } from '../lib/scheduler';
@@ -18,6 +19,7 @@ export default function BackgroundServices() {
   const { setAlerts, addAlert, removeAlert, updateAlertStatus } = useIncidentStore();
   const { setPatrols, setShifts, setActivityLogs, setPatrolSessions } = useTanodStore();
   const { clearActiveLogs } = useLogStore();
+  const { isOnline, setIsOnline, setQueuedSOSCount, lastSyncTime } = useSystemStore();
 
     // 2. Supabase Real-time Listener (The "Tactical Command" Feed)
     useEffect(() => {
@@ -339,26 +341,45 @@ export default function BackgroundServices() {
   // 3. Offline Sync (Flush Queue)
   useEffect(() => {
     if (!db) return;
-    const handleOnline = async () => {
-      const queueSize = await getQueueSize();
-      if (queueSize > 0) {
-        toast.loading(`Syncing ${queueSize} queued SOS alerts...`, { id: 'sync-sos' });
-        await flushSOSQueue(async (data) => {
-          if (data.id) {
-            await setDoc(doc(db, 'alerts', data.id), data);
+    
+    const syncQueue = async () => {
+      const size = await getQueueSize();
+      setQueuedSOSCount(size);
+
+      if (isOnline && size > 0) {
+        toast.loading(`Syncing ${size} queued SOS alerts...`, { id: 'sync-sos' });
+        try {
+          await flushSOSQueue(async (data) => {
+            if (data.id) {
+              await setDoc(doc(db, 'alerts', data.id), data);
+            } else {
+              await addDoc(collection(db, 'alerts'), data);
+            }
+          });
+          
+          const remaining = await getQueueSize();
+          setQueuedSOSCount(remaining);
+          
+          if (remaining === 0) {
+            toast.success('Offline alerts synchronized successfully!', { id: 'sync-sos', icon: '📡' });
           } else {
-            await addDoc(collection(db, 'alerts'), data);
+            toast.error(`Sync partially failed. ${remaining} alerts still queued.`, { id: 'sync-sos' });
           }
-        });
-        toast.success('Offline alerts synchronized successfully!', { id: 'sync-sos', icon: '📡' });
+        } catch (err) {
+          console.error('Sync failed:', err);
+          toast.error('Sync failed. Will retry later.', { id: 'sync-sos' });
+        }
       }
     };
 
-    window.addEventListener('online', handleOnline);
-    if (navigator.onLine) handleOnline();
+    // Periodically check queue size even if offline status doesn't change
+    const interval = setInterval(syncQueue, 10000);
+    
+    // Sync immediately when coming online
+    if (isOnline) syncQueue();
 
-    return () => window.removeEventListener('online', handleOnline);
-  }, []);
+    return () => clearInterval(interval);
+  }, [isOnline, setQueuedSOSCount, lastSyncTime]);
 
   return null;
 }

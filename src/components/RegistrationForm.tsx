@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db, storage } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
@@ -224,24 +225,38 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     setLoading(true);
     
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        alert('You must be logged in with Google to complete registration.');
-        setLoading(false);
-        return;
+      let activeUser = auth.currentUser;
+      
+      // If not logged in, create account via email/password
+      if (!activeUser) {
+        if (!formData.email || !formData.password) {
+          alert('Email and password are required for new account registration.');
+          setLoading(false);
+          return;
+        }
+        if (formData.password !== formData.confirmPassword) {
+          alert('Passwords do not match.');
+          setLoading(false);
+          return;
+        }
+
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        activeUser = userCredential.user;
+        await updateProfile(activeUser, { displayName: formData.fullName });
       }
 
+      const uid = activeUser.uid;
       let uploadedIdUrl = 'https://placehold.co/600x400?text=NO+ID+UPLOADED';
       let uploadedSelfieUrl = 'https://placehold.co/400x400?text=NO+SELFIE+UPLOADED';
 
       if (idPhoto && storage) {
-        const idRef = ref(storage, `residents/${currentUser.uid}/id_photo_${Date.now()}`);
+        const idRef = ref(storage, `residents/${uid}/id_photo_${Date.now()}`);
         await uploadBytes(idRef, idPhoto);
         uploadedIdUrl = await getDownloadURL(idRef);
       }
 
       if (selfiePhoto && storage) {
-        const selfieRef = ref(storage, `residents/${currentUser.uid}/selfie_${Date.now()}`);
+        const selfieRef = ref(storage, `residents/${uid}/selfie_${Date.now()}`);
         await uploadBytes(selfieRef, selfiePhoto);
         uploadedSelfieUrl = await getDownloadURL(selfieRef);
       }
@@ -250,19 +265,22 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
         ...formData,
         age: parseInt(formData.age) || 0,
         householdCount: parseInt(formData.householdCount) || 1,
-        uid: currentUser.uid,
+        uid: uid,
         idPhotoUrl: uploadedIdUrl,
         selfieUrl: uploadedSelfieUrl,
         status: 'pending',
         registeredAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'residents', currentUser.uid), residentData);
+      // Remove sensitive auth fields before saving to Firestore
+      const { password, confirmPassword, ...firestoreData } = residentData as any;
+
+      await setDoc(doc(db, 'residents', uid), firestoreData);
       
       // Sync to Supabase for Tactical Command link
       try {
         const { error: supaErr } = await supabase.from('residents').upsert([{
-          id: currentUser.uid,
+          id: uid,
           name: formData.fullName,
           age: parseInt(formData.age) || 0,
           gender: formData.gender,
@@ -281,20 +299,20 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       }
       
       // Also create a basic user entry so they are recognized by auth flow
-      await setDoc(doc(db, 'users', currentUser.uid), {
-        uid: currentUser.uid,
+      await setDoc(doc(db, 'users', uid), {
+        uid: uid,
         name: formData.fullName,
-        email: currentUser.email || '',
+        email: activeUser.email || formData.email,
         role: 'resident',
         status: 'pending',
         createdAt: new Date().toISOString()
       });
       
-      setSuccessId(currentUser.uid);
+      setSuccessId(uid);
       setStep(5); // Success step
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Registration failed. Please try again.');
+      alert('Registration failed: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -591,8 +609,12 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                   <input required placeholder="Assign unique username" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all font-mono italic" />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Security Access Key</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Security Access Key (Password)</label>
                   <input type="password" required placeholder="********" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Confirm Access Key</label>
+                  <input type="password" required placeholder="********" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
               </div>
               <div className="flex gap-4 pt-8">
