@@ -30,6 +30,7 @@ import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
+import AdminAnalytics from './Admin/AdminAnalytics';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -766,6 +767,11 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                 ))
               )}
             </AnimatePresence>
+
+      {/* Analytics */}
+      <motion.div variants={itemVariants}>
+        <AdminAnalytics incidents={recentIncidents} />
+      </motion.div>
 
             {/* Latest Incident Reports Section */}
             <div className="mt-12 space-y-6">

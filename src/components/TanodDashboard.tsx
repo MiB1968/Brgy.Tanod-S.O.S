@@ -19,6 +19,7 @@ import { InstallAppButton } from './InstallAppButton';
 import IncidentForm from './IncidentForm';
 import AnimatedButton from './AnimatedButton';
 import FlameAnimation from './FlameAnimation';
+import { DispatchAlert } from './Admin/DispatchAlert';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -462,6 +463,29 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Real-time Stream</span>
               </div>
             </div>
+
+            {/* Emergency Dispatch Area */}
+            {dashboardAlerts.filter(a => a.status === 'pending').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[9px] font-black uppercase text-emergency tracking-widest pl-2">Pending Dispatch</p>
+                {dashboardAlerts.filter(a => a.status === 'pending').map(alert => (
+                  <DispatchAlert 
+                    key={alert.id} 
+                    incident={{
+                      id: alert.id,
+                      tanodId: alert.assignedTo || 'pending',
+                      tanodName: 'Citizen SOS',
+                      timestamp: alert.timestamp,
+                      location: `${alert.location.lat},${alert.location.lng}`,
+                      type: alert.type,
+                      description: alert.customMessage || 'No description',
+                      status: 'pending'
+                    }}
+                    onDispatch={() => handleUpdateStatus(alert, 'responding')}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Tactical Filter Bar */}
             <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-[28px] border-white/5 backdrop-blur-md">
