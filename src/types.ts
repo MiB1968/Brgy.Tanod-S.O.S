@@ -1,5 +1,5 @@
 export type UserRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'guest';
-export type RegistryStatus = 'pending' | 'approved' | 'rejected' | 'On-Duty' | 'Responding' | 'Off-Duty' | 'Break' | 'Offline';
+export type RegistryStatus = 'pending' | 'approved' | 'rejected' | 'Available' | 'On Patrol' | 'Responding' | 'Off-Duty' | 'Break' | 'Offline';
 export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';
 export type IncidentStatus = 'pending' | 'ongoing' | 'resolved' | 'referred';
 export type EmergencyType = 'medical' | 'fire' | 'crime' | 'natural_disaster' | 'other' | 'violence' | 'flood';

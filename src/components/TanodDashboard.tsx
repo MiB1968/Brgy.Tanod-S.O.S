@@ -8,7 +8,7 @@ import {
   IconActiveSOS,
   IconRadar
 } from './TacticalIcons';
-import { Alert, User } from '../types';
+import { Alert, User, RegistryStatus } from '../types';
 import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -387,9 +387,27 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                Service Status
              </p>
              <div className="flex flex-col">
-               <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">STATUS ON ACTIVE</span>
+               <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">STATUS:</span>
                <div className="flex items-center gap-1 mt-1">
-                 <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-success leading-none">DUTY</span>
+                 <select 
+                    value={profile?.status || 'Available'}
+                    onChange={async (e) => {
+                      if (!profile) return;
+                      const newStatus = e.target.value as RegistryStatus;
+                      try {
+                        await updateDoc(doc(db, 'users', profile.uid), { status: newStatus });
+                        updateTanodStatus(profile.uid, newStatus);
+                      } catch(e) {
+                          console.error('Failed to update status', e);
+                      }
+                    }}
+                    className="text-4xl font-black italic tracking-tighter uppercase font-mono text-success leading-none bg-transparent outline-none cursor-pointer hover:text-success/80 transition-colors"
+                 >
+                    <option value="Available">AVAILABLE</option>
+                    <option value="On Patrol">ON PATROL</option>
+                    <option value="Responding">RESPONDING</option>
+                    <option value="Offline">OFFLINE</option>
+                 </select>
                </div>
              </div>
              <div className="mt-8 flex items-center justify-between">

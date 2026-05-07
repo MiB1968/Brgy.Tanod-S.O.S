@@ -3,14 +3,8 @@
   "name": "Barangay Tanod S.O.S.",
   "icons": [
     {
-      "src": "/logo.png",
-      "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/logo.png",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
