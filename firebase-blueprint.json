@@ -51,12 +51,24 @@
             "id": { "type": "string" },
             "tanodId": { "type": "string" }
         }
+    },
+    "WitnessRequest": {
+        "title": "WitnessRequest",
+        "description": "Request for nearby neighbors to witness/assist",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "alertId": { "type": "string" },
+            "witnessUserId": { "type": "string" },
+            "status": { "type": "string" }
+        }
     }
   },
   "firestore": {
     "/users/{userId}": { "schema": "User", "description": "User profiles" },
     "/alerts/{alertId}": { "schema": "Alert", "description": "SOS Alerts" },
     "/incidents/{incidentId}": { "schema": "Incident", "description": "Incident reports" },
-    "/patrols/{tanodId}": { "schema": "PatrolLocation", "description": "Live patrol locations" }
+    "/patrols/{tanodId}": { "schema": "PatrolLocation", "description": "Live patrol locations" },
+    "/alerts/{alertId}/witness_requests/{witnessId}": { "schema": "WitnessRequest", "description": "Real-time witness circle notifications" }
   }
 }

@@ -1,10 +1,13 @@
 import express from "express";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import * as http from "http";
 import path from "path";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 
 const apiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" ? process.env.GEMINI_API_KEY.trim() : null;
+const API_SECRET = process.env.API_SECRET_KEY;
 
 // Initialize AI without an empty API key
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI({});
@@ -12,6 +15,26 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI({});
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Security
+  app.use(helmet());
+  app.use(express.json());
+
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    limit: 100, 
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+  });
+  app.use("/api/", limiter);
+
+  // Simple API Key Auth
+  app.use("/api/", (req, res, next) => {
+    if (API_SECRET && req.headers['x-api-key'] !== API_SECRET) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  });
 
   // Helper to run AI model
   async function runAiRequest(prompt: string, systemInstruction?: string): Promise<string> {
@@ -32,8 +55,6 @@ async function startServer() {
 
   // Create HTTP server
   const server = http.createServer(app);
-
-  app.use(express.json());
 
   // -----------------------------
   // HTTP Endpoints

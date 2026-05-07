@@ -6,7 +6,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface SOSState {
+  activeAlert: Alert | null;
   offlineQueue: Omit<Alert, 'id'>[];
+  setActiveAlert: (alert: Alert | null) => void;
   addToQueue: (alert: Omit<Alert, 'id'>) => void;
   syncQueue: () => Promise<void>;
 }
@@ -14,7 +16,9 @@ interface SOSState {
 export const useSOSStore = create<SOSState>()(
   persist(
     (set, get) => ({
+      activeAlert: null,
       offlineQueue: [],
+      setActiveAlert: (alert) => set({ activeAlert: alert }),
       addToQueue: (alert) =>
         set((state) => ({ offlineQueue: [...state.offlineQueue, alert] })),
       syncQueue: async () => {

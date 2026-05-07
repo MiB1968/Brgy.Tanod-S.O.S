@@ -68,17 +68,64 @@ service cloud.firestore {
     // --- Patrols Collection ---
     function isValidPatrol(data) {
         return data.tanodId is string
-               && data.tanodId == request.auth.uid;
+               && data.tanodId == request.auth.uid
+               && data.tanodName is string
+               && data.location is map
+               && data.location.lat is float
+               && data.location.lng is float
+               && data.isActive is bool
+               && data.lastUpdate is string;
     }
 
     match /patrols/{tanodId} {
-      allow create, update: if isSignedIn()
+      allow create: if isSignedIn()
                             && isValidId(tanodId)
                             && tanodId == request.auth.uid
                             && isValidPatrol(incoming())
-                            && incoming().keys().hasAll(['id', 'tanodId'])
-                            && incoming().keys().size() == 2;
+                            && incoming().keys().hasAll(['id', 'tanodId', 'tanodName', 'location', 'isActive', 'lastUpdate']);
+      allow update: if isSignedIn()
+                            && tanodId == request.auth.uid
+                            && isValidPatrol(incoming())
+                            && incoming().id == existing().id
+                            && incoming().tanodId == existing().tanodId;
       allow read: if isSignedIn(); 
+      allow delete: if false;
+    }
+
+    // --- Witness Requests ---
+    function isValidWitnessRequest(data) {
+        return data.alertId is string
+               && data.witnessUserId is string
+               && data.status is string;
+    }
+
+    match /alerts/{alertId}/witness_requests/{witnessId} {
+      allow create: if isSignedIn()
+                    && isValidId(witnessId)
+                    && isValidWitnessRequest(incoming())
+                    && exists(/databases/$(database)/documents/alerts/$(alertId));
+      allow read: if isSignedIn() 
+                  && (resource.data.witnessUserId == request.auth.uid || get(/databases/$(database)/documents/alerts/$(alertId)).data.residentId == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // --- Broadcasts Collection ---
+    function isValidBroadcast(data) {
+        return data.adminId is string
+               && data.type is string
+               && data.message is string
+               && data.message.size() >= 1 && data.message.size() <= 500;
+    }
+
+    match /broadcasts/{broadcastId} {
+      allow create: if isSignedIn()
+                    && isValidId(broadcastId)
+                    && isValidBroadcast(incoming())
+                    && incoming().adminId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow update: if isSignedIn()
+                    && incoming().adminId == existing().adminId
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['isActive', 'expiresAt']);
       allow delete: if false;
     }
   }

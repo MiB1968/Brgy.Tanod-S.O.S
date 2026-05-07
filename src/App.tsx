@@ -70,7 +70,11 @@ import LiveMap from './LiveMap';
 import AdminDashboard from './components/AdminDashboard';
 import TanodDashboard from './components/TanodDashboard';
 import AboutModal from './components/AboutModal';
+import { BroadcastOverlay } from './components/BroadcastOverlay';
+import { CitizenReportTracker } from './components/CitizenReportTracker';
+import { NavigationSidebar } from './components/NavigationSidebar';
 import { Shift } from './types';
+import { navItems } from './constants';
 import { format } from 'date-fns';
 import { queueSOS, removeQueuedSOS, getQueueSize } from './lib/offlineQueue';
 import AnimatedButton from './components/AnimatedButton';
@@ -634,85 +638,12 @@ export default function App() {
       <Toaster />
 
       {/* Global System Broadcast SOS UI */}
-      <AnimatePresence>
-        {activeBroadcast && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 50 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 50 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-xl bg-emergency/40"
-          >
-            <div className="glass-panel border-emergency/50 bg-brand-bg/95 rounded-[48px] p-8 md:p-12 max-w-2xl w-full text-center relative overflow-hidden shadow-[0_0_100px_rgba(239,68,68,0.4)]">
-              <div className="scanline opacity-20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-full h-1 bg-emergency animate-pulse" />
-              
-              <div className="flex justify-center mb-8">
-                <div className="p-8 rounded-[40px] bg-emergency border-4 border-white animate-bounce shadow-glow-red">
-                  <IconActiveSOS className="w-16 h-16 text-white" glow />
-                </div>
-              </div>
-              
-              <h1 className="text-4xl md:text-6xl font-black italic tracking-tighter uppercase text-emergency mb-4 animate-pulse">
-                SYSTEM-WIDE SOS
-              </h1>
-              <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.4em] mb-8">Direct Authorized Broadcast from Command</p>
-              
-              <div className="bg-white/5 border border-white/10 rounded-[32px] p-8 mb-8">
-                <p className="text-2xl md:text-3xl font-black italic text-white uppercase font-mono leading-tight">
-                  "{activeBroadcast.message}"
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center gap-4">
-                <p className="text-xs font-bold text-white/40 font-mono uppercase tracking-widest">
-                  AUTHORITY: {activeBroadcast.adminName}
-                </p>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emergency/20 text-emergency text-[10px] font-black uppercase tracking-widest border border-emergency/30">
-                  <Clock className="w-3 h-3" />
-                  EMERGENCY DEPLOYED: {format(new Date(activeBroadcast.timestamp), 'HH:mm:ss')}
-                </div>
-              </div>
-
-              {effectiveRole === 'tanod' && alerts.some(a => a.status === 'pending') && (
-                <div className="mt-10 bg-emergency shadow-glow-red rounded-3xl p-6 border border-white/20">
-                  <p className="text-[10px] font-black text-black uppercase tracking-[0.2em] mb-4">Tactical Directive Active</p>
-                  <button 
-                    onClick={() => {
-                      setActiveTab('map');
-                      // Find nearest alert logic could go here, but focusing on navigation for now
-                      toast.success('ROUTING TO NEAREST EMERGENCY...', { icon: '📍' });
-                    }}
-                    className="w-full py-4 rounded-2xl bg-black text-white font-black uppercase tracking-widest font-mono text-xs hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    DISPATCH TO NEAREST SOS
-                  </button>
-                </div>
-              )}
-
-              {(effectiveRole === 'admin' || effectiveRole === 'superadmin') ? (
-                <button 
-                  onClick={async () => {
-                    if (activeBroadcast && db) {
-                      try {
-                        await updateDoc(doc(db, 'system_broadcasts', activeBroadcast.id), { isActive: false });
-                        toast.success('BROADCAST TERMINATED');
-                      } catch (err) {
-                        toast.error('Termination failed');
-                      }
-                    }
-                  }}
-                  className="mt-12 w-full py-5 rounded-[24px] bg-white text-black font-black uppercase tracking-[0.2em] font-mono hover:bg-white/90 active:scale-95 transition-all text-xs"
-                >
-                  DEACTIVATE COMMAND OVERRIDE
-                </button>
-              ) : (
-                <p className="mt-8 text-[10px] font-black text-white/20 uppercase tracking-[0.2em] animate-pulse">Awaiting All-Clear from Command</p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <BroadcastOverlay 
+        activeBroadcast={activeBroadcast}
+        effectiveRole={effectiveRole}
+        alerts={alerts}
+        setActiveTab={(tab: string) => setActiveTab(tab as any)}
+      />
 
       <BackgroundPattern />
       {/* Background Official Logo (Low Visibility) */}
@@ -761,87 +692,18 @@ export default function App() {
       )}
 
       {/* Sidebar Navigation */}
-      <nav className={cn(
-        "fixed inset-y-0 left-0 w-80 glass-panel border-r border-white/5 flex flex-col shrink-0 z-[100] transition-transform duration-500 ease-out md:relative md:translate-x-0 md:w-72 shadow-command",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="absolute top-0 left-0 w-full h-full bg-brand-bg/20 -z-10" />
-        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emergency/5 blur-[100px] rounded-full" />
-        
-        <div className="p-10 pt-12">
-          <TanodWordmark width={220} className="mx-auto filter drop-shadow-lg" />
-          <div className="mt-4 flex flex-col items-center">
-             <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-             <span className="text-[10px] font-black tracking-[0.4em] text-white/20 uppercase mt-4 font-mono italic">Central Command</span>
-          </div>
-        </div>
-
-        <div className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar pt-4">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id as any);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 relative group",
-                  isActive 
-                    ? "bg-emergency text-white shadow-glow-red scale-[1.02] italic font-black" 
-                    : "text-white/40 hover:bg-white/5 hover:text-white"
-                )}
-              >
-                {!isActive && (
-                   <div className="absolute inset-y-2 left-2 w-1 bg-emergency rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                )}
-                <Icon className={cn("w-5 h-5", isActive ? "text-white" : "text-white/20 group-hover:text-white")} />
-                <span className="text-xs uppercase tracking-widest font-mono">{item.label}</span>
-              </button>
-            );
-          })}
-          
-          {deferredPrompt && (
-            <button
-              onClick={handleInstallApp}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mt-8 transition-all hover:scale-[1.02] uppercase tracking-[0.2em] font-mono shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-            >
-              <span>INSTALL MOBILE APP</span>
-            </button>
-          )}
-        </div>
-
-        <div className="p-6 mt-auto border-t border-white/5 bg-brand-bg/30">
-          <div className="flex items-center gap-4 p-4 rounded-3xl bg-brand-bg/50 mb-6 border border-white/5 shadow-inner">
-            <div className="w-12 h-12 rounded-2xl bg-brand-card overflow-hidden flex items-center justify-center border border-white/5 shrink-0 shadow-lg">
-              {user.email === 'rubenlleg12@gmail.com' ? (
-                <img src="/ruben_avatar.jpg" referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
-              ) : user.photoURL ? (
-                <img src={user.photoURL} referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <UserIcon className="w-6 h-6 text-white/20" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-black truncate uppercase font-mono italic text-white leading-none mb-1">
-                {user.email === 'rubenlleg12@gmail.com' ? 'RubenLlego' : profile?.name || 'Unknown Unit'}
-              </p>
-              <p className="text-[8px] text-white/30 uppercase tracking-widest font-mono font-bold">
-                {user.email === 'rubenlleg12@gmail.com' ? 'SYSTEM_PRIME' : profile?.role || 'INITIATING'}
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={handleSignOut} 
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-white/40 hover:text-emergency hover:bg-emergency/5 transition-all text-[10px] font-black uppercase tracking-[0.2em] font-mono border border-transparent hover:border-emergency/10"
-          >
-            <LogOut className="w-4 h-4" />
-            SIGNOUT_SESSION
-          </button>
-        </div>
-      </nav>
+      <NavigationSidebar 
+        activeTab={activeTab}
+        setActiveTab={(tab: string) => setActiveTab(tab as any)}
+        effectiveRole={effectiveRole}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        user={user}
+        profile={profile}
+        handleSignOut={handleSignOut}
+        deferredPrompt={deferredPrompt}
+        handleInstallApp={handleInstallApp}
+      />
 
       <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 flex flex-col">
       <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
@@ -1089,19 +951,6 @@ function PendingApproval({ user, deferredPrompt, onInstall, onLogout }: { user: 
   );
 }
 
-const navItems = [
-  { id: 'home', label: '📡 Command', icon: IconRadar },
-  { id: 'logs', label: '📋 Activity Logs', icon: ClipboardList },
-  { id: 'map', label: '🗺 Offline Map', icon: MapIcon },
-  { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
-  { id: 'residents', label: '👥 Residents', icon: IconApprovedResidents },
-  { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },
-  { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },
-  { id: 'schedule', label: '📅 Schedule', icon: Clock },
-  { id: 'reports', label: '📜 Reports', icon: FileText },
-  { id: 'directory', label: '🆘 SOS Help', icon: Phone },
-  { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
-];
 
 function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDemoAdminLogin, deferredPrompt, onInstall, auth }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, onDemoAdminLogin: () => void, deferredPrompt?: any, onInstall?: () => void, auth: any }) {
   const handleRegister = () => {
@@ -1335,12 +1184,23 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
     });
   }, [profile.uid]);
 
+  const { isRecording, startRecording, stopRecording } = useVideoRecorder((chunk) => {
+    // For now, prompt upload to storage
+    console.log("Recording chunk captured:", chunk);
+    // TODO: Upload chunk to Firebase Storage
+  });
+
   const handleSOS = async (type: EmergencyType = 'other', description: string) => {
     if (!db) {
       toast.error('Local Database: Command link inactive. SOS queued.');
       return;
     }
     setSending(true);
+    
+    // 1. Immediately start recording
+    await startRecording();
+    toast.success('Evidence streaming initiated.');
+
     try {
       // 1. Get GPS with fallback if manual is NOT set
       let pos: { lat: number, lng: number, accuracy?: number } | null = manualLocation;
@@ -1394,11 +1254,17 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
       if (isOnline) {
         try {
           await setDoc(doc(db, 'alerts', alertId), alertData);
+          
+          // --- NEW: Witness Circle Notification ---
+          // TODO: Secure witness query logic
+          toast.success('Witnesses alerted in vicinity.');
+
           // Parallel Save to Supabase (Upsert for robustness)
           if (isSupabaseConfigured) {
             await supabase.from('report_logs').upsert([{
               id: alertId,
               incident_id: alertId,
+
               type: alertData.type,
               status: alertData.status,
               location_lat: alertData.location.lat,
@@ -1521,6 +1387,8 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CitizenReportTracker userId={profile.uid} />
 
       {!activeAlert && (
         <div className="space-y-6">

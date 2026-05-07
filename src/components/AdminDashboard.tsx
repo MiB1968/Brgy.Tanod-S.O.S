@@ -31,6 +31,7 @@ import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import AdminAnalytics from './Admin/AdminAnalytics';
+import { ManageBroadcasts } from './Admin/ManageBroadcasts';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -771,6 +772,11 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       {/* Analytics */}
       <motion.div variants={itemVariants}>
         <AdminAnalytics incidents={recentIncidents} />
+      </motion.div>
+
+      {/* Broadcasts */}
+      <motion.div variants={itemVariants}>
+        <ManageBroadcasts />
       </motion.div>
 
             {/* Latest Incident Reports Section */}

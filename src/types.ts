@@ -173,3 +173,11 @@ export interface SystemBroadcast {
   timestamp: string;
   expiresAt?: string;
 }
+
+export interface WitnessRequest {
+  id: string;
+  alertId: string;
+  witnessUserId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+}

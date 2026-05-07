@@ -20,6 +20,7 @@ import IncidentForm from './IncidentForm';
 import AnimatedButton from './AnimatedButton';
 import FlameAnimation from './FlameAnimation';
 import { DispatchAlert } from './Admin/DispatchAlert';
+import { WitnessIndicator } from './WitnessIndicator';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -615,6 +616,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                                 <div>
                                   <p className="text-[9px] font-black uppercase text-emergency tracking-tighter font-mono">Designated for SOS</p>
                                 </div>
+                               <WitnessIndicator alertId={alert.id} />
                               </div>
                             )}
                           </div>
