@@ -601,13 +601,15 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                   <p className="text-white/30 font-black uppercase tracking-widest text-xs font-mono relative z-10">No matching emergency alerts detected.</p>
                 </motion.div>
               ) : (
-                filteredAlerts.map(alert => (
+                filteredAlerts.map((alert, index) => (
                   <motion.div
                     layout
-                    initial={{ opacity: 0, x: -30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                    whileHover={{ x: 10, backgroundColor: 'rgba(255, 255, 255, 0.03)', transition: { duration: 0.2 } }}
+                    variants={itemVariants}
+                    initial="hidden"
+                    animate="show"
+                    exit="hidden"
+                    transition={{ delay: index * 0.05 }}
+                    whileHover={{ x: 5, backgroundColor: 'rgba(255, 255, 255, 0.03)', transition: { duration: 0.2 } }}
                     key={alert.id}
                     className={cn(
                       "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group border-l-4",
@@ -746,20 +748,24 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                         </a>
                         <div className="flex gap-2">
                           {alert.status === 'pending' && (
-                            <button 
+                            <motion.button 
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => setSelectedAlertForDispatch(alert)}
-                              className="flex-1 py-4 bg-emergency text-white text-xs font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase font-mono tracking-widest"
+                              className="flex-1 py-4 bg-emergency text-white text-xs font-black rounded-2xl transition-all shadow-glow-red uppercase font-mono tracking-widest"
                             >
                               Dispatch
-                            </button>
+                            </motion.button>
                           )}
                           {(alert.status === 'pending' || alert.status === 'responding') && (
-                            <button 
+                            <motion.button 
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
                               onClick={() => handleUpdateStatus(alert, 'resolved')}
-                              className="flex-1 py-4 bg-success text-white text-xs font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg uppercase font-mono tracking-widest"
+                              className="flex-1 py-4 bg-success text-white text-xs font-black rounded-2xl transition-all shadow-lg uppercase font-mono tracking-widest"
                             >
                               Resolve
-                            </button>
+                            </motion.button>
                           )}
                         </div>
                       </div>

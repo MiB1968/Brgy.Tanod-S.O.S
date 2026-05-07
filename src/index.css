@@ -111,11 +111,40 @@
   box-shadow: 4px 4px 0px 0px rgba(255,255,255,0.05);
 }
 
-.tactical-bg-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(0,122,255,0.05) 0%, transparent 70%);
+.PoliceLights {
+  animation: police-lights 0.8s linear infinite;
 }
 
-.emergency-bg-glow {
-  background: radial-gradient(circle at 50% 0%, rgba(255,59,48,0.05) 0%, transparent 70%);
+@keyframes police-lights {
+  0% { background: linear-gradient(90deg, rgba(255, 0, 0, 0.4) 0%, rgba(0, 0, 255, 0) 50%, rgba(255, 0, 0, 0.4) 100%); }
+  50% { background: linear-gradient(90deg, rgba(255, 0, 0, 0) 0%, rgba(0, 0, 255, 0.4) 50%, rgba(255, 0, 0, 0) 100%); }
+  100% { background: linear-gradient(90deg, rgba(255, 0, 0, 0.4) 0%, rgba(0, 0, 255, 0) 50%, rgba(255, 0, 0, 0.4) 100%); }
+}
+
+.shadow-glow-blue {
+  box-shadow: 0 0 15px rgba(0, 122, 255, 0.5);
+}
+
+.shadow-glow-green {
+  box-shadow: 0 0 15px rgba(52, 199, 89, 0.5);
+}
+
+.shadow-glow-gold {
+  box-shadow: 0 0 20px rgba(255, 214, 10, 0.4);
+}
+
+/* Custom Scrollbar Tactical */
+.scrollbar-tactical::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-tactical::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+.scrollbar-tactical::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.scrollbar-tactical::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 

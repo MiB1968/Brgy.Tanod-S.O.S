@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Eye, Users } from 'lucide-react';
 import { WitnessRequest } from '../types';
@@ -13,7 +13,12 @@ export const WitnessIndicator: React.FC<WitnessIndicatorProps> = ({ alertId }) =
   const [witnesses, setWitnesses] = useState<WitnessRequest[]>([]);
 
   useEffect(() => {
-    const q = collection(db, 'alerts', alertId, 'witness_requests');
+    if (!alertId) return;
+    const q = query(
+      collection(db, 'witness_invites'),
+      where('alertId', '==', alertId),
+      where('status', '==', 'accepted')
+    );
     const unsub = onSnapshot(q, (snapshot) => {
         setWitnesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WitnessRequest)));
     });

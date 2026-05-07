@@ -40,9 +40,22 @@ export default function AdminResidents({ profile }: { profile: any }) {
       }, { merge: true });
       console.log('Approve resident doc success');
       // Sync with users collection
-      await setDoc(doc(db, 'users', id), {
-        status: 'approved'
-      }, { merge: true });
+      const residentDoc = residents.find(r => r.id === id);
+      const updateData: any = { status: 'approved' };
+      
+      if (residentDoc) {
+        // Compute geohash for witness discovery
+        try {
+          const ngeohash = await import('ngeohash');
+          updateData.geohash = ngeohash.encode(residentDoc.gpsLat, residentDoc.gpsLng, 6);
+          updateData.lat = residentDoc.gpsLat;
+          updateData.lng = residentDoc.gpsLng;
+        } catch (e) {
+          console.warn("Geohash calculation failed during approval", e);
+        }
+      }
+
+      await setDoc(doc(db, 'users', id), updateData, { merge: true });
       console.log('Approve user doc success');
     } catch (err: any) {
       console.error('Approve failed:', err);

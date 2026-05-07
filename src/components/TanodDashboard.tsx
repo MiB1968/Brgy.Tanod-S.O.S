@@ -549,12 +549,14 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                   <p className="text-white/10 text-[8px] font-mono mt-2 tracking-widest">AWAITING TRANSMISSION...</p>
                 </div>
               ) : (
-                dashboardAlerts.map(alert => (
+                dashboardAlerts.map((alert, index) => (
                   <motion.div
+                    variants={itemVariants}
                     layout
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    initial="hidden"
+                    animate="show"
+                    exit="hidden"
+                    transition={{ delay: index * 0.05 }}
                     key={alert.id}
                     className={cn(
                       "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
@@ -569,9 +571,13 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                     <div className="scanline opacity-10" />
                     
                     {alert.status === 'pending' && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
-                      <div className="absolute -bottom-8 -right-8 opacity-20 pointer-events-none rotate-12 group-hover:opacity-30 transition-opacity">
+                      <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 0.3 }}
+                        className="absolute -bottom-8 -right-8 pointer-events-none rotate-12 group-hover:opacity-50 transition-opacity"
+                      >
                         <FlameAnimation size="lg" />
-                      </div>
+                      </motion.div>
                     )}
 
                     {alert.status === 'pending' && (
@@ -622,25 +628,36 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-3">
                            <div className="bg-brand-bg/80 rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
                               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Incident Protocol</p>
-                              <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono flex items-center gap-2">
-                                <span className="text-xl">
-                                  {alert.type === 'medical' && '🏥'}
-                                  {alert.type === 'fire' && '🔥'}
-                                  {alert.type === 'crime' && '🚨'}
-                                  {alert.type === 'flood' && '🌊'}
-                                </span>
-                                {alert.type}
-                              </p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono flex items-center gap-2">
+                                  <span className="text-xl">
+                                    {alert.type === 'medical' && '🏥'}
+                                    {alert.type === 'fire' && '🔥'}
+                                    {alert.type === 'crime' && '🚨'}
+                                    {alert.type === 'flood' && '🌊'}
+                                  </span>
+                                  {alert.type}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ff0000]" />
+                                   <span className="text-[8px] font-black text-emergency uppercase tracking-widest">EVIDENCE_STREAMING</span>
+                                </div>
+                              </div>
                            </div>
-                           <div className="bg-brand-bg/80 rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                              <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Mission ID</p>
-                              <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono truncate">
-                                INC-{alert.id.slice(0, 8).toUpperCase()}
-                              </p>
-                           </div>
+                           <motion.button 
+                             whileHover={{ scale: 1.02 }}
+                             whileTap={{ scale: 0.98 }}
+                             onClick={() => toast.success(`Secure Evidence Stream path: alerts/${alert.id}/`, { icon: '📺' })}
+                             className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                           >
+                             <div className="w-4 h-4 bg-red-500 rounded-sm flex items-center justify-center">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                             </div>
+                             VIEW LIVE EVIDENCE
+                           </motion.button>
                         </div>
 
                         {alert.customMessage && (
@@ -744,14 +761,16 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                       </div>
 
                       <div className="flex flex-col gap-3 shrink-0 justify-center">
-                        <a 
+                        <motion.a 
+                          whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                          whileTap={{ scale: 0.98 }}
                           href={`https://www.google.com/maps?q=${alert.location.lat},${alert.location.lng}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center justify-center gap-3 px-8 py-5 bg-brand-bg border border-white/10 text-white text-[10px] font-black rounded-2xl hover:bg-brand-card hover:border-emergency/50 transition-all uppercase tracking-widest font-mono shadow-lg active:scale-95"
+                          className="flex items-center justify-center gap-3 px-8 py-5 bg-brand-bg border border-white/10 text-white text-[10px] font-black rounded-2xl hover:border-emergency/50 transition-all uppercase tracking-widest font-mono shadow-lg"
                         >
                           <MapPin className="w-4 h-4 text-emergency" /> INITIALIZE GPS
-                        </a>
+                        </motion.a>
                         {alert.status === 'pending' && (
                           <div className="flex gap-2">
                              <AnimatedButton 
@@ -762,21 +781,25 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                                 successLabel="ACCEPTED"
                                 className="flex-1 bg-success shadow-glow-green"
                               />
-                              <button 
+                              <motion.button 
+                                whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => handleRejectAlert(alert)}
-                                className="py-5 px-6 bg-white/5 border border-white/10 text-white/40 text-[10px] font-black rounded-2xl hover:bg-emergency/10 hover:text-emergency hover:border-emergency/30 transition-all uppercase tracking-[0.2em] font-mono select-none flex items-center justify-center gap-2"
+                                className="py-5 px-6 bg-white/5 border border-white/10 text-white/40 text-[10px] font-black rounded-2xl hover:border-emergency/30 transition-all uppercase tracking-[0.2em] font-mono select-none flex items-center justify-center gap-2"
                               >
                                 <X className="w-4 h-4" /> REJECT
-                              </button>
+                              </motion.button>
                           </div>
                         )}
                         {alert.status === 'responding' && alert.respondedBy === profile?.uid && (
-                          <button 
+                          <motion.button 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={() => handleUpdateStatus(alert, 'resolved')}
-                            className="flex-1 py-5 px-10 bg-success text-white text-[10px] font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(52,199,89,0.3)] uppercase tracking-[0.2em] font-mono select-none italic"
+                            className="flex-1 py-5 px-10 bg-success text-white text-[10px] font-black rounded-2xl transition-all shadow-[0_0_20px_rgba(52,199,89,0.3)] uppercase tracking-[0.2em] font-mono select-none italic"
                           >
                             MARK RESOLVED
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     </div>

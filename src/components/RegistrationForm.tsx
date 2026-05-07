@@ -311,14 +311,25 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       }
       
       // Also create a basic user entry so they are recognized by auth flow
-      await setDoc(doc(db, 'users', uid), {
+      const userUpdate: any = {
         uid: uid,
         name: formData.fullName,
         email: activeUser.email || formData.email,
         role: 'resident',
         status: 'pending',
-        createdAt: new Date().toISOString()
-      });
+        createdAt: new Date().toISOString(),
+        lat: formData.gpsLat,
+        lng: formData.gpsLng
+      };
+
+      try {
+        const ngeohash = await import('ngeohash');
+        userUpdate.geohash = ngeohash.encode(formData.gpsLat, formData.gpsLng, 6);
+      } catch (e) {
+        console.warn("Geohash calculation failed during registration", e);
+      }
+
+      await setDoc(doc(db, 'users', uid), userUpdate);
       
       setSuccessId(uid);
       setStep(5); // Success step

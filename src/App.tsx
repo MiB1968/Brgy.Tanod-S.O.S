@@ -73,6 +73,8 @@ import AboutModal from './components/AboutModal';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
 import { CitizenReportTracker } from './components/CitizenReportTracker';
 import { NavigationSidebar } from './components/NavigationSidebar';
+import { WitnessOverlay } from './components/WitnessOverlay';
+import { useShoutDetection } from './hooks/useShoutDetection';
 import { Shift } from './types';
 import { navItems } from './constants';
 import { format } from 'date-fns';
@@ -145,6 +147,21 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (guardianMode) {
+      startListening();
+    } else {
+      stopListening();
+    }
+  }, [guardianMode, startListening, stopListening]);
+
+  useEffect(() => {
+    if (!activeAlert && isRecording) {
+      stopRecording();
+      activeAlertIdRef.current = null;
+    }
+  }, [activeAlert, isRecording, stopRecording]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -691,6 +708,9 @@ export default function App() {
         />
       )}
 
+      {/* Witness Overlay Notification */}
+      <WitnessOverlay userId={profile?.uid || ''} />
+
       {/* Sidebar Navigation */}
       <NavigationSidebar 
         activeTab={activeTab}
@@ -1184,11 +1204,27 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
     });
   }, [profile.uid]);
 
+  const activeAlertIdRef = useRef<string | null>(null);
+  const [guardianMode, setGuardianMode] = useState(false);
+
   const { isRecording, startRecording, stopRecording } = useVideoRecorder((chunk) => {
-    // For now, prompt upload to storage
-    console.log("Recording chunk captured:", chunk);
-    // TODO: Upload chunk to Firebase Storage
+    // UPLOAD: Evidence Streaming
+    if (!activeAlertIdRef.current) return;
+    
+    import('./services/StorageService').then(async (service) => {
+        await service.uploadVideoChunk(activeAlertIdRef.current!, chunk, Date.now());
+        console.log("Chunk uploaded for", activeAlertIdRef.current);
+    });
   });
+
+  const { isListening, startListening, stopListening } = useShoutDetection(() => {
+    toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', {
+      duration: 5000,
+      icon: '🔊'
+    });
+    handleSOS('other', 'Dynamic AI Alert: High-decibel sound/shout detected.');
+  });
+
 
   const handleSOS = async (type: EmergencyType = 'other', description: string) => {
     if (!db) {
@@ -1197,9 +1233,12 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
     }
     setSending(true);
     
+    const alertId = crypto.randomUUID();
+    activeAlertIdRef.current = alertId;
+
     // 1. Immediately start recording
     await startRecording();
-    toast.success('Evidence streaming initiated.');
+    toast.success('Secure Evidence Streaming Active 📡', { icon: '🛡️' });
 
     try {
       // 1. Get GPS with fallback if manual is NOT set
@@ -1234,7 +1273,6 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
       
       const locationObj: any = pos || { lat: 13.2236, lng: 120.5960 }; // Default to Mamburao center
 
-      const alertId = crypto.randomUUID();
       const alertData: any = {
         id: alertId,
         residentId: profile?.uid || '',
@@ -1255,9 +1293,25 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
         try {
           await setDoc(doc(db, 'alerts', alertId), alertData);
           
-          // --- NEW: Witness Circle Notification ---
-          // TODO: Secure witness query logic
-          toast.success('Witnesses alerted in vicinity.');
+          // --- WITNESS CIRCLE INTEGRATION ---
+          import('./services/WitnessService').then(async (service) => {
+            // Update user's discoverable location for future witness alerts
+            if (profile?.uid) {
+              const ngeohash = await import('ngeohash');
+              const hash = ngeohash.encode(alertData.location.lat, alertData.location.lng, 6);
+              updateDoc(doc(db, 'users', profile.uid), {
+                lat: alertData.location.lat,
+                lng: alertData.location.lng,
+                geohash: hash,
+                lastSOSAt: new Date().toISOString()
+              }).catch(e => console.warn("User location sync failed:", e));
+            }
+
+            const count = await service.triggerWitnessAlert(alertId, alertData.location);
+            if (count > 0) {
+              toast.success(`${count} neighbors alerted as witnesses.`);
+            }
+          });
 
           // Parallel Save to Supabase (Upsert for robustness)
           if (isSupabaseConfigured) {
@@ -1350,6 +1404,12 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
                   <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono leading-tight">Emergency Incident Live</h4>
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-[10px] bg-emergency px-2 py-0.5 rounded-full font-black tracking-widest uppercase">ACTIVE SOS</span>
+                    {isRecording && (
+                      <span className="flex items-center gap-1.5 ml-2 text-[9px] text-white/80 font-black tracking-tighter bg-black/40 px-2 py-0.5 rounded-full ring-1 ring-white/20 animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_#ff0000]" />
+                        EVIDENCE_STREAMING_ACTIVE
+                      </span>
+                    )}
                     <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] font-mono">
                       {activeAlert.type} • T+{Math.floor((Date.now() - new Date(activeAlert.timestamp).getTime()) / 60000)}m reported
                     </p>
@@ -1442,6 +1502,22 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
                   <span className="text-[8px] font-mono font-black text-white/20 uppercase tracking-[0.4em]">Auth Layer 1</span>
                 </div>
                 <span className="text-[10px] font-mono font-black text-white/40 uppercase tracking-[0.2em] italic">Resident SOS Protocol</span>
+                
+                <div className="flex items-center gap-3 ml-auto px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                   <div className="flex flex-col">
+                      <span className="text-[8px] font-black tracking-tighter text-white/60">Guardian AI Mode</span>
+                      <span className="text-[10px] font-black text-emergency leading-none">{guardianMode ? 'LISTENING' : 'INACTIVE'}</span>
+                   </div>
+                   <button 
+                    onClick={() => {
+                        setGuardianMode(!guardianMode);
+                        toast(guardianMode ? 'Guardian AI Mode Disabled' : 'Guardian AI Mode Enabled: Listening for shouts.', { icon: '🛡️' });
+                    }}
+                    className={`w-10 h-5 rounded-full p-1 transition-all duration-500 relative overflow-hidden ${guardianMode ? 'bg-emergency' : 'bg-white/10 border border-white/20'}`}
+                   >
+                      <div className={`w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-xl ${guardianMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                   </button>
+                </div>
               </div>
 
               <div className="absolute top-8 right-8 text-right opacity-20 group-hover:opacity-60 transition-opacity z-10">
@@ -1476,13 +1552,24 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
                   <motion.button 
                     disabled={sending}
                     onClick={() => setIsChoosingCategory(true)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.92 }}
+                    animate={{ 
+                      boxShadow: !sending ? [
+                        "0 0 20px rgba(239,68,68,0.2)",
+                        "0 0 60px rgba(239,68,68,0.5)",
+                        "0 0 20px rgba(239,68,68,0.2)"
+                      ] : "0 0 80px rgba(255,255,255,0.6)"
+                    }}
+                    transition={{ 
+                      boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                      scale: { duration: 0.2 }
+                    }}
                     className={cn(
-                      "relative w-72 h-72 md:w-96 md:h-96 rounded-full flex flex-col items-center justify-center gap-4 transition-all duration-700 shadow-glow-red group z-10 overflow-hidden border-8",
+                      "relative w-72 h-72 md:w-96 md:h-96 rounded-full flex flex-col items-center justify-center gap-4 transition-all duration-700 group z-10 overflow-hidden border-8",
                       sending 
-                        ? "bg-emergency scale-95 border-white shadow-[0_0_60px_rgba(255,255,255,0.4)]" 
-                        : "bg-emergency/10 border-emergency/40 hover:bg-emergency hover:border-white shadow-[0_0_40px_rgba(239,68,68,0.2)]"
+                        ? "bg-emergency scale-95 border-white" 
+                        : "bg-emergency/10 border-emergency/40 hover:bg-emergency hover:border-white"
                     )}
                   >
                     <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
