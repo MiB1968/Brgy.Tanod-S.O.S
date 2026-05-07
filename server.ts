@@ -4,11 +4,10 @@ import path from "path";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" ? process.env.GEMINI_API_KEY.trim() : null;
 
-// Use platform-managed credentials if apiKey is unset or invalid.
-const aiConfig: { apiKey?: string } = (apiKey && apiKey.length > 20) ? { apiKey } : {};
-const ai = new GoogleGenAI(aiConfig);
+// Initialize AI without an empty API key
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI({});
 
 async function startServer() {
   const app = express();
@@ -120,6 +119,18 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "RUNNING", message: "Brgy Tanod GPS Live (Node.js)" });
+  });
+
+  // Custom route for service worker to ensure to always fetch the latest version
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    if (process.env.NODE_ENV !== "production") {
+        res.sendFile(path.join(process.cwd(), 'public', 'sw.js'));
+    } else {
+        res.sendFile(path.join(process.cwd(), 'dist', 'sw.js'));
+    }
   });
 
   // Vite middleware for development

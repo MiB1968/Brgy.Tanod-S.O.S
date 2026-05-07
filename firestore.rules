@@ -48,7 +48,7 @@ service cloud.firestore {
       allow get: if isSignedIn(); // Allow get for boot lookup
       allow list: if isTanod(); // Tanods and Admins can list
       allow create: if isSignedIn() && isValidUser(incoming());
-      allow update: if isVerified() && (
+      allow update: if isSignedIn() && (
         (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'fcmToken', 'status', 'activeAlertId'])) ||
         isAdmin()
       );

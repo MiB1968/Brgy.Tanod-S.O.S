@@ -18,6 +18,15 @@ export interface User {
   activeAlertId?: string | null;
 }
 
+export interface TanodProfile extends User {
+  sector?: string;
+  lastGpsLocation?: {
+    lat: number;
+    lng: number;
+    updatedAt: string;
+  };
+}
+
 export interface ResidentProfile extends User {
   fullName: string;
   age: number;

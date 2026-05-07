@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getCountFromServer, addDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Alert, User } from '../types';
+import { Alert, User, TanodProfile, SystemBroadcast } from '../types';
 import { 
   AlertTriangle, 
   CheckCircle, 
@@ -17,7 +17,8 @@ import {
   Filter,
   Radio,
   Megaphone,
-  Locate
+  Locate,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -27,6 +28,7 @@ import AboutModal from './AboutModal';
 import { InstallAppButton } from './InstallAppButton';
 import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
+import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -57,7 +59,7 @@ const itemVariants = {
   show: { opacity: 1, y: 0 }
 };
 
-export default function AdminDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
+export default function AdminDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren, activeBroadcast }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void, activeBroadcast: SystemBroadcast | null }) {
   const { alerts } = useIncidentStore();
   const { patrols } = useTanodStore();
   const [isFlashing, setIsFlashing] = useState(false);
@@ -239,6 +241,32 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
   const [onDutyTanods, setOnDutyTanods] = useState<User[]>([]);
 
+  const handleUpdateTanodField = async (tanodId: string, field: string, value: string) => {
+    if (!db) return;
+    try {
+      await setDoc(doc(db, 'users', tanodId), {
+        [field]: value,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      toast.success(`Unit ${field} updated successfully`, {
+        icon: '🛡️',
+        style: {
+          borderRadius: '20px',
+          background: '#0D0D12',
+          color: '#fff',
+          border: '1px solid rgba(255,255,255,0.1)',
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase'
+        }
+      });
+    } catch (error) {
+      console.error(`Failed to update Tanod ${field}:`, error);
+      toast.error(`Tactical failure updating ${field}`);
+    }
+  };
+
   const handleUpdateTanodStatus = async (tanodId: string, newStatus: string) => {
     if (!db) return;
     try {
@@ -311,6 +339,21 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       animate="show"
       className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8"
     >
+      {activeBroadcast && (
+        <motion.div variants={itemVariants} className="glass-panel border-emergency/30 bg-emergency/10 rounded-[40px] p-8 border-l-4 border-l-emergency shadow-glow-red overflow-hidden relative">
+          <div className="flex items-center gap-6">
+            <div className="p-4 rounded-2xl bg-emergency text-white animate-pulse">
+               <IconActiveSOS className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+               <h4 className="text-[10px] font-black uppercase text-emergency tracking-widest font-mono">ACTIVE SYSTEM SOS BROADCAST</h4>
+               <p className="text-xl font-black italic tracking-tighter uppercase text-white font-mono mt-1">"{activeBroadcast.message}"</p>
+               <p className="text-[10px] font-bold text-white/40 mt-1 uppercase">INITIATED BY ADMIN: {activeBroadcast.adminName}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {deferredPrompt && (
         <motion.button
           variants={itemVariants}
@@ -770,6 +813,18 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                 )}
               </div>
             </div>
+
+            {/* Tanod Activity Logs */}
+            <div className="mt-12 space-y-6">
+              <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
+                <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
+                  <Activity className="w-5 h-5 text-info shadow-glow-blue" />
+                  DETAILED TANOD ACTIVITY LOGS
+                </h3>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Real-Time Dispatch Monitoring</span>
+              </div>
+              <TanodActivityLogs />
+            </div>
           </div>
         </div>
 
@@ -806,15 +861,24 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                         <div className="flex items-center justify-between">
                           <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight truncate">{t.name}</p>
                           <select
-                            value={t.status || 'Off-Duty'}
+                            value={(t as TanodProfile).status || 'Off-Duty'}
                             onChange={(e) => handleUpdateTanodStatus(t.uid, e.target.value)}
                             className="bg-brand-bg/80 border border-white/10 rounded-lg px-2 py-1 text-[8px] font-black text-white/40 font-mono outline-none focus:border-info/30 transition-all uppercase tracking-wider cursor-pointer hover:bg-brand-bg hover:text-white"
                           >
-                            <option value="On-Duty">ST: ON-DUTY</option>
+                            <option value="On-Duty">ST: ON DUTY</option>
                             <option value="Responding">ST: RESPONDING</option>
-                            <option value="Off-Duty">ST: OFF-DUTY</option>
-                            <option value="Break">ST: ON-BREAK</option>
+                            <option value="Off-Duty">ST: OFF DUTY</option>
                           </select>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className="text-[8px] text-white/50 font-mono uppercase">SECTOR:</span>
+                          <input
+                            type="text"
+                            value={(t as TanodProfile).sector || ''}
+                            onChange={(e) => handleUpdateTanodField(t.uid, 'sector', e.target.value)}
+                            className="bg-brand-bg/50 border border-white/10 rounded-lg px-2 py-0.5 text-[8px] font-black text-white font-mono outline-none focus:border-info/30 uppercase tracking-wider"
+                            placeholder="Assign Sector"
+                          />
                         </div>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <span className={cn(
@@ -830,7 +894,12 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                               #{t.activeAlertId.slice(-6).toUpperCase()}
                             </span>
                           )}
-                          {lastUpdate && (
+                          {(t as TanodProfile).lastGpsLocation && (
+                            <span className="text-[8px] font-mono text-white/40 uppercase ml-auto">
+                              GPS: {(t as TanodProfile).lastGpsLocation?.lat.toFixed(4)}, {(t as TanodProfile).lastGpsLocation?.lng.toFixed(4)}
+                            </span>
+                          )}
+                          {lastUpdate && !((t as TanodProfile).lastGpsLocation) && (
                             <span className="text-[8px] font-mono text-white/20 uppercase ml-auto">
                               Ping: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>

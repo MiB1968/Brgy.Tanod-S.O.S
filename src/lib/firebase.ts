@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getAuth, setPersistence, indexedDBLocalPersistence } from 'firebase/auth';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 import firebaseConfig from '@/firebase-applet-config.json';
@@ -21,6 +21,7 @@ if (!isConfigEmpty) {
       ignoreUndefinedProperties: true
     }, config.firestoreDatabaseId);
     auth = getAuth(app);
+    setPersistence(auth, indexedDBLocalPersistence);
     storage = getStorage(app);
   } catch (err) {
     console.error("Firebase init failed:", err);
@@ -34,8 +35,6 @@ export { db, auth, storage };
 async function testConnection() {
   if (!db) return;
   try {
-    // Just a probe, don't use getDocFromServer which is strictly online
-    // Use onSnapshot or simply wait for auth state
     console.log("Firebase initialized. Awaiting network synchronization...");
   } catch (error) {
     console.warn("Firebase probe failed:", error);

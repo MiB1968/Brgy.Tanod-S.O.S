@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -96,6 +96,14 @@ import { useAuthStore } from './store/useAuthStore';
 import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
 import { useSystemStore } from './store/useSystemStore';
+import { useSOSStore } from './store/useSOSStore';
+
+const SOS_SUGGESTIONS: Record<string, string[]> = {
+  'crime': ['Disturbance', 'Theft', 'Attempted Entry', 'Vandalism', 'Suspicious Activity'],
+  'fire': ['Smoke Seen', 'Structural Fire', 'Grass/Brush Fire', 'Electrical Fire', 'Chemical Smell'],
+  'medical': ['Unresponsive', 'Fall/Injury', 'Difficulty Breathing', 'Seizure'],
+  'flood': ['Rising Water', 'Flash Flood', 'Blocked Drainage', 'Home Inundation'],
+};
 
 // Siren sound
 const siren = new Howl({
@@ -152,6 +160,32 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [globalSirenActive, setGlobalSirenActive] = useState(false);
   const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
+
+  // Add Listener for Tanod GPS updates
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const gpsChannel = supabase.channel('tanod-gps-updates');
+
+    gpsChannel
+      .on('broadcast', { event: 'location_update' }, (payload) => {
+        const data = payload.payload;
+        // Update store
+        useTanodStore.getState().updatePatrol({
+            id: data.id,
+            tanodId: data.id,
+            tanodName: data.name,
+            location: { lat: data.lat, lng: data.lng, accuracy: 0 },
+            isActive: data.status === 'On-Duty',
+            lastUpdate: data.updated_at
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(gpsChannel);
+    };
+  }, []);
 
   useEffect(() => {
     if (!db) return;
@@ -231,6 +265,19 @@ export default function App() {
     role: effectiveRole as UserRole,
     name: isRuben ? 'RubenLlego (SuperAdmin)' : (isRonnie ? 'Ronnie Cantuba (SuperAdmin)' : profile.name)
   } : null;
+
+  const isResident = effectiveProfile?.role === 'resident';
+  
+  const visiblePatrols = patrols.filter(p => {
+    if (['admin', 'superadmin', 'tanod'].includes(effectiveProfile?.role || '')) {
+      return p.isActive;
+    }
+    if (isResident && effectiveProfile) {
+      // Only show patrols assigned to responding/pending alerts of this resident
+      return alerts.some(a => a.residentId === effectiveProfile.uid && (a.status === 'pending' || a.status === 'responding') && a.assignedTo === p.tanodId);
+    }
+    return false;
+  });
 
   useEffect(() => {
     // Failsafe: if Firebase takes over 10s and still hasn't resolved, stop loading
@@ -891,6 +938,8 @@ export default function App() {
                 onInstall={handleInstallApp}
                 sirenActive={globalSirenActive}
                 onToggleSiren={toggleGlobalSiren}
+                visiblePatrols={visiblePatrols}
+                activeBroadcast={activeBroadcast}
               />
             )}
             {activeTab === 'map' && effectiveRole === 'resident' && (
@@ -905,7 +954,7 @@ export default function App() {
                     <div className="flex items-center gap-2"><span className="text-base">🟢</span> PATROL</div>
                   </div>
                 </div>
-                <ActiveMap alerts={alerts} patrols={patrols} />
+                <ActiveMap alerts={alerts} patrols={visiblePatrols} />
               </div>
             )}
             {activeTab === 'tracker' && (
@@ -1215,8 +1264,8 @@ function RoleCard({ title, desc, icon: Icon, onClick, color, disabled }: any) {
   );
 }
 
-function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInstall, onTabChange, sirenActive, onToggleSiren }: { profile: User, patrols: PatrolLocation[], isOnline: boolean, deferredPrompt: any, onInstall: () => void, onTabChange: (tab: string) => void, sirenActive: boolean, onToggleSiren: () => void }) {
-  const { queuedSOSCount, setQueuedSOSCount, triggerSync } = useSystemStore();
+function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferredPrompt, onInstall, onTabChange, sirenActive, onToggleSiren }: { profile: User, patrols: PatrolLocation[], visiblePatrols: PatrolLocation[], isOnline: boolean, deferredPrompt: any, onInstall: () => void, onTabChange: (tab: string) => void, sirenActive: boolean, onToggleSiren: () => void }) {
+  const { queuedSOSCount, setQueuedSOSCount, triggerSync, setIsOnline } = useSystemStore();
   const [sending, setSending] = useState(false);
   const [activeAlert, setActiveAlert] = useState<Alert | null>(null);
   const [sosTypeToSubmit, setSosTypeToSubmit] = useState<EmergencyType | null>(null);
@@ -1246,6 +1295,22 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       { enableHighAccuracy: true }
     );
   }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      useSOSStore.getState().syncQueue();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [setIsOnline]);
 
   useEffect(() => {
     if (!db) return;
@@ -1327,11 +1392,10 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
       
       // 3. Offline-Aware Save
       if (isOnline) {
-        await setDoc(doc(db, 'alerts', alertId), alertData);
-        
-        // Parallel Save to Supabase (Upsert for robustness)
-        if (isSupabaseConfigured) {
-          try {
+        try {
+          await setDoc(doc(db, 'alerts', alertId), alertData);
+          // Parallel Save to Supabase (Upsert for robustness)
+          if (isSupabaseConfigured) {
             await supabase.from('report_logs').upsert([{
               id: alertId,
               incident_id: alertId,
@@ -1343,14 +1407,19 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
               lng: alertData.location.lng,
               citizen_id: profile?.uid || 'anonymous'
             }]);
-          } catch (supaErr) {
-            console.error('Supabase save failed:', supaErr);
           }
+        } catch (err: any) {
+          console.error('Online SOS failed, queuing:', err);
+          useSOSStore.getState().addToQueue(alertData);
+          toast.info('Command link weak. SOS queued locally.');
         }
       } else {
-        await queueSOS(alertData);
-        toast.error('Offline Mode: Alert queued for sync.', { icon: '📡' });
+        useSOSStore.getState().addToQueue(alertData);
+        toast.info('System Offline. SOS queued locally.');
       }
+      setSending(false);
+      setSosSuccess(true);
+      setTimeout(() => setSosSuccess(false), 3000);
       
       // Clear manual location after success
       setManualLocation(null);
@@ -1610,7 +1679,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
           </div>
         </div>
         <div className="h-64 rounded-[30px] overflow-hidden border border-[#2D3139]">
-          <ActiveMap alerts={activeAlert ? [activeAlert] : []} patrols={patrols} />
+          <ActiveMap alerts={activeAlert ? [activeAlert] : []} patrols={visiblePatrols} />
         </div>
         <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-[#8E9299] text-xs">There are {patrols.length} Tanod units currently patrolling the Barangay.</p>
@@ -1781,6 +1850,18 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                     <p className="text-white/40 text-[10px] font-black mb-4 uppercase tracking-[0.2em] font-mono leading-relaxed">Provide critical context for arriving Tanod units.</p>
                   </div>
                   
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {SOS_SUGGESTIONS[sosTypeToSubmit as string]?.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        onClick={() => setSosDescription(prev => prev ? `${prev}, ${suggestion}` : suggestion)}
+                        className="px-3 py-1 bg-white/5 text-white/70 text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-emergency/20 hover:text-white transition-all border border-white/5"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                  
                   <textarea 
                     value={sosDescription}
                     onChange={(e) => setSosDescription(e.target.value)}
@@ -1816,7 +1897,7 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
                    <div className="flex-1 bg-brand-bg/50 rounded-3xl border border-white/5 overflow-hidden">
                       <ActiveMap 
                         alerts={[]} 
-                        patrols={patrols} 
+                        patrols={visiblePatrols} 
                         center={manualLocation ? [manualLocation.lat, manualLocation.lng] : gpsLocation ? [gpsLocation.lat, gpsLocation.lng] : undefined}
                         onLocationSelect={(lat, lng) => setManualLocation({ lat, lng })}
                         selectionLocation={manualLocation || gpsLocation}
@@ -1940,10 +2021,10 @@ function RecentAlerts({ residentId }: { residentId: string }) {
   );
 }
 
-function DashboardView({ profile, alerts, patrols, onTabChange, isOnline, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User, alerts: Alert[], patrols: PatrolLocation[], onTabChange: (tab: string) => void, isOnline: boolean, deferredPrompt: any, onInstall: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
-  if (profile.role === 'resident') return <ResidentDashboard profile={profile} patrols={patrols} isOnline={isOnline} deferredPrompt={deferredPrompt} onInstall={onInstall} onTabChange={onTabChange} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
+function DashboardView({ profile, alerts, patrols, visiblePatrols, onTabChange, isOnline, deferredPrompt, onInstall, sirenActive, onToggleSiren, activeBroadcast }: { profile: User, alerts: Alert[], patrols: PatrolLocation[], visiblePatrols: PatrolLocation[], onTabChange: (tab: string) => void, isOnline: boolean, deferredPrompt: any, onInstall: () => void, sirenActive: boolean, onToggleSiren: () => void, activeBroadcast: SystemBroadcast | null }) {
+  if (profile.role === 'resident') return <ResidentDashboard profile={profile} patrols={patrols} visiblePatrols={visiblePatrols} isOnline={isOnline} deferredPrompt={deferredPrompt} onInstall={onInstall} onTabChange={onTabChange} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
   if (profile.role === 'tanod') return <TanodDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
-  if (profile.role === 'admin' || profile.role === 'superadmin') return <AdminDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
+  if (profile.role === 'admin' || profile.role === 'superadmin') return <AdminDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} sirenActive={sirenActive} onToggleSiren={onToggleSiren} activeBroadcast={activeBroadcast} />;
   return <div className="text-center p-12 text-[#8E9299]">Unauthorized Access</div>;
 }
 
@@ -2306,6 +2387,36 @@ function ReportsView() {
     };
   }, []);
 
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<string>('');
+  
+  const [appliedCategory, setAppliedCategory] = useState<string>('ALL');
+  const [appliedDate, setAppliedDate] = useState<string>('');
+
+  const filteredReports = useMemo(() => {
+    console.log('Filtering reports:', { reports, appliedCategory, appliedDate });
+    let result = [...reports];
+    
+    // Sort Newest first
+    result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    if (appliedCategory !== 'ALL') {
+      result = result.filter(r => r.type.toLowerCase() === appliedCategory.toLowerCase());
+    }
+    
+    if (appliedDate) {
+      result = result.filter(r => r.date === appliedDate);
+    }
+    
+    console.log('Filtered result:', result);
+    return result;
+  }, [reports, appliedCategory, appliedDate]);
+
+  const handleSearch = () => {
+    setAppliedCategory(categoryFilter);
+    setAppliedDate(dateFilter);
+  };
+
   return (
     <div className="space-y-8">
       <div className="glass-panel p-8 md:p-12 rounded-[48px] border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-command">
@@ -2313,24 +2424,51 @@ function ReportsView() {
           <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Incident Vault</h2>
           <p className="text-white/30 font-bold text-xs md:text-sm uppercase tracking-[0.3em] font-mono mt-3">Archived Tactical Response Intelligence</p>
         </div>
-        <button 
-          onClick={() => {
-            const csv = "id,type,date,status,citizen,location\n" + (reports.map(r => `${r.id},${r.type},${r.date},${r.status},${r.citizen},"${r.location}"`).join('\n'));
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `incident_audit_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-          }}
-          className="w-full md:w-auto justify-center px-10 py-5 glass-panel border-white/10 text-white font-black italic rounded-2xl hover:bg-white/5 transition-all flex items-center gap-3 text-xs font-mono tracking-widest uppercase"
-        >
-          <FileText className="w-5 h-5 text-info" /> DL_DATA_TRANSCRIPT
-        </button>
+        
+        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+          <select 
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="bg-brand-bg border border-white/5 rounded-2xl p-4 text-white font-black text-xs uppercase tracking-widest font-mono"
+          >
+            <option value="ALL">ALL CATEGORIES</option>
+            <option value="Crime">CRIME</option>
+            <option value="Fire">FIRE</option>
+            <option value="Medical">MEDICAL</option>
+            <option value="Flood">FLOOD</option>
+          </select>
+          <input 
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="bg-brand-bg border border-white/5 rounded-2xl p-4 text-white font-black text-xs uppercase tracking-widest font-mono"
+          />
+          <button 
+            onClick={handleSearch}
+            className="px-6 py-4 bg-info text-black font-black italic rounded-2xl hover:bg-info/80 transition-all text-xs font-mono tracking-widest uppercase"
+          >
+            SEARCH
+          </button>
+          <button 
+            onClick={() => {
+              const csv = "id,type,date,status,citizen,location\n" + (filteredReports.map(r => `${r.id},${r.type},${r.date},${r.status},${r.citizen},"${r.location}"`).join('\n'));
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `incident_audit_${new Date().toISOString().split('T')[0]}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="w-full md:w-auto justify-center px-10 py-5 glass-panel border-white/10 text-white font-black italic rounded-2xl hover:bg-white/5 transition-all flex items-center gap-3 text-xs font-mono tracking-widest uppercase"
+          >
+            <FileText className="w-5 h-5 text-info" /> DL_DATA_TRANSCRIPT
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {reports.map((report) => (
+        {filteredReports.map((report) => (
           <div key={report.id} className="glass-panel border-white/5 rounded-[40px] p-8 md:p-10 space-y-8 shadow-command relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl group-hover:bg-white/10 transition-colors" />
             
@@ -2350,7 +2488,22 @@ function ReportsView() {
             <div className="space-y-6 relative z-10">
               <div className="p-6 bg-brand-bg/50 rounded-3xl border border-white/5">
                 <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] mb-3 font-mono">Mission Narrative</p>
-                <p className="font-bold text-[15px] leading-relaxed text-caution font-mono italic">"{report.description}"</p>
+                <div className="space-y-3">
+                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
+                    <span className="text-white/40">Alerted By Cityzen Name:</span> {report.citizen || 'Unknown'}
+                  </p>
+                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
+                    <span className="text-white/40">Location:</span> {report.location || 'Unknown'}
+                  </p>
+                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
+                    <span className="text-white/40">Citizen Reported details:</span> "{report.description}"
+                  </p>
+                  <div className="pt-2 border-t border-white/5 mt-2">
+                    <p className="font-bold text-[13px] text-success font-mono italic">
+                      <span className="text-white/40">Note Cleared by:</span> {report.tanodName || 'Unknown'}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

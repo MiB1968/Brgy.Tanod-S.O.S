@@ -11,6 +11,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [tanods, setTanods] = useState<User[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Form state
@@ -19,6 +20,22 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [notes, setNotes] = useState('');
+
+  const openEditModal = (shift: Shift) => {
+    setEditingShift(shift);
+    setSelectedTanod(shift.tanodId);
+    setSector(shift.sector);
+    setStartTime(shift.startTime.slice(0, 16));
+    setEndTime(shift.endTime.slice(0, 16));
+    setNotes(shift.notes || '');
+    setIsAddModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsAddModalOpen(false);
+    setEditingShift(null);
+    resetForm();
+  };
 
   useEffect(() => {
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin') || !db) return;
@@ -42,28 +59,33 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
     };
   }, []);
 
-  const handleCreateShift = async (e: React.FormEvent) => {
+  const handleUpsertShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTanod || !sector || !startTime || !endTime || !db) return;
 
     setLoading(true);
     try {
       const tanod = tanods.find(t => t.uid === selectedTanod);
-      await addDoc(collection(db, 'shifts'), {
+      const shiftData = {
         tanodId: selectedTanod,
         tanodName: tanod?.name || 'Unknown Officer',
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
         sector,
-        status: 'scheduled',
-        tanodResponse: 'pending',
+        status: editingShift ? editingShift.status : 'scheduled',
+        tanodResponse: editingShift ? editingShift.tanodResponse : 'pending',
         notes,
-        createdAt: new Date().toISOString()
-      });
-      setIsAddModalOpen(false);
-      resetForm();
+        createdAt: editingShift ? editingShift.createdAt : new Date().toISOString()
+      };
+
+      if (editingShift) {
+        await setDoc(doc(db, 'shifts', editingShift.id), shiftData, { merge: true });
+      } else {
+        await addDoc(collection(db, 'shifts'), shiftData);
+      }
+      closeModal();
     } catch (error) {
-      console.error("Error creating shift:", error);
+      console.error("Error upserting shift:", error);
     } finally {
       setLoading(false);
     }
@@ -126,7 +148,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
               shift.status === 'active' ? "bg-amber-500/20 text-amber-500" :
               "bg-green-500/20 text-green-500"
             )}>
-              {shift.status}
+              {shift.status} - {shift.tanodResponse || 'pending'}
             </div>
 
             <div className="flex items-center gap-4">
@@ -157,6 +179,12 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
             )}
 
             <div className="flex gap-2 pt-2">
+              <button 
+                onClick={() => openEditModal(shift)}
+                className="p-2 bg-[#252932] text-white rounded-xl hover:bg-[#2D3139] transition-all text-xs"
+              >
+                Edit
+              </button>
               {shift.status === 'scheduled' && (
                 <button 
                   onClick={() => updateShiftStatus(shift.id, 'active')}
@@ -208,7 +236,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateShift} className="p-8 space-y-6">
+              <form onSubmit={handleUpsertShift} className="p-8 space-y-6">
                 <div className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest mb-2 block">Officer</label>

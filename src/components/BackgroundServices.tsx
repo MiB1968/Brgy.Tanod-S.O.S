@@ -93,9 +93,12 @@ export default function BackgroundServices() {
       };
     }, [addAlert, removeAlert, setPatrols]);
 
-  // 2. Tanod Location heartbeat (Sync to Supabase maps)
+  // 2. Tanod Location heartbeat (Sync to Supabase maps via WebSocket Broadcast)
   useEffect(() => {
     if (!isSupabaseConfigured || profile?.role !== 'tanod' || !auth?.currentUser) return;
+
+    // Establishing the tactical broadcast channel
+    const gpsChannel = supabase.channel('tanod-gps-updates');
 
     const pushLocation = async () => {
       try {
@@ -103,24 +106,40 @@ export default function BackgroundServices() {
           navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 5000 })
         );
 
-        await supabase.from('tanods').upsert([{
+        const locationData = {
           id: auth?.currentUser?.uid,
           name: profile.name,
-          location_lat: pos.coords.latitude,
-          location_lng: pos.coords.longitude,
-          lat: pos.coords.latitude, // Support both naming styles
+          lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           status: 'On-Duty',
           updated_at: new Date().toISOString()
+        };
+
+        // Real-time broadcast via WebSocket
+        gpsChannel.send({
+          type: 'broadcast',
+          event: 'location_update',
+          payload: locationData
+        });
+
+        // Persistent update in Database (for retrospective/initial map load)
+        await supabase.from('tanods').upsert([{
+          ...locationData,
+          location_lat: locationData.lat,
+          location_lng: locationData.lng
         }]);
       } catch (err) {
-        console.warn('Supabase heartbeat failed:', err);
+        console.warn('Supabase GPS update failed:', err);
       }
     };
 
     pushLocation();
-    const interval = setInterval(pushLocation, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(pushLocation, 15000); // Increased frequency to 15s for better "real-time" feel
+    
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(gpsChannel);
+    };
   }, [profile]);
 
   // 3. Daily Log Reset Listener (Supabase Broadcast + Mock Scheduler Fallback)

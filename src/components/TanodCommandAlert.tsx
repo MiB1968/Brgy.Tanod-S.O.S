@@ -18,6 +18,7 @@ import { useTanodStore } from '../store/useTanodStore';
 export default function TanodCommandAlert({ profile, isTestMode }: { profile: User, isTestMode?: boolean }) {
   const { shifts } = useTanodStore();
   const [activeAlert, setActiveAlert] = useState<Shift | null>(null);
+  const [pendingResponse, setPendingResponse] = useState<'accepted' | 'rejected' | null>(null);
 
   const pendingShifts = shifts.filter(s => {
     const isTarget = isTestMode || s.tanodId === profile.uid;
@@ -46,15 +47,24 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
     }
   }, [activeAlert]);
 
+  const initiateResponse = (response: 'accepted' | 'rejected') => {
+    setPendingResponse(response);
+  };
+
+  const cancelResponse = () => {
+    setPendingResponse(null);
+  };
+
   const handleResponse = async (shiftId: string, response: 'accepted' | 'rejected') => {
     try {
       await updateDoc(doc(db, 'shifts', shiftId), {
         tanodResponse: response,
-        status: response === 'accepted' ? 'active' : 'scheduled' // or maybe keep 'scheduled' if accepted? 
+        status: response === 'accepted' ? 'active' : 'scheduled'
       });
       toast.success(response === 'accepted' ? 'Task Accepted' : 'Task Rejected');
       siren.stop();
       setActiveAlert(null);
+      setPendingResponse(null);
     } catch (err) {
       console.error(err);
       toast.error('Failed to submit response');
@@ -66,12 +76,31 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          className="bg-[#16191F] border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)] w-full max-w-sm rounded-[32px] overflow-hidden"
-        >
+        {pendingResponse ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#16191F] border-2 border-amber-500 w-full max-w-sm rounded-[32px] p-8 text-center"
+          >
+            <h3 className="text-white text-xl font-black uppercase mb-4">Confirm {pendingResponse}?</h3>
+            <p className="text-[#8E9299] mb-6">Are you sure you want to {pendingResponse === 'accepted' ? 'accept' : 'decline'} this task?</p>
+            <div className="flex gap-3">
+              <button onClick={cancelResponse} className="flex-1 py-3 bg-[#252932] text-white rounded-xl">Cancel</button>
+              <button 
+                onClick={() => handleResponse(activeAlert.id, pendingResponse)} 
+                className={`flex-1 py-3 ${pendingResponse === 'accepted' ? 'bg-green-500' : 'bg-red-500'} text-white rounded-xl`}
+              >
+                Confirm
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-[#16191F] border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.5)] w-full max-w-sm rounded-[32px] overflow-hidden"
+          >
           <div className="bg-red-500 p-6 text-center animate-pulse">
             <AlertTriangle className="w-16 h-16 text-white mx-auto mb-2" />
             <h2 className="text-white text-2xl font-black italic uppercase tracking-widest">Command Alert</h2>
@@ -103,20 +132,21 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
 
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => handleResponse(activeAlert.id, 'rejected')}
+                onClick={() => initiateResponse('rejected')}
                 className="flex-1 py-4 bg-[#252932] hover:bg-gray-700 text-white font-black uppercase italic tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-colors"
               >
                 <X className="w-5 h-5" /> Reject
               </button>
               <button
-                onClick={() => handleResponse(activeAlert.id, 'accepted')}
+                onClick={() => initiateResponse('accepted')}
                 className="flex-1 py-4 bg-green-500 hover:bg-green-600 text-white font-black uppercase italic tracking-widest rounded-2xl shadow-xl shadow-green-500/20 flex items-center justify-center gap-2 transition-colors"
               >
                 <Check className="w-5 h-5" /> Accept
               </button>
             </div>
           </div>
-        </motion.div>
+          </motion.div>
+        )}
       </div>
     </AnimatePresence>
   );

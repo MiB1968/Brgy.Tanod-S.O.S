@@ -6,6 +6,7 @@ interface TanodState {
   shifts: Shift[];
   activityLogs: TanodActivityLog[];
   patrolSessions: TanodPatrolSession[];
+  updatePatrol: (patrol: PatrolLocation) => void;
   setPatrols: (patrols: PatrolLocation[]) => void;
   setShifts: (shifts: Shift[]) => void;
   setActivityLogs: (logs: TanodActivityLog[]) => void;
@@ -19,6 +20,9 @@ export const useTanodStore = create<TanodState>((set) => ({
   shifts: [],
   activityLogs: [],
   patrolSessions: [],
+  updatePatrol: (patrol: PatrolLocation) => set((state) => ({
+    patrols: state.patrols.map((p) => p.id === patrol.id ? { ...p, ...patrol } : p)
+  })),
   setPatrols: (patrols) => set({ patrols }),
   setShifts: (shifts) => set({ shifts }),
   setActivityLogs: (activityLogs) => set({ activityLogs }),

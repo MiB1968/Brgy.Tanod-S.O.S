@@ -1,4 +1,16 @@
-const CACHE_NAME = 'brgy-tanod-v1';
+const CACHE_NAME = 'brgy-tanod-v2';
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keyList) => {
+      return Promise.all(keyList.map((key) => {
+        if (key !== CACHE_NAME) {
+          return caches.delete(key);
+        }
+      }));
+    })
+  );
+});
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
