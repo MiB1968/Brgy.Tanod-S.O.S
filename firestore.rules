@@ -114,9 +114,9 @@ service cloud.firestore {
     }
 
     match /shifts/{shiftId} {
-      allow get, list: if isSignedIn(); // Allow reading shifts for all authenticated users
+      allow read: if isSignedIn();
       allow create: if isAdmin() && isValidShift(incoming());
-      allow update: if (isAdmin() || (isTanod() && existing().tanodId == request.auth.uid)) && (
+      allow update: if (isSignedIn() && (isAdmin() || (isTanod() && existing().tanodId == request.auth.uid))) && (
         incoming().diff(existing()).affectedKeys().hasAll(['updatedAt']) || // allow timestamp updates
         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'tanodResponse', 'notes', 'updatedAt'])
       );

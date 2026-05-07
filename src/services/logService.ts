@@ -5,6 +5,7 @@ import { AuditLogEntry } from '../types/auditLog';
 import { Alert } from '../types';
 
 export const logIncidentAction = async (alert: Alert, actionNotes?: string) => {
+  if (!db) return;
   try {
     const entry: Partial<AuditLogEntry> = {
       incident_id: alert.id,

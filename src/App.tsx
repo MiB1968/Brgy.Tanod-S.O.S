@@ -434,17 +434,43 @@ export default function App() {
     setLoading(false);
   };
 
+  const handleDemoAdminLogin = async () => {
+    const realUid = 'demo-admin-456';
+    const mockUser = {
+      uid: realUid,
+      displayName: 'Admin (Offline Mode)',
+      email: 'admin.demo@example.com',
+      photoURL: 'https://placehold.co/400x400?text=ADMIN'
+    } as FirebaseUser;
+
+    const mockProfile: User = {
+      id: realUid,
+      uid: realUid,
+      name: 'Admin (Offline Mode)',
+      email: 'admin.demo@example.com',
+      role: 'superadmin',
+      createdAt: new Date().toISOString(),
+      status: 'approved',
+      phone: '09123456789'
+    };
+
+    setUser(mockUser);
+    setProfile(mockProfile);
+    setLoading(false);
+    toast.success('ADMIN OVERRIDE ACTIVE', { icon: '🔑' });
+  };
+
   const [isSettingRole, setIsSettingRole] = useState(false);
 
   const handleSetRole = async (role: UserRole) => {
     console.log("handleSetRole triggered with:", role);
     console.log("user:", user, "db:", db);
     if (!user) {
-      alert("Error: User is not authenticated.");
+      toast.error("Error: User is not authenticated.");
       return;
     }
     if (!db) {
-      alert("Error: Database connection is missing.");
+      toast.error("Error: Database connection is missing.");
       return;
     }
     
@@ -474,7 +500,7 @@ export default function App() {
       setProfile(newProfile as User);
     } catch (error: any) {
       console.error("Failed to set role:", error);
-      alert("Failed to set role: " + error.message);
+      toast.error("Failed to set role: " + error.message);
     } finally {
       setIsSettingRole(false);
     }
@@ -519,8 +545,10 @@ export default function App() {
       onRegister={() => setIsRegistering(true)} 
       isLoggingIn={isLoggingIn} 
       onDemoLogin={handleDemoResidentLogin}
+      onDemoAdminLogin={handleDemoAdminLogin}
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
+      auth={auth}
     />
   );
 
@@ -1039,7 +1067,7 @@ const navItems = [
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
 ];
 
-function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, deferredPrompt, onInstall }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, deferredPrompt?: any, onInstall?: () => void }) {
+function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDemoAdminLogin, deferredPrompt, onInstall, auth }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, onDemoAdminLogin: () => void, deferredPrompt?: any, onInstall?: () => void, auth: any }) {
   const handleRegister = () => {
     onRegister();
   };
@@ -1081,6 +1109,13 @@ function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, deferredProm
           {isLoggingIn ? 'Establishing...' : 'Authenticate Unit'}
         </button>
         
+        {!auth && (
+          <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest">
+             <AlertTriangle className="w-4 h-4 mx-auto mb-2" />
+             Command Link Disconnected. Authentication Unavailable.
+          </div>
+        )}
+
         <button 
           disabled={isLoggingIn}
           onClick={handleRegister}
@@ -1091,9 +1126,26 @@ function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, deferredProm
 
         <button 
           onClick={onDemoLogin}
-          className="w-full text-white/20 hover:text-white/40 transition-all uppercase tracking-[0.3em] font-mono text-[8px] mt-4"
+          className={cn(
+            "w-full transition-all uppercase font-mono mt-4",
+            !auth 
+              ? "bg-info text-white py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
+              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
+          )}
         >
-          [ Bypass Authentication — Test Mode ]
+          {auth ? '[ Bypass Authentication — Resident Mode ]' : 'PROCEED AS RESIDENT (OFFLINE)'}
+        </button>
+
+        <button 
+          onClick={onDemoAdminLogin}
+          className={cn(
+            "w-full transition-all uppercase font-mono mt-2",
+            !auth 
+              ? "bg-amber-500 text-black py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
+              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
+          )}
+        >
+          {auth ? '[ Bypass Authentication — Admin Mode ]' : 'PROCEED AS ADMIN (OFFLINE)'}
         </button>
       </div>
       
@@ -1232,6 +1284,10 @@ function ResidentDashboard({ profile, patrols, isOnline, deferredPrompt, onInsta
   }, [profile.uid]);
 
   const handleSOS = async (type: EmergencyType = 'other', description: string) => {
+    if (!db) {
+      toast.error('Local Database: Command link inactive. SOS queued.');
+      return;
+    }
     setSending(true);
     try {
       // 1. Get GPS with fallback if manual is NOT set
@@ -1966,7 +2022,7 @@ function TanodRosterView() {
   }, []);
 
   const handleAddUnit = async () => {
-    if (!newUnitName.trim() || !newUnitEmail.trim()) return;
+    if (!newUnitName.trim() || !newUnitEmail.trim() || !db) return;
     try {
       await addDoc(collection(db, 'users'), {
         uid: Date.now().toString(),
@@ -2132,12 +2188,12 @@ function TanodRosterView() {
 
               <div className="flex gap-3">
                 <button 
-                  onClick={() => alert(`Accessing tactical profile for ${t.name}`)}
+                  onClick={() => toast.success(`Accessing tactical profile for ${t.name}`, { icon: '👮' })}
                   className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
                   Logistics
                 </button>
                 <button 
-                  onClick={() => alert(`Retrieving operational history for ${t.name}`)}
+                  onClick={() => toast.success(`Retrieving operational history for ${t.name}`, { icon: '📋' })}
                   className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
                   History
                 </button>
@@ -2448,12 +2504,12 @@ function SettingsView() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
            <button 
-              onClick={() => alert("SILENT SOS BROADCAST INITIATED. Units alerted.")}
+              onClick={() => toast.success("SILENT SOS BROADCAST INITIATED. Units alerted.", { icon: '🆘' })}
               className="flex-1 p-6 glass-panel border-white/10 text-[10px] font-black hover:bg-white/5 transition-all font-mono uppercase tracking-[0.2em] italic text-white/60 hover:text-white">
               BROADCAST_SOS_SILENT
            </button>
            <button 
-              onClick={() => alert("PATROL LOGISTICS RESET. Recalibrating sectors.")}
+              onClick={() => toast.success("PATROL LOGISTICS RESET. Recalibrating sectors.", { icon: '🔄' })}
               className="flex-1 p-6 glass-panel border-white/10 text-[10px] font-black hover:bg-white/5 transition-all font-mono uppercase tracking-[0.2em] italic text-white/60 hover:text-white">
               FLUSH_SECTOR_DATA
            </button>

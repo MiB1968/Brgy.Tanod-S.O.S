@@ -1,219 +1,32 @@
 {
   "entities": {
-    "ResidentProfile": {
-      "title": "ResidentProfile",
-      "description": "Detailed resident registration profile",
-      "type": "object",
-      "properties": {
-        "fullName": { "type": "string" },
-        "age": { "type": "number" },
-        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
-        "dob": { "type": "string", "format": "date" },
-        "civilStatus": { "type": "string" },
-        "idType": { "type": "string" },
-        "idNumber": { "type": "string" },
-        "idPhotoUrl": { "type": "string" },
-        "selfieUrl": { "type": "string" },
-        "mobileNumber": { "type": "string" },
-        "altContactName": { "type": "string" },
-        "altContactNumber": { "type": "string" },
-        "houseNumber": { "type": "string" },
-        "street": { "type": "string" },
-        "householdCount": { "type": "number" },
-        "specialNeeds": { "type": "string", "enum": ["Yes", "No"] },
-        "specialNeedsInfo": { "type": "string" },
-        "gpsLat": { "type": "number" },
-        "gpsLng": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "registeredAt": { "type": "string", "format": "date-time" },
-        "approvedAt": { "type": "string", "format": "date-time" },
-        "uid": { "type": "string" }
-      },
-      "required": ["fullName", "age", "gender", "idType", "idNumber", "mobileNumber", "gpsLat", "gpsLng", "status", "registeredAt", "uid"]
-    },
     "User": {
       "title": "User",
-      "description": "User profile with role info",
+      "description": "User profile",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
-        "name": { "type": "string" },
-        "role": { "type": "string", "enum": ["resident", "tanod", "admin"] },
-        "phone": { "type": "string" },
         "email": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "role": { "type": "string", "enum": ["resident", "tanod", "admin"] },
         "status": { "type": "string" }
       },
-      "required": ["uid", "name", "role", "email"]
+      "required": ["uid", "email", "role"]
     },
     "Alert": {
-      "title": "Emergency Alert",
-      "description": "SOS alert triggered by a resident",
+      "title": "Alert",
+      "description": "Emergency SOS Alert",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "residentId": { "type": "string" },
-        "residentName": { "type": "string" },
-        "residentMobile": { "type": "string" },
-        "type": { "type": "string", "enum": ["medical", "fire", "crime", "flood", "violence", "other", "disturbance"] },
-        "customMessage": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" }
-          }
-        },
-        "status": { "type": "string", "enum": ["pending", "responding", "resolved", "cancelled"] },
-        "respondedBy": { "type": "string" },
-        "resolutionNotes": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "resolvedAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Tanod": {
-      "title": "Tanod Officer",
-      "description": "Tanod officer profile and live data",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string" },
-        "name": { "type": "string" },
-        "status": { "type": "string", "enum": ["on-duty", "responding", "off-duty"] },
-        "lat": { "type": "number" },
-        "lng": { "type": "number" },
-        "lastSeen": { "type": "string", "format": "date-time" },
-        "activeAlertId": { "type": "string" }
-      }
-    },
-    "IncidentReport": {
-      "title": "Incident Report",
-      "description": "Formal report filed by a Tanod officer",
-      "type": "object",
-      "properties": {
-        "tanodId": { "type": "string" },
-        "tanodName": { "type": "string" },
-        "date": { "type": "string" },
-        "time": { "type": "string" },
         "type": { "type": "string" },
-        "description": { "type": "string" },
-        "location": { "type": "string" },
-        "personsInvolved": { "type": "string" },
-        "actionsTaken": { "type": "string" },
-        "status": { "type": "string", "enum": ["resolved", "ongoing", "referred", "pending"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string" },
+        "timestamp": { "type": "number" }
       }
-    },
-    "PatrolLocation": {
-      "title": "PatrolLocation",
-      "description": "Real-time location of active Tanod units",
-      "type": "object",
-      "properties": {
-        "tanodId": { "type": "string" },
-        "tanodName": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" }
-          }
-        },
-        "isActive": { "type": "boolean" },
-        "lastUpdate": { "type": "string", "format": "date-time" }
-      },
-      "required": ["tanodId", "tanodName", "location", "isActive", "lastUpdate"]
-    },
-    "SystemStatus": {
-      "title": "System Status",
-      "description": "Global system flags (e.g. manual siren)",
-      "type": "object",
-      "properties": {
-        "sirenActive": { "type": "boolean" },
-        "sirenTriggeredBy": { "type": "string" },
-        "sirenTriggeredAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "TanodActivityLog": {
-      "title": "Tanod Activity Log",
-      "description": "Individual event logs for Tanod actions",
-      "type": "object",
-      "properties": {
-        "tanodId": { "type": "string" },
-        "tanodName": { "type": "string" },
-        "type": { "type": "string", "enum": ["duty_start", "duty_end", "alert_response", "patrol_marker", "status_change"] },
-        "details": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "alertId": { "type": "string" },
-        "responseTime": { "type": "number" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" }
-          }
-        }
-      },
-      "required": ["tanodId", "tanodName", "type", "details", "timestamp"]
-    },
-    "TanodPatrolSession": {
-      "title": "Tanod Patrol Session",
-      "description": "Aggregated patrol session data",
-      "type": "object",
-      "properties": {
-        "tanodId": { "type": "string" },
-        "tanodName": { "type": "string" },
-        "startTime": { "type": "string", "format": "date-time" },
-        "endTime": { "type": "string", "format": "date-time" },
-        "route": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "lat": { "type": "number" },
-              "lng": { "type": "number" },
-              "timestamp": { "type": "string", "format": "date-time" }
-            }
-          }
-        },
-        "distanceCovered": { "type": "number" }
-      },
-      "required": ["tanodId", "tanodName", "startTime", "route"]
     }
   },
   "firestore": {
-    "system": {
-      "schema": "SystemStatus",
-      "description": "Global system configurations and states"
-    },
-    "residents": {
-      "schema": "ResidentProfile",
-      "description": "Resident application and profile details"
-    },
-    "users": {
-        "schema": "User",
-        "description": "Registered residents, tanods, and admins"
-    },
-    "tanods": {
-      "schema": "Tanod",
-      "description": "Active Tanod officer data and state"
-    },
-    "alerts": {
-      "schema": "Alert",
-      "description": "Real-time emergency alerts"
-    },
-    "incidents": {
-      "schema": "IncidentReport",
-      "description": "Captured incident reports"
-    },
-    "patrols": {
-      "schema": "PatrolLocation",
-      "description": "Live GPS tracking of tanods"
-    },
-    "tanod_activity_logs": {
-      "schema": "TanodActivityLog",
-      "description": "History of tanod operational activities"
-    },
-    "patrol_sessions": {
-      "schema": "TanodPatrolSession",
-      "description": "Recorded patrol routes and sessions"
-    }
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/alerts/{alertId}": { "schema": "Alert", "description": "SOS Alerts" }
   }
 }

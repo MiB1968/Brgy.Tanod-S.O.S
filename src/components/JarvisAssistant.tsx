@@ -14,9 +14,30 @@ export const JarvisAssistant: React.FC<JarvisAssistantProps> = ({ onCommand }) =
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [jarvisVoice, setJarvisVoice] = useState<SpeechSynthesisVoice | null>(null);
   
   const recognitionRef = useRef<any>(null);
-  const { userProfile } = useAuthStore();
+  const { profile } = useAuthStore();
+
+  // Voice selection logic
+  useEffect(() => {
+    const updateVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      // Improved British Male voice lookup
+      const preferred = voices.find(v => 
+        (v.name.toLowerCase().includes('jarvis') || v.name.toLowerCase().includes('google uk english male') || v.name === 'Daniel' || v.name === 'Arthur' || v.name === 'Microsoft James' || v.lang === 'en-GB')
+      ) || voices.find(v => v.lang.startsWith('en-GB')) 
+        || voices.find(v => v.lang.startsWith('en'));
+
+      if (preferred) {
+        console.log("Jarvis: Voice initialized as", preferred.name);
+        setJarvisVoice(preferred);
+      }
+    };
+
+    window.speechSynthesis.onvoiceschanged = updateVoices;
+    updateVoices();
+  }, []);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -33,30 +54,75 @@ export const JarvisAssistant: React.FC<JarvisAssistantProps> = ({ onCommand }) =
         setTranscript(transcriptText);
 
         if (event.results[current].isFinal) {
+          console.log("Jarvis: Final transcript perceived:", transcriptText);
           handleCommand(transcriptText.toLowerCase());
         }
       };
 
+      recognitionRef.current.onstart = () => {
+        console.log("Jarvis: Voice recognition started.");
+        setIsListening(true);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Jarvis: Speech recognition error", event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          speak("Microphone access denied. Please enable permissions in your browser. If you are in AI Studio, try opening the application in a new tab.");
+          setTranscript("Permission Error: Microphone access blocked.");
+        } else if (event.error === 'network') {
+          speak("Network error. Please check your connection.");
+        } else {
+          speak("I'm having trouble hearing you. Please try again.");
+        }
+      };
+
       recognitionRef.current.onend = () => {
+        console.log("Jarvis: Voice recognition ended.");
         setIsListening(false);
       };
+    } else {
+      console.warn("Jarvis: Speech Recognition API not supported in this browser.");
     }
   }, []);
 
   const handleCommand = async (command: string) => {
+    if (!command.trim()) return;
+    
     setIsLoading(true);
+    setResponse("Analyzing command context...");
+    
     try {
+      console.log("Jarvis: Sending command to core...", command);
       const res = await fetch('/api/jarvis/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcript: command,
-          userId: userProfile?.uid || 'anonymous',
-          role: userProfile?.role || 'resident'
+          userId: profile?.uid || 'anonymous',
+          role: profile?.role || 'resident'
         })
       });
 
+      if (res.status === 429) {
+        speak("I am currently experiencing a high volume of requests. Please standby for a moment.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (res.status === 401 || res.status === 500) {
+        speak("My neural core is restricted. Please ensure the Gemini API key is correctly configured in the system environment variables.");
+        setTranscript("System Configuration Error");
+        setIsLoading(false);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
       const data = await res.json();
+      console.log("Jarvis: Core response received:", data);
       
       if (data.response) {
         speak(data.response);
@@ -66,23 +132,40 @@ export const JarvisAssistant: React.FC<JarvisAssistantProps> = ({ onCommand }) =
         onCommand(command, data.action, data.payload);
       }
     } catch (error) {
-      console.error("Jarvis command failed:", error);
-      speak("System error. Connection to Jarvis core lost.");
+      console.error("Jarvis: Command execution failed:", error);
+      speak("System error. My connection to the central core has been interrupted.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const speak = (text: string) => {
-    setResponse(text);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 0.9; // More deep "Jarvis" like pitch
-    
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
+    try {
+      setResponse(text);
+      // Cancel previous speech to avoid "Uncaught" errors
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      if (jarvisVoice) {
+        utterance.voice = jarvisVoice;
+      }
+      
+      utterance.rate = 1.05; // Slightly faster for a modern AI feel
+      utterance.pitch = 0.85; // Deep, calm tones like Paul Bettany
+      
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = (e) => {
+        console.error("Jarvis: Speech synthesis error", e);
+        setIsSpeaking(false);
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.error("Jarvis: Could not speak", err);
+      setIsSpeaking(false);
+    }
   };
 
   const toggleListening = () => {
@@ -183,8 +266,29 @@ export const JarvisAssistant: React.FC<JarvisAssistantProps> = ({ onCommand }) =
         className="relative w-16 h-16 rounded-full bg-[#0F172A] border-2 border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center overflow-hidden"
       >
         {/* Animated Background Gradients */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-cyan-900/40 to-transparent animate-pulse" />
+        <div className={`absolute inset-0 bg-gradient-to-tr transition-colors duration-500 ${isSpeaking ? 'from-cyan-400/40 via-cyan-900/40' : 'from-cyan-900/40'} to-transparent animate-pulse`} />
         
+        {/* Neural Waveform (Speaking Indicator) */}
+        {isSpeaking && (
+          <div className="absolute inset-0 flex items-center justify-center gap-0.5 px-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <motion.div
+                key={i}
+                animate={{ 
+                  height: [4, 24, 4],
+                  opacity: [0.3, 1, 0.3]
+                }}
+                transition={{ 
+                  repeat: Infinity, 
+                  duration: 0.5 + (i * 0.1),
+                  ease: "easeInOut" 
+                }}
+                className="w-1 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)]"
+              />
+            ))}
+          </div>
+        )}
+
         {/* Scanning Line */}
         <motion.div 
           animate={{ y: [-32, 32] }}

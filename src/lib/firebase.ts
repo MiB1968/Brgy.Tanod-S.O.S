@@ -5,30 +5,28 @@ import { getStorage } from 'firebase/storage';
 
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const isConfigEmpty = !firebaseConfig.apiKey || firebaseConfig.apiKey === "";
+const config = firebaseConfig as any;
+const isConfigEmpty = !config || !config.apiKey || config.apiKey === "";
 
-let app;
-let db: any;
-let auth: any;
-let storage: any;
+let app: any = null;
+let db: any = null;
+let auth: any = null;
+let storage: any = null;
 
 if (!isConfigEmpty) {
-  app = initializeApp(firebaseConfig);
-  // Using experimentalAutoDetectLongPolling is generally more stable than forcing it
-  // and we explicitly set databaseId if it exists in the config
-  db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-    ignoreUndefinedProperties: true
-  }, firebaseConfig.firestoreDatabaseId);
-  auth = getAuth(app);
-  storage = getStorage(app);
+  try {
+    app = initializeApp(config);
+    db = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      ignoreUndefinedProperties: true
+    }, config.firestoreDatabaseId);
+    auth = getAuth(app);
+    storage = getStorage(app);
+  } catch (err) {
+    console.error("Firebase init failed:", err);
+  }
 } else {
   console.warn("⚠️ Firebase configuration is missing. Authentication and real-time features are disabled.");
-  // Provide partial mocks/nulls to prevent import crashes
-  app = null;
-  db = null;
-  auth = null;
-  storage = null;
 }
 
 export { db, auth, storage };

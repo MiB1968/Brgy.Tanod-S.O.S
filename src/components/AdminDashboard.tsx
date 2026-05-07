@@ -90,7 +90,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   }, [alerts, profile, sirenActive]);
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
+    if (!db || !profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
     // Real-time Residents stats
     const approvedQ = query(collection(db, 'residents'), where('status', '==', 'approved'));
@@ -154,6 +154,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   });
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
+    if (!db) return;
     try {
       const updateData: any = { 
         status, 
@@ -239,6 +240,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   const [onDutyTanods, setOnDutyTanods] = useState<User[]>([]);
 
   const handleUpdateTanodStatus = async (tanodId: string, newStatus: string) => {
+    if (!db) return;
     try {
       // 1. Update Firestore Users collection
       await setDoc(doc(db, 'users', tanodId), {
@@ -293,7 +295,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   useEffect(() => {
-    if (!profile) return;
+    if (!db || !profile) return;
     const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
     return onSnapshot(q, (snapshot) => {
       setOnDutyTanods(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User)));
@@ -373,6 +375,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
             <button 
               onClick={async () => {
+                if (!db) return;
                 const message = window.prompt('Enter SOS Broadcast Message (e.g., Extreme Flood Evacuation):');
                 if (!message) return;
                 
@@ -398,6 +401,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             </button>
             <button 
               onClick={async () => {
+                if (!db) return;
                 try {
                   const q = query(collection(db, 'system_broadcasts'), where('isActive', '==', true));
                   const snapshot = await getDocs(q);

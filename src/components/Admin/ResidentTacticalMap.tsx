@@ -45,6 +45,7 @@ export default function ResidentTacticalMap() {
   const [specialNeedsFilter, setSpecialNeedsFilter] = useState<'all' | 'yes' | 'no'>('all');
 
   useEffect(() => {
+    if (!db) return;
     // Only approved residents for the tactical map
     const q = query(collection(db, 'residents'), where('status', '==', 'approved'));
     
