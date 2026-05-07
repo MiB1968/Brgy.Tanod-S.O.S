@@ -21,6 +21,7 @@ import AnimatedButton from './AnimatedButton';
 import FlameAnimation from './FlameAnimation';
 
 import { useIncidentStore } from '../store/useIncidentStore';
+import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
 
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
@@ -40,6 +41,7 @@ const itemVariants = {
 
 export default function TanodDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
   const { alerts } = useIncidentStore();
+  const { updateTanodStatus } = useTanodStore();
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const [loadingAlertIds, setLoadingAlertIds] = useState<Set<string>>(new Set());

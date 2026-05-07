@@ -93,8 +93,7 @@ export interface Incident {
   alertId?: string;
   tanodId: string;
   tanodName: string;
-  date: string;
-  time: string;
+  timestamp: string; // Unified date/time
   location: string;
   gpsLocation?: { lat: number; lng: number };
   type: string;

@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Alert } from '../types';
 import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface SOSState {
   offlineQueue: Omit<Alert, 'id'>[];
@@ -28,7 +29,7 @@ export const useSOSStore = create<SOSState>()(
               timestamp: serverTimestamp(),
             });
           } catch (error) {
-            console.error('Failed to sync offline SOS:', error);
+            handleFirestoreError(error, OperationType.CREATE, 'alerts');
             stillQueued.push(alertData);
           }
         }

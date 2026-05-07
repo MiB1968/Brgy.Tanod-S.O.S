@@ -25,7 +25,7 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
       const allTanods = snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User));
       // Filter for those who are approved and NOT currently responding
       const available = allTanods.filter(t => 
-        t.status === 'approved' || t.status === 'On-Duty'
+        t.status === 'approved' || t.status === 'Available'
       );
       setTanods(available);
     });

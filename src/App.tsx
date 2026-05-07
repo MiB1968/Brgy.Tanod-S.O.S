@@ -1411,11 +1411,11 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
         } catch (err: any) {
           console.error('Online SOS failed, queuing:', err);
           useSOSStore.getState().addToQueue(alertData);
-          toast.info('Command link weak. SOS queued locally.');
+          toast('Command link weak. SOS queued locally.');
         }
       } else {
         useSOSStore.getState().addToQueue(alertData);
-        toast.info('System Offline. SOS queued locally.');
+        toast('System Offline. SOS queued locally.');
       }
       setSending(false);
       setSosSuccess(true);

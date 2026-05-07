@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { collection, addDoc, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, IncidentStatus } from '../types';
-import { X, Send } from 'lucide-react';
+import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface IncidentFormProps {
   profile: User;
@@ -29,32 +30,25 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
     
     setSubmitting(true);
     try {
-      let adminName = (profile.role === 'admin' || profile.role === 'superadmin') ? profile.name : 'Unknown Admin';
-      if (profile.role !== 'admin' && profile.role !== 'superadmin') {
-        try {
-          const adminQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
-          const adminDocs = await getDocs(adminQuery);
-          if (!adminDocs.empty) {
-            adminName = adminDocs.docs[0].data().name || 'Admin';
-          }
-        } catch (e) {
-          console.error('Failed to fetch admin');
-        }
-      }
-
       const incidentId = crypto.randomUUID();
       const incidentData = {
-        ...formData,
         id: incidentId,
         tanodId: auth.currentUser.uid,
         tanodName: profile.name,
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toLocaleTimeString(),
-        createdAt: new Date().toISOString(),
-        adminOnDuty: adminName
+        timestamp: new Date().toISOString(),
+        location: formData.location,
+        type: formData.type,
+        description: formData.description,
+        personsInvolved: formData.personsInvolved,
+        actionsTaken: formData.actionsTaken,
+        status: formData.status
       };
 
-      await setDoc(doc(db, 'incidents', incidentId), incidentData);
+      try {
+        await setDoc(doc(db, 'incidents', incidentId), incidentData);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `incidents/${incidentId}`);
+      }
 
       // Sync to Supabase
       if (isSupabaseConfigured) {

@@ -1,201 +1,85 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Global Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
     
-    // ==========================================
-    // 0. GLOBAL SAFETY NET
-    // ==========================================
+    // Default-Deny Catch-All
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ==========================================
-    // PHASE 3: PRIMITIVES
-    // ==========================================
-    function isSignedIn() { return request.auth != null; }
-    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    
-    // Roles - Look up from trusted 'users' collection
-    function getRole() { 
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(userPath) ? get(userPath).data.role : 'resident'; 
-    }
-    function isAdmin() { 
-      return isVerified() && (
-        getRole() == 'admin' || 
-        getRole() == 'superadmin' || 
-        request.auth.token.email == 'rubenlleg12@gmail.com' || 
-        request.auth.token.email == 'ronniecantuba420@gmail.com'
-      ); 
-    }
-    function isTanod() { return isVerified() && (getRole() == 'tanod' || isAdmin()); }
-    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
-
-    // ==========================================
-    // 1. USERS COLLECTION
-    // ==========================================
-    function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'name', 'role', 'email']) &&
-             data.uid == request.auth.uid &&
-             data.name is string && data.name.size() <= 100 &&
-             data.email == (request.auth.token.email || '');
-    }
-
-    match /users/{userId} {
-      allow get: if isSignedIn(); // Allow get for boot lookup
-      allow list: if isTanod(); // Tanods and Admins can list
-      allow create: if isSignedIn() && isValidUser(incoming());
-      allow update: if isSignedIn() && (
-        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'fcmToken', 'status', 'activeAlertId'])) ||
-        isAdmin()
-      );
-    }
-
-    // ==========================================
-    // 2. RESIDENTS (Registration Data)
-    // ==========================================
-    function isValidResident(data) {
-      return data.keys().hasAll(['fullName', 'mobileNumber', 'gpsLat', 'gpsLng', 'status', 'registeredAt', 'uid']) &&
-             data.uid == request.auth.uid &&
-             data.fullName is string && data.fullName.size() <= 200 &&
-             data.status == 'pending' &&
-             data.registeredAt == request.time;
-    }
-
-    match /residents/{residentId} {
-      allow get: if isVerified() && (isTanod() || isOwner(residentId));
-      allow list: if isTanod();
-      allow create: if isVerified() && isValidResident(incoming()) && isValidId(residentId);
-      allow update: if isVerified() && (
-        (isOwner(residentId) && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'mobileNumber', 'idPhotoUrl', 'selfieUrl'])) ||
-        (isTanod() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'approvedAt']))
-      );
-    }
-
-    // ==========================================
-    // 3. EMERGENCY ALERTS (SOS)
-    // ==========================================
+    // --- Alerts Collection ---
     function isValidAlert(data) {
-      return data.keys().hasAll(['residentId', 'residentName', 'type', 'status', 'timestamp', 'location']) &&
-             data.residentId == request.auth.uid &&
-             data.type is string && data.type.size() <= 50 &&
-             data.status == 'pending' &&
-             data.location is map && data.location.lat is number && data.location.lng is number;
+      return data.residentId is string 
+             && data.residentId == request.auth.uid
+             && data.status is string
+             && data.timestamp is string 
+             && data.residentName is string 
+             && data.residentName.size() >= 1 && data.residentName.size() <= 100;
     }
 
     match /alerts/{alertId} {
-      allow get: if isVerified();
-      allow list: if isVerified() && (isTanod() || resource.data.residentId == request.auth.uid);
-      allow create: if isVerified() && (isAdmin() || (isValidAlert(incoming()) && isValidId(alertId)));
-      allow update: if isVerified() && (
-        isAdmin() ||
-        // Resident cancels their own alert
-        (isOwner(existing().residentId) && existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status == 'cancelled') ||
-        // Tanod responds or resolves
-        (isTanod() && (
-          (existing().status in ['pending', 'responding'] && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'respondedBy', 'resolutionNotes', 'resolvedAt', 'updatedAt']))
-        ))
-      );
-      allow delete: if isAdmin();
+      allow create: if isSignedIn() 
+                    && isValidId(alertId)
+                    && isValidAlert(incoming())
+                    && incoming().keys().hasAll(['residentId', 'status', 'timestamp', 'residentName'])
+                    && incoming().keys().size() == 4;
+      allow read: if isSignedIn() && resource.data.residentId == request.auth.uid;
+      allow update, delete: if false; 
     }
 
-    // ==========================================
-    // 4. SHIFTS (Patrol Assignments)
-    // ==========================================
-    function isValidShift(data) {
-      return data.keys().hasAll(['tanodId', 'tanodName', 'startTime', 'endTime', 'sector', 'status', 'tanodResponse', 'createdAt']) &&
-             data.tanodId is string &&
-             data.tanodName is string &&
-             data.status in ['scheduled', 'active', 'completed'] &&
-             data.tanodResponse in ['pending', 'accepted', 'declined'];
+    // --- Incidents Collection ---
+    function isValidIncident(data) {
+        return data.tanodId is string 
+               && data.tanodId == request.auth.uid
+               && data.status is string
+               && data.type is string
+               && data.description is string
+               && data.location is string
+               && data.timestamp is string
+               && data.tanodName is string
+               && data.description.size() >= 1 && data.description.size() <= 1000
+               && data.location.size() >= 1 && data.location.size() <= 200;
     }
 
-    match /shifts/{shiftId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin() && isValidShift(incoming());
-      allow update: if (isSignedIn() && (isAdmin() || (isTanod() && existing().tanodId == request.auth.uid))) && (
-        incoming().diff(existing()).affectedKeys().hasAll(['updatedAt']) || // allow timestamp updates
-        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'tanodResponse', 'notes', 'updatedAt'])
-      );
-      allow delete: if isAdmin();
-    }
-
-    // ==========================================
-    // 5. TANODS (Status & Real-time GPS)
-    // ==========================================
-    match /tanods/{tanodId} {
-      allow read: if isVerified();
-      allow write: if isTanod() && isOwner(tanodId);
-    }
-
-    // ==========================================
-    // 6. PATROLS (Live Tracking Status)
-    // ==========================================
-    match /patrols/{patrolId} {
-      allow read: if isVerified();
-      allow write: if isTanod() && isOwner(patrolId);
-    }
-
-    // ==========================================
-    // 7. PATROL SESSIONS (Detailed Route)
-    // ==========================================
-    match /patrol_sessions/{sessionId} {
-      allow read: if isTanod();
-      allow write: if isTanod() && (incoming().tanodId == request.auth.uid || existing().tanodId == request.auth.uid);
-    }
-
-    // ==========================================
-    // 8. TANOD ACTIVITY LOGS
-    // ==========================================
-    match /tanod_activity_logs/{logId} {
-      allow read: if isTanod();
-      allow create: if isTanod() && (incoming().tanodId == request.auth.uid);
-    }
-
-    // ==========================================
-    // 9. SYSTEM CONFIG (Siren, etc)
-    // ==========================================
-    match /system/{docId} {
-      allow read: if isSignedIn();
-      allow update: if isTanod() && incoming().diff(existing()).affectedKeys().hasOnly(['sirenActive', 'sirenTriggeredBy', 'sirenTriggeredAt']);
-    }
-
-    // ==========================================
-    // 10. SYSTEM BROADCASTS
-    // ==========================================
-    match /system_broadcasts/{broadcastId} {
-      allow read: if isSignedIn();
-      allow create: if isTanod();
-      allow update: if isTanod();
-      allow delete: if isAdmin();
-    }
-
-    // ==========================================
-    // 11. INCIDENTS (Archives)
-    // ==========================================
     match /incidents/{incidentId} {
-      allow read: if isSignedIn();
-      allow create: if isTanod();
-      allow update, delete: if isAdmin();
+      allow create: if isSignedIn() 
+                    && isValidId(incidentId)
+                    && isValidIncident(incoming())
+                    && incoming().keys().hasAll(['id', 'tanodId', 'tanodName', 'timestamp', 'location', 'type', 'description', 'status'])
+                    && incoming().keys().size() >= 8;
+      allow update: if isSignedIn()
+                    && isValidIncident(incoming())
+                    && incoming().tanodId == existing().tanodId // Immutable
+                    && existing().status != 'completed' // Pillar 3: Terminal State Locking
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'description', 'actionsTaken', 'personsInvolved', 'resolvedAt']);
+      allow read: if isSignedIn() && resource.data.tanodId == request.auth.uid;
+      allow delete: if false; 
     }
-    
-    // ==========================================
-    // 13. AUDIT LOGS
-    // ==========================================
-    match /audit_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isTanod();
-    }
-    
-    // ==========================================
-    // 12. TEST CONNECTION
-    // ==========================================
-    match /test/connection {
 
-      allow read: if true;
+    // --- Patrols Collection ---
+    function isValidPatrol(data) {
+        return data.tanodId is string
+               && data.tanodId == request.auth.uid;
+    }
+
+    match /patrols/{tanodId} {
+      allow create, update: if isSignedIn()
+                            && isValidId(tanodId)
+                            && tanodId == request.auth.uid
+                            && isValidPatrol(incoming())
+                            && incoming().keys().hasAll(['id', 'tanodId'])
+                            && incoming().keys().size() == 2;
+      allow read: if isSignedIn(); 
+      allow delete: if false;
     }
   }
 }

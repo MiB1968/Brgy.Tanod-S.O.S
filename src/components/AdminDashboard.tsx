@@ -29,6 +29,7 @@ import { InstallAppButton } from './InstallAppButton';
 import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
+import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -508,6 +509,13 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           icon={IconOnlineTanods}
           color="text-success" 
           bg="bg-success/10" 
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <TanodUnitStatusList 
+          tanods={onDutyTanods} 
+          onUpdateStatus={handleUpdateTanodStatus} 
         />
       </motion.div>
 

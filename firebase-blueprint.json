@@ -7,7 +7,7 @@
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["resident", "tanod", "admin"] },
+        "role": { "type": "string" },
         "status": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
@@ -21,12 +21,42 @@
         "residentId": { "type": "string" },
         "type": { "type": "string" },
         "status": { "type": "string" },
-        "timestamp": { "type": "number" }
+        "timestamp": { "type": "string" },
+        "residentName": { "type": "string" }
       }
+    },
+    "Incident": {
+        "title": "Incident",
+        "description": "Patrol incident report",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "alertId": { "type": "string" },
+            "tanodId": { "type": "string" },
+            "tanodName": { "type": "string" },
+            "timestamp": { "type": "string" },
+            "location": { "type": "string" },
+            "type": { "type": "string" },
+            "description": { "type": "string" },
+            "personsInvolved": { "type": "string" },
+            "actionsTaken": { "type": "string" },
+            "status": { "type": "string" }
+        }
+    },
+    "PatrolLocation": {
+        "title": "PatrolLocation",
+        "description": "Tanod patrol location",
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "tanodId": { "type": "string" }
+        }
     }
   },
   "firestore": {
     "/users/{userId}": { "schema": "User", "description": "User profiles" },
-    "/alerts/{alertId}": { "schema": "Alert", "description": "SOS Alerts" }
+    "/alerts/{alertId}": { "schema": "Alert", "description": "SOS Alerts" },
+    "/incidents/{incidentId}": { "schema": "Incident", "description": "Incident reports" },
+    "/patrols/{tanodId}": { "schema": "PatrolLocation", "description": "Live patrol locations" }
   }
 }
