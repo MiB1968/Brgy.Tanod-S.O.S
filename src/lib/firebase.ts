@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfig from '@/firebase-applet-config.json';
 
 const config = firebaseConfig as any;
 const isConfigEmpty = !config || !config.apiKey || config.apiKey === "";

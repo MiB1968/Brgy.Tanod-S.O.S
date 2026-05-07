@@ -14,7 +14,4 @@ if (!isSupabaseConfigured) {
   console.warn('⚠️ Supabase credentials missing or invalid. Tactical Real-time features will be limited.');
 }
 
-export const supabase = createClient(
-  isSupabaseConfigured ? supabaseUrl! : 'https://placeholder-none.supabase.co',
-  isSupabaseConfigured ? supabaseAnonKey! : 'placeholder'
-);
+export const supabase = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseAnonKey!) : null;

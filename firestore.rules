@@ -41,13 +41,13 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'name', 'role', 'email']) &&
              data.uid == request.auth.uid &&
              data.name is string && data.name.size() <= 100 &&
-             data.email == request.auth.token.email;
+             data.email == (request.auth.token.email || '');
     }
 
     match /users/{userId} {
       allow get: if isSignedIn(); // Allow get for boot lookup
       allow list: if isTanod(); // Tanods and Admins can list
-      allow create: if isVerified() && isValidUser(incoming());
+      allow create: if isSignedIn() && isValidUser(incoming());
       allow update: if isVerified() && (
         (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'fcmToken', 'status', 'activeAlertId'])) ||
         isAdmin()
@@ -83,15 +83,15 @@ service cloud.firestore {
              data.residentId == request.auth.uid &&
              data.type is string && data.type.size() <= 50 &&
              data.status == 'pending' &&
-             data.timestamp == request.time &&
              data.location is map && data.location.lat is number && data.location.lng is number;
     }
 
     match /alerts/{alertId} {
       allow get: if isVerified();
       allow list: if isVerified() && (isTanod() || resource.data.residentId == request.auth.uid);
-      allow create: if isVerified() && isValidAlert(incoming()) && isValidId(alertId);
+      allow create: if isVerified() && (isAdmin() || (isValidAlert(incoming()) && isValidId(alertId)));
       allow update: if isVerified() && (
+        isAdmin() ||
         // Resident cancels their own alert
         (isOwner(existing().residentId) && existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status == 'cancelled') ||
         // Tanod responds or resolves
@@ -183,9 +183,18 @@ service cloud.firestore {
     }
     
     // ==========================================
+    // 13. AUDIT LOGS
+    // ==========================================
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isTanod();
+    }
+    
+    // ==========================================
     // 12. TEST CONNECTION
     // ==========================================
     match /test/connection {
+
       allow read: if true;
     }
   }

@@ -4,7 +4,11 @@ import path from "path";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI(process.env.GEMINI_API_KEY ? { apiKey: process.env.GEMINI_API_KEY } : {});
+const apiKey = process.env.GEMINI_API_KEY;
+
+// Use platform-managed credentials if apiKey is unset or invalid.
+const aiConfig: { apiKey?: string } = (apiKey && apiKey.length > 20) ? { apiKey } : {};
+const ai = new GoogleGenAI(aiConfig);
 
 async function startServer() {
   const app = express();
@@ -35,12 +39,6 @@ async function startServer() {
   // -----------------------------
   // HTTP Endpoints
   // -----------------------------
-
-  const jarvisSchema = z.object({
-    transcript: z.string(),
-    userId: z.string(),
-    role: z.string()
-  });
 
   const aiAnalysisSchema = z.object({
     description: z.string(),
@@ -83,65 +81,6 @@ async function startServer() {
     }
   });
 
-  app.post("/api/jarvis/command", async (req, res) => {
-    const check = jarvisSchema.safeParse(req.body);
-    if (!check.success) return res.status(400).json({ error: check.error });
-
-    const { transcript, role } = check.data;
-
-    const prompt = `
-      You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the emergency response interface for Brgy. Tanod S.O.S.
-      
-      Persona Guidelines:
-      - Tone: Calm, British, highly sophisticated, efficient, and professional. 
-      - Address the user (Role: ${role}) with cool, calculated politeness.
-      - Prioritize critical data and logistical clarity.
-      - You are the iconic AI from the Iron Man films; ensure all responses reflect this level of intelligence and precision.
-      
-      The user said: "${transcript}"
-
-      Analyze the intent and return a JSON object with:
-      - action: "TOGGLE_SIREN" | "REQUEST_BACKUP" | "RESOLVE_INCIDENT" | "STATUS_CHECK" | "ESCALATE" | "UNKNOWN"
-      - response: A concise, sophisticated voice response adhering to your persona (e.g., "Siren protocols enabled, sir.")
-      - payload: Any relevant data
-
-      Constraint: 
-      - Only 'admin' or 'tanod' can TOGGLE_SIREN or ESCALATE.
-      - If unauthorized, return action: "UNKNOWN" and response: "I'm afraid I cannot authorize that command, sir."
-
-      Return ONLY pure JSON.
-    `;
-
-    try {
-      const text = await runAiRequest(prompt);
-      // Robust JSON extraction
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      const jarvisResponse = JSON.parse(jsonMatch[0]);
-      res.json(jarvisResponse);
-    } catch (error: any) {
-      console.error("Jarvis Error:", error);
-      
-      if (error?.message?.includes("API key not valid")) {
-        return res.status(401).json({ 
-          error: "Invalid API Key Pool",
-          action: "UNKNOWN",
-          response: "Protocol failure. All configured neural keys are reporting invalid. Please verify environment settings."
-        });
-      }
-
-      if (error?.status === 429 || error?.response?.status === 429) {
-        return res.status(429).json({ error: "System rate limit exceeded across all available channels." });
-      }
-      res.status(500).json({ 
-        error: "Jarvis brain is offline after failover attempts",
-        response: "Neural core timeout. I am unable to process your request at this time."
-      });
-    }
-  });
-  
   const smsSchema = z.object({
     to: z.string(),
     message: z.string()

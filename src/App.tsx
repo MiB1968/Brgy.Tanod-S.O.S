@@ -91,7 +91,6 @@ import { Toaster, toast } from 'react-hot-toast';
 import { scheduleDailyLogReset } from './lib/scheduler';
 import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import TanodCommandAlert from './components/TanodCommandAlert';
-import { JarvisAssistant } from './components/JarvisAssistant';
 import BackgroundServices from './components/BackgroundServices';
 import { useAuthStore } from './store/useAuthStore';
 import { useIncidentStore } from './store/useIncidentStore';
@@ -478,7 +477,7 @@ export default function App() {
     const newProfile: Partial<User> = {
       uid: user.uid,
       name: user.displayName || 'Anonymous User',
-      email: user.email || '',
+      email: user.email || '', 
       role: role,
       createdAt: new Date().toISOString(),
       status: role === 'resident' ? 'pending' : 'approved'
@@ -940,18 +939,6 @@ export default function App() {
         )}
         {effectiveProfile && effectiveRole === 'tanod' && <TanodCommandAlert profile={effectiveProfile} isTestMode={viewOverride === 'tanod'} />}
         <BackgroundServices />
-        <JarvisAssistant 
-          onCommand={(cmd, action, payload) => {
-            if (action === 'TOGGLE_SIREN') {
-              const targetState = payload?.value ?? !globalSirenActive;
-              if (globalSirenActive !== targetState) toggleGlobalSiren();
-            } else if (action === 'REQUEST_BACKUP') {
-              toast.error("BACKUP REQUEST INITIATED", { icon: '🚨' });
-            } else if (action === 'STATUS_CHECK') {
-              toast.success("SYSTEM STATUS: ONLINE", { icon: '🛡️' });
-            }
-          }} 
-        />
       </main>
     </div>
   );
