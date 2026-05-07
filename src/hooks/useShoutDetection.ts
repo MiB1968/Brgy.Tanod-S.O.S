@@ -5,7 +5,7 @@ export const useShoutDetection = (onShout: () => void, threshold = -20) => {
   const [isListening, setIsListening] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | null>(null);
 
   const startListening = useCallback(async () => {
     try {

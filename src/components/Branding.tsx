@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../lib/utils';
 
 /* ── LOGO SVG COMPONENT ───────────────────────────────────── */
-export function TanodLogo({ size = 200, animated = true, className, useImage = true }: { size?: number, animated?: boolean, className?: string, useImage?: boolean }) {
+export function TanodLogo({ size = 200, animated = true, className, useImage = false }: { size?: number, animated?: boolean, className?: string, useImage?: boolean }) {
   const [imgError, setImgError] = React.useState(false);
   const logoUrl = '/logo.png';
 
@@ -23,108 +23,136 @@ export function TanodLogo({ size = 200, animated = true, className, useImage = t
     <svg width={size} height={size} viewBox="0 0 400 460" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>
         <radialGradient id="logoBackground" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#0a0f16" />
-          <stop offset="100%" stopColor="#020406" />
+          <stop offset="0%" stopColor="#1e1e2e" />
+          <stop offset="100%" stopColor="#0a0a0f" />
         </radialGradient>
         <linearGradient id="shieldBorder" x1="0" y1="0" x2="400" y2="460">
-          <stop offset="0%" stopColor="#94a3b8" />
-          <stop offset="50%" stopColor="#475569" />
-          <stop offset="100%" stopColor="#1e293b" />
+          <stop offset="0%" stopColor="#64748b" />
+          <stop offset="50%" stopColor="#1e293b" />
+          <stop offset="100%" stopColor="#ef4444" />
         </linearGradient>
-        <filter id="textGlow">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
+        <filter id="emeraldGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="crimsonGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="15" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
         </filter>
         <clipPath id="shieldShape">
           <path d="M200 10 L380 60 L380 280 C380 380 200 450 200 450 C200 450 20 380 20 280 L20 60 L200 10Z" />
         </clipPath>
       </defs>
 
-      {/* Shadow */}
-      <path d="M200 20 L385 70 L385 290 C385 390 200 460 200 460 C200 460 15 390 15 290 L15 70 L200 20Z" fill="black" opacity="0.4" filter="blur(8px)" />
+      {/* Extreme Depth Shadow */}
+      <path d="M200 30 L390 80 L390 300 C390 400 200 470 200 470 C200 470 10 400 10 300 L10 80 L200 30Z" fill="black" opacity="0.6" filter="blur(12px)" />
+
+      {/* Outer Tactical Frame */}
+      <path d="M200 5 L390 60 L390 285 C390 390 200 455 200 455 C200 455 10 390 10 285 L10 60 L200 5Z" fill="#0f172a" stroke="#ffffff10" strokeWidth="2" />
 
       {/* Main Shield Body */}
       <path d="M200 10 L380 60 L380 280 C380 380 200 450 200 450 C200 450 20 380 20 280 L20 60 L200 10Z" fill="url(#logoBackground)" stroke="url(#shieldBorder)" strokeWidth="8" />
 
-      {/* Tactical Texture (Hexagons) */}
-      <g clipPath="url(#shieldShape)" opacity="0.08">
-        {[...Array(12)].map((_, r) => (
-          [...Array(12)].map((_, c) => (
-            <path key={`${r}-${c}`} d={`M${c * 40 + (r % 2 ? 20 : 0)} ${r * 35} l20 0 l10 17 l-10 17 l-20 0 l-10 -17 z`} fill="none" stroke="#475569" strokeWidth="1" />
+      {/* Tactical Hex Grid */}
+      <g clipPath="url(#shieldShape)" opacity="0.15">
+        {[...Array(15)].map((_, r) => (
+          [...Array(15)].map((_, c) => (
+            <path key={`${r}-${c}`} d={`M${c * 36 + (r % 2 ? 18 : 0)} ${r * 32} l18 0 l9 15 l-9 15 l-18 0 l-9 -15 z`} fill="none" stroke="#ef4444" strokeWidth="0.5" />
           ))
         ))}
       </g>
 
-      {/* Philippine Sun & Stars */}
-      <g transform="translate(200, 85)">
-        {/* Sun */}
+      {/* Philippine Sun & Stars (High Detail) */}
+      <g transform="translate(200, 95)" opacity="0.9">
+        <circle r="25" fill="#fbbf24" filter="url(#emeraldGlow)" />
         <circle r="22" fill="#fbbf24" stroke="#f59e0b" strokeWidth="2" />
         {[...Array(8)].map((_, i) => (
-          <path key={i} d="M0 -32 L4 -24 L-4 -24 Z" fill="#fbbf24" transform={`rotate(${i * 45})`} />
+          <path key={i} d="M0 -36 L6 -26 L-6 -26 Z" fill="#fbbf24" transform={`rotate(${i * 45})`} />
         ))}
-        {/* 3 Stars */}
-        <path d="M0 -65 l5 15 l15 0 l-12 10 l5 15 l-13 -10 l-13 10 l5 -15 l-12 -10 l15 0 z" fill="#f59e0b" transform="scale(0.4) translate(0, -10)" />
-        <path d="M0 -65 l5 15 l15 0 l-12 10 l5 15 l-13 -10 l-13 10 l5 -15 l-12 -10 l15 0 z" fill="#f59e0b" transform="scale(0.4) translate(-100, 30) rotate(-30)" />
-        <path d="M0 -65 l5 15 l15 0 l-12 10 l5 15 l-13 -10 l-13 10 l5 -15 l-12 -10 l15 0 z" fill="#f59e0b" transform="scale(0.4) translate(100, 30) rotate(30)" />
-      </g>
-
-      {/* TEXT AREA */}
-      <text x="200" y="165" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="900" fontSize="28" fill="#94a3b8" letterSpacing="4">BRGY.</text>
-      <text x="200" y="240" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="900" fontSize="72" fill="white" filter="url(#textGlow)">TANOD</text>
-      <text x="200" y="325" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="900" fontSize="84" fill="#ef4444" filter="url(#textGlow)">S.O.S.</text>
-
-      {/* BOTTOM ICONS */}
-      <g transform="translate(100, 375)">
-        {/* Shield Icon (Blue) */}
-        <g transform="translate(0, 0)">
-          <path d="M25 0 L45 8 L45 25 Q45 38 25 45 Q5 38 5 25 L5 8 Z" fill="#3b82f6" />
-          <path d="M25 15 l3 8 l8 0-6 5 2 8-7-5-7 5 2-8-6-5 8 0z" fill="white" transform="scale(0.4) translate(37, 25)" />
-        </g>
-        {/* Radio Tower (Red) */}
-        <g transform="translate(85, 0)">
-          <path d="M25 5 L15 40 L35 40 Z" stroke="#ef4444" strokeWidth="3" fill="none" />
-          <circle cx="25" cy="5" r="3" fill="#ef4444" />
-          <path d="M15 15 Q5 15 5 5" stroke="#ef4444" strokeWidth="2" fill="none" opacity="0.6" transform="translate(0, 0)" />
-          <path d="M35 15 Q45 15 45 5" stroke="#ef4444" strokeWidth="2" fill="none" opacity="0.6" />
-        </g>
-        {/* People (Green) */}
-        <g transform="translate(160, 5)">
-          <circle cx="25" cy="12" r="8" fill="#22c55e" />
-          <path d="M10 40 Q25 25 40 40" fill="#22c55e" />
-          <circle cx="15" cy="18" r="6" fill="#16a34a" />
-          <path d="M5 38 Q15 28 25 38" fill="#16a34a" />
-          <circle cx="35" cy="18" r="6" fill="#16a34a" />
-          <path d="M25 38 Q35 28 45 38" fill="#16a34a" />
+        {/* Stars */}
+        <g fill="#f59e0b">
+           <path d="M0 -75 l6 18 l20 0 l-16 12 l6 18 l-16 -12 l-16 12 l6 -18 l-16 -12 l20 0 z" transform="scale(0.3) translate(0, -20)" />
+           <path d="M0 -75 l6 18 l20 0 l-16 12 l6 18 l-16 -12 l-16 12 l6 -18 l-16 -12 l20 0 z" transform="scale(0.3) translate(-120, 60) rotate(-30)" />
+           <path d="M0 -75 l6 18 l20 0 l-16 12 l6 18 l-16 -12 l-16 12 l6 -18 l-16 -12 l20 0 z" transform="scale(0.3) translate(120, 60) rotate(30)" />
         </g>
       </g>
 
-      {/* Animated Scan Line */}
+      {/* CENTRAL BRANDING */}
+      <g filter="url(#crimsonGlow)">
+        <text x="200" y="185" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontWeight="900" fontSize="24" fill="#94a3b8" letterSpacing="8" opacity="0.8">BRGY.</text>
+        <text x="200" y="255" textAnchor="middle" fontFamily="Outfit, sans-serif" fontWeight="900" fontSize="82" fill="white" style={{ letterSpacing: '-2px' }}>TANOD</text>
+        <text x="200" y="325" textAnchor="middle" fontFamily="Outfit, sans-serif" fontWeight="900" fontSize="104" fill="#ef4444" style={{ letterSpacing: '-4px' }}>S.O.S.</text>
+      </g>
+
+      {/* STATUS INDICATORS */}
+      <rect x="140" y="345" width="120" height="4" rx="2" fill="#ffffff10" />
+      <rect x="180" y="345" width="40" height="4" rx="2" fill="#ef4444">
+        <animate attributeName="x" from="140" to="220" dur="2s" repeatCount="indefinite" />
+      </rect>
+
+      {/* BOTTOM ASSETS */}
+      <g transform="translate(85, 385)">
+        {/* Secure Shield */}
+        <path d="M30 4 L55 12 L55 35 C55 50 30 60 30 60 C30 60 5 50 5 35 L5 12 Z" fill="#3b82f620" stroke="#3b82f6" strokeWidth="2" />
+        <path d="M30 18 l4 10 l12 0-8 6 4 10-8-6-8 6 4-10-8-6 12 0z" fill="#3b82f6" transform="scale(0.4) translate(45, 45)" />
+
+        {/* Transmission Tower */}
+        <g transform="translate(100, 0)">
+          <path d="M30 10 L15 55 L45 55 Z" stroke="#ef4444" strokeWidth="2.5" fill="none" />
+          <circle cx="30" cy="10" r="4" fill="#ef4444">
+            <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
+          </circle>
+          <path d="M20 20 Q5 20 5 5" stroke="#ef444450" strokeWidth="2" fill="none" />
+          <path d="M40 20 Q55 20 55 5" stroke="#ef444450" strokeWidth="2" fill="none" />
+        </g>
+      </g>
+
+      {/* Cyberpunk Scanline */}
       {animated && (
-        <line x1="20" y1="0" x2="380" y2="0" stroke="#ef4444" strokeWidth="2" opacity="0.3">
-          <animateTransform attributeName="transform" type="translate" from="0 60" to="0 380" dur="4s" repeatCount="indefinite" />
-        </line>
+        <g>
+          <rect x="20" y="0" width="360" height="2" fill="url(#scanGradient)" opacity="0.6">
+            <animateTransform attributeName="transform" type="translate" from="0 60" to="0 390" dur="3s" repeatCount="indefinite" />
+          </rect>
+          <defs>
+            <linearGradient id="scanGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="transparent" />
+              <stop offset="50%" stopColor="#ef4444" />
+              <stop offset="100%" stopColor="transparent" />
+            </linearGradient>
+          </defs>
+        </g>
       )}
     </svg>
   );
 }
 
 /* ── FULL WORDMARK COMPONENT ──────────────────────────────── */
-export function TanodWordmark({ width = 480, className }: { width?: number, className?: string }) {
+export function TanodWordmark({ width, className, size = 'md' }: { width?: number, className?: string, size?: 'sm' | 'md' | 'lg' }) {
+  const isSm = size === 'sm';
+  const logoSize = isSm ? 50 : (size === 'lg' ? 120 : 80);
+  
   return (
-    <div className={cn("flex items-center gap-6", className)} style={{ width }}>
-      <TanodLogo size={80} animated={false} />
-      <div className="flex flex-col text-left">
+    <div className={cn("flex items-center", isSm ? "gap-2" : "gap-6", className)} style={width ? { width } : undefined}>
+      <div className="relative shrink-0">
+        <TanodLogo size={logoSize} animated={false} />
+        <div className={cn("absolute -inset-2 bg-emergency/10 blur-2xl rounded-full -z-10", isSm ? "opacity-30" : "opacity-100")} />
+      </div>
+      <div className="flex flex-col text-left min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-mono text-white/50 uppercase tracking-[0.4em]">BARANGAY</span>
-          <span className="px-2 py-0.5 rounded bg-brand-red text-[10px] font-black text-white uppercase tracking-widest">S.O.S.</span>
+          <span className={cn("font-mono font-black text-white/40 uppercase tracking-[0.2em]", isSm ? "text-[8px]" : "text-[12px]")}>BRGY DISTRICT</span>
+          {!isSm && <div className="h-0.5 w-8 bg-emergency/20" />}
+          <span className={cn("px-1.5 py-0.5 rounded bg-brand-red font-black text-white uppercase tracking-[0.1em] shadow-glow-red", isSm ? "text-[7px]" : "text-[10px]")}>S.O.S.</span>
         </div>
-        <h1 className="text-4xl font-black italic text-white tracking-tighter uppercase font-mono leading-none mt-1 group">
-          TANOD<span className="text-brand-red group-hover:text-white transition-colors">NET</span>
+        <h1 className={cn(
+          "font-black italic text-white tracking-tighter uppercase font-mono leading-[0.9] mt-0.5 group select-none",
+          isSm ? "text-xl xs:text-2xl" : "text-5xl"
+        )}>
+          TANOD<span className="text-brand-red group-hover:text-emergency transition-all duration-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]">NET</span>
         </h1>
-        <p className="text-[10px] font-mono text-white/20 uppercase tracking-[0.3em] mt-2">EMERGENCY INTELLIGENCE SYSTEM</p>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <div className={cn("rounded-full bg-success animate-pulse", isSm ? "w-1 h-1" : "w-1.5 h-1.5")} />
+          <p className={cn("font-mono text-white/30 uppercase tracking-[0.15em] font-black", isSm ? "text-[7px]" : "text-[10px]")}>ACTIVE INTEL GRID</p>
+        </div>
       </div>
     </div>
   );

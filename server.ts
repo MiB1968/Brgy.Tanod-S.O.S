@@ -17,7 +17,11 @@ async function startServer() {
   const PORT = 3000;
 
   // Security
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    frameguard: false,
+  }));
   app.use(express.json());
 
   const limiter = rateLimit({
@@ -164,7 +168,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    const publicPath = path.join(process.cwd(), 'public');
+    
+    // Serve from dist first, then public as fallback
     app.use(express.static(distPath));
+    app.use(express.static(publicPath));
+    
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

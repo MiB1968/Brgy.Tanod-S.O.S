@@ -379,9 +379,12 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             <span className="w-2 h-2 rounded-full bg-emergency animate-pulse" />
             <span className="text-[10px] font-mono text-emergency font-black uppercase tracking-[0.4em]">Signal: Secure Encryption Active</span>
           </div>
-          <h2 className="text-4xl md:text-6xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4 outline-text">
-            <TanodLogo size={64} animated={true} className="text-emergency shadow-glow-red" />
-            COMMAND<span className="text-emergency">CENTER</span>
+          <h2 className="text-4xl md:text-6xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center flex-wrap gap-4 outline-text">
+            <TanodLogo size={64} animated={true} className="text-emergency shadow-glow-red shrink-0" />
+            <div className="flex flex-col">
+              <span className="flex items-center">COMMAND<span className="text-emergency">CENTER</span></span>
+              <span className="text-[10px] font-black tracking-[0.5em] text-white/20 -mt-1 ml-1">ADMIN_PANEL_v2</span>
+            </div>
           </h2>
           <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.4em] mt-4 bg-white/5 inline-block px-4 py-1.5 rounded-full border border-white/5">Strategic Surveillance & Tactical Response Matrix</p>
         </div>

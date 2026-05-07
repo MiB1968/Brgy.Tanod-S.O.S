@@ -11,6 +11,7 @@ import {
 import { Alert, User, RegistryStatus } from '../types';
 import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';

@@ -48,11 +48,13 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       <div className="absolute top-0 left-0 w-full h-full bg-brand-bg/20 -z-10" />
       <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emergency/5 blur-[100px] rounded-full" />
       
-      <div className="p-10 pt-12">
-        <TanodWordmark width={220} className="mx-auto filter drop-shadow-lg" />
-        <div className="mt-4 flex flex-col items-center">
+      <div className="p-6 pt-10 overflow-hidden">
+        <div className="scale-75 origin-left">
+          <TanodWordmark size="md" className="filter drop-shadow-lg" />
+        </div>
+        <div className="mt-2 flex flex-col items-center">
             <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-            <span className="text-[10px] font-black tracking-[0.4em] text-white/20 uppercase mt-4 font-mono italic">Central Command</span>
+            <span className="text-[9px] font-black tracking-[0.4em] text-white/20 uppercase mt-4 font-mono italic">Central Command</span>
         </div>
       </div>
 

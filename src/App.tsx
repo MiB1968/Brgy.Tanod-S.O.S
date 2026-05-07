@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
@@ -75,6 +75,7 @@ import { CitizenReportTracker } from './components/CitizenReportTracker';
 import { NavigationSidebar } from './components/NavigationSidebar';
 import { WitnessOverlay } from './components/WitnessOverlay';
 import { useShoutDetection } from './hooks/useShoutDetection';
+import { useVideoRecorder } from './hooks/useVideoRecorder';
 import { Shift } from './types';
 import { navItems } from './constants';
 import { format } from 'date-fns';
@@ -147,21 +148,6 @@ export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (guardianMode) {
-      startListening();
-    } else {
-      stopListening();
-    }
-  }, [guardianMode, startListening, stopListening]);
-
-  useEffect(() => {
-    if (!activeAlert && isRecording) {
-      stopRecording();
-      activeAlertIdRef.current = null;
-    }
-  }, [activeAlert, isRecording, stopRecording]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -649,8 +635,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
-      <div className={cn("absolute top-0 left-0 w-full z-[100] px-4 py-1 text-center text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer hover:brightness-125", isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse")} onClick={() => setIsOnline(!isOnline)}>
-        {isOnline ? "System Online — Neural Sync Active" : "Offline Mode — Operating on Local Storage"}
+      <div className="fixed top-0 left-0 w-full z-[101] pointer-events-none h-8 overflow-hidden">
+        <div 
+          className={cn(
+            "absolute top-0 left-0 w-full px-4 py-1.5 text-center text-[7px] xs:text-[9px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer pointer-events-auto", 
+            isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse"
+          )} 
+          onClick={(e) => { e.stopPropagation(); setIsOnline(!isOnline); }}
+        >
+          <span className="inline-block animate-flicker">
+            {isOnline ? "System Online — Neural Sync Active" : "Offline Mode — Operating on Local Storage"}
+          </span>
+        </div>
       </div>
       <Toaster />
 
@@ -668,10 +664,13 @@ export default function App() {
         <TanodLogo size={800} animated={false} useImage={false} className="grayscale contrast-150 rotate-[-15deg] blur-[2px]" />
       </div>
       {/* Mobile Top Bar */}
-      <div className="md:hidden flex items-center justify-between p-5 glass-panel border-b border-white/5 shrink-0 z-[60] shadow-command">
-        <div className="flex items-center gap-3">
-          <TanodLogo size={36} animated={false} useImage={false} />
-          <span className="font-black italic tracking-tighter text-lg uppercase font-mono text-white leading-none">Brgy.TANOD <span className="text-emergency">🆘</span> ALERT</span>
+      <div className="md:hidden flex items-center justify-between p-4 glass-panel border-b border-white/5 shrink-0 z-[60] shadow-command mt-8">
+        <div className="flex items-center gap-2">
+          <TanodLogo size={32} animated={false} useImage={false} />
+          <div className="flex flex-col">
+            <span className="font-black italic tracking-tighter text-sm xs:text-base uppercase font-mono text-white leading-none">Brgy.TANOD <span className="text-emergency">🆘</span></span>
+            <span className="text-[8px] font-black text-white/40 uppercase tracking-widest font-mono">TACTICAL GRID</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {deferredPrompt && (
@@ -1207,23 +1206,45 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
   const activeAlertIdRef = useRef<string | null>(null);
   const [guardianMode, setGuardianMode] = useState(false);
 
-  const { isRecording, startRecording, stopRecording } = useVideoRecorder((chunk) => {
+  const handleSOSRef = useRef<((type?: EmergencyType, description?: string) => Promise<void>) | null>(null);
+
+  const handleShout = useCallback(() => {
+    toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', {
+      duration: 5000,
+      icon: '🔊'
+    });
+    if (handleSOSRef.current) {
+      handleSOSRef.current('other', 'Dynamic AI Alert: High-decibel sound/shout detected.');
+    }
+  }, []);
+
+  const { isListening, startListening, stopListening } = useShoutDetection(handleShout);
+
+  const handleVideoChunk = useCallback((chunk: Blob) => {
     // UPLOAD: Evidence Streaming
     if (!activeAlertIdRef.current) return;
     
     import('./services/StorageService').then(async (service) => {
         await service.uploadVideoChunk(activeAlertIdRef.current!, chunk, Date.now());
-        console.log("Chunk uploaded for", activeAlertIdRef.current);
     });
-  });
+  }, []);
 
-  const { isListening, startListening, stopListening } = useShoutDetection(() => {
-    toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', {
-      duration: 5000,
-      icon: '🔊'
-    });
-    handleSOS('other', 'Dynamic AI Alert: High-decibel sound/shout detected.');
-  });
+  const { isRecording, startRecording, stopRecording } = useVideoRecorder(handleVideoChunk);
+  
+  useEffect(() => {
+    if (guardianMode) {
+      startListening();
+    } else {
+      stopListening();
+    }
+  }, [guardianMode, startListening, stopListening]);
+
+  useEffect(() => {
+    if (!activeAlert && isRecording) {
+      stopRecording();
+      activeAlertIdRef.current = null;
+    }
+  }, [activeAlert, isRecording, stopRecording]);
 
 
   const handleSOS = async (type: EmergencyType = 'other', description: string) => {
@@ -1357,6 +1378,8 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
       setSending(false);
     }
   };
+
+  handleSOSRef.current = handleSOS;
 
   return (
     <motion.div 
@@ -1496,14 +1519,16 @@ function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferre
               <div className="scanline opacity-20 pointer-events-none" />
               <div className="absolute inset-0 emergency-bg-glow opacity-5" />
               
-              <div className="absolute top-8 left-8 flex flex-col gap-1 z-10">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
-                  <span className="text-[8px] font-mono font-black text-white/20 uppercase tracking-[0.4em]">Auth Layer 1</span>
+              <div className="absolute top-8 left-8 flex flex-col gap-4 z-10">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
+                    <span className="text-[8px] font-mono font-black text-white/20 uppercase tracking-[0.4em]">Auth Layer 1</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-black text-white/40 uppercase tracking-[0.2em] italic">Resident SOS Protocol</span>
                 </div>
-                <span className="text-[10px] font-mono font-black text-white/40 uppercase tracking-[0.2em] italic">Resident SOS Protocol</span>
                 
-                <div className="flex items-center gap-3 ml-auto px-3 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 w-fit">
                    <div className="flex flex-col">
                       <span className="text-[8px] font-black tracking-tighter text-white/60">Guardian AI Mode</span>
                       <span className="text-[10px] font-black text-emergency leading-none">{guardianMode ? 'LISTENING' : 'INACTIVE'}</span>

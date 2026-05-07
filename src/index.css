@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@400;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
 @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
 
 @import "tailwindcss";
@@ -11,7 +11,8 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Space Mono", monospace;
+  --font-display: "Outfit", sans-serif;
+  --font-mono: "JetBrains Mono", "Space Mono", monospace;
 
   /* Command Center Palette */
   --color-brand-bg: #0B0F19;
