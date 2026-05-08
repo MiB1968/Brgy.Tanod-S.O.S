@@ -75,7 +75,9 @@ service cloud.firestore {
       return data.residentId is string 
              && data.status is string && data.status in ['pending', 'responding', 'resolved', 'cancelled']
              && (data.timestamp is string || data.timestamp is timestamp)
+             && (data.timestamp is timestamp ? data.timestamp <= request.time : (data.timestamp is string && data.timestamp.size() <= 30 && timestamp.date(int(data.timestamp[0:4]), int(data.timestamp[5:7]), int(data.timestamp[8:10])) <= request.time))
              && data.residentName is string && data.residentName.size() <= 100
+             && (!("customMessage" in data) || (data.customMessage is string && data.customMessage.size() <= 1000))
              && (data.type is string && data.type.size() <= 50);
     }
 
@@ -93,11 +95,15 @@ service cloud.firestore {
         (existing().residentId == request.auth.uid && incoming().residentId == existing().residentId && (
            // Terminal lock
            existing().status != 'resolved' && existing().status != 'cancelled' &&
+           // Cannot shortcut to resolved
+           !(existing().status == 'pending' && incoming().status == 'resolved') &&
            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'location', 'type', 'customMessage', 'updatedAt', 'isManualLocation'])
         )) ||
         // Action: Tanod response
         (isTanodOrAdmin() && incoming().residentId == existing().residentId && (
            existing().status != 'resolved' && existing().status != 'cancelled' &&
+           // Cannot shortcut to resolved
+           !(existing().status == 'pending' && incoming().status == 'resolved') &&
            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTo', 'assignedToName', 'respondedBy', 'respondedByName', 'respondedAt', 'resolvedAt', 'resolutionNotes', 'responderNotes', 'aiAnalysis', 'updatedAt'])
         )) ||
         // Master override for admins
@@ -123,7 +129,8 @@ service cloud.firestore {
       return data.tanodId is string 
              && data.status is string
              && data.type is string
-             && (data.description is string && data.description.size() <= 3000);
+             && (data.description is string && data.description.size() <= 3000)
+             && data.alertId is string && exists(/databases/$(database)/documents/alerts/$(data.alertId));
     }
 
     match /incidents/{incidentId} {
