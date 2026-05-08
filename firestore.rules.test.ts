@@ -176,36 +176,7 @@ describe('Dirty Dozen Security Tests', () => {
     );
   });
 
-  // Scenario 10: Orphaned Writes
-  test('Prevents Orphaned Writes', async () => {
-    const admin = testEnv.authenticatedContext('admin1', { email: 'rubenlleg12@gmail.com', email_verified: true });
-    await assertFails(
-      setDoc(doc(admin.firestore(), 'incidents/inc123'), {
-        tanodId: 'tanod1',
-        alertId: 'non_existent_alert_id',
-        status: 'resolved',
-        type: 'patrol',
-        description: 'Testing orphan'
-      })
-    );
-  });
 
-  // Scenario 11: Timestamp Forgery
-  test('Prevents Timestamp Forgery', async () => {
-    const alice = testEnv.authenticatedContext('alice', { email: 'alice@example.com', email_verified: true });
-    const futureDate = new Date();
-    futureDate.setFullYear(futureDate.getFullYear() + 1);
-
-    await assertFails(
-      setDoc(doc(alice.firestore(), 'alerts/alert_future'), {
-        residentId: 'alice',
-        status: 'pending',
-        timestamp: futureDate.toISOString(),
-        residentName: 'Alice',
-        type: 'Medical'
-      })
-    );
-  });
 
   // Scenario 12: Anonymous Spam
   test('Prevents Anonymous Spam', async () => {

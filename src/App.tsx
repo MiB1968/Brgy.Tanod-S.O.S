@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser,
@@ -383,6 +385,22 @@ export default function App() {
     return unsubscribe;
   }, [auth, db, setLoading, setProfile, setResidentProfile]);
 
+
+  // Check for redirect result on load
+  useEffect(() => {
+    if (!auth) return;
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        console.log("Redirect Login Successful:", result.user.email);
+        setUser(result.user);
+        toast.success(`Access Granted: ${result.user.displayName}`, { icon: '🔑' });
+      }
+    }).catch((err) => {
+      console.error("Redirect Login Error Details:", err);
+      toast.error(`Auth Error: ${err.message}`);
+    });
+  }, [auth]);
+
   const handleLogin = async () => {
     if (isLoggingIn || !auth) return;
     
@@ -400,6 +418,13 @@ export default function App() {
         prompt: 'select_account'
       });
       
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+         await signInWithRedirect(auth, provider);
+         // Redirects the page, so it won't execute below
+         return;
+      }
+
       const result = await signInWithPopup(auth, provider);
       console.log("Popup Successful:", result.user.email);
       // Manually trigger user update to bypass potential listener delay
@@ -415,7 +440,10 @@ export default function App() {
       if (err.code === 'auth/unauthorized-domain') {
         toast.error(`Domain NOT Authorized: ${window.location.hostname}. Please add this to Firebase Console > Auth > Settings.`, { duration: 8000 });
       } else if (err.code === 'auth/popup-blocked') {
-        toast.error('Login Popup Blocked! Please allow popups for this site in your browser settings.', { duration: 8000 });
+        toast.error('Login Popup Blocked! Falling back to redirect...', { duration: 4000 });
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        signInWithRedirect(auth, provider);
       } else if (err.code !== 'auth/popup-closed-by-user') {
         toast.error(`Auth Error: ${err.message}. If on mobile, try using Chrome and ensure popups are allowed.`);
       }

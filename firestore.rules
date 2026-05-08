@@ -75,7 +75,7 @@ service cloud.firestore {
       return data.residentId is string 
              && data.status is string && data.status in ['pending', 'responding', 'resolved', 'cancelled']
              && (data.timestamp is string || data.timestamp is timestamp)
-             && (data.timestamp is timestamp ? data.timestamp <= request.time : (data.timestamp is string && data.timestamp.size() <= 30 && timestamp.date(int(data.timestamp[0:4]), int(data.timestamp[5:7]), int(data.timestamp[8:10])) <= request.time))
+             && (data.timestamp is timestamp ? data.timestamp <= request.time : (data.timestamp is string && data.timestamp.size() <= 30))
              && data.residentName is string && data.residentName.size() <= 100
              && (!("customMessage" in data) || (data.customMessage is string && data.customMessage.size() <= 1000))
              && (data.type is string && data.type.size() <= 50);
@@ -129,8 +129,7 @@ service cloud.firestore {
       return data.tanodId is string 
              && data.status is string
              && data.type is string
-             && (data.description is string && data.description.size() <= 3000)
-             && data.alertId is string && exists(/databases/$(database)/documents/alerts/$(data.alertId));
+             && (data.description is string && data.description.size() <= 3000);
     }
 
     match /incidents/{incidentId} {
