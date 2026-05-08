@@ -10,7 +10,9 @@ import {
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser,
-  signInAnonymously
+  signInAnonymously,
+  setPersistence,
+  browserLocalPersistence
 } from 'firebase/auth';
 import { 
   collection, 
@@ -327,28 +329,34 @@ export default function App() {
   useEffect(() => {
     if (!auth || !db) return;
 
+    // Set persistence to local to ensure mobile browsers keep the session
+    setPersistence(auth, browserLocalPersistence).catch(err => {
+      console.warn("Persistence Error:", err);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth State Changed:", { 
+        loggedIn: !!firebaseUser, 
+        uid: firebaseUser?.uid, 
+        email: firebaseUser?.email 
+      });
+
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
+          setLoading(true);
           // Profile check
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             const data = userDoc.data() as User;
-            // Force superadmin if checkIsRuben
-            if (checkIsRuben(firebaseUser.uid) && data.role !== 'superadmin') {
-              await updateDoc(doc(db, 'users', firebaseUser.uid), { role: 'superadmin' });
-              setProfile({ ...data, role: 'superadmin' });
-            } else {
-              setProfile(data);
-            }
-          } else if (checkIsRuben(firebaseUser.uid)) {
-            // Bootstrap
+            setProfile(data);
+          } else if (checkIsRuben(firebaseUser.uid) || firebaseUser.email === 'rubenlleg12@gmail.com') {
+            // Self-healing bootstrap for the owner
             const adminProfile: User = {
               uid: firebaseUser.uid,
               id: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Super Admin',
-              email: firebaseUser.email || '',
+              name: firebaseUser.displayName || 'Ruben Llego',
+              email: firebaseUser.email || 'rubenlleg12@gmail.com',
               role: 'superadmin',
               createdAt: new Date().toISOString(),
               status: 'approved'
@@ -377,14 +385,39 @@ export default function App() {
 
   const handleLogin = async () => {
     if (isLoggingIn || !auth) return;
+    
+    // Check if inside an iframe (like AI Studio preview)
+    if (window.self !== window.top) {
+      toast.error('Login works best in a new tab. Please click the "Open in new tab" icon at the top right of the preview.', { duration: 10000 });
+      // On some platforms we can't login inside an iframe at all
+    }
+
     setIsLoggingIn(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      // Set high precision hint for Google login
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      const result = await signInWithPopup(auth, provider);
+      console.log("Popup Successful:", result.user.email);
+      // Manually trigger user update to bypass potential listener delay
+      setUser(result.user);
+      toast.success(`Access Granted: ${result.user.displayName}`, { icon: '🔑' });
     } catch (err: any) {
-      console.error("Login Error:", err);
-      if (err.code !== 'auth/popup-closed-by-user') {
-        toast.error(`Authentication Failed: ${err.message}`);
+      console.error("Login Error Details:", {
+        code: err.code,
+        message: err.message,
+        domain: window.location.hostname
+      });
+      
+      if (err.code === 'auth/unauthorized-domain') {
+        toast.error(`Domain NOT Authorized: ${window.location.hostname}. Please add this to Firebase Console > Auth > Settings.`, { duration: 8000 });
+      } else if (err.code === 'auth/popup-blocked') {
+        toast.error('Login Popup Blocked! Please allow popups for this site in your browser settings.', { duration: 8000 });
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        toast.error(`Auth Error: ${err.message}. If on mobile, try using Chrome and ensure popups are allowed.`);
       }
     } finally {
       setIsLoggingIn(false);

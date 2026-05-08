@@ -63,6 +63,13 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
           {isLoggingIn ? 'Establishing...' : 'Authenticate Unit'}
         </button>
         
+        <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-[10px] font-mono uppercase tracking-widest text-white/40 text-center leading-relaxed">
+           <span className="text-white/60 font-black">Trouble logging in?</span><br/>
+           1. Open in <span className="text-info">New Tab</span> (icon top right)<br/>
+           2. Allow <span className="text-emergency">Popups</span> in Chrome settings<br/>
+           3. Use <span className="text-info">Incognito</span> if error persists
+        </div>
+        
         {!auth && (
           <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest">
              <AlertTriangle className="w-4 h-4 mx-auto mb-2" />
