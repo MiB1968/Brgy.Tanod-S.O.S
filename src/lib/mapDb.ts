@@ -13,15 +13,41 @@ export interface OfflineAlert {
   timestamp: number;
 }
 
+export interface OfflineIncident {
+  id?: number;
+  data: any;
+  supabaseData?: any;
+  timestamp: number;
+}
+
+export interface OfflinePatrol {
+  id?: number;
+  data: any;
+  type: 'status_update' | 'route_point';
+  sessionId?: string;
+  tanodId?: string;
+  timestamp: number;
+}
+
 export class MapDatabase extends Dexie {
   tiles!: Table<MapTile>;
   pendingAlerts!: Table<OfflineAlert>;
+  pendingIncidents!: Table<OfflineIncident>;
+  pendingPatrols!: Table<OfflinePatrol>;
 
   constructor() {
     super('TanodNetCache');
     this.version(2).stores({
       tiles: '++id, url',
       pendingAlerts: '++id, timestamp'
+    });
+    this.version(3).stores({
+      tiles: '++id, url',
+      pendingAlerts: '++id, timestamp',
+      pendingIncidents: '++id, timestamp',
+      pendingPatrols: '++id, timestamp'
+    }).upgrade(tx => {
+      // Nothing needed to upgrade from 2 -> 3 since we just added tables
     });
   }
 }

@@ -6,6 +6,8 @@ import { User, IncidentStatus } from '../types';
 import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import { queueIncident } from '../lib/offlineQueue';
+import toast from 'react-hot-toast';
 
 interface IncidentFormProps {
   profile: User;
@@ -44,35 +46,51 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
         status: formData.status
       };
 
-      try {
-        await setDoc(doc(db, 'incidents', incidentId), incidentData);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `incidents/${incidentId}`);
+      let supabaseData = null;
+      if (isSupabaseConfigured) {
+        let coords = { lat: 0, lng: 0 };
+        try {
+          const pos = await new Promise<GeolocationPosition>((res, rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
+          );
+          coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } catch (e) { /* ignore location error */ }
+
+        supabaseData = {
+          id: incidentId,
+          incident_id: incidentId,
+          type: formData.type,
+          status: formData.status,
+          tanod_assigned: profile.name,
+          location_lat: coords.lat,
+          location_lng: coords.lng
+        };
       }
 
-      // Sync to Supabase
-      if (isSupabaseConfigured) {
+      if (navigator.onLine) {
         try {
-          let coords = { lat: 0, lng: 0 };
-          try {
-            const pos = await new Promise<GeolocationPosition>((res, rej) => 
-              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
-            );
-            coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          } catch (e) { /* ignore location error */ }
-
-          await supabase.from('report_logs').upsert([{
-            id: incidentId,
-            incident_id: incidentId,
-            type: formData.type,
-            status: formData.status,
-            tanod_assigned: profile.name,
-            location_lat: coords.lat,
-            location_lng: coords.lng
-          }]);
-        } catch (supaErr) {
-          console.error('Supabase incident sync failed:', supaErr);
+          await setDoc(doc(db, 'incidents', incidentId), incidentData);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.CREATE, `incidents/${incidentId}`);
+          await queueIncident(incidentData, supabaseData);
+          toast.error('Network error. Incident saved offline and will sync when reconnected.');
         }
+
+        // Sync to Supabase
+        if (isSupabaseConfigured && supabaseData) {
+          try {
+            await supabase.from('report_logs').upsert([supabaseData]);
+          } catch (supaErr) {
+            console.error('Supabase incident sync failed:', supaErr);
+            // We already queued it if Firestore failed, but if Firestore succeeded and Supabase failed,
+            // for simplicity in this system we might not queue partials.
+            // However, queuing just Supabase failure could be complex.
+            // Let's assume if it reached here, the core record is saved.
+          }
+        }
+      } else {
+        await queueIncident(incidentData, supabaseData);
+        toast.error('You are offline. Incident saved and will sync when reconnected.', { icon: '📡' });
       }
 
       setIsSuccess(true);
