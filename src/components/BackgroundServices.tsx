@@ -7,7 +7,7 @@ import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { useLogStore } from '../store/useLogStore';
 import { watchLocation } from '../lib/gps';
-import { flushSOSQueue, getQueueSize } from '../lib/offlineQueue';
+import { flushSOSQueue, getQueueSize, queuePatrol, flushIncidentQueue, flushPatrolQueue } from '../lib/offlineQueue';
 import { useSystemStore } from '../store/useSystemStore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Alert, PatrolLocation, Shift, TanodProfile } from '../types';
@@ -331,7 +331,7 @@ export default function BackgroundServices() {
 
         const tacticalStatus = !isSharing ? 'offline' : (isResponding ? 'responding' : 'patrolling');
         
-        await setDoc(doc(db, 'patrols', profile.uid), {
+        const patrolUpdateData = {
           tanodId: profile.uid,
           tanodName: profile.name,
           location: {
@@ -343,35 +343,60 @@ export default function BackgroundServices() {
           status: tacticalStatus,
           isLocationSharingEnabled: isSharing,
           lastUpdate: new Date().toISOString()
-        }, { merge: true });
+        };
+
+        if (navigator.onLine) {
+          await setDoc(doc(db, 'patrols', profile.uid), patrolUpdateData, { merge: true });
+        } else {
+          await queuePatrol(patrolUpdateData, 'status_update');
+        }
 
         // Log route point every 2 minutes or if distance is significant (simplified to 2 mins here)
         if (now - lastLoggedTime > 120000) {
           lastLoggedTime = now;
           const timestamp = new Date().toISOString();
           
-          // Use arrayUnion to append to the route
-          const { arrayUnion } = await import('firebase/firestore');
-          await setDoc(doc(db, 'patrol_sessions', sessionId), {
-            route: arrayUnion({
-              lat: loc.lat,
-              lng: loc.lng,
-              timestamp
-            })
-          }, { merge: true });
+          const routePoint = {
+            lat: loc.lat,
+            lng: loc.lng,
+            timestamp
+          };
 
-          // Also log a patrol marker activity
-          await addDoc(collection(db, 'tanod_activity_logs'), {
+          const activityLog = {
             tanodId: profile.uid,
             tanodName: profile.name,
             type: 'patrol_marker',
             timestamp,
             location: { lat: loc.lat, lng: loc.lng },
             details: `Patrol marker recorded at ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
-          });
+          };
+
+          if (navigator.onLine) {
+            // Use arrayUnion to append to the route
+            const { arrayUnion } = await import('firebase/firestore');
+            await setDoc(doc(db, 'patrol_sessions', sessionId), {
+              route: arrayUnion(routePoint)
+            }, { merge: true });
+
+            // Also log a patrol marker activity
+            await addDoc(collection(db, 'tanod_activity_logs'), activityLog);
+          } else {
+            await queuePatrol({ routePoint, activityLog }, 'route_point', sessionId, profile.uid);
+          }
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, `patrols/${profile.uid}`);
+        // If an error happens while online, we might also queue it
+        const timestamp = new Date().toISOString();
+        queuePatrol({
+            tanodId: profile.uid,
+            tanodName: profile.name,
+            location: { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy },
+            isActive: (profile as TanodProfile).isLocationSharingEnabled !== false,
+            status: 'offline', // simplified fallback
+            isLocationSharingEnabled: (profile as TanodProfile).isLocationSharingEnabled !== false,
+            lastUpdate: timestamp
+        }, 'status_update');
       }
     }, (err) => {
       console.warn('GPS tracking error:', err.message);
@@ -405,7 +430,7 @@ export default function BackgroundServices() {
       setQueuedSOSCount(size);
 
       if (isOnline && size > 0) {
-        toast.loading(`Syncing ${size} queued SOS alerts...`, { id: 'sync-sos' });
+        toast.loading(`Syncing ${size} offline items...`, { id: 'sync-offline' });
         try {
           await flushSOSQueue(async (data) => {
             if (data.id) {
@@ -415,17 +440,40 @@ export default function BackgroundServices() {
             }
           });
           
+          await flushIncidentQueue(async (data, supabaseData) => {
+            if (data.id) {
+              await setDoc(doc(db, 'incidents', data.id), data);
+            }
+            if (isSupabaseConfigured && supabaseData) {
+              await supabase.from('report_logs').upsert([supabaseData]);
+            }
+          });
+
+          const { arrayUnion } = await import('firebase/firestore');
+          await flushPatrolQueue(async (data, type, sessionId, tanodId) => {
+            if (type === 'status_update') {
+               await setDoc(doc(db, 'patrols', data.tanodId), data, { merge: true });
+            } else if (type === 'route_point' && sessionId && data.routePoint) {
+               await setDoc(doc(db, 'patrol_sessions', sessionId), {
+                 route: arrayUnion(data.routePoint)
+               }, { merge: true });
+               if (data.activityLog) {
+                 await addDoc(collection(db, 'tanod_activity_logs'), data.activityLog);
+               }
+            }
+          });
+
           const remaining = await getQueueSize();
           setQueuedSOSCount(remaining);
           
           if (remaining === 0) {
-            toast.success('Offline alerts synchronized successfully!', { id: 'sync-sos', icon: '📡' });
+            toast.success('Offline data synchronized successfully!', { id: 'sync-offline', icon: '📡' });
           } else {
-            toast.error(`Sync partially failed. ${remaining} alerts still queued.`, { id: 'sync-sos' });
+            toast.error(`Sync partially failed. ${remaining} items still queued.`, { id: 'sync-offline' });
           }
         } catch (err) {
           console.error('Sync failed:', err);
-          toast.error('Sync failed. Will retry later.', { id: 'sync-sos' });
+          toast.error('Sync failed. Will retry later.', { id: 'sync-offline' });
         }
       }
     };

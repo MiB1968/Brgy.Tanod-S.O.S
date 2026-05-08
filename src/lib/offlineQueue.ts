@@ -60,9 +60,84 @@ export async function flushSOSQueue(processFn: (data: any) => Promise<void>) {
   }
 }
 
+export async function queueIncident(data: any, supabaseData?: any) {
+  try {
+    const id = await db.pendingIncidents.add({
+      data,
+      supabaseData,
+      timestamp: Date.now(),
+    });
+    console.log('Incident queued in IndexedDB:', id);
+    return id.toString();
+  } catch (error) {
+    console.error('Failed to queue Incident in IndexedDB:', error);
+    return null;
+  }
+}
+
+export async function flushIncidentQueue(processFn: (data: any, supabaseData?: any) => Promise<void>) {
+  try {
+    const queue = await db.pendingIncidents.toArray();
+    if (queue.length === 0) return;
+
+    console.log(`[IndexedDB] Flushing ${queue.length} queued Incidents...`);
+
+    for (const item of queue) {
+      try {
+        await processFn(item.data, item.supabaseData);
+        if (item.id) await db.pendingIncidents.delete(item.id);
+      } catch (error) {
+        console.error(`Failed to process queued Incident ${item.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to flush Incident queue from IndexedDB:', error);
+  }
+}
+
+export async function queuePatrol(data: any, type: 'status_update' | 'route_point', sessionId?: string, tanodId?: string) {
+  try {
+    const id = await db.pendingPatrols.add({
+      data,
+      type,
+      sessionId,
+      tanodId,
+      timestamp: Date.now(),
+    });
+    console.log(`Patrol data (${type}) queued in IndexedDB:`, id);
+    return id.toString();
+  } catch (error) {
+    console.error('Failed to queue Patrol data in IndexedDB:', error);
+    return null;
+  }
+}
+
+export async function flushPatrolQueue(processFn: (data: any, type: 'status_update' | 'route_point', sessionId?: string, tanodId?: string) => Promise<void>) {
+  try {
+    const queue = await db.pendingPatrols.toArray();
+    if (queue.length === 0) return;
+
+    console.log(`[IndexedDB] Flushing ${queue.length} queued Patrol items...`);
+
+    for (const item of queue) {
+      try {
+        await processFn(item.data, item.type, item.sessionId, item.tanodId);
+        if (item.id) await db.pendingPatrols.delete(item.id);
+      } catch (error) {
+        console.error(`Failed to process queued Patrol item ${item.id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to flush Patrol queue from IndexedDB:', error);
+  }
+}
+
 export async function getQueueSize(): Promise<number> {
   try {
-    return await db.pendingAlerts.count();
+    const alertsCount = await db.pendingAlerts.count();
+    const incidentsCount = await db.pendingIncidents.count();
+    const patrolsCount = await db.pendingPatrols.count();
+    return alertsCount + incidentsCount + patrolsCount;
   } catch {
     return 0;
   }
