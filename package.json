@@ -1,7 +1,8 @@
 {
-  "name": "react-example",
+  "name": "brgy-tanod-sos",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Mobile-first emergency response platform for Philippine barangays",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

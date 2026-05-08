@@ -153,15 +153,15 @@ service cloud.firestore {
     }
 
     match /broadcasts/{broadcastId} {
-      allow get: if isSignedIn() && isValidId(broadcastId);
-      allow list: if isSignedIn();
+      allow get: if request.auth != null && isValidId(broadcastId);
+      allow list: if request.auth != null;
       allow create, update: if isAdmin() && isValidBroadcast(incoming());
       allow delete: if isAdmin();
     }
 
     match /system_broadcasts/{broadcastId} {
-      allow get: if isSignedIn() && isValidId(broadcastId);
-      allow list: if isSignedIn();
+      allow get: if request.auth != null && isValidId(broadcastId);
+      allow list: if request.auth != null;
       allow create, update: if isAdmin() && isValidBroadcast(incoming());
       allow delete: if isAdmin();
     }

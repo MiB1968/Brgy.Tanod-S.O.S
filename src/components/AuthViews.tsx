@@ -64,11 +64,19 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
         </button>
         
         <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-[10px] font-mono uppercase tracking-widest text-white/40 text-center leading-relaxed">
-           <span className="text-white/60 font-black">Trouble logging in?</span><br/>
-           1. Open in <span className="text-info">New Tab</span> (icon top right)<br/>
-           2. Allow <span className="text-emergency">Popups</span> in Chrome settings<br/>
-           3. Use <span className="text-info">Incognito</span> if error persists
+           <span className="text-white/60 font-black underline mb-1 block">CRITICAL AUTH PROTOCOL</span>
+           • <span className="text-info">Authorized Domains</span>: Ensure <span className="text-white/80">{window.location.hostname}</span> is added to Firebase Whitelist<br/>
+           • <span className="text-emergency">Browser Rules</span>: Disable "Block Third-Party Cookies"<br/>
+           • <span className="text-info">Platform</span>: Works best on Mobile Chrome / Desktop Chrome<br/>
+           • <span className="text-emergency">Context</span>: If in Iframe, use the "New Tab" icon
         </div>
+
+        <button 
+          onClick={onLogin}
+          className="text-white/20 hover:text-white/40 text-[9px] font-mono tracking-[0.3em] uppercase mt-2 w-full active:scale-95"
+        >
+          [ Manual Authentication Handshake ]
+        </button>
         
         {!auth && (
           <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest">

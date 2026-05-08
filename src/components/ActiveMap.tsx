@@ -119,6 +119,55 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom?: number 
   return null;
 }
 
+function MyLocationButton() {
+  const map = useMap();
+  const [locating, setLocating] = useState(false);
+
+  const locateMe = () => {
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        map.flyTo([latitude, longitude], 17);
+        
+        const RedIcon = L.icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        });
+
+        L.marker([latitude, longitude], { icon: RedIcon })
+          .addTo(map)
+          .bindPopup("<div class='text-black font-black uppercase text-[10px]'>Your Position</div>")
+          .openPopup();
+          
+        setLocating(false);
+      },
+      (err) => {
+        console.error("GPS error", err);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  return (
+    <button 
+      onClick={(e) => { e.preventDefault(); locateMe(); }}
+      className={cn(
+        "absolute bottom-4 right-4 z-[400] w-12 h-12 bg-[#16191F] text-xl rounded-full shadow-2xl border border-white/10 flex items-center justify-center hover:bg-emergency hover:scale-110 active:scale-95 transition-all outline-none",
+        locating && "animate-pulse"
+      )}
+      title="Pinpoint My Location"
+    >
+      {locating ? <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "📍"}
+    </button>
+  );
+}
+
 interface MapProps {
   alerts: Alert[];
   patrols: PatrolLocation[];
@@ -183,64 +232,6 @@ export default function ActiveMap({
       setMapCenter(propCenter);
     }
   }, [alerts, propCenter]);
-
-  const MyLocationButton = () => {
-    const map = useMap();
-    const [locating, setLocating] = useState(false);
-  
-    useEffect(() => {
-      setTimeout(() => {
-        if (map && (map as any)._mapPane) {
-          map.invalidateSize();
-        }
-      }, 400); 
-    }, [map]);
-
-    const locateMe = () => {
-      setLocating(true);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          map.flyTo([latitude, longitude], 17);
-          
-          const RedIcon = L.icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-          });
-
-          L.marker([latitude, longitude], { icon: RedIcon })
-            .addTo(map)
-            .bindPopup("<div class='text-black font-bold'>You are here 📍</div>")
-            .openPopup();
-            
-          setLocating(false);
-        },
-        (err) => {
-          console.error("GPS error", err);
-          setLocating(false);
-          alert("Unable to fetch location");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    };
-  
-    return (
-      <button 
-        onClick={(e) => { e.preventDefault(); locateMe(); }}
-        className={cn(
-          "absolute bottom-4 right-4 z-[400] w-12 h-12 bg-[#252932] text-xl rounded-full shadow-lg border border-[#2D3139] flex items-center justify-center hover:bg-[#FF4B4B] hover:scale-110 transition-all",
-          locating && "animate-pulse"
-        )}
-        title="Pinpoint My Location"
-      >
-        {locating ? <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "📍"}
-      </button>
-    );
-  };
 
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative border border-[#2D3139]">

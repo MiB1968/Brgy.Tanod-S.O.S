@@ -13,7 +13,7 @@ interface NavigationSidebarProps {
   setIsMobileMenuOpen: (open: boolean) => void;
   user: any;
   profile: any;
-  handleSignOut: () => void;
+  handleLogout: () => void;
   deferredPrompt?: any;
   handleInstallApp: () => void;
 }
@@ -26,7 +26,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   setIsMobileMenuOpen,
   user,
   profile,
-  handleSignOut,
+  handleLogout,
   deferredPrompt,
   handleInstallApp,
 }) => {
@@ -116,7 +116,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </div>
         </div>
         <button 
-          onClick={handleSignOut} 
+          onClick={handleLogout} 
           className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-white/40 hover:text-emergency hover:bg-emergency/5 transition-all text-[10px] font-black uppercase tracking-[0.2em] font-mono border border-transparent hover:border-emergency/10"
         >
           <LogOut className="w-4 h-4" />

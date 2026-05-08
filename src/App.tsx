@@ -10,9 +10,11 @@ import {
   GoogleAuthProvider, 
   signOut,
   User as FirebaseUser,
-  signInAnonymously,
-  setPersistence,
-  browserLocalPersistence
+  getRedirectResult,
+  browserSessionPersistence,
+  signInWithRedirect,
+  indexedDBLocalPersistence,
+  setPersistence
 } from 'firebase/auth';
 import { 
   collection, 
@@ -329,29 +331,22 @@ export default function App() {
   useEffect(() => {
     if (!auth || !db) return;
 
-    // Set persistence to local to ensure mobile browsers keep the session
-    setPersistence(auth, browserLocalPersistence).catch(err => {
-      console.warn("Persistence Error:", err);
-    });
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("Auth State Changed:", { 
+      console.log("AUTH_STATE_REPORT:", { 
         loggedIn: !!firebaseUser, 
         uid: firebaseUser?.uid, 
-        email: firebaseUser?.email 
+        email: firebaseUser?.email,
+        timestamp: new Date().toISOString()
       });
 
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
-          setLoading(true);
-          // Profile check
+          if (!loading) setLoading(true);
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            const data = userDoc.data() as User;
-            setProfile(data);
+            setProfile(userDoc.data() as User);
           } else if (checkIsRuben(firebaseUser.uid) || firebaseUser.email === 'rubenlleg12@gmail.com') {
-            // Self-healing bootstrap for the owner
             const adminProfile: User = {
               uid: firebaseUser.uid,
               id: firebaseUser.uid,
@@ -365,72 +360,85 @@ export default function App() {
             setProfile(adminProfile);
           }
 
-          // Resident profile check
           const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
           if (resDoc.exists()) {
             setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
           }
         } catch (err) {
-          console.error("Auth sync failure:", err);
+          console.error("Profile sync error:", err);
+          toast.error("DATA_SYNC_ERROR: Profile retrieval failed.");
+        } finally {
+          setLoading(false);
         }
       } else {
         setProfile(null);
         setResidentProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return unsubscribe;
   }, [auth, db, setLoading, setProfile, setResidentProfile]);
 
+  // Handle Redirect Result explicitly - DISABLED to prevent missing initial state error in restricted environments.
+  useEffect(() => {
+    console.log("REDIRECT_AUTH_FLOW_DISABLED");
+  }, []); // Run ONCE at app load
+
   const handleLogin = async () => {
     if (isLoggingIn || !auth) return;
     
-    // Check if inside an iframe (like AI Studio preview)
-    if (window.self !== window.top) {
-      toast.error('Login works best in a new tab. Please click the "Open in new tab" icon at the top right of the preview.', { duration: 10000 });
-      // On some platforms we can't login inside an iframe at all
-    }
+    const isIframe = window.self !== window.top;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const isIncognito = !window.indexedDB; // Crude check for some browsers
 
-    setIsLoggingIn(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      // Set high precision hint for Google login
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
-      const result = await signInWithPopup(auth, provider);
-      console.log("Popup Successful:", result.user.email);
-      // Manually trigger user update to bypass potential listener delay
-      setUser(result.user);
-      toast.success(`Access Granted: ${result.user.displayName}`, { icon: '🔑' });
-    } catch (err: any) {
-      console.error("Login Error Details:", {
-        code: err.code,
-        message: err.message,
-        domain: window.location.hostname
-      });
-      
-      if (err.code === 'auth/unauthorized-domain') {
-        toast.error(`Domain NOT Authorized: ${window.location.hostname}. Please add this to Firebase Console > Auth > Settings.`, { duration: 8000 });
-      } else if (err.code === 'auth/popup-blocked') {
-        toast.error('Login Popup Blocked! Please allow popups for this site in your browser settings.', { duration: 8000 });
-      } else if (err.code !== 'auth/popup-closed-by-user') {
-        toast.error(`Auth Error: ${err.message}. If on mobile, try using Chrome and ensure popups are allowed.`);
+      // Force REDIRECT for mobile environments that are known to struggle with popups (e.g. webviews, or if requested)
+      // Android Chrome generally supports popups well.
+      if (isIframe) {
+        toast.error('AUTHENTICATION_ERROR: Iframe context detected. Please open this app in a NEW TAB to authenticate.', { 
+          duration: 8000,
+          style: { background: '#FF4B4B', color: '#fff' }
+        });
+        return;
       }
-    } finally {
-      setIsLoggingIn(false);
-    }
+
+      try {
+        setIsLoggingIn(true);
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        
+        await signInWithPopup(auth, provider);
+        // Note: setUser will be called via onAuthStateChanged, not here
+        toast.success(`Access Granted`, { icon: '🔑' });
+      } catch (err: any) {
+        console.error("AUTH_FAULT:", err);
+        
+        if (err.code === 'auth/unauthorized-domain') {
+          toast.error(`SECURITY: Unauthorized Host. Contact Admin.`, { duration: 10000 });
+        } else if (err.code === 'auth/popup-blocked') {
+          toast.error("AUTH ISSUE: Redirect/Popups Blocked. Please tap the button again or allow popups in your browser settings.", { duration: 10000 });
+        } else if (err.code === 'auth/network-request-failed') {
+          toast.error('NETWORK ERROR: Connection unstable. Check your signal.');
+        } else if (err.code !== 'auth/popup-closed-by-user') {
+          toast.error(`AUTH ERROR: ${err.message}`);
+        }
+      } finally {
+        setIsLoggingIn(false);
+      }
   };
 
-  const handleSignOut = async () => {
+  const handleLogout = async () => {
     if (!auth) return;
-    await auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setResidentProfile(null);
-    setActiveTab('home');
+    try {
+      await signOut(auth);
+      setUser(null);
+      setProfile(null);
+      setResidentProfile(null);
+      setActiveTab('home');
+      toast.success("SESSION_TERMINATED: Unit logged out.");
+    } catch (err) {
+      console.error("Logout failure:", err);
+    }
   };
 
   const [isSettingRole, setIsSettingRole] = useState(false);
@@ -520,8 +528,8 @@ export default function App() {
   );
 
   if (effectiveRole === 'resident' && profile && !viewOverride) {
-    if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
-    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
+    if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleLogout} />;
+    if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleLogout} />;
   }
 
   const items = navItems.filter(item => {
@@ -611,7 +619,7 @@ export default function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         user={user}
         profile={profile}
-        handleSignOut={handleSignOut}
+        handleLogout={handleLogout}
         deferredPrompt={deferredPrompt}
         handleInstallApp={handleInstallApp}
       />

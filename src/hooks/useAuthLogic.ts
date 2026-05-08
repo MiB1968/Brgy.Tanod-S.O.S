@@ -47,5 +47,5 @@ export const useAuthLogic = () => {
     return unsubscribe;
   }, []);
 
-  return { user, isLoggingIn, handleLogin: async () => {}, handleSignOut: async () => {}, handleSetRole: async () => {} };
+  return { user, isLoggingIn, handleLogin: async () => {}, handleLogout: async () => {}, handleSetRole: async () => {} };
 };

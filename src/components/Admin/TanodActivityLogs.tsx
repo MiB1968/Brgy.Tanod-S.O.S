@@ -70,6 +70,10 @@ export function TanodActivityLogs() {
     return groups;
   }, [filteredLogs, currentPage, itemsPerPage]);
 
+  const sortedSessions = useMemo(() => {
+    return [...patrolSessions].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  }, [patrolSessions]);
+
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
   const stats = useMemo(() => {

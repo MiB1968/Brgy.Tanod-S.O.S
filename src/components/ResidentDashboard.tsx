@@ -106,7 +106,6 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      useSOSStore.getState().syncQueue();
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -125,6 +124,7 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   }, [profile.uid]);
 
   const activeAlertIdRef = useRef<string | null>(null);
+  const pendingChunksRef = useRef<Blob[]>([]);
   const [guardianMode, setGuardianMode] = useState(false);
 
   const handleSOSRef = useRef<((type?: EmergencyType, description?: string) => Promise<void>) | null>(null);
@@ -142,10 +142,24 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   const { isListening, startListening, stopListening } = useShoutDetection(handleShout);
 
   const handleVideoChunk = useCallback((chunk: Blob) => {
-    if (!activeAlertIdRef.current) return;
-    import('../services/StorageService').then(async (service) => {
-        await service.uploadVideoChunk(activeAlertIdRef.current!, chunk, Date.now());
-    });
+    if (!activeAlertIdRef.current) {
+      pendingChunksRef.current.push(chunk);
+      return;
+    }
+    
+    // If we have an ID, upload current chunk AND any pending ones
+    const upload = async (blob: Blob, timestamp: number) => {
+      const service = await import('../services/StorageService');
+      await service.uploadVideoChunk(activeAlertIdRef.current!, blob, timestamp);
+    };
+
+    if (pendingChunksRef.current.length > 0) {
+      const chunks = [...pendingChunksRef.current];
+      pendingChunksRef.current = [];
+      chunks.forEach((c, idx) => upload(c, Date.now() - (chunks.length - idx) * 1000));
+    }
+    
+    upload(chunk, Date.now());
   }, []);
 
   const { isRecording, startRecording, stopRecording } = useVideoRecorder(handleVideoChunk);
@@ -162,11 +176,14 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
     if (!activeAlert && isRecording) {
       stopRecording();
       activeAlertIdRef.current = null;
+      pendingChunksRef.current = [];
     }
   }, [activeAlert, isRecording, stopRecording]);
 
 
   const handleSOS = async (type: EmergencyType = 'other', description: string) => {
+    if (activeAlert || isSending) return;
+    
     try {
       let location = manualLocation;
       
@@ -187,7 +204,9 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
         }
       }
 
+      // Start recording immediately to capture initial moments
       await startRecording();
+      
       const alertId = await createSOS(type, description, location);
       activeAlertIdRef.current = alertId;
 
