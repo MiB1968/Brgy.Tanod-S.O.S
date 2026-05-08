@@ -113,7 +113,7 @@ export function TanodActivityLogs() {
                 {filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-white/5 transition-colors group">
                     <td className="p-4 whitespace-nowrap">
-                      <span className="text-[10px] font-mono text-white/40">#{log.tanodId.slice(-6).toUpperCase()}</span>
+                      <span className="text-[10px] font-mono text-white/40">#{log.tanodId?.slice(-6).toUpperCase()}</span>
                     </td>
                     <td className="p-4">
                       <span className="text-xs font-black text-white/80 uppercase italic font-mono">{log.tanodName}</span>

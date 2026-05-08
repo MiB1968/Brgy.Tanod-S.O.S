@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, orderBy, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Shift, User } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Calendar, Clock, MapPin, User as UserIcon, Plus, X, Trash2, CheckCircle2, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -25,8 +26,8 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
     setEditingShift(shift);
     setSelectedTanod(shift.tanodId);
     setSector(shift.sector);
-    setStartTime(shift.startTime.slice(0, 16));
-    setEndTime(shift.endTime.slice(0, 16));
+    setStartTime(shift.startTime?.slice(0, 16) || '');
+    setEndTime(shift.endTime?.slice(0, 16) || '');
     setNotes(shift.notes || '');
     setIsAddModalOpen(true);
   };
@@ -44,14 +45,14 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
     const qShift = query(collection(db, 'shifts'), orderBy('startTime', 'desc'));
     const unsubShift = onSnapshot(qShift, (snap) => {
       setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'shifts'));
 
     // Listen for Tanods
     const qTanod = query(collection(db, 'users'), orderBy('name', 'asc'));
     const unsubTanod = onSnapshot(qTanod, (snap) => {
       const allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setTanods(allUsers.filter(u => u.role === 'tanod' && u.status === 'approved'));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'tanod_users'));
 
     return () => {
       unsubShift();

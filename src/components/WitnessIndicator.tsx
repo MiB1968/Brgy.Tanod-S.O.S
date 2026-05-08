@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Eye, Users } from 'lucide-react';
 import { WitnessRequest } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface WitnessIndicatorProps {
   alertId: string;
@@ -21,7 +22,7 @@ export const WitnessIndicator: React.FC<WitnessIndicatorProps> = ({ alertId }) =
     );
     const unsub = onSnapshot(q, (snapshot) => {
         setWitnesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WitnessRequest)));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'witness_invites_active'));
     return unsub;
   }, [alertId]);
 

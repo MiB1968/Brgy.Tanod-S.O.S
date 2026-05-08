@@ -1,31 +1,28 @@
-# Firebase Security Specification: Brgy. Tanod S.O.S.
+# Security Specification: Brgy. Tanod S.O.S.
 
 ## 1. Data Invariants
+- A **User** profile must exist for all authenticated actions.
+- An **Alert** (SOS) cannot be created without a valid resident identity.
+- **Alert** status transitions must be unidirectional (pending -> responding -> resolved/cancelled).
+- **Tanod** locations are only visible to authorized personnel (Admin, Tanod) or a resident who has an active emergency assigned to that unit.
+- **System Broadcasts** can only be initiated by verified Admins.
 
-- **User Access:** A user document MUST only be modifiable by the user to whom it belongs (based on UID).
-- **Incident Integrity:** An Incident MUST have a valid `tanodId` (Patrol Officer ID) and MUST be created by an authorized Tanod.
-- **Patrol Location:** A Patrol Location document MUST be created/updated ONLY by the Tanod it belongs to.
-- **Alerts:** SOS Alerts are created by residents. A resident can only create alerts for themselves.
-- **Immutability:** Fields like `createdAt`, `originalOwnerId`, and `tanodId` MUST be immutable after creation.
-- **Terminal State:** An Incident with `status: 'completed'` cannot be updated further.
+## 2. The "Dirty Dozen" Payloads
 
-## 2. The "Dirty Dozen" Payloads (Attack Vectors)
+1.  **Identity Spoofing**: Attempt to create a user profile with a different `uid` than the authenticated one.
+2.  **Role Escalation**: Attempt to update own `role` to 'admin'.
+3.  **Ghost Alert**: Create an SOS alert with a `residentId` that doesn't match the sender.
+4.  **Shadow Update**: Update an alert using `affectedKeys()` bypass (if the rule didn't have `hasOnly`).
+5.  **Status Shortcut**: Transition an alert from 'pending' directly to 'resolved' bypassing 'responding' (or other state logic).
+6.  **Junk Data Injection**: Inject a 1MB string into the alert `customMessage`.
+7.  **Resource Poisoning**: Use a document ID containing malicious scripts or excessive length (>128 chars).
+8.  **Unauthorized List Coverage**: Attempt to list all residents as a standard resident.
+9.  **PII Leak**: Attempt to 'get' a resident's private profile details (if split).
+10. **Orphaned Writes**: Create an `incident` report referencing a non-existent `alert`.
+11. **Timestamp Forgery**: Provide a client-side `timestamp` in the future for an alert.
+12. **Anonymous Spam**: Attempt to create alerts while unverified (if email verification is mandated).
 
-| ID | Attack Vector | Payload | Expected Result |
-| :--- | :--- | :--- | :--- |
-| 1 | Identity Spoofing | `{ "uid": "other_user_uid", "role": "admin" }` | PERMISSION_DENIED |
-| 2 | State Shortcutting | `{ "status": "completed" }` (on an active incident) | PERMISSION_DENIED |
-| 3 | Resource Poisoning | `{ "id": "A".repeat(1000) }` (invalid ID length) | PERMISSION_DENIED |
-| 4 | Orphaned Write | Incident with `tanodId: "non_existent_tanod"` | PERMISSION_DENIED |
-| 5 | Unauthorized PII Read | Get request to `users/{uid}/private` by non-owner | PERMISSION_DENIED |
-| 6 | Ghost Field Injection | `{ "status": "active", "isVerified": true }` | PERMISSION_DENIED |
-| 7 | Email Spoofing | Spoofed Admin Write (`email_verified: false`) | PERMISSION_DENIED |
-| 8 | Terminal State Bypass | Update `completed` incident status to `active` | PERMISSION_DENIED |
-| 9 | Immutable Field Mod | Change `createdAt` on existing document | PERMISSION_DENIED |
-| 10 | Query Scraping | `allow list` access without restricting to ownerId | PERMISSION_DENIED |
-| 11 | Malicious ID Injection| Path variable `{incidentId}` = `../../admins/adminUid` | PERMISSION_DENIED |
-| 12 | Value Poisoning | Update `winner` (boolean) with `winner: "string"` | PERMISSION_DENIED |
+## 3. Test Runner (Draft)
+A comprehensive test suite in `firestore.rules.test.ts` will verify that all above payloads return `PERMISSION_DENIED`.
 
-## 3. Test Runner Invariant
-
-The `firestore.rules.test.ts` will use the Firebase Rules Emulator to execute these 12 scenarios against the draft ruleset. All 12 must return `PERMISSION_DENIED` to proceed to rule finalization.
+(Detailed test implementation planned for next step)

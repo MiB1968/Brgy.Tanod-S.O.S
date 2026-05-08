@@ -182,6 +182,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           tanodName: alert.respondedByName || profile?.name || 'Unknown',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
+          timestamp: new Date().toISOString(),
           location: alert.customMessage || 'Location via GPS',
           gpsLocation: alert.location,
           type: alert.type,
@@ -716,7 +717,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                              </div>
                              <p className="text-xs font-bold text-white/90 leading-relaxed mb-4 italic font-mono">"{alert.aiAnalysis.summary}"</p>
                              <div className="flex flex-wrap gap-2">
-                                {alert.aiAnalysis.riskFactors.slice(0, 3).map(risk => (
+                                {(alert.aiAnalysis.riskFactors || []).slice(0, 3).map(risk => (
                                   <span key={risk} className="text-[8px] font-black bg-white/5 border border-white/5 px-2 py-1 rounded text-white/40 uppercase tracking-tighter font-mono">⚠ {risk}</span>
                                 ))}
                              </div>
@@ -920,7 +921,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                           )}>{(t.status as string)?.toLowerCase() === 'responding' ? 'RESPONDING' : (isOnline ? (t.status || 'ON-DUTY') : 'OFFLINE')}</p>
                           {t.activeAlertId && (
                             <span className="text-[7px] px-1.5 py-0.5 rounded-md bg-emergency/10 text-emergency font-black border border-emergency/20">
-                              #{t.activeAlertId.slice(-6).toUpperCase()}
+                              #{t.activeAlertId?.slice(-6).toUpperCase()}
                             </span>
                           )}
                           {(t as TanodProfile).lastGpsLocation && (

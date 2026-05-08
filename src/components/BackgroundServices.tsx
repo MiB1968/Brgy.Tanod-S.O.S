@@ -10,7 +10,7 @@ import { watchLocation } from '../lib/gps';
 import { flushSOSQueue, getQueueSize } from '../lib/offlineQueue';
 import { useSystemStore } from '../store/useSystemStore';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
-import { Alert, PatrolLocation, Shift } from '../types';
+import { Alert, PatrolLocation, Shift, TanodProfile } from '../types';
 import { scheduleDailyLogReset } from '../lib/scheduler';
 import toast from 'react-hot-toast';
 
@@ -101,6 +101,12 @@ export default function BackgroundServices() {
     const gpsChannel = supabase.channel('tanod-gps-updates');
 
     const pushLocation = async () => {
+      // Respect Privacy: Check if location sharing is enabled
+      if ((profile as TanodProfile)?.isLocationSharingEnabled === false) {
+        console.log('📡 Tactical Link: Privacy Shield ACTIVE (GPS Sharing Disabled)');
+        return;
+      }
+
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => 
           navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 5000 })
@@ -141,6 +147,24 @@ export default function BackgroundServices() {
       supabase.removeChannel(gpsChannel);
     };
   }, [profile]);
+
+  // 2.5 Handle Privacy Toggle: If sharing is disabled, mark patrol as inactive immediately
+  useEffect(() => {
+    if (!profile || profile.role !== 'tanod' || !db) return;
+    
+    const updateActivity = async () => {
+      if ((profile as any).isLocationSharingEnabled === false) {
+        console.log('📡 Tactical Link: Privacy Shield DEPLOYED. Suspending GPS broadcasts.');
+        try {
+          await setDoc(doc(db, 'patrols', profile.uid), { isActive: false }, { merge: true });
+        } catch (e) {
+          console.error('Failed to update patrol status during privacy toggle', e);
+        }
+      }
+    };
+
+    updateActivity();
+  }, [profile?.uid, (profile as any)?.isLocationSharingEnabled]);
 
   // 3. Daily Log Reset Listener (Supabase Broadcast + Mock Scheduler Fallback)
   useEffect(() => {
@@ -216,7 +240,7 @@ export default function BackgroundServices() {
     }
 
     // C. Shifts Listener (Relevant to profile)
-    const shiftsQ = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
+    const shiftsQ = query(collection(db, 'shifts'));
     const unsubShifts = onSnapshot(shiftsQ, (snapshot) => {
       const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Shift));
       setShifts(list);
@@ -278,7 +302,7 @@ export default function BackgroundServices() {
           details: 'Tanod went on duty and started patrol session.'
         });
       } catch (err) {
-        console.error('Failed to start patrol session:', err);
+        handleFirestoreError(err, OperationType.CREATE, `patrol_sessions/${sessionId}`);
       }
     };
 
@@ -286,10 +310,15 @@ export default function BackgroundServices() {
 
     let lastLoggedTime = 0;
     const stopWatching = watchLocation(async (loc) => {
+      // Respect Privacy
+      if ((profile as TanodProfile)?.isLocationSharingEnabled === false) return;
+
       try {
         const now = new Date().getTime();
         
         // Update active patrol status
+        const isSharing = (profile as TanodProfile).isLocationSharingEnabled !== false;
+        
         await setDoc(doc(db, 'patrols', profile.uid), {
           tanodId: profile.uid,
           tanodName: profile.name,
@@ -298,7 +327,8 @@ export default function BackgroundServices() {
             lng: loc.lng,
             accuracy: loc.accuracy
           },
-          isActive: true,
+          isActive: isSharing,
+          isLocationSharingEnabled: isSharing,
           lastUpdate: new Date().toISOString()
         }, { merge: true });
 
@@ -328,7 +358,7 @@ export default function BackgroundServices() {
           });
         }
       } catch (err) {
-        console.error('Failed to update patrol location/route:', err);
+        handleFirestoreError(err, OperationType.WRITE, `patrols/${profile.uid}`);
       }
     }, (err) => {
       console.warn('GPS tracking error:', err.message);

@@ -4,6 +4,8 @@ import { db } from '../lib/firebase';
 import { Eye, ShieldAlert, X, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+
 interface WitnessInvite {
   id: string;
   alertId: string;
@@ -29,7 +31,7 @@ export const WitnessOverlay: React.FC<WitnessOverlayProps> = ({ userId }) => {
 
     const unsub = onSnapshot(q, (snapshot) => {
       setInvites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WitnessInvite)));
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'witness_invites'));
 
     return unsub;
   }, [userId]);

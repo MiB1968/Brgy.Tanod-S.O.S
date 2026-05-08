@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ResidentProfile } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Check, X, Eye, Search, Filter, MapPin, Phone, User, Calendar, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,9 +26,7 @@ export default function AdminResidents({ profile }: { profile: any }) {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResidentProfile));
       setResidents(list);
       setLoading(false);
-    }, (error) => {
-      console.error("Admin Residents listener error:", error);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'residents'));
     return unsubscribe;
   }, [filter]);
 

@@ -3,13 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut,
-  User as FirebaseUser
+  User as FirebaseUser,
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   collection, 
@@ -20,117 +21,109 @@ import {
   query, 
   where, 
   orderBy, 
-  addDoc,
   updateDoc,
-  getDocs,
-  limit
+  limit,
+  Timestamp,
+  getDocs
 } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
-import { InstallAppButton } from './components/InstallAppButton';
-import TacticalCard from './components/TacticalCard';
-import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { 
-  IconRadar, 
-  IconApprovedResidents, 
-  IconOnlineTanods, 
-  IconAdminBadge,
-  IconActiveSOS,
-  IconNewIncident
-} from './components/TacticalIcons';
-import { User, Alert, UserRole, PatrolLocation, EmergencyType, ResidentProfile, SystemBroadcast } from './types';
+  User, 
+  Alert, 
+  UserRole, 
+  PatrolLocation, 
+  SystemBroadcast,
+  EmergencyType,
+  ResidentProfile
+} from './types';
+import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { 
-  Bell, 
-  Shield, 
-  Megaphone,
-  Map as MapIcon, 
   LogOut, 
-  User as UserIcon, 
+  Plus,
   AlertTriangle, 
-  ClipboardList,
-  FileText, 
-  Phone,
+  Shield, 
+  User as UserIcon, 
   LayoutDashboard,
   Clock,
-  Navigation,
-  FileCheck,
-  Plus,
-  Settings as SettingsIcon,
-  X,
-  MapPin,
-  Users,
+  Map as MapIcon,
   Volume2,
   VolumeX,
-  Info
+  MapPin,
+  Clock3,
+  Search,
+  Users,
+  Calendar,
+  FileText,
+  Settings,
+  Bell,
+  Menu,
+  X as XIcon,
+  ChevronRight,
+  ChevronLeft,
+  Filter,
+  Download,
+  Printer,
+  Share2,
+  Info,
+  Radio,
+  Phone,
+  Flame,
+  Activity,
+  AlertCircle,
+  Stethoscope,
+  Waves,
+  Zap,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Navigation,
+  Globe,
+  Database,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { Howl } from 'howler';
-import ActiveMap from './components/ActiveMap';
-import LiveMap from './LiveMap';
 import AdminDashboard from './components/AdminDashboard';
 import TanodDashboard from './components/TanodDashboard';
-import AboutModal from './components/AboutModal';
 import { BroadcastOverlay } from './components/BroadcastOverlay';
-import { CitizenReportTracker } from './components/CitizenReportTracker';
 import { NavigationSidebar } from './components/NavigationSidebar';
 import { WitnessOverlay } from './components/WitnessOverlay';
-import { useShoutDetection } from './hooks/useShoutDetection';
-import { useVideoRecorder } from './hooks/useVideoRecorder';
-import { Shift } from './types';
-import { navItems } from './constants';
-import { format } from 'date-fns';
-import { queueSOS, removeQueuedSOS, getQueueSize } from './lib/offlineQueue';
-import AnimatedButton from './components/AnimatedButton';
-import FlameAnimation from './components/FlameAnimation';
-import AdminResidents from './components/AdminResidents';
-import ResidentTacticalMap from './components/Admin/ResidentTacticalMap';
-import PatrolScheduler from './components/PatrolScheduler';
-import RegistrationForm from './components/RegistrationForm';
-import { TanodActivityLogs } from './components/Admin/TanodActivityLogs';
-import IncidentForm from './components/IncidentForm';
-import ReportMap from './components/ReportMap';
-import { BrgyTanodQR } from './components/BrgyTanodQR';
-import { TanodLogo, TanodWordmark, BackgroundPattern, AppIcon } from './components/Branding';
-import { analyzeIncident } from './services/aiService';
-import { db as dexieDb } from './lib/mapDb';
-import { startGPSTracking, calculateDistance } from './services/gpsService';
 import { Toaster, toast } from 'react-hot-toast';
-import { scheduleDailyLogReset } from './lib/scheduler';
-import { handleFirestoreError, OperationType } from './lib/firestore-errors';
+import { TanodLogo, BackgroundPattern } from './components/Branding';
 import TanodCommandAlert from './components/TanodCommandAlert';
 import BackgroundServices from './components/BackgroundServices';
+import SirenController from './components/SirenController';
+import DashboardView from './components/DashboardView';
+import ActiveMap from './components/ActiveMap';
+import AdminResidents from './components/AdminResidents';
+import DirectoryView from './components/DirectoryView';
+import ScheduleView from './components/ScheduleView';
+import ReportsView from './components/ReportsView';
+import SettingsView from './components/SettingsView';
+import TanodRosterView from './components/TanodRosterView';
+import { TanodActivityLogs } from './components/Admin/TanodActivityLogs';
+import IncidentForm from './components/IncidentForm';
+import ResidentTacticalMap from './components/Admin/ResidentTacticalMap';
+import RegistrationForm from './components/RegistrationForm';
+import { LoginView, RoleSelection, PendingApproval, RejectedScreen } from './components/AuthViews';
+import LiveMap from './components/ReportMap';
 import { useAuthStore } from './store/useAuthStore';
 import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
 import { useSystemStore } from './store/useSystemStore';
 import { useSOSStore } from './store/useSOSStore';
 
-const SOS_SUGGESTIONS: Record<string, string[]> = {
-  'crime': ['Disturbance', 'Theft', 'Attempted Entry', 'Vandalism', 'Suspicious Activity'],
-  'fire': ['Smoke Seen', 'Structural Fire', 'Grass/Brush Fire', 'Electrical Fire', 'Chemical Smell'],
-  'medical': ['Unresponsive', 'Fall/Injury', 'Difficulty Breathing', 'Seizure'],
-  'flood': ['Rising Water', 'Flash Flood', 'Blocked Drainage', 'Home Inundation'],
-};
-
-// Siren sound
-const siren = new Howl({
-  src: ['https://assets.mixkit.co/active_storage/sfx/1004/1004-preview.mp3'], // Emergency siren
-  loop: true,
-  volume: 0.5,
-});
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 }
-};
+// Service & Lib imports
+import { analyzeIncident } from './services/aiService';
+import { getQueueSize } from './lib/offlineQueue';
+import { cn } from './lib/utils';
+import { isSupabaseConfigured, supabase } from './lib/supabase';
+import { 
+  isRuben as checkIsRuben, 
+  PATROL_TIMEOUT, 
+  navItems, 
+  containerVariants 
+} from './constants';
 
 export default function App() {
   const { 
@@ -141,14 +134,30 @@ export default function App() {
     isLoading: loading, 
     setIsLoading: setLoading 
   } = useAuthStore();
-  const { alerts } = useIncidentStore();
-  const { patrols } = useTanodStore();
-  const { isOnline, setIsOnline, queuedSOSCount, setQueuedSOSCount, triggerSync } = useSystemStore();
+  const { alerts, setAlerts } = useIncidentStore();
+  const { patrols, setPatrols } = useTanodStore();
+  const { 
+    isOnline, 
+    setIsOnline, 
+    queuedSOSCount, 
+    setQueuedSOSCount, 
+    triggerSync 
+  } = useSystemStore();
+  const { subscribeToUserAlerts } = useSOSStore();
   
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'resident-map' | 'roster' | 'settings' | 'logs'>('home');
+  const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [viewOverride, setViewOverride] = useState<'admin' | 'tanod' | 'resident' | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [globalSirenActive, setGlobalSirenActive] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+  const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
 
+  // Connection status management
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -158,89 +167,9 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'resident-map' | 'roster' | 'settings' | 'logs'>('home');
-  const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
+  }, [setIsOnline]);
 
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [viewOverride, setViewOverride] = useState<'admin' | 'tanod' | 'resident' | null>(null);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [globalSirenActive, setGlobalSirenActive] = useState(false);
-  const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
-
-  // Add Listener for Tanod GPS updates
-  useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
-
-    const gpsChannel = supabase.channel('tanod-gps-updates');
-
-    gpsChannel
-      .on('broadcast', { event: 'location_update' }, (payload) => {
-        const data = payload.payload;
-        // Update store
-        useTanodStore.getState().updatePatrol({
-            id: data.id,
-            tanodId: data.id,
-            tanodName: data.name,
-            location: { lat: data.lat, lng: data.lng, accuracy: 0 },
-            isActive: data.status === 'On-Duty',
-            lastUpdate: data.updated_at
-        });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(gpsChannel);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, 'system_broadcasts'), where('isActive', '==', true), orderBy('timestamp', 'desc'), limit(1));
-    return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const broadcast = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as SystemBroadcast;
-        setActiveBroadcast(broadcast);
-        // Play siren for broadcast if not already active
-        if (!globalSirenActive) setGlobalSirenActive(true);
-      } else {
-        setActiveBroadcast(null);
-      }
-    }, (error) => {
-      console.warn("Broadcast listener limited:", error.message);
-    });
-  }, [user]);
-
-  useEffect(() => {
-    if (!db || !user) return;
-    return onSnapshot(doc(db, 'system', 'siren'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setGlobalSirenActive(data?.sirenActive || false);
-      }
-    }, (error) => {
-      console.warn("Siren sync limited:", error.message);
-    });
-  }, [user]);
-
-  const toggleGlobalSiren = async () => {
-    if (!db) return;
-    try {
-      await setDoc(doc(db, 'system', 'siren'), {
-        sirenActive: !globalSirenActive,
-        sirenTriggeredBy: effectiveProfile?.name || 'System',
-        sirenTriggeredAt: new Date().toISOString()
-      }, { merge: true });
-      toast.success(globalSirenActive ? 'Global Siren Off' : 'Global Siren BROADCAST ACTIVE', { 
-        icon: globalSirenActive ? '🔇' : '📢',
-        style: globalSirenActive ? {} : { background: '#FF4B4B', color: '#fff' }
-      });
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to toggle siren system');
-    }
-  };
-
+  // PWA installation handling
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -255,316 +184,260 @@ export default function App() {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
-        toast.success('App installation initiated.', { icon: '📲' });
+        toast.success('System Linked Locally', { icon: '📲' });
       }
       setDeferredPrompt(null);
     }
   };
 
-  const isRuben = user?.email === 'rubenlleg12@gmail.com';
-  const isRonnie = user?.email === 'ronniecantuba420@gmail.com';
-  const isMasterAdminEmail = isRuben || isRonnie;
+  const isMasterAdminEmail = useMemo(() => {
+    return user?.email === 'rubenlleg12@gmail.com' || user?.email === 'ronniecantuba420@gmail.com';
+  }, [user?.email]);
   
-  const baseRole = isMasterAdminEmail ? 'superadmin' : profile?.role;
+  const baseRole = useMemo(() => {
+    if (isMasterAdminEmail) return 'superadmin';
+    return profile?.role || 'guest';
+  }, [isMasterAdminEmail, profile?.role]);
+
   const effectiveRole = viewOverride || baseRole;
-  const effectiveProfile = profile ? { 
-    ...profile, 
-    role: effectiveRole as UserRole,
-    name: isRuben ? 'RubenLlego (SuperAdmin)' : (isRonnie ? 'Ronnie Cantuba (SuperAdmin)' : profile.name)
-  } : null;
 
-  const isResident = effectiveProfile?.role === 'resident';
-  
-  const visiblePatrols = patrols.filter(p => {
-    if (['admin', 'superadmin', 'tanod'].includes(effectiveProfile?.role || '')) {
-      return p.isActive;
-    }
-    if (isResident && effectiveProfile) {
-      // Only show patrols assigned to responding/pending alerts of this resident
-      return alerts.some(a => a.residentId === effectiveProfile.uid && (a.status === 'pending' || a.status === 'responding') && a.assignedTo === p.tanodId);
-    }
-    return false;
-  });
+  const effectiveProfile = useMemo(() => {
+    if (!profile && !user) return null;
+    const p = profile || { uid: user?.uid, name: user?.displayName, email: user?.email } as User;
+    return { 
+      ...p, 
+      role: effectiveRole as UserRole,
+      name: checkIsRuben(user?.uid) ? `${p.name} (SuperAdmin)` : p.name
+    } as User;
+  }, [profile, effectiveRole, user]);
 
+  const visiblePatrols = useMemo(() => {
+    return patrols.filter(p => {
+      if (['admin', 'superadmin', 'tanod'].includes(effectiveRole)) {
+        return p.isActive && (Date.now() - new Date(p.lastUpdate).getTime() < PATROL_TIMEOUT);
+      }
+      if (effectiveRole === 'resident' && profile) {
+        return alerts.some(a => 
+          a.residentId === profile.uid && 
+          (a.status === 'pending' || a.status === 'responding') && 
+          a.assignedTo === p.tanodId
+        );
+      }
+      return false;
+    });
+  }, [patrols, effectiveRole, profile, alerts]);
+
+  // Global Data Listeners
   useEffect(() => {
-    // Failsafe: if Firebase takes over 10s and still hasn't resolved, stop loading
-    // so the user isn't stuck forever.
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 10000);
-    return () => clearTimeout(timer);
+    if (!db || !user) return;
+
+    // Listen for all alerts (if admin/tanod) or just relevant ones
+    const alertsQuery = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Alert));
+      setAlerts(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'alerts'));
+
+    // Listen for patrols
+    const patrolsQuery = collection(db, 'patrols');
+    const unsubPatrols = onSnapshot(patrolsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PatrolLocation));
+      setPatrols(data);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'patrols'));
+
+    return () => {
+      unsubAlerts();
+      unsubPatrols();
+    };
+  }, [user, db, setAlerts, setPatrols]);
+
+  // SOS Store Subscription
+  useEffect(() => {
+    if (user?.uid && effectiveRole === 'resident') {
+      const unsubscribe = subscribeToUserAlerts(user.uid);
+      return () => unsubscribe();
+    }
+  }, [user?.uid, effectiveRole, subscribeToUserAlerts]);
+
+  // Global Siren Sync
+  useEffect(() => {
+    if (!db || !user) return;
+    return onSnapshot(doc(db, 'system', 'siren'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const active = data?.sirenActive || false;
+        setGlobalSirenActive(active);
+        if (active) {
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 2000);
+        }
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'system/siren'));
+  }, [user]);
+
+  const toggleGlobalSiren = async () => {
+    if (!db) return;
+    try {
+      const nextState = !globalSirenActive;
+      await setDoc(doc(db, 'system', 'siren'), {
+        sirenActive: nextState,
+        sirenTriggeredBy: profile?.name || 'System',
+        sirenTriggeredAt: new Date().toISOString()
+      }, { merge: true });
+      
+      toast.success(nextState ? 'GLOBAL SIREN BROADCAST ACTIVE' : 'Global Siren Off', { 
+        icon: nextState ? '📢' : '🔇',
+        style: nextState ? { background: '#FF4B4B', color: '#fff' } : {}
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error('Siren Control System Failure');
+    }
+  };
+
+  // Broadcast Listener
+  useEffect(() => {
+    if (!db) return;
+    const q = query(
+      collection(db, 'system_broadcasts'), 
+      where('isActive', '==', true), 
+      orderBy('timestamp', 'desc'), 
+      limit(1)
+    );
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const broadcast = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as SystemBroadcast;
+        setActiveBroadcast(broadcast);
+        if (!globalSirenActive) setGlobalSirenActive(true);
+      } else {
+        setActiveBroadcast(null);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'system_broadcasts'));
   }, []);
 
+  // Failsafe Loading
   useEffect(() => {
-    if (!auth || !db) {
+    const timer = setTimeout(() => {
       setLoading(false);
-      return;
-    }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, [setLoading]);
 
-    const fetchDocWithTimeout = (docRef: any) => getDoc(docRef);
-    const setDocWithTimeout = (docRef: any, data: any) => setDoc(docRef, data);
-    const updateDocWithTimeout = (docRef: any, data: any) => updateDoc(docRef, data);
+  // Auth Sync
+  useEffect(() => {
+    if (!auth || !db) return;
 
-    console.log("[App.tsx] Setting up onAuthStateChanged listener...", auth, db);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("[App.tsx] onAuthStateChanged fired:", firebaseUser);
-      try {
-        setUser(firebaseUser);
-        if (firebaseUser) {
-          const isSuperAdminEmail = isMasterAdminEmail;
-          
-          // First check if they have a standard user profile
-          const userDoc = await fetchDocWithTimeout(doc(db, 'users', firebaseUser.uid));
-          
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        try {
+          // Profile check
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            const data = userDoc.data() as any;
-            // Force superadmin role if email matches
-            if (isSuperAdminEmail && data.role !== 'superadmin') {
-              try { await updateDocWithTimeout(doc(db, 'users', firebaseUser.uid), { role: 'superadmin' }); } catch(e){}
-              setProfile({ id: userDoc.id, ...data, role: 'superadmin' } as User);
+            const data = userDoc.data() as User;
+            // Force superadmin if checkIsRuben
+            if (checkIsRuben(firebaseUser.uid) && data.role !== 'superadmin') {
+              await updateDoc(doc(db, 'users', firebaseUser.uid), { role: 'superadmin' });
+              setProfile({ ...data, role: 'superadmin' });
             } else {
-              setProfile({ id: userDoc.id, ...data } as User);
+              setProfile(data);
             }
-          } else if (isSuperAdminEmail) {
-            // Auto-bootstrap master super admin
-            const adminProfile: Partial<User> = {
+          } else if (checkIsRuben(firebaseUser.uid)) {
+            // Bootstrap
+            const adminProfile: User = {
               uid: firebaseUser.uid,
-              name: isRuben ? 'Ruben Llego (SuperAdmin)' : 'Ronnie Cantuba (SuperAdmin)',
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Super Admin',
               email: firebaseUser.email || '',
               role: 'superadmin',
               createdAt: new Date().toISOString(),
               status: 'approved'
-            };
-            try { await setDocWithTimeout(doc(db, 'users', firebaseUser.uid), adminProfile); } catch(e) {}
-            setProfile(adminProfile as User);
-          } else {
-            setProfile(null);
+            } as User;
+            await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
+            setProfile(adminProfile);
           }
 
-          try {
-            const resDoc = await fetchDocWithTimeout(doc(db, 'residents', firebaseUser.uid));
-            if (resDoc.exists()) {
-              setResidentProfile({ id: resDoc.id, ...(resDoc.data() as any) } as ResidentProfile);
-            }
-          } catch(e) { }
-        } else {
-          setProfile(null);
-          setResidentProfile(null);
+          // Resident profile check
+          const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
+          if (resDoc.exists()) {
+            setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
+          }
+        } catch (err) {
+          console.error("Auth sync failure:", err);
         }
-      } catch (err: any) {
-        if (err?.message?.includes('offline') || err?.message?.includes('Timeout')) {
-          console.warn("Auth Sync: Client is offline. Profile data may be delayed.");
-          toast.error("Database connection timeout. Features may be limited.", { id: 'db-timeout' });
-        } else if (err?.message?.includes('permission')) {
-          console.error("CRITICAL: Permission Denied. This usually happens if your AUTH project and DATABASE project do not match.");
-          toast.error("Security System: Permission Denied. Check project configuration.");
-        } else {
-          console.error("Auth Sync Error:", err);
-          toast.error("Security System Synchronization Error. Retrying...");
-        }
-      } finally {
-        setLoading(false);
+      } else {
+        setProfile(null);
+        setResidentProfile(null);
       }
+      setLoading(false);
     });
+
     return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    // Alert sound logic
-    if (globalSirenActive) {
-      if (!siren.playing()) {
-        siren.play();
-      }
-      return; // If global is active, keep it playing
-    }
-
-    if (!effectiveProfile || (effectiveProfile.role !== 'tanod' && effectiveProfile.role !== 'admin' && effectiveProfile.role !== 'superadmin')) {
-      siren.stop();
-      return;
-    }
-
-    const hasActive = alerts.some(a => a.status === 'pending');
-    if (hasActive) {
-      if (!siren.playing()) {
-        siren.volume(1.0);
-        siren.play();
-        setTimeout(() => { if (!globalSirenActive) siren.stop(); }, 10000);
-      }
-    } else {
-      siren.stop();
-    }
-    
-    return () => { if (!globalSirenActive) siren.stop(); };
-  }, [alerts, effectiveProfile?.role, globalSirenActive]);
+  }, [auth, db, setLoading, setProfile, setResidentProfile]);
 
   const handleLogin = async () => {
-    if (isLoggingIn) return;
-    if (!auth) {
-      toast.error('Auth system is disconnected or improperly configured.');
-      return;
-    }
+    if (isLoggingIn || !auth) return;
     setIsLoggingIn(true);
-    const provider = new GoogleAuthProvider();
     try {
-      return await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        console.info('Login was cancelled by the user.');
-      } else if (error.code === 'auth/popup-blocked') {
-        console.error("Popup blocked:", error);
-        toast.error("Popup blocked! Please 'Open App in New Tab' (top right of preview) to login, or allow popups for this site.", { duration: 10000 });
-      } else if (error.code === 'auth/network-request-failed') {
-        console.error("Network request failed:", error);
-        toast.error("Network error! Please check your internet connection or disable adblockers/privacy extensions that might be blocking Google Auth.", { duration: 10000 });
-      } else if (error.code === 'auth/unauthorized-domain') {
-        const domain = window.location.hostname;
-        toast.error(`Error: Unauthorized Domain. Please go to Firebase Console > Authentication > Settings > Authorized Domains and add: ${domain}`, { duration: 15000 });
-        console.error("Unauthorized domain:", domain);
-      } else {
-        console.error("Login failed", error);
-        toast.error(`Login failed: ${error.message}`);
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      if (err.code !== 'auth/popup-closed-by-user') {
+        toast.error(`Authentication Failed: ${err.message}`);
       }
-      throw error;
     } finally {
       setIsLoggingIn(false);
     }
   };
 
-  const handleDemoResidentLogin = async () => {
-    // True bypass mode
-    const realUid = 'demo-resident-123';
-    
-    // Mock user for demo purposes
-    const mockUser = {
-      ...(auth?.currentUser || {}),
-      uid: realUid,
-      displayName: 'Juan Dela Cruz (Demo)',
-      email: 'juan.demo@example.com',
-      photoURL: 'https://placehold.co/400x400?text=Juan'
-    } as FirebaseUser;
-
-    const mockProfile: User = {
-      id: realUid,
-      uid: realUid,
-      name: 'Juan Dela Cruz (Demo)',
-      email: 'juan.demo@example.com',
-      role: 'resident',
-      createdAt: new Date().toISOString(),
-      status: 'approved',
-      phone: '09123456789'
-    };
-
-    const mockResidentProfile: ResidentProfile = {
-      ...mockProfile,
-      id: realUid,
-      fullName: 'Juan Dela Cruz (Demo)',
-      age: 28,
-      gender: 'Male',
-      dob: '1996-05-20',
-      civilStatus: 'Single',
-      idType: 'PhilSys',
-      idNumber: '1234-5678-9012',
-      idPhotoUrl: 'https://placehold.co/600x400?text=ID+SKIP',
-      selfieUrl: 'https://placehold.co/400x400?text=SELFIE+SKIP',
-      mobileNumber: '09123456789',
-      altContactName: 'Maria Dela Cruz',
-      altContactNumber: '09987654321',
-      houseNumber: 'Blk 12 Lot 5',
-      street: 'Sampaguita St.',
-      householdCount: 4,
-      specialNeeds: 'No',
-      specialNeedsInfo: '',
-      gpsLat: 13.0641,
-      gpsLng: 120.7303,
-      status: 'approved',
-      registeredAt: new Date().toISOString(),
-      uid: realUid
-    };
-
-    setUser(mockUser);
-    setProfile(mockProfile);
-    setResidentProfile(mockResidentProfile);
-    setLoading(false);
-  };
-
-  const handleDemoAdminLogin = async () => {
-    const realUid = 'demo-admin-456';
-    const mockUser = {
-      uid: realUid,
-      displayName: 'Admin (Offline Mode)',
-      email: 'admin.demo@example.com',
-      photoURL: 'https://placehold.co/400x400?text=ADMIN'
-    } as FirebaseUser;
-
-    const mockProfile: User = {
-      id: realUid,
-      uid: realUid,
-      name: 'Admin (Offline Mode)',
-      email: 'admin.demo@example.com',
-      role: 'superadmin',
-      createdAt: new Date().toISOString(),
-      status: 'approved',
-      phone: '09123456789'
-    };
-
-    setUser(mockUser);
-    setProfile(mockProfile);
-    setLoading(false);
-    toast.success('ADMIN OVERRIDE ACTIVE', { icon: '🔑' });
+  const handleSignOut = async () => {
+    if (!auth) return;
+    await auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setResidentProfile(null);
+    setActiveTab('home');
   };
 
   const [isSettingRole, setIsSettingRole] = useState(false);
-
   const handleSetRole = async (role: UserRole) => {
-    console.log("handleSetRole triggered with:", role);
-    console.log("user:", user, "db:", db);
-    if (!user) {
-      toast.error("Error: User is not authenticated.");
-      return;
-    }
-    if (!db) {
-      toast.error("Error: Database connection is missing.");
-      return;
-    }
-    
+    if (!user || !db) return;
     setIsSettingRole(true);
-    const newProfile: Partial<User> = {
-      uid: user.uid,
-      name: user.displayName || 'Anonymous User',
-      email: user.email || '', 
-      role: role,
-      createdAt: new Date().toISOString(),
-      status: role === 'resident' ? 'pending' : 'approved'
-    };
-
-    if (user.uid === 'demo-resident-123') {
-      console.log("Demo user detected, skipping Firebase write.");
-      setProfile(newProfile as User);
-      setIsSettingRole(false);
-      return;
-    }
-
     try {
-      console.log("Attempting setDoc with profile:", newProfile);
-      
+      const newProfile: Partial<User> = {
+        uid: user.uid,
+        name: user.displayName || 'Citizen',
+        email: user.email || '',
+        role: role,
+        createdAt: new Date().toISOString(),
+        status: role === 'resident' ? 'pending' : 'approved',
+        lastActive: new Date().toISOString()
+      };
       await setDoc(doc(db, 'users', user.uid), newProfile);
-
-      console.log("setDoc successful, updating local profile state.");
       setProfile(newProfile as User);
-    } catch (error: any) {
-      console.error("Failed to set role:", error);
-      toast.error("Failed to set role: " + error.message);
+    } catch (err) {
+      console.error("Role assignment failure:", err);
+      toast.error("Security System: Role Assignment Failed");
     } finally {
       setIsSettingRole(false);
     }
   };
 
-  const handleSignOut = async () => {
-    setUser(null);
-    setProfile(null);
-    setResidentProfile(null);
-    if (!auth) return;
-    await auth.signOut();
+  const handleDemoLogin = (role: 'resident' | 'admin') => {
+    const uid = role === 'resident' ? 'demo_resident_uid' : 'anonymous_admin_demo';
+    const mockUser = { uid, displayName: `Demo ${role}`, email: `${role}@demo.com` } as FirebaseUser;
+    setUser(mockUser);
+    setProfile({ 
+      uid, 
+      id: uid, 
+      name: mockUser.displayName!, 
+      email: mockUser.email!, 
+      role: role === 'resident' ? 'resident' : 'superadmin',
+      status: 'approved',
+      createdAt: new Date().toISOString()
+    } as User);
+    setLoading(false);
   };
 
   if (loading) {
@@ -588,24 +461,21 @@ export default function App() {
     );
   }
 
-  // If registering, show form
   if (isRegistering) return <RegistrationForm onCancel={() => setIsRegistering(false)} onComplete={() => { setIsRegistering(false); window.location.reload(); }} />;
 
-  // If no user, show login
   if (!user) return (
     <LoginView 
       onLogin={handleLogin} 
       onRegister={() => setIsRegistering(true)} 
       isLoggingIn={isLoggingIn} 
-      onDemoLogin={handleDemoResidentLogin}
-      onDemoAdminLogin={handleDemoAdminLogin}
+      onDemoLogin={() => handleDemoLogin('resident')}
+      onDemoAdminLogin={() => handleDemoLogin('admin')}
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
       auth={auth}
     />
   );
 
-  // Special case: Resident Portal (Registration Flow)
   if (user && !profile && !residentProfile) return (
     <RoleSelection 
       onSelect={handleSetRole} 
@@ -616,20 +486,14 @@ export default function App() {
     />
   );
 
-  // Resident Pending/Rejected State
   if (effectiveRole === 'resident' && profile && !viewOverride) {
     if (profile.status === 'pending') return <PendingApproval user={user} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
     if (profile.status === 'rejected') return <RejectedScreen reason={residentProfile?.rejectionReason || 'Documents verification failed.'} deferredPrompt={deferredPrompt} onInstall={handleInstallApp} onLogout={handleSignOut} />;
   }
 
   const items = navItems.filter(item => {
-    if (effectiveRole === 'admin' || effectiveRole === 'superadmin') {
-      return item.id !== 'map'; // Admins use Command & Tracker
-    }
-    if (effectiveRole === 'tanod') {
-      return !['residents', 'settings', 'map', 'logs'].includes(item.id); // Tanods use Command & Tracker
-    }
-    // Residents see Dashboard (home), Map (map), Tracker (tracker), Comms (directory), Profile (settings)
+    if (effectiveRole === 'admin' || effectiveRole === 'superadmin') return true;
+    if (effectiveRole === 'tanod') return !['residents', 'settings', 'logs'].includes(item.id);
     return ['home', 'map', 'tracker', 'directory', 'settings'].includes(item.id);
   });
 
@@ -650,7 +514,6 @@ export default function App() {
       </div>
       <Toaster />
 
-      {/* Global System Broadcast SOS UI */}
       <BroadcastOverlay 
         activeBroadcast={activeBroadcast}
         effectiveRole={effectiveRole}
@@ -659,11 +522,10 @@ export default function App() {
       />
 
       <BackgroundPattern />
-      {/* Background Official Logo (Low Visibility) */}
       <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden opacity-[0.02] select-none">
         <TanodLogo size={800} animated={false} useImage={false} className="grayscale contrast-150 rotate-[-15deg] blur-[2px]" />
       </div>
-      {/* Mobile Top Bar */}
+
       <div className="md:hidden flex items-center justify-between p-4 glass-panel border-b border-white/5 shrink-0 z-[60] shadow-command mt-8">
         <div className="flex items-center gap-2">
           <TanodLogo size={32} animated={false} useImage={false} />
@@ -687,19 +549,18 @@ export default function App() {
             className="p-3 text-white/40 hover:text-white transition-colors bg-white/5 rounded-2xl border border-white/5 active:scale-90"
           >
             {isMobileMenuOpen ? (
-              <Plus className="w-6 h-6 rotate-45" />
+              <XIcon className="w-6 h-6" />
             ) : (
               <div className="flex flex-col gap-1.5 w-6">
-                <span className="w-full h-0.5 bg-current rounded-full"></span>
-                <span className="w-2/3 h-0.5 bg-current rounded-full ml-auto"></span>
-                <span className="w-full h-0.5 bg-current rounded-full"></span>
+                <span className="w-full h-0.5 bg-white/40 rounded-full" />
+                <span className="w-full h-0.5 bg-white/40 rounded-full" />
+                <span className="w-full h-0.5 bg-white/40 rounded-full" />
               </div>
             )}
           </button>
         </div>
       </div>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-brand-bg/80 backdrop-blur-md z-[55]"
@@ -707,10 +568,8 @@ export default function App() {
         />
       )}
 
-      {/* Witness Overlay Notification */}
       <WitnessOverlay userId={profile?.uid || ''} />
 
-      {/* Sidebar Navigation */}
       <NavigationSidebar 
         activeTab={activeTab}
         setActiveTab={(tab: string) => setActiveTab(tab as any)}
@@ -725,7 +584,7 @@ export default function App() {
       />
 
       <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 flex flex-col">
-      <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
+        <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
           <div className="flex-1 w-full">
             <div className="flex justify-between items-start w-full transition-all">
               <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white">
@@ -745,7 +604,7 @@ export default function App() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-            {(profile?.role === 'admin' || profile?.role === 'superadmin' || isRuben) && (
+            {(isMasterAdminEmail || checkIsRuben(user?.uid)) && (
               <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
                 <button 
                   onClick={() => { setViewOverride(null); setActiveTab('home'); }} 
@@ -823,7 +682,7 @@ export default function App() {
                 activeBroadcast={activeBroadcast}
               />
             )}
-            {activeTab === 'map' && effectiveRole === 'resident' && (
+            {activeTab === 'map' && (
               <div className="h-full min-h-[500px] flex flex-col gap-4">
                 <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
@@ -850,15 +709,15 @@ export default function App() {
                     <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
                   </div>
                 </div>
-                <LiveMap />
+                <LiveMap lat={13.2236} lng={120.596} />
               </div>
             )}
             {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}
             {activeTab === 'resident-map' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <ResidentTacticalMap />}
             {activeTab === 'directory' && <DirectoryView />}
-            {activeTab === 'schedule' && effectiveProfile && <ScheduleView role={effectiveRole as any} profile={effectiveProfile} />}
+            {activeTab === 'schedule' && effectiveProfile && <ScheduleView profile={effectiveProfile} role={effectiveRole as any} />}
             {activeTab === 'reports' && <ReportsView />}
-            {activeTab === 'settings' && <SettingsView />}
+            {activeTab === 'settings' && effectiveProfile && <SettingsView profile={effectiveProfile} role={effectiveRole as any} />}
             {activeTab === 'roster' && <TanodRosterView />}
             {activeTab === 'logs' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <TanodActivityLogs />}
           </motion.div>
@@ -868,1773 +727,18 @@ export default function App() {
           <IncidentForm profile={effectiveProfile} onClose={() => setIsIncidentFormOpen(false)} />
         )}
         {effectiveProfile && effectiveRole === 'tanod' && <TanodCommandAlert profile={effectiveProfile} isTestMode={viewOverride === 'tanod'} />}
+        
+        <SirenController 
+          globalSirenActive={globalSirenActive} 
+          profile={effectiveProfile} 
+          alerts={alerts} 
+        />
         <BackgroundServices />
       </main>
     </div>
   );
 }
 
-function RejectedScreen({ reason, deferredPrompt, onInstall, onLogout }: { reason: string, deferredPrompt?: any, onInstall?: () => void, onLogout: () => void }) {
-  return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-      <div className="scanline" />
-      <BackgroundPattern />
-      <div className="absolute inset-0 bg-emergency/5 pointer-events-none" />
-      
-      {deferredPrompt && (
-        <button
-          onClick={onInstall}
-          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-card text-info font-black border border-white/10 hover:border-info/40 transition-all text-[10px] tracking-widest font-mono uppercase shadow-lg"
-        >
-          <span>📲 SYSTEM INSTALL</span>
-        </button>
-      )}
 
-      <div className="w-24 h-24 bg-emergency/10 rounded-full flex items-center justify-center mb-8 border border-emergency/30 shadow-glow-red animate-flicker">
-        <X className="w-12 h-12 text-emergency" />
-      </div>
 
-      <h2 className="text-5xl font-black italic tracking-tighter mb-4 text-white uppercase font-mono leading-none">ACCESS DENIED</h2>
-      <p className="text-white/30 max-w-md mb-8 text-[10px] font-black uppercase tracking-[0.4em] font-mono">Authentication credentials invalidated</p>
-      
-      <div className="glass-panel border-emergency/20 p-10 rounded-[48px] w-full max-w-md mb-12 shadow-glow-red relative overflow-hidden">
-        <div className="scanline opacity-20" />
-        <p className="text-[10px] font-black uppercase text-emergency tracking-[0.3em] mb-6 font-mono leading-none">REJECTION INTEL</p>
-        <p className="text-white font-bold italic text-xl font-mono leading-relaxed bg-black/20 p-4 rounded-2xl border border-white/5">
-          "{reason}"
-        </p>
-        <div className="mt-6 flex justify-center gap-2">
-          <div className="w-1 h-1 bg-emergency rounded-full animate-pulse" />
-          <div className="w-1 h-1 bg-emergency rounded-full animate-pulse delay-75" />
-          <div className="w-1 h-1 bg-emergency rounded-full animate-pulse delay-150" />
-        </div>
-      </div>
 
-      <button 
-        onClick={onLogout}
-        className="px-14 py-6 bg-brand-card border border-white/10 text-white font-black italic rounded-3xl hover:bg-brand-bg hover:border-emergency/50 hover:shadow-glow-red transition-all shadow-2xl font-mono tracking-[0.2em] uppercase text-xs animate-pulse"
-      >
-        TERMINATE SESSION
-      </button>
-    </div>
-  );
-}
-
-function PendingApproval({ user, deferredPrompt, onInstall, onLogout }: { user: FirebaseUser, deferredPrompt?: any, onInstall?: () => void, onLogout: () => void }) {
-  return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-      <div className="scanline" />
-      <BackgroundPattern />
-      
-      {deferredPrompt && (
-        <button
-          onClick={onInstall}
-          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-card text-info font-black border border-white/10 hover:border-info/40 transition-all text-[10px] tracking-widest font-mono uppercase shadow-lg"
-        >
-          <span>📲 SYSTEM INSTALL</span>
-        </button>
-      )}
-
-      <div className="w-24 h-24 bg-caution/10 rounded-[32px] flex items-center justify-center mb-8 border border-caution/30 shadow-2xl animate-pulse">
-        <Clock className="w-12 h-12 text-caution" />
-      </div>
-
-      <h1 className="text-5xl font-black italic tracking-tighter mb-4 text-white uppercase font-mono leading-none">CLEARANCE PENDING</h1>
-      <p className="text-white/30 max-w-md mb-12 text-[10px] font-black uppercase tracking-[0.4em] font-mono leading-none">Security appraisal in progress</p>
-      
-      <div className="glass-panel border-white/5 p-10 rounded-[48px] w-full max-w-md mb-12 relative overflow-hidden">
-        <div className="scanline opacity-10" />
-        <p className="text-white/50 text-sm leading-relaxed font-mono">
-          Resident profile for <span className="text-white font-black italic text-lg">{user.displayName}</span> is currently under <span className="text-caution font-black">Level 1 Evaluation</span>. 
-        </p>
-        <div className="mt-8 flex flex-col items-center gap-3">
-          <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-            <motion.div 
-               initial={{ width: 0 }}
-               animate={{ width: "65%" }}
-               transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
-               className="h-full bg-caution shadow-[0_0_10px_rgba(245,158,11,0.5)]" 
-            />
-          </div>
-          <p className="text-[8px] font-black uppercase text-white/20 tracking-[0.5em] font-mono">Verifying Credentials...</p>
-        </div>
-      </div>
-
-      <button 
-        onClick={onLogout} 
-        className="px-14 py-6 bg-brand-card border border-white/10 text-white font-black italic rounded-3xl hover:bg-brand-bg hover:border-caution/50 hover:shadow-[0_0_30px_rgba(245,158,11,0.2)] transition-all shadow-2xl font-mono tracking-[0.2em] uppercase text-xs flex items-center gap-4"
-      >
-        <LogOut className="w-4 h-4 text-caution" /> ABORT SESSION
-      </button>
-    </div>
-  );
-}
-
-
-function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDemoAdminLogin, deferredPrompt, onInstall, auth }: { onLogin: () => void, onRegister: () => void, isLoggingIn: boolean, onDemoLogin: () => void, onDemoAdminLogin: () => void, deferredPrompt?: any, onInstall?: () => void, auth: any }) {
-  const handleRegister = () => {
-    onRegister();
-  };
-
-  return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-      <BackgroundPattern />
-      <div className="relative mb-12">
-        <div className="absolute inset-0 bg-emergency/20 blur-[100px] rounded-full animate-pulse" />
-        <TanodLogo size={180} className="relative z-10 drop-shadow-[0_0_30px_rgba(255,75,75,0.3)]" />
-      </div>
-      
-      <h1 className="text-6xl font-black tracking-tighter mb-4 text-white z-10 font-mono italic">
-        BRGY.<span className="text-emergency">TANOD</span> S.O.S
-      </h1>
-      <p className="text-white/40 max-w-sm mb-16 text-lg z-10 font-bold uppercase tracking-[0.2em] font-mono leading-tight">
-        TACTICAL COMMUNITY RESPONSE NETWORK
-      </p>
-
-      <div className="space-y-4 w-full max-w-xs z-10">
-        {deferredPrompt && (
-          <button 
-            onClick={onInstall}
-            className="w-full bg-info text-white font-black py-4 rounded-3xl flex items-center justify-center gap-3 hover:bg-info/90 active:scale-95 transition-all shadow-xl uppercase tracking-widest font-mono text-xs italic mb-4"
-          >
-            <span>📲 INSTALL MOBILE LINK</span>
-          </button>
-        )}
-        <button 
-          disabled={isLoggingIn}
-          onClick={onLogin}
-          className="w-full bg-white text-black font-black py-6 rounded-3xl flex items-center justify-center gap-3 hover:bg-[#E2E2E2] active:scale-95 transition-all shadow-2xl disabled:opacity-50 uppercase tracking-widest font-mono text-sm italic"
-        >
-          {isLoggingIn ? (
-            <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-          ) : (
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-          )}
-          {isLoggingIn ? 'Establishing...' : 'Authenticate Unit'}
-        </button>
-        
-        {!auth && (
-          <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest">
-             <AlertTriangle className="w-4 h-4 mx-auto mb-2" />
-             Command Link Disconnected. Authentication Unavailable.
-          </div>
-        )}
-
-        <button 
-          disabled={isLoggingIn}
-          onClick={handleRegister}
-          className="w-full glass-panel border-white/10 text-white font-black py-4 rounded-3xl hover:bg-white/5 transition-all disabled:opacity-50 uppercase tracking-widest font-mono text-xs"
-        >
-          Resident Registration
-        </button>
-
-        <button 
-          onClick={onDemoLogin}
-          className={cn(
-            "w-full transition-all uppercase font-mono mt-4",
-            !auth 
-              ? "bg-info text-white py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
-              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
-          )}
-        >
-          {auth ? '[ Bypass Authentication — Resident Mode ]' : 'PROCEED AS RESIDENT (OFFLINE)'}
-        </button>
-
-        <button 
-          onClick={onDemoAdminLogin}
-          className={cn(
-            "w-full transition-all uppercase font-mono mt-2",
-            !auth 
-              ? "bg-amber-500 text-black py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
-              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
-          )}
-        >
-          {auth ? '[ Bypass Authentication — Admin Mode ]' : 'PROCEED AS ADMIN (OFFLINE)'}
-        </button>
-      </div>
-      
-      <div className="absolute bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.5em] font-mono">
-        System Ver 4.2.0 • Encryption Active
-      </div>
-    </div>
-  );
-}
-
-function RoleSelection({ onSelect, onRegister, isSettingRole, deferredPrompt, onInstall }: { onSelect: (role: UserRole) => void, onRegister: () => void, isSettingRole?: boolean, deferredPrompt?: any, onInstall?: () => void }) {
-  return (
-    <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
-      <BackgroundPattern />
-      {deferredPrompt && (
-        <button 
-          onClick={onInstall}
-          className="absolute top-8 right-8 z-50 flex items-center gap-2 px-4 py-2 rounded-xl bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 transition-all text-[10px] tracking-widest font-mono uppercase"
-        >
-          <span>📲 INSTALL APP</span>
-        </button>
-      )}
-      <h2 className="text-4xl font-black italic tracking-tighter mb-2 text-white uppercase font-mono z-10">ASSIGNMENT</h2>
-      <p className="text-white/40 text-[10px] font-black mb-16 uppercase tracking-[0.5em] font-mono z-10">Select operational profile</p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-6xl z-10">
-        <RoleCard 
-          title="Resident Portal" 
-          desc="Request SOS assistance and view local safety advisories." 
-          icon={UserIcon} 
-          onClick={() => onSelect('resident')}
-          color="emergency"
-          disabled={isSettingRole}
-        />
-        <RoleCard 
-          title="Tanod Officer" 
-          desc="Tactical response unit and incident management interface." 
-          icon={Shield} 
-          onClick={() => onSelect('tanod')}
-          color="info"
-          disabled={isSettingRole}
-        />
-        <RoleCard 
-          title="Admin Command" 
-          desc="High-level oversight, roster management, and archives." 
-          icon={LayoutDashboard} 
-          onClick={() => onSelect('admin')}
-          color="caution"
-          disabled={isSettingRole}
-        />
-      </div>
-      {isSettingRole && (
-        <div className="mt-8 text-amber-400 font-mono text-sm animate-pulse">
-          CONFIGURING CLEARANCE... PLEASE WAIT
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RoleCard({ title, desc, icon: Icon, onClick, color, disabled }: any) {
-  const isEmergency = color === 'emergency';
-  return (
-    <button 
-      onClick={onClick} 
-      disabled={disabled}
-      className={`p-12 glass-panel border-white/5 rounded-[48px] hover:border-white/20 hover:bg-white/5 transition-all text-left group active:scale-95 flex flex-col relative overflow-hidden ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl group-hover:bg-white/10 transition-colors" />
-      
-      <div className={cn(
-        "w-20 h-20 rounded-3xl flex items-center justify-center mb-10 transition-all shadow-xl group-hover:scale-110",
-        isEmergency ? "bg-emergency text-white sos-glow" : "bg-info text-white shadow-info/20"
-      )}>
-        <Icon className="w-10 h-10" />
-      </div>
-      <h3 className="text-3xl font-black mb-4 text-white italic tracking-tighter font-mono uppercase leading-none">{title}</h3>
-      <p className="text-white/40 text-base leading-relaxed font-bold uppercase tracking-tight font-mono">{desc}</p>
-    </button>
-  );
-}
-
-function ResidentDashboard({ profile, patrols, visiblePatrols, isOnline, deferredPrompt, onInstall, onTabChange, sirenActive, onToggleSiren }: { profile: User, patrols: PatrolLocation[], visiblePatrols: PatrolLocation[], isOnline: boolean, deferredPrompt: any, onInstall: () => void, onTabChange: (tab: string) => void, sirenActive: boolean, onToggleSiren: () => void }) {
-  const { queuedSOSCount, setQueuedSOSCount, triggerSync, setIsOnline } = useSystemStore();
-  const [sending, setSending] = useState(false);
-  const [activeAlert, setActiveAlert] = useState<Alert | null>(null);
-  const [sosTypeToSubmit, setSosTypeToSubmit] = useState<EmergencyType | null>(null);
-  const [isChoosingCategory, setIsChoosingCategory] = useState(false);
-  const [sosDescription, setSosDescription] = useState('');
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [sosSuccess, setSosSuccess] = useState(false);
-  const [manualLocation, setManualLocation] = useState<{ lat: number, lng: number } | null>(null);
-  const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number, accuracy?: number } | null>(null);
-
-  useEffect(() => {
-    const checkQueue = async () => {
-      const size = await getQueueSize();
-      setQueuedSOSCount(size);
-    };
-    checkQueue();
-    const interval = setInterval(checkQueue, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    // Get initial GPS to center map if available
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setGpsLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-      () => {},
-      { enableHighAccuracy: true }
-    );
-  }, []);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      useSOSStore.getState().syncQueue();
-    };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [setIsOnline]);
-
-  useEffect(() => {
-    if (!db) return;
-    const q = query(
-      collection(db, 'alerts'), 
-      where('residentId', '==', profile.uid),
-      orderBy('timestamp', 'desc'),
-      limit(1)
-    );
-    
-    return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const data = snapshot.docs[0].data() as Omit<Alert, 'id'>;
-        if (data.status !== 'resolved' && data.status !== 'cancelled') {
-          setActiveAlert({ id: snapshot.docs[0].id, ...data } as Alert);
-        } else {
-          setActiveAlert(null);
-        }
-      }
-    }, (error) => {
-      console.error("Alerts listener disabled or failed (ResidentDashboard):", error.message);
-    });
-  }, [profile.uid]);
-
-  const activeAlertIdRef = useRef<string | null>(null);
-  const [guardianMode, setGuardianMode] = useState(false);
-
-  const handleSOSRef = useRef<((type?: EmergencyType, description?: string) => Promise<void>) | null>(null);
-
-  const handleShout = useCallback(() => {
-    toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', {
-      duration: 5000,
-      icon: '🔊'
-    });
-    if (handleSOSRef.current) {
-      handleSOSRef.current('other', 'Dynamic AI Alert: High-decibel sound/shout detected.');
-    }
-  }, []);
-
-  const { isListening, startListening, stopListening } = useShoutDetection(handleShout);
-
-  const handleVideoChunk = useCallback((chunk: Blob) => {
-    // UPLOAD: Evidence Streaming
-    if (!activeAlertIdRef.current) return;
-    
-    import('./services/StorageService').then(async (service) => {
-        await service.uploadVideoChunk(activeAlertIdRef.current!, chunk, Date.now());
-    });
-  }, []);
-
-  const { isRecording, startRecording, stopRecording } = useVideoRecorder(handleVideoChunk);
-  
-  useEffect(() => {
-    if (guardianMode) {
-      startListening();
-    } else {
-      stopListening();
-    }
-  }, [guardianMode, startListening, stopListening]);
-
-  useEffect(() => {
-    if (!activeAlert && isRecording) {
-      stopRecording();
-      activeAlertIdRef.current = null;
-    }
-  }, [activeAlert, isRecording, stopRecording]);
-
-
-  const handleSOS = async (type: EmergencyType = 'other', description: string) => {
-    if (!db) {
-      toast.error('Local Database: Command link inactive. SOS queued.');
-      return;
-    }
-    setSending(true);
-    
-    const alertId = crypto.randomUUID();
-    activeAlertIdRef.current = alertId;
-
-    // 1. Immediately start recording
-    await startRecording();
-    toast.success('Secure Evidence Streaming Active 📡', { icon: '🛡️' });
-
-    try {
-      // 1. Get GPS with fallback if manual is NOT set
-      let pos: { lat: number, lng: number, accuracy?: number } | null = manualLocation;
-      
-      if (!pos) {
-        try {
-          const gpsPos = await new Promise<GeolocationPosition>((res, rej) => 
-            navigator.geolocation.getCurrentPosition(res, rej, { 
-              enableHighAccuracy: true, 
-              timeout: 5000, 
-              maximumAge: 0 
-            })
-          );
-          pos = { 
-            lat: gpsPos.coords.latitude, 
-            lng: gpsPos.coords.longitude,
-            accuracy: gpsPos.coords.accuracy
-          };
-        } catch (gpsErr) {
-          console.warn('GPS failed, proceeding with empty location', gpsErr);
-        }
-      }
-
-      // 2. AI Analysis (optional for speed)
-      let aiAnalysis = { incidentType: type, severity: 'high', priority: 1, action: 'dispatch' };
-      try {
-        aiAnalysis = await analyzeIncident(description || `Emergency ${type} alert.`, type) as any;
-      } catch (aiErr) {
-        console.warn('AI analysis failed', aiErr);
-      }
-      
-      const locationObj: any = pos || { lat: 13.2236, lng: 120.5960 }; // Default to Mamburao center
-
-      const alertData: any = {
-        id: alertId,
-        residentId: profile?.uid || '',
-        residentName: profile?.name || 'Unknown Resident',
-        type: (aiAnalysis.incidentType?.toLowerCase() || type) as any,
-        location: locationObj,
-        status: 'pending',
-        timestamp: new Date().toISOString(),
-        aiAnalysis: aiAnalysis,
-        isManualLocation: !!manualLocation
-      };
-      
-      if (profile?.phone) alertData.residentMobile = profile.phone;
-      if (description) alertData.customMessage = description;
-      
-      // 3. Offline-Aware Save
-      if (isOnline) {
-        try {
-          await setDoc(doc(db, 'alerts', alertId), alertData);
-          
-          // --- WITNESS CIRCLE INTEGRATION ---
-          import('./services/WitnessService').then(async (service) => {
-            // Update user's discoverable location for future witness alerts
-            if (profile?.uid) {
-              const ngeohash = await import('ngeohash');
-              const hash = ngeohash.encode(alertData.location.lat, alertData.location.lng, 6);
-              updateDoc(doc(db, 'users', profile.uid), {
-                lat: alertData.location.lat,
-                lng: alertData.location.lng,
-                geohash: hash,
-                lastSOSAt: new Date().toISOString()
-              }).catch(e => console.warn("User location sync failed:", e));
-            }
-
-            const count = await service.triggerWitnessAlert(alertId, alertData.location);
-            if (count > 0) {
-              toast.success(`${count} neighbors alerted as witnesses.`);
-            }
-          });
-
-          // Parallel Save to Supabase (Upsert for robustness)
-          if (isSupabaseConfigured) {
-            await supabase.from('report_logs').upsert([{
-              id: alertId,
-              incident_id: alertId,
-
-              type: alertData.type,
-              status: alertData.status,
-              location_lat: alertData.location.lat,
-              location_lng: alertData.location.lng,
-              lat: alertData.location.lat,
-              lng: alertData.location.lng,
-              citizen_id: profile?.uid || 'anonymous'
-            }]);
-          }
-        } catch (err: any) {
-          console.error('Online SOS failed, queuing:', err);
-          useSOSStore.getState().addToQueue(alertData);
-          toast('Command link weak. SOS queued locally.');
-        }
-      } else {
-        useSOSStore.getState().addToQueue(alertData);
-        toast('System Offline. SOS queued locally.');
-      }
-      setSending(false);
-      setSosSuccess(true);
-      setTimeout(() => setSosSuccess(false), 3000);
-      
-      // Clear manual location after success
-      setManualLocation(null);
-      setSosSuccess(true);
-      
-      setTimeout(() => {
-        setSosTypeToSubmit(null);
-        setSosDescription('');
-        setSosSuccess(false);
-      }, 1500);
-    } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, 'alerts');
-      toast.error('Critical failure. Please call hotlines directly.');
-    } finally {
-      setSending(false);
-    }
-  };
-
-  handleSOSRef.current = handleSOS;
-
-  return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-8 pb-32 relative tactical-grid min-h-screen p-4 md:p-8"
-    >
-      <div className="scanline opacity-10 pointer-events-none" />
-      {deferredPrompt && (
-        <motion.button
-          variants={itemVariants}
-          onClick={onInstall}
-          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-info/5 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-          <span className="text-lg group-hover:rotate-12 transition-transform">📲</span>
-          <span className="relative z-10">INSTALL BRGY. S.O.S. MOBILE</span>
-        </motion.button>
-      )}
-      <AnimatePresence mode="popLayout">
-        {activeAlert && (
-          <motion.div 
-            initial={{ opacity: 0, y: -40, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-            className="glass-panel border-emergency/50 rounded-[48px] p-8 shadow-glow-red overflow-hidden relative skew-card"
-          >
-            <div className="absolute inset-0 emergency-bg-glow opacity-20 pointer-events-none" />
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-emergency/20 overflow-hidden">
-               <motion.div 
-                 animate={{ x: ['-100%', '100%'] }}
-                 transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
-                 className="w-1/2 h-full bg-emergency shadow-glow-red"
-               />
-            </div>
-
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-              <div className="flex items-center gap-8">
-                <div className="w-20 h-20 bg-emergency rounded-[28px] flex items-center justify-center relative sos-glow">
-                  <TanodLogo size={56} animated={false} className="z-10" />
-                  <div className="absolute inset-0 bg-emergency rounded-[28px] blur-2xl opacity-40 animate-pulse" />
-                </div>
-                <div>
-                  <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono leading-tight">Emergency Incident Live</h4>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-[10px] bg-emergency px-2 py-0.5 rounded-full font-black tracking-widest uppercase">ACTIVE SOS</span>
-                    {isRecording && (
-                      <span className="flex items-center gap-1.5 ml-2 text-[9px] text-white/80 font-black tracking-tighter bg-black/40 px-2 py-0.5 rounded-full ring-1 ring-white/20 animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_#ff0000]" />
-                        EVIDENCE_STREAMING_ACTIVE
-                      </span>
-                    )}
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] font-mono">
-                      {activeAlert.type} • T+{Math.floor((Date.now() - new Date(activeAlert.timestamp).getTime()) / 60000)}m reported
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex-1 max-w-lg w-full">
-                <div className="relative h-3 bg-brand-bg rounded-full overflow-hidden mb-3 border border-white/5">
-                  <motion.div 
-                    initial={{ width: '0%' }}
-                    animate={{ 
-                      width: activeAlert.status === 'pending' ? '33.33%' : 
-                             activeAlert.status === 'responding' ? '66.66%' : '100%' 
-                    }}
-                    className="absolute top-0 left-0 h-full bg-emergency shadow-[0_0_15px_rgba(255,59,48,0.5)]"
-                  />
-                </div>
-                <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.3em] font-mono">
-                  <span className={activeAlert.status === 'pending' ? 'text-emergency' : 'text-white/20'}>[Alert Sent]</span>
-                  <span className={activeAlert.status === 'responding' ? 'text-emergency' : 'text-white/20'}>[Unit En Route]</span>
-                  <span className={activeAlert.status === 'resolved' ? 'text-success' : 'text-white/20'}>[Resolved]</span>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setCancellingId(activeAlert.id)}
-                  className="px-8 py-4 bg-brand-bg border border-white/10 text-white/60 text-xs font-black rounded-2xl hover:text-white hover:border-emergency/50 transition-all uppercase tracking-widest active:scale-95 group"
-                >
-                  <span className="group-hover:text-emergency transition-colors">Abort SOS Protocol</span>
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <CitizenReportTracker userId={profile.uid} />
-
-      {!activeAlert && (
-        <div className="space-y-6">
-          {queuedSOSCount > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.1)]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase text-amber-500 tracking-[0.2em] font-mono leading-none mb-1">Queue Active</p>
-                  <p className="text-[11px] font-bold text-white/60 font-mono tracking-tight">{queuedSOSCount} SOS request{queuedSOSCount > 1 ? 's' : ''} pending sync</p>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="text-[8px] font-black text-amber-500/40 uppercase tracking-widest font-mono">
-                  {isOnline ? 'Syncing...' : 'Waiting for Data'}
-                </div>
-                {isOnline && (
-                  <button 
-                    onClick={triggerSync}
-                    className="bg-amber-500 text-black text-[9px] font-black px-3 py-2 rounded-xl active:scale-95 transition-all shadow-lg shadow-amber-500/20 uppercase tracking-widest"
-                  >
-                    Sync Now
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          )}
-
-          <motion.div 
-            variants={itemVariants}
-            className="relative max-w-2xl mx-auto"
-          >
-          {/* Tactical Frame */}
-          <div className="absolute -inset-4 border border-white/5 rounded-[64px] pointer-events-none opacity-50" />
-          <div className="absolute -inset-2 border border-white/10 rounded-[56px] pointer-events-none opacity-20" />
-          
-            <div className="glass-panel border-white/10 rounded-[56px] p-10 md:p-20 relative overflow-hidden group shadow-[0_0_50px_rgba(0,0,0,0.5)] skew-card">
-              <div className="absolute inset-0 tactical-grid opacity-10" />
-              <div className="scanline opacity-20 pointer-events-none" />
-              <div className="absolute inset-0 emergency-bg-glow opacity-5" />
-              
-              <div className="absolute top-8 left-8 flex flex-col gap-4 z-10">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
-                    <span className="text-[8px] font-mono font-black text-white/20 uppercase tracking-[0.4em]">Auth Layer 1</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-black text-white/40 uppercase tracking-[0.2em] italic">Resident SOS Protocol</span>
-                </div>
-                
-                <div className="flex items-center gap-3 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 w-fit">
-                   <div className="flex flex-col">
-                      <span className="text-[8px] font-black tracking-tighter text-white/60">Guardian AI Mode</span>
-                      <span className="text-[10px] font-black text-emergency leading-none">{guardianMode ? 'LISTENING' : 'INACTIVE'}</span>
-                   </div>
-                   <button 
-                    onClick={() => {
-                        setGuardianMode(!guardianMode);
-                        toast(guardianMode ? 'Guardian AI Mode Disabled' : 'Guardian AI Mode Enabled: Listening for shouts.', { icon: '🛡️' });
-                    }}
-                    className={`w-10 h-5 rounded-full p-1 transition-all duration-500 relative overflow-hidden ${guardianMode ? 'bg-emergency' : 'bg-white/10 border border-white/20'}`}
-                   >
-                      <div className={`w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-xl ${guardianMode ? 'translate-x-5' : 'translate-x-0'}`} />
-                   </button>
-                </div>
-              </div>
-
-              <div className="absolute top-8 right-8 text-right opacity-20 group-hover:opacity-60 transition-opacity z-10">
-                <Shield size={16} className="text-white ml-auto mb-1" />
-                <span className="text-[7px] font-mono font-black text-white uppercase tracking-tighter">SECURED_LINK</span>
-              </div>
-
-              <div className="relative z-10 flex flex-col items-center text-center mt-12">
-                <h2 className="text-5xl md:text-8xl font-black tracking-tighter mb-4 italic text-white uppercase font-mono leading-none outline-text">
-                  COMMAND <span className="text-emergency">STATUS</span>
-                </h2>
-
-              <div className="flex items-center gap-2 mb-12">
-                <span className="h-[1px] w-8 bg-white/20" />
-                <p className="text-white/30 text-[9px] font-black uppercase tracking-[0.4em] font-mono">Standby / Network Ready</p>
-                <span className="h-[1px] w-8 bg-white/20" />
-              </div>
-              
-                <div className="relative">
-                  {/* Visual Feedback Rings */}
-                  <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 25, ease: 'linear' }}
-                    className="absolute inset-0 -m-12 border border-emergency/10 rounded-full opacity-20" 
-                  />
-                  <motion.div 
-                    animate={{ rotate: -360 }}
-                    transition={{ repeat: Infinity, duration: 15, ease: 'linear' }}
-                    className="absolute inset-0 -m-6 border border-emergency/30 rounded-full opacity-30" 
-                  />
-                  
-                  <motion.button 
-                    disabled={sending}
-                    onClick={() => setIsChoosingCategory(true)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.92 }}
-                    animate={{ 
-                      boxShadow: !sending ? [
-                        "0 0 20px rgba(239,68,68,0.2)",
-                        "0 0 60px rgba(239,68,68,0.5)",
-                        "0 0 20px rgba(239,68,68,0.2)"
-                      ] : "0 0 80px rgba(255,255,255,0.6)"
-                    }}
-                    transition={{ 
-                      boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                      scale: { duration: 0.2 }
-                    }}
-                    className={cn(
-                      "relative w-72 h-72 md:w-96 md:h-96 rounded-full flex flex-col items-center justify-center gap-4 transition-all duration-700 group z-10 overflow-hidden border-8",
-                      sending 
-                        ? "bg-emergency scale-95 border-white" 
-                        : "bg-emergency/10 border-emergency/40 hover:bg-emergency hover:border-white"
-                    )}
-                  >
-                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
-                    <div className="z-10 group-hover:scale-110 transition-transform duration-500 drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">
-                      <TanodLogo 
-                        size={180} 
-                        animated={!sending} 
-                        className={cn(
-                          "transition-all duration-500",
-                          !sending ? "text-emergency group-hover:text-white" : "text-white"
-                        )} 
-                      />
-                    </div>
-                    
-                    <div className="z-10 flex flex-col items-center gap-1 mt-4">
-                      <span className={cn(
-                        "text-3xl md:text-5xl font-black italic tracking-tighter uppercase font-mono transition-colors",
-                        sending ? "text-white" : "text-white group-hover:text-white"
-                      )}>
-                        {sending ? 'COMM_SYNC...' : 'INITIATE_SOS'}
-                      </span>
-                      <span className="text-[10px] font-black font-mono text-white/30 uppercase tracking-[0.2em] group-hover:text-white/60 text-center px-8 leading-tight">DEPLOY_RESIDENTIAL_SIGNAL <br/>TO BRGY_NETWORK</span>
-                    </div>
-
-                    {!sending && (
-                      <div className="absolute inset-0 rounded-full border-4 border-emergency/20 animate-[ping_3s_infinite] opacity-50" />
-                    )}
-                  </motion.button>
-                </div>
-
-
-              <div className="mt-16 flex flex-col items-center gap-4">
-                <div className="flex gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="w-6 h-1 rounded-full bg-emergency/20 overflow-hidden">
-                      <motion.div 
-                        initial={{ x: "-100%" }}
-                        animate={{ x: "100%" }}
-                        transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2, ease: "linear" }}
-                        className="h-full w-full bg-emergency"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <p className="text-white/20 text-[8px] font-mono font-black uppercase tracking-[0.3em]">Neural Sync Active • Cluster: Mamburao_Main</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    )}
-
-      <motion.div variants={itemVariants} className="bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] p-6 md:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h3 className="font-bold text-xl flex items-center gap-2 text-white uppercase italic tracking-tighter">
-            <MapIcon className="w-5 h-5 text-[#FF4B4B]" /> LIVE PATROL STATUS
-          </h3>
-          <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
-            <div className="flex items-center gap-2"><span className="text-base">🔴</span> RESIDENT SOS</div>
-            <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
-          </div>
-        </div>
-        <div className="h-64 rounded-[30px] overflow-hidden border border-[#2D3139]">
-          <ActiveMap alerts={activeAlert ? [activeAlert] : []} patrols={visiblePatrols} />
-        </div>
-        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[#8E9299] text-xs">There are {patrols.length} Tanod units currently patrolling the Barangay.</p>
-          <button 
-            onClick={() => onTabChange('tracker')}
-            className="px-6 py-2 bg-brand-card border border-white/5 text-info text-[10px] font-black rounded-xl hover:border-info/40 transition-all uppercase tracking-widest font-mono"
-          >
-            🛰️ Tactical GPS Tracker
-          </button>
-        </div>
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="font-black text-xl text-white uppercase italic tracking-tighter font-mono">Tactical Comms</h3>
-          <div className="flex items-center gap-3">
-            <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.3em] font-mono">External Hotlines</span>
-            <button 
-              onClick={onToggleSiren}
-              className={cn(
-                "px-3 py-1.5 rounded-xl border transition-all flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-widest group",
-                sirenActive 
-                  ? "bg-emergency border-white text-white animate-pulse shadow-glow-red" 
-                  : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white/60"
-              )}
-              title={sirenActive ? "Stop Global Siren" : "Test Global Siren"}
-            >
-              {sirenActive ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-              {sirenActive ? "STOP SIREN" : "TEST SIREN"}
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { name: 'Police (PNP)', number: '117', color: 'bg-info', icon: '🚨', glow: 'rgba(56, 189, 248, 0.3)' },
-            { name: 'Fire (BFP)', number: '911', color: 'bg-caution', icon: '🔥', glow: 'rgba(251, 191, 36, 0.3)' },
-            { name: 'Medical', number: '0917-SOS', color: 'bg-emergency', icon: '🚑', glow: 'rgba(255, 59, 48, 0.3)' },
-            { name: 'Brgy. Hall', number: '123-4567', color: 'bg-success', icon: '🏢', glow: 'rgba(34, 197, 94, 0.3)' },
-          ].map(c => (
-            <TacticalCard
-              key={c.name}
-              onClick={() => window.location.href = `tel:${c.number}`}
-              glowColor={c.glow}
-              className="p-1"
-            >
-              <div className="flex flex-col items-center gap-3 p-6">
-                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-1 group-hover:scale-110 transition-transform shadow-xl text-2xl relative", c.color)}>
-                  <div className="absolute inset-0 bg-white/20 rounded-2xl animate-pulse" />
-                  <span className="z-10">{c.icon}</span>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-1 font-mono">{c.name}</p>
-                  <p className="text-base font-black text-white italic tracking-tighter font-mono">{c.number}</p>
-                </div>
-              </div>
-            </TacticalCard>
-          ))}
-        </div>
-      </motion.div>
-
-      <motion.div variants={itemVariants} className="pb-16">
-        <RecentAlerts residentId={profile.uid} />
-      </motion.div>
-
-      <motion.div variants={itemVariants} className="mb-16">
-        <BrgyTanodQR />
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <InstallAppButton />
-      </motion.div>
-
-      <AboutModal 
-        isOpen={isAboutOpen} 
-        onClose={() => setIsAboutOpen(false)} 
-        role={profile.role} 
-      />
-
-      <motion.div variants={itemVariants} className="flex justify-center pt-8 border-t border-[#2D3139]">
-        <button 
-          onClick={() => setIsAboutOpen(true)}
-          className="flex items-center gap-2 text-[#8E9299] hover:text-white transition-colors group px-4 py-2"
-          id="resident-about-btn"
-        >
-          <Info className="w-4 h-4 text-[#8E9299]/40 group-hover:text-white transition-colors" />
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] font-mono">System Vision & Mission</span>
-        </button>
-      </motion.div>
-
-      {/* SOS Category Modal */}
-      <AnimatePresence>
-        {isChoosingCategory && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#16191F] border border-white/10 w-full max-w-lg rounded-[40px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col p-8 relative"
-            >
-              <div className="scanline" />
-              <div className="absolute -top-24 -right-24 w-48 h-48 bg-emergency/20 blur-3xl" />
-              
-              <h3 className="font-black italic text-2xl md:text-3xl tracking-tighter text-white mb-2 uppercase text-center font-mono">Select Protocol</h3>
-              <p className="text-white/40 text-xs font-bold mb-8 text-center uppercase tracking-[0.2em] font-mono">Mission-critical category required</p>
-              
-               <div className="grid grid-cols-2 gap-4 mb-8">
-                {(['medical', 'fire', 'crime', 'flood'] as EmergencyType[]).map(type => {
-                  const getIcon = (t: string) => {
-                    switch(t) {
-                      case 'medical': return '🏥';
-                      case 'fire': return '🔥';
-                      case 'crime': return '🚨';
-                      case 'flood': return '🌊';
-                      default: return '⚠️';
-                    }
-                  };
-                  return (
-                    <TacticalCard
-                      key={type}
-                      onClick={() => { setIsChoosingCategory(false); setSosTypeToSubmit(type); }}
-                      glowColor="rgba(255, 59, 48, 0.3)"
-                      className="p-1"
-                    >
-                      <div className="p-6 flex flex-col items-center">
-                        <div className="w-16 h-16 bg-brand-card rounded-2xl flex items-center justify-center mb-4 group-hover:bg-emergency group-hover:shadow-glow-red transition-all text-3xl">
-                          <span className="group-hover:scale-110 transition-transform">{getIcon(type)}</span>
-                        </div>
-                        <p className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em] group-hover:text-white font-mono">{type}</p>
-                      </div>
-                    </TacticalCard>
-                  );
-                })}
-              </div>
-              
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setIsChoosingCategory(false)}
-                  className="flex-1 py-5 bg-brand-card border border-white/5 text-white/60 font-black rounded-2xl hover:text-white hover:bg-brand-bg transition-all text-[10px] uppercase italic tracking-[0.2em] font-mono shadow-md active:scale-95"
-                >
-                  ABORT REQUEST
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* SOS Description Modal */}
-      <AnimatePresence>
-        {sosTypeToSubmit && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#16191F] border border-white/10 w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl flex flex-col p-6 md:p-8 relative"
-            >
-              <div className="absolute inset-0 pointer-events-none opacity-10 flex items-end justify-center">
-                <FlameAnimation size="lg" className="w-[80%] h-[60%]" />
-              </div>
-              <div className="scanline" />
-              <div className="absolute -top-24 -left-24 w-48 h-48 bg-info/20 blur-3xl" />
-              
-              <div className="flex flex-col lg:flex-row gap-6">
-                <div className="flex-1 space-y-6">
-                  <div>
-                    <h3 className="font-black italic text-2xl tracking-tighter text-white mb-2 uppercase font-mono">Situation Intel</h3>
-                    <p className="text-white/40 text-[10px] font-black mb-4 uppercase tracking-[0.2em] font-mono leading-relaxed">Provide critical context for arriving Tanod units.</p>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {SOS_SUGGESTIONS[sosTypeToSubmit as string]?.map(suggestion => (
-                      <button
-                        key={suggestion}
-                        onClick={() => setSosDescription(prev => prev ? `${prev}, ${suggestion}` : suggestion)}
-                        className="px-3 py-1 bg-white/5 text-white/70 text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-emergency/20 hover:text-white transition-all border border-white/5"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  <textarea 
-                    value={sosDescription}
-                    onChange={(e) => setSosDescription(e.target.value)}
-                    placeholder="DETAILS: Location, nature, casualties..."
-                    className="w-full bg-brand-bg border border-white/5 rounded-3xl p-6 text-white placeholder:text-white/20 focus:outline-none focus:border-emergency min-h-[120px] font-mono text-sm leading-relaxed shadow-inner"
-                  />
-
-                  <div className="flex items-center justify-between p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-2 rounded-lg", manualLocation ? "bg-info/20 text-info" : "bg-white/5 text-white/20")}>
-                        <MapPin className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-white/60 font-mono">Location Mode</p>
-                        <p className="text-[9px] font-bold text-white/30 truncate max-w-[120px]">
-                          {manualLocation ? 'MANUAL OVERRIDE' : 'LIVE GPS SYNC'}
-                        </p>
-                      </div>
-                    </div>
-                    {manualLocation && (
-                      <button 
-                        onClick={() => setManualLocation(null)}
-                        className="text-[8px] font-black text-emergency border border-emergency/20 px-2 py-1 rounded hover:bg-emergency/10"
-                      >
-                        RESET TO GPS
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 min-h-[300px] flex flex-col gap-2">
-                   <p className="text-[10px] font-black uppercase text-white/30 tracking-widest ml-2">Tactical Map Override</p>
-                   <div className="flex-1 bg-brand-bg/50 rounded-3xl border border-white/5 overflow-hidden">
-                      <ActiveMap 
-                        alerts={[]} 
-                        patrols={visiblePatrols} 
-                        center={manualLocation ? [manualLocation.lat, manualLocation.lng] : gpsLocation ? [gpsLocation.lat, gpsLocation.lng] : undefined}
-                        onLocationSelect={(lat, lng) => setManualLocation({ lat, lng })}
-                        selectionLocation={manualLocation || gpsLocation}
-                      />
-                   </div>
-                </div>
-              </div>
-              
-              <div className="flex gap-4 mt-8">
-                <button 
-                  onClick={() => { setSosTypeToSubmit(null); setSosDescription(''); setManualLocation(null); }}
-                  className="flex-1 py-5 bg-brand-card border border-white/5 text-white/50 font-black rounded-2xl hover:text-white transition-all text-[10px] uppercase tracking-widest font-mono italic active:scale-95"
-                >
-                  Cancel
-                </button>
-                <AnimatedButton 
-                  isLoading={sending}
-                  isSuccess={sosSuccess}
-                  onClick={() => handleSOS(sosTypeToSubmit, sosDescription)}
-                  label="Transmit Alert"
-                  successLabel="Alert Transmitted"
-                  className="flex-[2]"
-                />
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Cancel SOS Modal */}
-      <AnimatePresence>
-        {cancellingId && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#16191F] border border-[#2D3139] w-full max-w-md rounded-[32px] overflow-hidden shadow-2xl flex flex-col p-6"
-            >
-              <h3 className="font-black italic text-xl md:text-2xl tracking-tighter text-white mb-6 uppercase text-center">Cancel Alert?</h3>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setCancellingId(null)}
-                  className="flex-1 py-3 bg-[#252932] text-white font-bold rounded-xl hover:bg-[#2D3139] transition-all text-sm uppercase"
-                >
-                  No, Keep SOS
-                </button>
-                <button 
-                  onClick={async () => {
-                    try {
-                      await removeQueuedSOS(cancellingId);
-                      await updateDoc(doc(db, 'alerts', cancellingId), { status: 'cancelled' });
-                    } catch (error: any) {
-                      useIncidentStore.getState().updateAlertStatus(cancellingId, 'cancelled');
-                      console.warn('Failed to update cancel status online, cancelled locally:', error);
-                    } finally {
-                      setCancellingId(null);
-                    }
-                  }}
-                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all text-sm uppercase"
-                >
-                  Yes, Cancel
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-function RecentAlerts({ residentId }: { residentId: string }) {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-
-  useEffect(() => {
-    if (!db) return;
-    const q = query(
-      collection(db, 'alerts'),
-      where('residentId', '==', residentId),
-      orderBy('timestamp', 'desc'),
-      limit(5)
-    );
-    return onSnapshot(q, (snap) => {
-      setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Alert)));
-    }, (error) => {
-      console.error("Alerts listener disabled or failed:", error.message);
-    });
-  }, [residentId]);
-
-  if (alerts.length === 0) return null;
-
-  return (
-    <div className="space-y-6">
-      <h3 className="font-bold text-xl text-white uppercase italic tracking-tighter">My Recent Alerts</h3>
-      <div className="space-y-4">
-        {alerts.map(alert => (
-          <div key={alert.id} className="bg-[#16191F] border border-[#2D3139] p-6 rounded-3xl flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-[#252932] rounded-xl flex items-center justify-center">
-                <AlertTriangle className={cn("w-5 h-5", alert.status === 'pending' ? 'text-red-500' : 'text-[#8E9299]')} />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm uppercase tracking-tight">{alert.type} Emergency</p>
-                <p className="text-[10px] text-[#8E9299] font-bold uppercase tracking-widest">{new Date(alert.timestamp).toLocaleString()}</p>
-              </div>
-            </div>
-            <span className={cn(
-              "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-              alert.status === 'pending' ? "bg-red-500/10 text-red-500" :
-              alert.status === 'responding' ? "bg-blue-500/10 text-blue-500" :
-              "bg-green-500/10 text-green-500"
-            )}>
-              {alert.status}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function DashboardView({ profile, alerts, patrols, visiblePatrols, onTabChange, isOnline, deferredPrompt, onInstall, sirenActive, onToggleSiren, activeBroadcast }: { profile: User, alerts: Alert[], patrols: PatrolLocation[], visiblePatrols: PatrolLocation[], onTabChange: (tab: string) => void, isOnline: boolean, deferredPrompt: any, onInstall: () => void, sirenActive: boolean, onToggleSiren: () => void, activeBroadcast: SystemBroadcast | null }) {
-  if (profile.role === 'resident') return <ResidentDashboard profile={profile} patrols={patrols} visiblePatrols={visiblePatrols} isOnline={isOnline} deferredPrompt={deferredPrompt} onInstall={onInstall} onTabChange={onTabChange} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
-  if (profile.role === 'tanod') return <TanodDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} sirenActive={sirenActive} onToggleSiren={onToggleSiren} />;
-  if (profile.role === 'admin' || profile.role === 'superadmin') return <AdminDashboard profile={profile} onTabChange={onTabChange} deferredPrompt={deferredPrompt} onInstall={onInstall} sirenActive={sirenActive} onToggleSiren={onToggleSiren} activeBroadcast={activeBroadcast} />;
-  return <div className="text-center p-12 text-[#8E9299]">Unauthorized Access</div>;
-}
-
-
-function DirectoryView() {
-  const contacts = [
-    { name: 'PNP HOTLINE', number: '117', icon: Shield, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { name: 'FIRE STATION', number: '911', icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { name: 'BARANGAY HALL', number: '8-123-4567', icon: Phone, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { name: 'RESCUE', number: '0917-SOS-BRGY', icon: Bell, color: 'text-[#FF4B4B]', bg: 'bg-[rgba(255,75,75,0.1)]' },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {contacts.map(c => {
-        const Icon = c.icon;
-        return (
-          <div key={c.name} className="p-6 md:p-8 bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] flex flex-col md:flex-row justify-between items-center hover:border-white/20 transition-all shadow-xl group gap-6 md:gap-0">
-            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-               <div className={cn("p-6 rounded-[30px] group-hover:scale-110 transition-transform", c.bg, c.color)}>
-                  <Icon className="w-8 h-8 md:w-8 md:h-8" />
-               </div>
-               <div>
-                  <h4 className="font-extrabold text-[#8E9299] text-[10px] md:text-xs tracking-widest">{c.name}</h4>
-                  <p className="text-2xl md:text-3xl font-black italic text-white mt-1 tracking-tighter">{c.number}</p>
-               </div>
-            </div>
-            <button 
-              onClick={() => {
-                try {
-                  window.location.href = `tel:${c.number.replace(/-/g, '')}`;
-                } catch(e) {
-                  window.open(`tel:${c.number.replace(/-/g, '')}`, '_top');
-                }
-              }}
-              className="w-full md:w-auto p-4 md:p-5 flex items-center justify-center bg-white rounded-2xl hover:bg-[#FF4B4B] hover:text-white text-black transition-all active:scale-95 shadow-2xl"
-            >
-               <Phone className="w-6 h-6 md:w-8 md:h-8" />
-               <span className="ml-2 font-bold md:hidden">CALL</span>
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TanodRosterView() {
-  const { patrols } = useTanodStore();
-  const [tanods, setTanods] = useState<User[]>([]);
-  const [addingUnit, setAddingUnit] = useState(false);
-  const [newUnitName, setNewUnitName] = useState('');
-  const [newUnitEmail, setNewUnitEmail] = useState('');
-
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
-    return onSnapshot(q, (snap) => {
-      setTanods(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
-    }, (error) => {
-      console.error("Tanod Roster listener error:", error.message);
-    });
-  }, []);
-
-  const handleAddUnit = async () => {
-    if (!newUnitName.trim() || !newUnitEmail.trim() || !db) return;
-    try {
-      await addDoc(collection(db, 'users'), {
-        uid: Date.now().toString(),
-        name: newUnitName,
-        email: newUnitEmail,
-        role: 'tanod',
-        status: 'approved',
-        createdAt: new Date().toISOString()
-      });
-      setAddingUnit(false);
-      setNewUnitName('');
-      setNewUnitEmail('');
-    } catch (e: any) {
-      handleFirestoreError(e, OperationType.WRITE, 'users');
-    }
-  };
-
-  return (
-    <div className="space-y-8">
-      <div className="glass-panel p-8 md:p-12 rounded-[48px] border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-command">
-        <div>
-          <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Tanod Roster</h2>
-          <p className="text-white/40 font-bold text-xs md:text-sm uppercase tracking-[0.3em] font-mono mt-3">Tactical Peacekeeping Force Inventory</p>
-        </div>
-        <button 
-          onClick={() => setAddingUnit(true)}
-          className="w-full md:w-auto justify-center px-10 py-5 bg-emergency text-white font-black italic rounded-2xl hover:scale-105 transition-all flex items-center gap-3 text-xs shadow-glow-red font-mono tracking-widest uppercase">
-          <Plus className="w-5 h-5 text-white" /> REGISTER UNIT
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {addingUnit && (
-          <div className="fixed inset-0 bg-brand-bg/90 backdrop-blur-md z-[9999] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: 'spring', damping: 20 }}
-              className="glass-panel border-white/10 w-full max-w-lg rounded-[48px] overflow-hidden shadow-command flex flex-col p-10 md:p-14 relative"
-            >
-              <div className="absolute top-0 right-0 w-40 h-40 bg-emergency/10 blur-3xl rounded-full translate-x-1/2 -translate-y-1/2" />
-              
-              <h3 className="font-black italic text-2xl md:text-3xl tracking-tighter text-white mb-4 uppercase font-mono leading-none">Initialize New Unit</h3>
-              <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mb-10 font-mono">Deploy authorized personnel to the network</p>
-              
-              <div className="space-y-6 mb-10">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase mb-2 block font-mono">Operator Identity</label>
-                  <input 
-                    type="text"
-                    value={newUnitName}
-                    onChange={(e) => setNewUnitName(e.target.value)}
-                    placeholder="e.g. Officer Cruz"
-                    className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white placeholder-white/10 focus:outline-none focus:border-emergency/50 font-mono font-bold italic"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase mb-2 block font-mono">Communication Link (Email)</label>
-                  <input 
-                    type="email"
-                    value={newUnitEmail}
-                    onChange={(e) => setNewUnitEmail(e.target.value)}
-                    placeholder="unit_alpha@brgy.gov"
-                    className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white placeholder-white/10 focus:outline-none focus:border-emergency/50 font-mono font-bold"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setAddingUnit(false)}
-                  className="flex-1 py-5 glass-panel border-white/10 text-white/40 font-black rounded-2xl hover:bg-white/5 transition-all text-xs uppercase font-mono tracking-widest"
-                >
-                  ABORT
-                </button>
-                <button 
-                  onClick={handleAddUnit}
-                  className="flex-1 py-5 bg-emergency text-white font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-xs uppercase font-mono tracking-widest italic shadow-glow-red"
-                >
-                  CONFIRM DEPLOYMENT
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 staggered-list">
-        {tanods.map((t, index) => {
-          // Find patrol data for this tanod
-          const patrolMatch = patrols.find(p => p.tanodId === t.uid);
-          const isActuallyActive = patrolMatch?.isActive;
-          const lastSeen = patrolMatch?.lastUpdate;
-
-          return (
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              key={t.uid} 
-              className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group hover:border-white/10 hover:bg-white/5 transition-all shadow-command skew-card"
-            >
-              <div className="absolute inset-0 tactical-grid opacity-5" />
-              <div className="absolute top-0 right-0 w-32 h-32 bg-success/5 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2 transition-all group-hover:bg-success/15"></div>
-              
-              <div className="flex items-center gap-6 mb-8">
-                <div className="w-16 h-16 bg-brand-card rounded-2xl flex items-center justify-center border border-white/5 group-hover:border-success/30 transition-colors shadow-lg">
-                  <TanodLogo size={44} animated={false} className="drop-shadow-lg" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-2xl font-black italic tracking-tighter text-white truncate uppercase font-mono leading-none">{t.name}</h4>
-                    {isActuallyActive && <span className="w-2 h-2 bg-success rounded-full animate-pulse shadow-glow-success" />}
-                  </div>
-                  <p className="font-mono text-white/30 text-[9px] uppercase font-bold tracking-[0.2em]">{t.id || `UNIT-${t.uid.slice(0, 4).toUpperCase()}`}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-8">
-                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Duty Status</span>
-                  <div className="flex flex-col items-end">
-                    <span className={cn(
-                      "flex items-center gap-2 text-[10px] font-black uppercase italic font-mono",
-                      isActuallyActive ? "text-success" : "text-white/40"
-                    )}>
-                       {isActuallyActive ? 'ON_DUTY' : 'OFFLINE'}
-                    </span>
-                    {t.activeAlertId && (
-                      <span className="text-[7px] font-mono text-emergency font-black uppercase mt-1 tracking-tighter">
-                        REQ: {t.activeAlertId.slice(-8).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Last Location Ping</span>
-                  <div className="flex flex-col items-end">
-                    <span className={cn(
-                      "text-[10px] font-black uppercase italic font-mono",
-                      lastSeen && (new Date().getTime() - new Date(lastSeen).getTime() < 300000) ? "text-success" : "text-white/60"
-                    )}>
-                      {lastSeen ? new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'NEVER_SYNCED'}
-                    </span>
-                    {lastSeen && (
-                      <span className="text-[7px] font-mono text-white/20 uppercase font-black mt-1">
-                        {Math.floor((new Date().getTime() - new Date(lastSeen).getTime()) / 60000)} MINS AGO
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Tactical Status</span>
-                  <span className={cn(
-                    "text-[10px] font-black uppercase italic font-mono",
-                    isActuallyActive ? "text-success" : "text-caution"
-                  )}>
-                    {isActuallyActive ? 'ACTIVE_ON_GRID' : 'SIGNAL_LOST'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => toast.success(`Accessing tactical profile for ${t.name}`, { icon: '👮' })}
-                  className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
-                  Logistics
-                </button>
-                <button 
-                  onClick={() => toast.success(`Retrieving operational history for ${t.name}`, { icon: '📋' })}
-                  className="flex-1 py-4 glass-panel border-white/10 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white hover:border-white/30 rounded-2xl transition-all font-mono">
-                  History
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ScheduleView({ role, profile }: { role: UserRole, profile: User | null }) {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
-    if (!db) { 
-      clearTimeout(fallbackTimer);
-      setLoading(false); 
-      return; 
-    }
-    const q = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      clearTimeout(fallbackTimer);
-      setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
-      setLoading(false);
-    }, (error) => {
-      clearTimeout(fallbackTimer);
-      setLoading(false);
-      console.error("Shifts listener disabled or failed:", error.message);
-    });
-    return () => {
-      clearTimeout(fallbackTimer);
-      unsub();
-    };
-  }, []);
-
-  if (role === 'admin' || role === 'superadmin') return <PatrolScheduler profile={profile} />;
-
-  return (
-    <div className="glass-panel border-white/5 rounded-[48px] p-8 md:p-14 shadow-command max-w-5xl relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-64 h-64 bg-info/5 blur-[100px] rounded-full translate-x-1/3 -translate-y-1/3" />
-      
-      <h3 className="text-3xl md:text-4xl font-black italic tracking-tighter mb-12 border-l-8 border-emergency pl-8 uppercase font-mono text-white leading-none">
-        OPERATIONAL DEPLOYMENT
-      </h3>
-      
-      {loading ? (
-        <div className="py-24 text-center animate-pulse text-white/20 font-mono font-bold tracking-widest">ESTABLISHING DATA LINK...</div>
-      ) : (
-        <div className="space-y-6 md:space-y-8 relative z-10">
-          {shifts.map((s) => {
-            const isActive = s.status === 'active';
-            return (
-              <div key={s.id} className={cn(
-                "p-8 md:p-12 glass-panel rounded-[40px] border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 transition-all group",
-                isActive && "bg-info/5 border-info/30 shadow-info/10"
-              )}>
-                <div className="text-center md:text-left flex-1">
-                  <div className="flex items-center justify-center md:justify-start gap-4 mb-3">
-                    <p className={cn("text-[10px] font-black tracking-[0.3em] font-mono", isActive ? "text-info" : "text-white/20")}>
-                      T-MINUS {format(new Date(s.startTime), 'HH:mm')} - {format(new Date(s.endTime), 'HH:mm')}
-                    </p>
-                    {isActive && (
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-info rounded-full animate-ping shadow-info/50" />
-                        <span className="text-[9px] font-black text-info font-mono uppercase tracking-widest">LIVE_STATUS</span>
-                      </span>
-                    )}
-                  </div>
-                  <h4 className="text-2xl md:text-4xl font-black tracking-tighter mb-3 italic text-white uppercase font-mono leading-none">{s.sector}</h4>
-                  <p className="text-white/40 font-bold uppercase tracking-widest font-mono text-xs flex items-center justify-center md:justify-start gap-3">
-                    <UserIcon className="w-5 h-5 text-info/50" /> OFFICER {s.tanodName.toUpperCase()}
-                  </p>
-                </div>
-                <div className={cn(
-                  "w-full md:w-auto px-10 py-5 rounded-2xl text-[10px] font-black tracking-[0.3em] border border-white/5 text-center font-mono italic",
-                  isActive ? "bg-info text-white shadow-lg" : "bg-brand-card text-white/20"
-                )}>
-                  {isActive ? 'PATROL_OPERATIONAL' : s.status.toUpperCase()}
-                </div>
-              </div>
-            );
-          })}
-
-          {shifts.length === 0 && (
-            <div className="py-24 text-center text-white/10 italic font-mono font-bold tracking-[0.2em] bg-white/5 rounded-[40px] border border-dashed border-white/10 uppercase">
-              No tactical shifts scheduled for current cycle.
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ReportsView() {
-  const [reports, setReports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
-    if (!db) {
-      clearTimeout(fallbackTimer);
-      setLoading(false); 
-      return; 
-    }
-    const q = query(collection(db, 'incidents'), orderBy('date', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      clearTimeout(fallbackTimer);
-      setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, (error) => {
-      clearTimeout(fallbackTimer);
-      console.error("Incidents Reports listener error:", error);
-      setLoading(false);
-    });
-    return () => {
-      clearTimeout(fallbackTimer);
-      unsub();
-    };
-  }, []);
-
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [dateFilter, setDateFilter] = useState<string>('');
-  
-  const [appliedCategory, setAppliedCategory] = useState<string>('ALL');
-  const [appliedDate, setAppliedDate] = useState<string>('');
-
-  const filteredReports = useMemo(() => {
-    console.log('Filtering reports:', { reports, appliedCategory, appliedDate });
-    let result = [...reports];
-    
-    // Sort Newest first
-    result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    if (appliedCategory !== 'ALL') {
-      result = result.filter(r => r.type.toLowerCase() === appliedCategory.toLowerCase());
-    }
-    
-    if (appliedDate) {
-      result = result.filter(r => r.date === appliedDate);
-    }
-    
-    console.log('Filtered result:', result);
-    return result;
-  }, [reports, appliedCategory, appliedDate]);
-
-  const handleSearch = () => {
-    setAppliedCategory(categoryFilter);
-    setAppliedDate(dateFilter);
-  };
-
-  return (
-    <div className="space-y-8">
-      <div className="glass-panel p-8 md:p-12 rounded-[48px] border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-command">
-        <div className="min-w-0">
-          <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Incident Vault</h2>
-          <p className="text-white/30 font-bold text-xs md:text-sm uppercase tracking-[0.3em] font-mono mt-3">Archived Tactical Response Intelligence</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-          <select 
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-brand-bg border border-white/5 rounded-2xl p-4 text-white font-black text-xs uppercase tracking-widest font-mono"
-          >
-            <option value="ALL">ALL CATEGORIES</option>
-            <option value="Crime">CRIME</option>
-            <option value="Fire">FIRE</option>
-            <option value="Medical">MEDICAL</option>
-            <option value="Flood">FLOOD</option>
-          </select>
-          <input 
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="bg-brand-bg border border-white/5 rounded-2xl p-4 text-white font-black text-xs uppercase tracking-widest font-mono"
-          />
-          <button 
-            onClick={handleSearch}
-            className="px-6 py-4 bg-info text-black font-black italic rounded-2xl hover:bg-info/80 transition-all text-xs font-mono tracking-widest uppercase"
-          >
-            SEARCH
-          </button>
-          <button 
-            onClick={() => {
-              const csv = "id,type,date,status,citizen,location\n" + (filteredReports.map(r => `${r.id},${r.type},${r.date},${r.status},${r.citizen},"${r.location}"`).join('\n'));
-              const blob = new Blob([csv], { type: 'text/csv' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `incident_audit_${new Date().toISOString().split('T')[0]}.csv`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-            className="w-full md:w-auto justify-center px-10 py-5 glass-panel border-white/10 text-white font-black italic rounded-2xl hover:bg-white/5 transition-all flex items-center gap-3 text-xs font-mono tracking-widest uppercase"
-          >
-            <FileText className="w-5 h-5 text-info" /> DL_DATA_TRANSCRIPT
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {filteredReports.map((report) => (
-          <div key={report.id} className="glass-panel border-white/5 rounded-[40px] p-8 md:p-10 space-y-8 shadow-command relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl group-hover:bg-white/10 transition-colors" />
-            
-            <div className="flex justify-between items-start relative z-10">
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-brand-card rounded-2xl flex items-center justify-center border border-white/5 shadow-lg">
-                  <Shield className="w-8 h-8 text-emergency/50" />
-                </div>
-                <div>
-                  <h4 className="font-black text-[9px] text-emergency uppercase tracking-[0.4em] mb-2 font-mono">FILE_RECORD</h4>
-                  <p className="text-2xl font-black text-white italic tracking-tighter uppercase font-mono leading-none">{report.type}</p>
-                </div>
-              </div>
-              <span className="px-4 py-1.5 bg-success/10 border border-success/30 text-success text-[10px] font-black rounded-full uppercase font-mono italic tracking-widest">{report.status}</span>
-            </div>
-
-            <div className="space-y-6 relative z-10">
-              <div className="p-6 bg-brand-bg/50 rounded-3xl border border-white/5">
-                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] mb-3 font-mono">Mission Narrative</p>
-                <div className="space-y-3">
-                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Alerted By Cityzen Name:</span> {report.citizen || 'Unknown'}
-                  </p>
-                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Location:</span> {report.location || 'Unknown'}
-                  </p>
-                  <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Citizen Reported details:</span> "{report.description}"
-                  </p>
-                  <div className="pt-2 border-t border-white/5 mt-2">
-                    <p className="font-bold text-[13px] text-success font-mono italic">
-                      <span className="text-white/40">Note Cleared by:</span> {report.tanodName || 'Unknown'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {report.adminOnDuty && (
-                  <div className="col-span-2 p-5 bg-brand-bg/50 rounded-2xl border border-white/5">
-                    <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 font-mono">Command Admin</p>
-                    <p className="text-xs font-black text-white uppercase font-mono italic tracking-tight">{report.adminOnDuty}</p>
-                  </div>
-                )}
-                <div className="p-5 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 font-mono">Field Operator</p>
-                  <p className="text-xs font-black text-white uppercase font-mono italic tracking-tight">{report.tanodName}</p>
-                </div>
-                <div className="p-5 bg-brand-bg/50 rounded-2xl border border-white/5">
-                  <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 font-mono">Time Index</p>
-                  <p className="text-xs font-black text-white uppercase font-mono italic tracking-tight">{report.date} • {report.time}</p>
-                </div>
-                {report.respondedAt && report.resolvedAt && (
-                  <div className="col-span-2 p-6 bg-info/5 border border-info/20 rounded-3xl flex flex-col gap-4">
-                     <div className="flex justify-between items-center">
-                       <p className="text-[9px] font-black text-info uppercase tracking-[0.3em] font-mono">Response Duration</p>
-                       <p className="text-base font-black text-white uppercase font-mono italic">
-                         {(() => {
-                           const start = new Date(report.respondedAt).getTime();
-                           const end = new Date(report.resolvedAt).getTime();
-                           const mins = Math.round((end - start) / 60000);
-                           if (mins < 1) return '< 1M';
-                           if (mins < 60) return `${mins}M`;
-                           const hrs = Math.floor(mins / 60);
-                           const hMins = mins % 60;
-                           return `${hrs}H ${hMins}M`;
-                         })()}
-                       </p>
-                     </div>
-                     <div className="flex justify-between items-center text-[9px] text-info/50 font-black uppercase tracking-widest font-mono">
-                       <span>IN: {new Date(report.respondedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                       <span>OUT: {new Date(report.resolvedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-6 border-t border-white/5 flex flex-col gap-4 relative z-10">
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-white/20" />
-                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] font-mono italic truncate">{report.location}</p>
-              </div>
-              {report.gpsLocation && (
-                <div className="h-24 rounded-2xl overflow-hidden border border-white/10 opacity-60 grayscale group-hover:opacity-100 group-hover:grayscale-0 transition-all">
-                  <ReportMap lat={report.gpsLocation.lat} lng={report.gpsLocation.lng} />
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {reports.length === 0 && !loading && (
-          <div className="col-span-full py-40 text-center glass-panel border-dashed border-white/10 rounded-[48px]">
-            <FileText className="w-20 h-20 text-white/5 mx-auto mb-8" />
-            <p className="text-white/20 font-black uppercase tracking-[0.4em] font-mono text-xs italic">Secure vault is empty. No files detected.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SettingsView() {
-  const [brgyName, setBrgyName] = useState('Brgy. San Jose');
-  const [phone, setPhone] = useState('0912-345-6789');
-
-  return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      <div className="glass-panel border-white/5 rounded-[48px] p-8 md:p-14 shadow-command relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-info/5 blur-[100px] rounded-full translate-x-1/2 -translate-y-1/2" />
-        
-        <h3 className="text-3xl font-black mb-12 italic tracking-tighter uppercase text-white font-mono leading-none">System Core Config</h3>
-        
-        <div className="space-y-8 relative z-10">
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] font-mono ml-2">Barangay Identification</label>
-            <input 
-              type="text" 
-              value={brgyName}
-              onChange={(e) => setBrgyName(e.target.value)}
-              className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white focus:border-emergency/50 outline-none font-mono font-bold" 
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] font-mono ml-2">Emergency Hotline Terminal</label>
-            <input 
-              type="text" 
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white focus:border-emergency/50 outline-none font-mono font-bold" 
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] font-mono ml-2">SMS Gateway Encryption Key</label>
-            <input 
-              type="password" 
-              placeholder="••••••••••••••••"
-              className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white focus:border-emergency/50 outline-none font-mono" 
-            />
-            <p className="text-[9px] text-white/20 italic font-mono uppercase tracking-widest mt-2 ml-2">System uses AES-256 for automated resident notifications.</p>
-          </div>
-
-          <div className="pt-8">
-            <button 
-              onClick={(e) => {
-                const btn = e.currentTarget;
-                const orig = btn.innerText;
-                btn.innerText = "CONFIG_SYNCED";
-                btn.classList.add('bg-success');
-                btn.classList.remove('bg-emergency');
-                setTimeout(() => {
-                  btn.innerText = orig;
-                  btn.classList.remove('bg-success');
-                  btn.classList.add('bg-emergency');
-                }, 2000);
-              }}
-              className="w-full py-6 bg-emergency text-white font-black italic rounded-2xl hover:scale-[1.02] transition-all shadow-glow-red font-mono tracking-[0.3em] uppercase"
-            >
-              COMMIT CHANGES
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-panel border-white/5 rounded-[40px] p-8 md:p-10 space-y-8 shadow-command">
-        <div>
-          <h4 className="text-[10px] font-black uppercase text-white/30 tracking-[0.3em] font-mono mb-2 leading-none">Force Multiplier Controls</h4>
-          <p className="text-[9px] text-white/20 font-bold font-mono italic uppercase tracking-wider">System-wide tactical overrides</p>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-           <button 
-              onClick={() => toast.success("SILENT SOS BROADCAST INITIATED. Units alerted.", { icon: '🆘' })}
-              className="flex-1 p-6 glass-panel border-white/10 text-[10px] font-black hover:bg-white/5 transition-all font-mono uppercase tracking-[0.2em] italic text-white/60 hover:text-white">
-              BROADCAST_SOS_SILENT
-           </button>
-           <button 
-              onClick={() => toast.success("PATROL LOGISTICS RESET. Recalibrating sectors.", { icon: '🔄' })}
-              className="flex-1 p-6 glass-panel border-white/10 text-[10px] font-black hover:bg-white/5 transition-all font-mono uppercase tracking-[0.2em] italic text-white/60 hover:text-white">
-              FLUSH_SECTOR_DATA
-           </button>
-        </div>
-      </div>
-    </div>
-  );
-}

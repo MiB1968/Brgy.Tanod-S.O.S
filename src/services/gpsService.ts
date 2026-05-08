@@ -39,9 +39,18 @@ export const startGPSTracking = (
             return;
           }
           
-          // Check if the document exists before updating
-          // This avoids the "NOT_FOUND" error which manifests as permission denied in some scenarios 
-          // or just fails silently with our previous catch
+          // Check the privacy flag in the main users collection
+          const masterProfileRef = doc(db, 'users', uid);
+          const profileSnap = await getDoc(masterProfileRef);
+          
+          if (profileSnap.exists()) {
+            const profileData = profileSnap.data();
+            if (profileData.isLocationSharingEnabled === false) {
+              return; // Respect privacy: stop location updates
+            }
+          }
+          
+          // Check if the role-specific document exists before updating
           const userDocRef = doc(db, collectionName, uid);
           const docSnap = await getDoc(userDocRef);
           

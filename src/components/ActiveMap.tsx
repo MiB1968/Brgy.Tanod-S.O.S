@@ -16,26 +16,56 @@ const DefaultIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
-const SosIcon = L.divIcon({
-  className: 'custom-div-icon',
-  html: `<div class="relative flex items-center justify-center">
-    <div class="absolute w-12 h-12 bg-emergency/30 rounded-full animate-ping"></div>
-    <div class="absolute w-8 h-8 bg-emergency/40 rounded-full animate-pulse"></div>
-    <div class="z-10 text-2xl shadow-glow-red">🔴</div>
-  </div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-});
+const createSosIcon = (alert: Alert) => {
+  const isHighSeverity = alert.aiAnalysis && alert.aiAnalysis.severityScore > 7;
+  const color = isHighSeverity ? '#ff1100' : '#FF4B4B';
+  const pulseSize = isHighSeverity ? 'w-16 h-16' : 'w-12 h-12';
+  
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <div class="absolute ${pulseSize} bg-[${color}]/20 rounded-full animate-ping"></div>
+        <div class="absolute w-10 h-10 bg-[${color}]/30 rounded-full animate-pulse"></div>
+        <div class="z-10 relative flex items-center justify-center w-10 h-10 bg-[#16191F] rounded-xl border-2 border-[${color}] shadow-[0_0_15px_rgba(255,75,75,0.4)] overflow-hidden">
+          <div class="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[size:200%_200%] animate-[shimmer_2s_infinite]"></div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+          </svg>
+        </div>
+        <div class="absolute -top-1 -right-1 z-20 w-4 h-4 bg-[${color}] rounded-full border-2 border-[#16191F] flex items-center justify-center">
+          <span class="text-[8px] font-black text-white">${alert.aiAnalysis?.severityScore || '!'}</span>
+        </div>
+      </div>
+    `,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+    popupAnchor: [0, -20]
+  });
+};
 
-const TanodIcon = L.divIcon({
-  className: 'custom-div-icon',
-  html: `<div class="relative flex items-center justify-center">
-    <div class="absolute w-10 h-10 bg-success/20 rounded-full animate-pulse"></div>
-    <div class="z-10 text-2xl drop-shadow-[0_0_8px_rgba(52,199,89,0.5)]">🟢</div>
-  </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-});
+const createTanodIcon = (patrol: PatrolLocation) => {
+  const color = '#34C759';
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <div class="absolute w-10 h-10 bg-[${color}]/20 rounded-full animate-pulse"></div>
+        <div class="z-10 relative flex items-center justify-center w-8 h-8 bg-[#16191F] rounded-full border-2 border-[${color}] shadow-[0_0_10px_rgba(52,199,89,0.3)]">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>
+          </svg>
+        </div>
+        <div class="absolute -bottom-1 z-20 px-1 bg-[#16191F] border border-[${color}]/30 rounded text-[6px] font-black uppercase text-[${color}] tracking-tighter">
+          TANOD
+        </div>
+      </div>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -15]
+  });
+};
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom?: number }) {
   const map = useMap();
@@ -282,15 +312,45 @@ export default function ActiveMap({
             )}
             <Marker 
               position={[alert.location.lat, alert.location.lng]} 
-              icon={SosIcon}
+              icon={createSosIcon(alert)}
             >
               <Popup className="dark-popup">
-                <div className="p-1">
-                  <p className="font-bold text-[#FF4B4B]">SOS: {alert.residentName}</p>
-                  <p className="text-xs">{alert.type.toUpperCase()}</p>
-                  {alert.location.accuracy && (
-                    <p className="text-[10px] text-gray-400 mt-1">Accuracy: ±{Math.round(alert.location.accuracy)}m</p>
-                  )}
+                <div className="p-3 min-w-[200px] space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div className="flex flex-col">
+                      <p className="font-black text-[#FF4B4B] uppercase text-xs tracking-tighter m-0 leading-tight">CRITICAL SOS</p>
+                      <p className="font-bold text-white text-sm m-0 leading-tight">{alert.residentName}</p>
+                    </div>
+                    <div className="bg-[#FF4B4B]/10 border border-[#FF4B4B]/30 px-2 py-1 rounded">
+                       <span className="text-[10px] font-black text-[#FF4B4B]">SV: {alert.aiAnalysis?.severityScore || 'N/A'}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-info" />
+                      <span className="text-[10px] font-mono font-bold uppercase text-white/60 tracking-wider">Type: {alert.type}</span>
+                    </div>
+                    
+                    {alert.aiAnalysis?.summary && (
+                      <div className="p-2 bg-white/5 rounded-lg border border-white/5">
+                        <p className="text-[10px] text-white/80 leading-relaxed font-medium italic">
+                          "{alert.aiAnalysis.summary.length > 80 ? alert.aiAnalysis.summary.substring(0, 80) + '...' : alert.aiAnalysis.summary}"
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/30 uppercase font-black">Status</span>
+                        <span className="text-[10px] text-info font-bold uppercase">{alert.status}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/30 uppercase font-black">Accuracy</span>
+                        <span className="text-[10px] text-white/70 font-mono">±{Math.round(alert.location.accuracy || 0)}m</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </Popup>
             </Marker>
@@ -313,39 +373,42 @@ export default function ActiveMap({
           <React.Fragment key={patrol.id}>
             <Marker 
               position={[patrol.location.lat, patrol.location.lng]} 
-              icon={TanodIcon}
+              icon={createTanodIcon(patrol)}
             >
               <Popup className="dark-popup">
-                <div className="p-2 min-w-[160px] space-y-2">
-                  <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-                    <div className={cn("w-2 h-2 rounded-full", patrol.isActive ? "bg-green-500 animate-pulse" : "bg-gray-500")} />
-                    <p className="font-bold text-white uppercase text-sm m-0 leading-tight">{patrol.tanodName}</p>
+                <div className="p-3 min-w-[180px] space-y-3">
+                  <div className="flex items-center gap-3 border-b border-white/10 pb-2">
+                    <div className="relative">
+                      <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                        <span className="text-[10px] font-black text-white/40">{patrol.tanodName.charAt(0)}</span>
+                      </div>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-[#16191F] animate-pulse" />
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="font-black text-white uppercase text-xs tracking-tighter m-0 leading-tight">{patrol.tanodName}</p>
+                      <p className="text-[8px] font-mono text-white/40 m-0 uppercase tracking-widest">Patrol Officer</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-400">ID:</span>
-                      <span className="font-mono text-gray-200">{patrol.tanodId.slice(0, 8)}</span>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-white/30 uppercase font-black">Tactical ID</span>
+                      <span className="font-mono text-white/70">{patrol.tanodId?.slice(0, 8)}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-400">Status:</span>
-                      <span className={cn("font-medium", patrol.isActive ? "text-green-400" : "text-gray-500")}>
-                        {patrol.isActive ? 'ON DUTY' : 'OFF DUTY'}
-                      </span>
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-white/30 uppercase font-black">Status</span>
+                      <span className="text-success font-bold uppercase tracking-wider">ACTIVE巡回</span>
                     </div>
-                    {patrol.lastUpdate && (
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Last Seen:</span>
-                        <span className="text-gray-300">
-                          {new Date(patrol.lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-white/30 uppercase font-black">Signal</span>
+                      <span className="text-white/70 font-mono">STABLE | ±{Math.round(patrol.location.accuracy || 0)}m</span>
+                    </div>
+                    <div className="pt-2 mt-2 border-t border-white/5">
+                      <div className="flex items-center gap-1.5 opacity-40">
+                         <div className="w-1 h-1 rounded-full bg-white animate-ping" />
+                         <span className="text-[8px] font-mono uppercase">Last Sync: {new Date(patrol.lastUpdate || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                       </div>
-                    )}
-                    {patrol.location.accuracy && (
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-400">Accuracy:</span>
-                        <span className="text-gray-300">±{Math.round(patrol.location.accuracy)}m</span>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </Popup>
@@ -409,6 +472,10 @@ export default function ActiveMap({
         }
         .dark-popup .leaflet-popup-content p {
           margin: 0 !important;
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% -200%; }
+          100% { background-position: 200% 200%; }
         }
         @keyframes pulse {
           0% { transform: scale(1); opacity: 1; }

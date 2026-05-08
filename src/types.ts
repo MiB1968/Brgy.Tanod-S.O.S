@@ -16,10 +16,12 @@ export interface User {
   status: RegistryStatus;
   rejectionReason?: string;
   activeAlertId?: string | null;
+  lastActive?: string;
 }
 
 export interface TanodProfile extends User {
   sector?: string;
+  isLocationSharingEnabled?: boolean;
   lastGpsLocation?: {
     lat: number;
     lng: number;
@@ -116,6 +118,7 @@ export interface PatrolLocation {
     accuracy?: number;
   };
   isActive: boolean;
+  isLocationSharingEnabled?: boolean;
   lastUpdate: string;
 }
 
@@ -180,4 +183,13 @@ export interface WitnessRequest {
   witnessUserId: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
+}
+
+export interface SOSChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  message: string;
+  timestamp: string;
 }

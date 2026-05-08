@@ -8,8 +8,8 @@ import {
   IconActiveSOS,
   IconRadar
 } from './TacticalIcons';
-import { Alert, User, RegistryStatus } from '../types';
-import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X } from 'lucide-react';
+import { Alert, User, RegistryStatus, TanodProfile } from '../types';
+import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
@@ -22,6 +22,7 @@ import AnimatedButton from './AnimatedButton';
 import FlameAnimation from './FlameAnimation';
 import { DispatchAlert } from './Admin/DispatchAlert';
 import { WitnessIndicator } from './WitnessIndicator';
+import { SOSChat } from './SOSChat';
 
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
@@ -178,6 +179,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           tanodName: profile?.name || 'Unknown Tanod',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
+          timestamp: new Date().toISOString(),
           location: alert.customMessage || 'Location via GPS',
           gpsLocation: alert.location,
           type: alert.type,
@@ -391,6 +393,60 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
                Service Status
              </p>
+
+             {profile?.role === 'tanod' && (
+               <div className="mb-4 flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5 w-fit hover:bg-white/10 transition-colors group">
+                 <div className="flex items-center gap-2">
+                   <div className={cn(
+                     "w-2 h-2 rounded-full transition-all",
+                     (profile as TanodProfile).isLocationSharingEnabled !== false 
+                       ? "bg-success shadow-[0_0_10px_#22c55e] animate-pulse" 
+                       : "bg-white/10"
+                   )} />
+                   <div className="flex flex-col">
+                     <span className="text-[10px] font-mono font-black uppercase tracking-widest text-white/40 group-hover:text-white/60">Live GPS Link</span>
+                     <span className="text-[8px] font-mono font-bold uppercase text-white/20 tracking-tighter">
+                       {(profile as TanodProfile).isLocationSharingEnabled !== false ? 'TRANSMITTING' : 'ENCRYPTED_OFFLINE'}
+                     </span>
+                   </div>
+                 </div>
+                 <button
+                   onClick={async () => {
+                     if (!profile || !db) return;
+                     const currentState = (profile as TanodProfile).isLocationSharingEnabled !== false;
+                     try {
+                       await updateDoc(doc(db, 'users', profile.uid), { 
+                         isLocationSharingEnabled: !currentState,
+                         updatedAt: new Date().toISOString()
+                       });
+                       toast.success(!currentState ? 'Intel Link: GPS SHARING ACTIVE' : 'Intel Link: GPS SHARING SUSPENDED', {
+                         icon: !currentState ? '📡' : '🔏',
+                         style: {
+                           borderRadius: '10px',
+                           background: '#14171d',
+                           color: '#fff',
+                           border: '1px solid rgba(255,255,255,0.1)',
+                           fontSize: '12px',
+                           fontWeight: 'bold',
+                           fontFamily: 'monospace'
+                         }
+                       });
+                     } catch (e) {
+                       console.error('Failed to toggle location sharing', e);
+                       toast.error('Tactical Error: Setting Update Failed');
+                     }
+                   }}
+                   className={cn(
+                     "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border font-mono shadow-lg",
+                     (profile as TanodProfile).isLocationSharingEnabled !== false
+                       ? "bg-success/20 text-success border-success/30 hover:bg-success/30 shadow-success/10"
+                       : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                   )}
+                 >
+                   {(profile as TanodProfile).isLocationSharingEnabled !== false ? 'ON' : 'OFF'}
+                 </button>
+               </div>
+             )}
              <div className="flex flex-col">
                <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">STATUS:</span>
                <div className="flex items-center gap-1 mt-1">
@@ -757,6 +813,13 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                                 )}
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* Tactical Chat Section */}
+                        {profile && (alert.status === 'responding' || alert.status === 'pending') && (
+                          <div className="mt-4">
+                            <SOSChat alertId={alert.id} currentUser={profile} />
                           </div>
                         )}
                       </div>

@@ -32,10 +32,10 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
 }) => {
   const items = navItems.filter(item => {
     if (effectiveRole === 'admin' || effectiveRole === 'superadmin') {
-      return item.id !== 'map'; 
+      return true; 
     }
     if (effectiveRole === 'tanod') {
-      return !['residents', 'settings', 'map', 'logs'].includes(item.id);
+      return !['residents', 'settings', 'logs'].includes(item.id);
     }
     return ['home', 'map', 'tracker', 'directory', 'settings'].includes(item.id);
   });

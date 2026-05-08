@@ -3,130 +3,214 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Global Helpers ---
-    function isSignedIn() { return request.auth != null; }
-    function isValidId(id) { 
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
-    }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-    
-    // Default-Deny Catch-All
+    // --- Global Safety Net ---
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Alerts Collection ---
+    // --- Global Helpers ---
+    function isSignedIn() { 
+      return request.auth != null && request.auth.token.email_verified == true; 
+    }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() in ['rubenlleg12@gmail.com', 'ronniecantuba420@gmail.com'] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
+      );
+    }
+    
+    function isTanod() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'rubenlleg12@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tanod')
+      );
+    }
+
+    function isTanodOrAdmin() {
+      return isAdmin() || isTanod();
+    }
+
+    // --- Users Collection ---
+    function isValidUser(data) {
+      return data.uid is string && data.uid == request.auth.uid
+             && data.email is string && data.email.size() <= 128
+             && data.role is string && data.role in ['resident', 'tanod', 'admin', 'superadmin']
+             && data.status is string && data.status in ['pending', 'approved', 'rejected', 'Available', 'On Patrol', 'Responding', 'Offline', 'On-Duty'];
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (userId == request.auth.uid || isTanodOrAdmin());
+      allow list: if isSignedIn() && isTanodOrAdmin();
+      
+      allow create: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming()) && incoming().role == 'resident';
+      allow update: if isSignedIn() && (
+        // Self-update limited fields
+        (userId == request.auth.uid && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'name', 'phone', 'address', 'lastActive', 'photoURL', 'activeAlertId', 'geohash', 'updatedAt', 'lat', 'lng', 'lastSOSAt', 'isLocationSharingEnabled'])
+        )) ||
+        // Admin update roles
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'rejectionReason', 'updatedAt', 'activeAlertId']))
+      );
+    }
+
+    // --- Residents Collection (Detailed PII) ---
+    match /residents/{residentId} {
+      allow get: if isSignedIn() && (residentId == request.auth.uid || isTanodOrAdmin());
+      allow list: if isSignedIn() && isTanodOrAdmin();
+      allow write: if isSignedIn() && residentId == request.auth.uid;
+    }
+
+    // --- Alerts Collection (SOS) ---
     function isValidAlert(data) {
       return data.residentId is string 
-             && data.residentId == request.auth.uid
-             && data.status is string
-             && data.timestamp is string 
-             && data.residentName is string 
-             && data.residentName.size() >= 1 && data.residentName.size() <= 100;
+             && data.status is string && data.status in ['pending', 'responding', 'resolved', 'cancelled']
+             && (data.timestamp is string || data.timestamp is timestamp)
+             && data.residentName is string && data.residentName.size() <= 100
+             && (data.type is string && data.type.size() <= 50);
     }
 
     match /alerts/{alertId} {
+      allow get: if isSignedIn() && (resource.data.residentId == request.auth.uid || isTanodOrAdmin());
+      allow list: if isSignedIn() && (isTanodOrAdmin() || resource.data.residentId == request.auth.uid);
+      
       allow create: if isSignedIn() 
                     && isValidId(alertId)
                     && isValidAlert(incoming())
-                    && incoming().keys().hasAll(['residentId', 'status', 'timestamp', 'residentName'])
-                    && incoming().keys().size() == 4;
-      allow read: if isSignedIn() && resource.data.residentId == request.auth.uid;
-      allow update, delete: if false; 
+                    && incoming().residentId == request.auth.uid;
+                    
+      allow update: if isSignedIn() && isValidAlert(incoming()) && (
+        // Action: Resident abort/update
+        (existing().residentId == request.auth.uid && incoming().residentId == existing().residentId && (
+           // Terminal lock
+           existing().status != 'resolved' && existing().status != 'cancelled' &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'location', 'type', 'customMessage', 'updatedAt', 'isManualLocation'])
+        )) ||
+        // Action: Tanod response
+        (isTanodOrAdmin() && incoming().residentId == existing().residentId && (
+           existing().status != 'resolved' && existing().status != 'cancelled' &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTo', 'assignedToName', 'respondedBy', 'respondedByName', 'respondedAt', 'resolvedAt', 'resolutionNotes', 'responderNotes', 'aiAnalysis', 'updatedAt'])
+        )) ||
+        // Master override for admins
+        isAdmin()
+      );
+
+      // --- Tactical SOS Chat ---
+      match /messages/{messageId} {
+        allow list, get: if isSignedIn() && (
+          get(/databases/$(database)/documents/alerts/$(alertId)).data.residentId == request.auth.uid ||
+          isTanodOrAdmin()
+        );
+        allow create: if isSignedIn() && (
+          get(/databases/$(database)/documents/alerts/$(alertId)).data.residentId == request.auth.uid ||
+          isTanodOrAdmin()
+        ) && incoming().senderId == request.auth.uid
+          && incoming().message is string && incoming().message.size() <= 2000;
+      }
     }
 
-    // --- Incidents Collection ---
+    // --- Incidents (Archives) ---
     function isValidIncident(data) {
-        return data.tanodId is string 
-               && data.tanodId == request.auth.uid
-               && data.status is string
-               && data.type is string
-               && data.description is string
-               && data.location is string
-               && data.timestamp is string
-               && data.tanodName is string
-               && data.description.size() >= 1 && data.description.size() <= 1000
-               && data.location.size() >= 1 && data.location.size() <= 200;
+      return data.tanodId is string 
+             && data.status is string
+             && data.type is string
+             && (data.description is string && data.description.size() <= 3000);
     }
 
     match /incidents/{incidentId} {
-      allow create: if isSignedIn() 
-                    && isValidId(incidentId)
-                    && isValidIncident(incoming())
-                    && incoming().keys().hasAll(['id', 'tanodId', 'tanodName', 'timestamp', 'location', 'type', 'description', 'status'])
-                    && incoming().keys().size() >= 8;
-      allow update: if isSignedIn()
-                    && isValidIncident(incoming())
-                    && incoming().tanodId == existing().tanodId // Immutable
-                    && existing().status != 'completed' // Pillar 3: Terminal State Locking
-                    && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'description', 'actionsTaken', 'personsInvolved', 'resolvedAt']);
-      allow read: if isSignedIn() && resource.data.tanodId == request.auth.uid;
-      allow delete: if false; 
+      allow get: if isSignedIn() && (resource.data.tanodId == request.auth.uid || isTanodOrAdmin());
+      allow list: if isSignedIn() && isTanodOrAdmin();
+      allow create: if isSignedIn() && isTanodOrAdmin() && isValidIncident(incoming());
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
-    // --- Patrols Collection ---
-    function isValidPatrol(data) {
-        return data.tanodId is string
-               && data.tanodId == request.auth.uid
-               && data.tanodName is string
-               && data.location is map
-               && data.location.lat is float
-               && data.location.lng is float
-               && data.isActive is bool
-               && data.lastUpdate is string;
-    }
-
+    // --- Live Patrols ---
     match /patrols/{tanodId} {
-      allow create: if isSignedIn()
-                            && isValidId(tanodId)
-                            && tanodId == request.auth.uid
-                            && isValidPatrol(incoming())
-                            && incoming().keys().hasAll(['id', 'tanodId', 'tanodName', 'location', 'isActive', 'lastUpdate']);
-      allow update: if isSignedIn()
-                            && tanodId == request.auth.uid
-                            && isValidPatrol(incoming())
-                            && incoming().id == existing().id
-                            && incoming().tanodId == existing().tanodId;
-      allow read: if isSignedIn(); 
-      allow delete: if false;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (tanodId == request.auth.uid || isAdmin());
     }
 
-    // --- Witness Requests ---
-    function isValidWitnessRequest(data) {
-        return data.alertId is string
-               && data.witnessUserId is string
-               && data.status is string;
+    // --- System Status & Broadcasts ---
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    match /alerts/{alertId}/witness_requests/{witnessId} {
-      allow create: if isSignedIn()
-                    && isValidId(witnessId)
-                    && isValidWitnessRequest(incoming())
-                    && exists(/databases/$(database)/documents/alerts/$(alertId));
-      allow read: if isSignedIn() 
-                  && (resource.data.witnessUserId == request.auth.uid || get(/databases/$(database)/documents/alerts/$(alertId)).data.residentId == request.auth.uid);
-      allow delete: if false;
-    }
-
-    // --- Broadcasts Collection ---
     function isValidBroadcast(data) {
-        return data.adminId is string
-               && data.type is string
-               && data.message is string
-               && data.message.size() >= 1 && data.message.size() <= 500;
+      return data.message is string && data.message.size() <= 2000
+             && data.type is string
+             && (data.timestamp is string || data.timestamp is timestamp);
     }
 
     match /broadcasts/{broadcastId} {
-      allow create: if isSignedIn()
-                    && isValidId(broadcastId)
-                    && isValidBroadcast(incoming())
-                    && incoming().adminId == request.auth.uid;
-      allow read: if isSignedIn();
-      allow update: if isSignedIn()
-                    && incoming().adminId == existing().adminId
-                    && incoming().diff(existing()).affectedKeys().hasOnly(['isActive', 'expiresAt']);
-      allow delete: if false;
+      allow get: if isSignedIn() && isValidId(broadcastId);
+      allow list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidBroadcast(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /system_broadcasts/{broadcastId} {
+      allow get: if isSignedIn() && isValidId(broadcastId);
+      allow list: if isSignedIn();
+      allow create, update: if isAdmin() && isValidBroadcast(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // --- Shifts & Patrols ---
+    function isValidShift(data) {
+      return data.tanodId is string && data.tanodName is string
+             && (data.startTime is string || data.startTime is timestamp) 
+             && (data.endTime is string || data.endTime is timestamp)
+             && data.status is string;
+    }
+
+    match /shifts/{shiftId} {
+      allow get: if isSignedIn() && isValidId(shiftId);
+      allow list: if isSignedIn();
+      allow create: if isAdmin() && isValidShift(incoming());
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (isTanod() && existing().tanodId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /patrol_sessions/{sessionId} {
+      allow read: if isSignedIn() && isTanodOrAdmin();
+      allow create: if isSignedIn() && isTanod() && incoming().tanodId == request.auth.uid;
+      allow update: if isAdmin() || (isTanod() && existing().tanodId == request.auth.uid);
+    }
+
+    match /tanod_activity_logs/{logId} {
+      allow read: if isSignedIn() && isTanodOrAdmin();
+      allow create: if isSignedIn() && isTanod() && incoming().tanodId == request.auth.uid;
+    }
+
+    // --- Witness Circle ---
+    match /witness_invites/{inviteId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.witnessUserId == request.auth.uid || isTanodOrAdmin());
+      allow update: if isSignedIn() && resource.data.witnessUserId == request.auth.uid;
+    }
+
+    match /system_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
     }
   }
 }

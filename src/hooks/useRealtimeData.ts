@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import { useTanodStore } from '../store/useTanodStore';
 import { useIncidentStore } from '../store/useIncidentStore';
 import { SystemBroadcast, Alert, PatrolLocation } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadcast | null) => void, setGlobalSirenActive: (a: boolean) => void) => {
   useEffect(() => {
@@ -18,7 +19,7 @@ export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadca
       } else {
         setActiveBroadcast(null);
       }
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'system_broadcasts'));
 
     // Siren listener
     const unsubS = onSnapshot(doc(db, 'system', 'siren'), (snapshot) => {
@@ -26,7 +27,7 @@ export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadca
         const data = snapshot.data();
         setGlobalSirenActive(data?.sirenActive || false);
       }
-    });
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'system/siren'));
 
     return () => {
       unsubB();
