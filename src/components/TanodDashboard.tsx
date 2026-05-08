@@ -45,7 +45,7 @@ const itemVariants = {
 
 export default function TanodDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
   const { alerts } = useIncidentStore();
-  const { updateTanodStatus } = useTanodStore();
+  const { patrols, updateTanodStatus } = useTanodStore();
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const [loadingAlertIds, setLoadingAlertIds] = useState<Set<string>>(new Set());
@@ -510,6 +510,29 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       </motion.div>
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
+          {/* Tactical Units Status Bar */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col">
+              <span className="text-[9px] font-black uppercase text-white/30 tracking-widest font-mono">Total Units</span>
+              <span className="text-2xl font-black text-white font-mono mt-1">{patrols.length}</span>
+            </div>
+            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col">
+              <span className="text-[9px] font-black uppercase text-success/60 tracking-widest font-mono">On Patrol</span>
+              <span className="text-2xl font-black text-white font-mono mt-1">
+                {patrols.filter(p => p.isActive && p.status === 'patrolling').length}
+              </span>
+            </div>
+            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col relative overflow-hidden">
+              <span className="text-[9px] font-black uppercase text-emergency/60 tracking-widest font-mono">Responding</span>
+              <span className="text-2xl font-black text-white font-mono mt-1">
+                {patrols.filter(p => p.isActive && p.status === 'responding').length}
+              </span>
+              {patrols.some(p => p.isActive && p.status === 'responding') && (
+                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emergency animate-ping" />
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
               <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">

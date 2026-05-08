@@ -118,6 +118,7 @@ export interface PatrolLocation {
     accuracy?: number;
   };
   isActive: boolean;
+  status: 'patrolling' | 'responding' | 'offline';
   isLocationSharingEnabled?: boolean;
   lastUpdate: string;
 }

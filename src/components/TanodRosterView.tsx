@@ -156,12 +156,14 @@ export default function TanodRosterView() {
                 <div className="flex justify-between items-center p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
                   <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Duty Status</span>
                   <div className="flex flex-col items-end">
-                    <span className={cn(
-                      "flex items-center gap-2 text-[10px] font-black uppercase italic font-mono",
-                      isActuallyActive ? "text-success" : "text-white/40"
-                    )}>
-                       {isActuallyActive ? 'ON_DUTY' : 'OFFLINE'}
-                    </span>
+                      <span className={cn(
+                        "flex items-center gap-2 text-[10px] font-black uppercase italic font-mono",
+                        isActuallyActive ? (patrolMatch?.status === 'responding' ? "text-emergency animate-pulse" : "text-success") : "text-white/40"
+                      )}>
+                         {isActuallyActive 
+                           ? (patrolMatch?.status === 'responding' ? 'RESPONDING' : 'ON_PATROL') 
+                           : 'OFFLINE'}
+                      </span>
                     {t.activeAlertId && (
                       <span className="text-[7px] font-mono text-emergency font-black uppercase mt-1 tracking-tighter">
                         REQ: {t.activeAlertId?.slice(-8).toUpperCase()}
@@ -189,9 +191,11 @@ export default function TanodRosterView() {
                   <span className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Tactical Status</span>
                   <span className={cn(
                     "text-[10px] font-black uppercase italic font-mono",
-                    isActuallyActive ? "text-success" : "text-caution"
+                    isActuallyActive ? (patrolMatch?.status === 'responding' ? "text-emergency shadow-glow-red" : "text-success") : "text-caution"
                   )}>
-                    {isActuallyActive ? 'ACTIVE_ON_GRID' : 'SIGNAL_LOST'}
+                    {isActuallyActive 
+                      ? (patrolMatch?.status === 'responding' ? 'COMBAT_ACTIVE' : 'ACTIVE_ON_GRID') 
+                      : 'SIGNAL_LOST'}
                   </span>
                 </div>
               </div>

@@ -156,7 +156,10 @@ export default function BackgroundServices() {
       if ((profile as any).isLocationSharingEnabled === false) {
         console.log('📡 Tactical Link: Privacy Shield DEPLOYED. Suspending GPS broadcasts.');
         try {
-          await setDoc(doc(db, 'patrols', profile.uid), { isActive: false }, { merge: true });
+          await setDoc(doc(db, 'patrols', profile.uid), { 
+            isActive: false,
+            status: 'offline' 
+          }, { merge: true });
         } catch (e) {
           console.error('Failed to update patrol status during privacy toggle', e);
         }
@@ -319,6 +322,15 @@ export default function BackgroundServices() {
         // Update active patrol status
         const isSharing = (profile as TanodProfile).isLocationSharingEnabled !== false;
         
+        // Determine Tactical Status
+        const currentAlerts = useIncidentStore.getState().alerts;
+        const isResponding = currentAlerts.some(a => 
+          (a.assignedTo === profile.uid || a.respondedBy === profile.uid) && 
+          (a.status === 'responding' || a.status === 'pending')
+        );
+
+        const tacticalStatus = !isSharing ? 'offline' : (isResponding ? 'responding' : 'patrolling');
+        
         await setDoc(doc(db, 'patrols', profile.uid), {
           tanodId: profile.uid,
           tanodName: profile.name,
@@ -328,6 +340,7 @@ export default function BackgroundServices() {
             accuracy: loc.accuracy
           },
           isActive: isSharing,
+          status: tacticalStatus,
           isLocationSharingEnabled: isSharing,
           lastUpdate: new Date().toISOString()
         }, { merge: true });

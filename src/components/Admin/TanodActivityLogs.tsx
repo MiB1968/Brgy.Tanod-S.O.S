@@ -22,28 +22,69 @@ export function TanodActivityLogs() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   const filteredLogs = useMemo(() => {
     return activityLogs.filter(log => {
+      const logDate = new Date(log.timestamp);
       const matchesSearch = log.tanodName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           log.details.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === 'ALL' || log.type === filterType;
-      return matchesSearch && matchesType;
+      
+      let matchesDate = true;
+      if (dateFilter === 'TODAY') {
+        const today = new Date();
+        matchesDate = logDate.toDateString() === today.toDateString();
+      } else if (dateFilter === 'WEEK') {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        matchesDate = logDate >= weekAgo;
+      }
+
+      return matchesSearch && matchesType && matchesDate;
     });
-  }, [activityLogs, searchTerm, filterType]);
+  }, [activityLogs, searchTerm, filterType, dateFilter]);
+
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredLogs.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredLogs, currentPage, itemsPerPage]);
 
   const sortedSessions = useMemo(() => {
     return [...patrolSessions].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
   }, [patrolSessions]);
 
-  const activityTypes = [
-    { value: 'ALL', label: 'All Activities' },
-    { value: 'duty_start', label: 'Duty Start' },
-    { value: 'duty_end', label: 'Duty End' },
-    { value: 'alert_response', label: 'Alert Response' },
-    { value: 'patrol_marker', label: 'Patrol Markers' },
-    { value: 'status_change', label: 'Status Changes' }
-  ];
+  const stats = useMemo(() => {
+    const today = new Date().toDateString();
+    const logsToday = activityLogs.filter(l => new Date(l.timestamp).toDateString() === today);
+    const sessionsToday = patrolSessions.filter(s => new Date(s.startTime).toDateString() === today);
+    
+    return {
+      totalToday: logsToday.length,
+      alertsToday: logsToday.filter(l => l.type === 'alert_response').length,
+      patrolsToday: sessionsToday.length,
+      activeUnits: new Set(patrolSessions.filter(s => !s.endTime).map(s => s.tanodId)).size
+    };
+  }, [activityLogs, patrolSessions]);
+
+  const activityTypes = useMemo(() => {
+    const counts = activityLogs.reduce((acc, log) => {
+      acc[log.type] = (acc[log.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return [
+      { value: 'ALL', label: 'All', count: activityLogs.length },
+      { value: 'duty_start', label: 'Duty', count: counts['duty_start'] || 0 },
+      { value: 'duty_end', label: 'End', count: counts['duty_end'] || 0 },
+      { value: 'alert_response', label: 'SOS', count: counts['alert_response'] || 0 },
+      { value: 'patrol_marker', label: 'Patrol', count: counts['patrol_marker'] || 0 },
+      { value: 'status_change', label: 'Status', count: counts['status_change'] || 0 }
+    ];
+  }, [activityLogs]);
 
   const formatDuration = (start: string, end?: string) => {
     if (!end) return 'Ongoing';
@@ -56,130 +97,197 @@ export function TanodActivityLogs() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Tactical Overview Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Logs', value: stats.totalToday, icon: ClipboardList, color: 'text-white' },
+          { label: 'SOS Responses', value: stats.alertsToday, icon: AlertCircle, color: 'text-emergency' },
+          { label: 'Patrol Missions', value: stats.patrolsToday, icon: Navigation, color: 'text-info' },
+          { label: 'Active Units', value: stats.activeUnits, icon: Activity, color: 'text-success' },
+        ].map((stat, i) => (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            key={stat.label}
+            className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-black uppercase text-white/30 tracking-widest font-mono">{stat.label}</span>
+              <stat.icon className={cn("w-3.5 h-3.5", stat.color)} />
+            </div>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-black text-white font-mono leading-none">{stat.value}</span>
+              <span className="text-[8px] font-mono text-white/20 uppercase mb-1">Today</span>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between glass-panel p-6 rounded-[2rem]">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-          <input
-            type="text"
-            placeholder="Search tanod name or details..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm text-white placeholder:text-white/20 outline-none focus:border-emergency/30 transition-all font-mono"
-          />
+      <div className="flex flex-col gap-4 glass-panel p-4 rounded-[1.5rem] border-white/5">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+            <input
+              type="text"
+              placeholder="Search tanod name or details..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm text-white placeholder:text-white/20 outline-none focus:border-emergency/30 transition-all font-mono"
+            />
+          </div>
+          <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
+            {(['ALL', 'TODAY', 'WEEK'] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => {
+                  setDateFilter(d);
+                  setCurrentPage(1);
+                }}
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter font-mono transition-all",
+                  dateFilter === d ? "bg-white/10 text-white shadow-lg" : "text-white/30 hover:text-white/60"
+                )}
+              >
+                {d === 'ALL' ? 'All Time' : d === 'TODAY' ? 'Today' : 'Last 7 Days'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
+        
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 w-full scrollbar-hide">
           {activityTypes.map(type => (
             <button
               key={type.value}
-              onClick={() => setFilterType(type.value)}
+              onClick={() => {
+                setFilterType(type.value);
+                setCurrentPage(1);
+              }}
               className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest font-mono whitespace-nowrap transition-all border",
+                "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest font-mono whitespace-nowrap transition-all border flex items-center gap-2",
                 filterType === type.value 
-                  ? "bg-emergency text-white border-emergency shadow-glow-red" 
+                  ? "bg-emergency text-white border-emergency/50 shadow-glow-red" 
                   : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
               )}
             >
-              {type.label}
+              <span>{type.label}</span>
+              <span className={cn(
+                "px-1.5 py-0.5 rounded-md text-[8px] border font-mono",
+                filterType === type.value ? "bg-white/20 border-white/20" : "bg-white/5 border-white/5"
+              )}>
+                {type.count}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Recent Activity Log Table */}
-        <div className="glass-panel rounded-[2.5rem] overflow-hidden border border-white/5 flex flex-col">
-          <div className="p-6 border-b border-white/5 bg-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <ClipboardList className="w-5 h-5 text-emergency" />
-              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white font-mono italic">Operational Logs</h3>
+        <div className="glass-panel rounded-[2rem] overflow-hidden border border-white/5 flex flex-col">
+          <div className="px-6 py-5 border-b border-white/5 bg-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <ClipboardList className="w-6 h-6 text-emergency" />
+              <h3 className="text-xl font-black uppercase tracking-[0.15em] text-white font-mono italic">Operational Logs</h3>
             </div>
-            <span className="text-[10px] font-mono text-white/30">{filteredLogs.length} Entries</span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-mono text-white/30 font-bold uppercase tracking-widest">{filteredLogs.length} Entries</span>
+            </div>
           </div>
-          <div className="flex-1 overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-brand-bg/30">
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Tanod ID</th>
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Name</th>
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Activity Type</th>
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Timestamp</th>
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Details</th>
-                  <th className="p-4 text-[9px] font-black uppercase tracking-widest text-white/40 font-mono border-b border-white/5">Response Time</th>
+          <div className="flex-1 overflow-auto max-h-[600px] scrollbar-tactical relative">
+            <table className="w-full text-left border-collapse table-fixed">
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-[#16191F] border-b border-white/10">
+                  <th className="p-4 w-32 text-[10px] font-black uppercase tracking-widest text-white/20 font-mono">Tanod ID</th>
+                  <th className="p-4 w-48 text-[10px] font-black uppercase tracking-widest text-white/20 font-mono">Name</th>
+                  <th className="p-4 w-32 text-[10px] font-black uppercase tracking-widest text-white/20 font-mono text-center">Activity Type</th>
+                  <th className="p-4 w-40 text-[10px] font-black uppercase tracking-widest text-white/20 font-mono">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-white/5 transition-colors group">
-                    <td className="p-4 whitespace-nowrap">
-                      <span className="text-[10px] font-mono text-white/40">#{log.tanodId?.slice(-6).toUpperCase()}</span>
+              <tbody className="divide-y divide-white/5 font-mono">
+                {paginatedLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-white/5 transition-all group border-b border-white/5 h-20">
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <span className="text-[12px] font-bold text-white/20">#{log.tanodId?.slice(-6).toUpperCase()}</span>
                     </td>
-                    <td className="p-4">
-                      <span className="text-xs font-black text-white/80 uppercase italic font-mono">{log.tanodName}</span>
+                    <td className="py-4 px-4">
+                      <div className="flex flex-col">
+                        <span className="text-[14px] font-black text-white/90 uppercase italic tracking-tighter">{log.tanodName}</span>
+                        {log.details && (
+                          <span className="text-[9px] text-white/20 font-medium truncate max-w-full uppercase mt-0.5">{log.details.length > 30 ? log.details.slice(0, 30) + '...' : log.details}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="p-4">
+                    <td className="py-4 px-4 text-center">
                       <div className={cn(
-                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter font-mono",
-                        log.type === 'duty_start' && "bg-success/20 text-success border border-success/30",
-                        log.type === 'duty_end' && "bg-white/10 text-white/60 border border-white/20",
-                        log.type === 'alert_response' && "bg-emergency/20 text-emergency border border-emergency/30",
-                        log.type === 'patrol_marker' && "bg-info/20 text-info border border-info/30"
+                        "inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tight border min-w-[100px]",
+                        log.type === 'duty_start' && "bg-success/10 text-success border-success/20",
+                        log.type === 'duty_end' && "bg-white/5 text-white/40 border-white/10",
+                        log.type === 'alert_response' && "bg-[#FF4B4B]/20 text-[#FF4B4B] border-[#FF4B4B]/30 shadow-glow-red",
+                        log.type === 'patrol_marker' && "bg-[#3498db]/20 text-[#3498db] border-[#3498db]/30",
+                        log.type === 'status_change' && "bg-white/5 text-white/60 border-white/10"
                       )}>
                         {log.type.replace('_', ' ')}
                       </div>
                     </td>
-                    <td className="p-4 whitespace-nowrap">
+                    <td className="py-4 px-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-white font-mono">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                        <span className="text-[8px] text-white/30 font-mono">{new Date(log.timestamp).toLocaleDateString()}</span>
+                        <span className="text-[14px] font-bold text-white/80 leading-none">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+                        <span className="text-[10px] text-white/20 font-bold uppercase mt-1.5 tracking-tighter">
+                          {new Date(log.timestamp).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
                       </div>
-                    </td>
-                    <td className="p-4">
-                      <p className="text-[10px] text-white/60 font-medium leading-tight max-w-[200px] truncate group-hover:whitespace-normal group-hover:overflow-visible group-hover:bg-brand-bg group-hover:p-2 group-hover:rounded-lg group-hover:absolute group-hover:z-50 group-hover:border group-hover:border-white/10 group-hover:shadow-2xl">
-                        {log.details}
-                        {log.location && (
-                          <span className="block mt-1 text-[8px] text-white/20">
-                            COORD: {log.location.lat.toFixed(4)}, {log.location.lng.toFixed(4)}
-                          </span>
-                        )}
-                      </p>
-                    </td>
-                    <td className="p-4">
-                      {log.responseTime ? (
-                        <div className="flex flex-col">
-                           <span className="text-[10px] font-black text-warning font-mono italic">
-                            {Math.floor(log.responseTime / 60)}m {log.responseTime % 60}s
-                           </span>
-                           <span className="text-[6px] text-white/20 uppercase font-mono tracking-tighter">Mission Response</span>
-                        </div>
-                      ) : (
-                        <span className="text-[8px] text-white/10 font-mono italic">N/A</span>
-                      )}
                     </td>
                   </tr>
                 ))}
                 {filteredLogs.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-12 text-center text-white/20 font-mono text-xs italic">
-                      No matching activity logs found.
+                    <td colSpan={6} className="p-12 text-center text-white/20 font-mono text-xs italic">
+                      SYSTEM_IDLE: No matching logs
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-white/5 bg-white/5 flex items-center justify-between">
+               <div className="text-[8px] font-mono text-white/20 uppercase tracking-[0.2em] font-black">
+                PAGINATION_{currentPage}/{totalPages}
+               </div>
+               <div className="flex items-center gap-1.5">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="px-2 py-1 rounded bg-white/5 border border-white/5 text-[8px] font-black uppercase font-mono text-white/40 disabled:opacity-10 hover:bg-white/10 transition-all"
+                  >
+                    PREV
+                  </button>
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="px-2 py-1 rounded bg-white/5 border border-white/5 text-[8px] font-black uppercase font-mono text-white/40 disabled:opacity-10 hover:bg-white/10 transition-all"
+                  >
+                    NEXT
+                  </button>
+               </div>
+            </div>
+          )}
         </div>
 
         {/* Patrol Route Sessions (Expandable) */}
-        <div className="glass-panel rounded-[2.5rem] overflow-hidden border border-white/5 flex flex-col">
-          <div className="p-6 border-b border-white/5 bg-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Navigation className="w-5 h-5 text-info" />
-              <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white font-mono italic">Patrol Routes</h3>
+        <div className="glass-panel rounded-[2rem] overflow-hidden border border-white/5 flex flex-col">
+          <div className="px-5 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Navigation className="w-4 h-4 text-info" />
+              <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white font-mono italic">Mission Records</h3>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto max-h-[600px] p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto max-h-[550px] p-4 space-y-3 scrollbar-tactical">
              {sortedSessions.map(session => (
                <div key={session.id} className="glass-panel border-white/5 rounded-3xl overflow-hidden">
                  <button 

@@ -45,19 +45,22 @@ const createSosIcon = (alert: Alert) => {
 };
 
 const createTanodIcon = (patrol: PatrolLocation) => {
-  const color = '#34C759';
+  const isResponding = patrol.status === 'responding';
+  const color = isResponding ? '#FF4B4B' : '#34C759';
+  const label = isResponding ? 'SOS_RES' : 'PATROL';
+  
   return L.divIcon({
     className: 'custom-div-icon',
     html: `
       <div class="relative flex items-center justify-center">
         <div class="absolute w-10 h-10 bg-[${color}]/20 rounded-full animate-pulse"></div>
-        <div class="z-10 relative flex items-center justify-center w-8 h-8 bg-[#16191F] rounded-full border-2 border-[${color}] shadow-[0_0_10px_rgba(52,199,89,0.3)]">
+        <div class="z-10 relative flex items-center justify-center w-8 h-8 bg-[#16191F] rounded-full border-2 border-[${color}] shadow-[0_0_10px_${color}4d]">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>
           </svg>
         </div>
         <div class="absolute -bottom-1 z-20 px-1 bg-[#16191F] border border-[${color}]/30 rounded text-[6px] font-black uppercase text-[${color}] tracking-tighter">
-          TANOD
+          ${label}
         </div>
       </div>
     `,
@@ -397,7 +400,12 @@ export default function ActiveMap({
                     </div>
                     <div className="flex justify-between items-center text-[10px]">
                       <span className="text-white/30 uppercase font-black">Status</span>
-                      <span className="text-success font-bold uppercase tracking-wider">ACTIVE巡回</span>
+                      <span className={cn(
+                        "font-bold uppercase tracking-wider",
+                        patrol.status === 'responding' ? "text-emergency animate-pulse" : "text-success"
+                      )}>
+                        {patrol.status === 'responding' ? 'RESPONDING!!' : 'ACTIVE_ON_PATROL'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center text-[10px]">
                       <span className="text-white/30 uppercase font-black">Signal</span>
