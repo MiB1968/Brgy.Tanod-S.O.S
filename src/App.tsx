@@ -184,6 +184,24 @@ export default function App() {
     setLoading(false);
   }, [setProfile, setLoading]);
 
+  // Initial Load of Data
+  useEffect(() => {
+    async function loadInitialData() {
+      if (!user) return;
+      try {
+        const [alertsData, patrolsData] = await Promise.all([
+          api.alerts.getAll(),
+          api.generic.list('patrols')
+        ]);
+        setAlerts(alertsData);
+        setPatrols(patrolsData);
+      } catch (err) {
+        console.error("Failed to load initial data", err);
+      }
+    }
+    loadInitialData();
+  }, [user, setAlerts, setPatrols]);
+
   // SOS Store Subscription
   useEffect(() => {
     if (user?.id && effectiveRole === 'resident') {
@@ -324,7 +342,7 @@ export default function App() {
     });
 
     return () => {
-      socket.off('sos_new');
+      socket.off('alert_update');
       socket.off('patrol_update');
       socket.off('broadcast_update');
     };

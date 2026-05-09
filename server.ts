@@ -546,6 +546,7 @@ async function startServer() {
       io.emit("alert_update", { type: 'new', alert });
       res.json(alert);
     } catch (err: any) {
+      console.error("SOS_ALERT_ERROR:", err);
       res.status(500).json({ error: err.message });
     }
   });
