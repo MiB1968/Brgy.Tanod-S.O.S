@@ -54,14 +54,15 @@ describe('Dirty Dozen Security Tests', () => {
   test('Prevents Unauthorized List Coverage', async () => {
     // Resident 'bob' tries to list all residents
     const bob = testEnv.authenticatedContext('bob');
-    await assertFails(
-      testEnv.withSecurityRulesDisabled(async (context) => {
-        await setDoc(doc(context.firestore(), 'residents/alice'), { id: 'alice' });
-      })
-    );
+
+    // First setup the data using withSecurityRulesDisabled without assertFails
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'residents/alice'), { id: 'alice' });
+    });
+
     // Real test requires a query. For now, checking doc read access.
     await assertFails(
-      testEnv.authenticatedContext('bob').firestore().collection('residents').get()
+      bob.firestore().collection('residents').get()
     );
   });
 

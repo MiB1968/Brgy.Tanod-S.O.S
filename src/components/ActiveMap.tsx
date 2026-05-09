@@ -16,6 +16,8 @@ const DefaultIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
+L.Marker.prototype.options.icon = DefaultIcon;
+
 const createSosIcon = (alert: Alert) => {
   const isHighSeverity = alert.aiAnalysis && alert.aiAnalysis.severityScore > 7;
   const color = isHighSeverity ? '#ff1100' : '#FF4B4B';
