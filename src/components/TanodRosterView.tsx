@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   query, 
@@ -22,6 +22,14 @@ export default function TanodRosterView() {
   const [addingUnit, setAddingUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
   const [newUnitEmail, setNewUnitEmail] = useState('');
+
+  const patrolsRecord = useMemo(() => {
+    const record: Record<string, typeof patrols[0]> = {};
+    for (let i = 0; i < patrols.length; i++) {
+      record[patrols[i].tanodId] = patrols[i];
+    }
+    return record;
+  }, [patrols]);
 
   useEffect(() => {
     if (!db) return;
@@ -124,7 +132,7 @@ export default function TanodRosterView() {
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 staggered-list">
         {tanods.map((t, index) => {
-          const patrolMatch = patrols.find(p => p.tanodId === t.uid);
+          const patrolMatch = patrolsRecord[t.uid];
           const isActuallyActive = patrolMatch?.isActive;
           const lastSeen = patrolMatch?.lastUpdate;
 
