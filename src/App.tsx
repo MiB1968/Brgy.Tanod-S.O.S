@@ -14,7 +14,8 @@ import {
   browserSessionPersistence,
   signInWithRedirect,
   indexedDBLocalPersistence,
-  setPersistence
+  setPersistence,
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   collection, 
@@ -110,7 +111,7 @@ import IncidentForm from './components/IncidentForm';
 import ResidentTacticalMap from './components/Admin/ResidentTacticalMap';
 import RegistrationForm from './components/RegistrationForm';
 import { LoginView, RoleSelection, PendingApproval, RejectedScreen } from './components/AuthViews';
-import LiveMap from './components/ReportMap';
+import LiveMap from './LiveMap';
 import { useAuthStore } from './store/useAuthStore';
 import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
@@ -233,10 +234,16 @@ export default function App() {
 
   // Global Data Listeners
   useEffect(() => {
-    if (!db || !user) return;
+    if (!db || !user || !profile) return;
 
     // Listen for all alerts (if admin/tanod) or just relevant ones
-    const alertsQuery = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    let alertsQuery;
+    if (profile.role === 'admin' || profile.role === 'superadmin' || profile.role === 'tanod') {
+      alertsQuery = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    } else {
+      alertsQuery = query(collection(db, 'alerts'), where('residentId', '==', user.uid), orderBy('timestamp', 'desc'), limit(50));
+    }
+
     const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Alert));
       setAlerts(data);
@@ -253,7 +260,7 @@ export default function App() {
       unsubAlerts();
       unsubPatrols();
     };
-  }, [user, db, setAlerts, setPatrols]);
+  }, [user, profile, db, setAlerts, setPatrols]);
 
   // SOS Store Subscription
   useEffect(() => {
@@ -380,47 +387,56 @@ export default function App() {
     return unsubscribe;
   }, [auth, db, setLoading, setProfile, setResidentProfile]);
 
-  // Handle Redirect Result explicitly - DISABLED to prevent missing initial state error in restricted environments.
+  // Handle Redirect Result explicitly
   useEffect(() => {
-    console.log("REDIRECT_AUTH_FLOW_DISABLED");
-  }, []); // Run ONCE at app load
+    if (!auth) return;
+    
+    // Check for redirect result silently
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("REDIRECT_FLOW_SUCCESS:", result.user.email);
+        }
+      })
+      .catch((error) => {
+        console.warn("REDIRECT_FLOW_IGNORED_ERROR:", error);
+      });
+  }, [auth]);
 
   const handleLogin = async () => {
     if (isLoggingIn || !auth) return;
     
     const isIframe = window.self !== window.top;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const isIncognito = !window.indexedDB; // Crude check for some browsers
 
-      // Force REDIRECT for mobile environments that are known to struggle with popups (e.g. webviews, or if requested)
-      // Android Chrome generally supports popups well.
-      if (isIframe) {
-        toast.error('AUTHENTICATION_ERROR: Iframe context detected. Please open this app in a NEW TAB to authenticate.', { 
-          duration: 8000,
-          style: { background: '#FF4B4B', color: '#fff' }
-        });
-        return;
-      }
-
+      // In the AI Studio preview environment, the app runs in an iframe.
+      // Firebase Auth handles iframe constraints automatically, so we don't need to block it.
+      
       try {
         setIsLoggingIn(true);
         const provider = new GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         
-        await signInWithPopup(auth, provider);
-        // Note: setUser will be called via onAuthStateChanged, not here
-        toast.success(`Access Granted`, { icon: '🔑' });
+        try {
+          await signInWithPopup(auth, provider);
+          toast.success(`Access Granted`, { icon: '🔑' });
+        } catch (popupErr: any) {
+          console.warn("POPUP BLOCKED OR FAILED. FALLING BACK TO REDIRECT.", popupErr);
+          if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
+             toast.loading("Popup blocked. Switching to Redirect flow...", { duration: 3000 });
+             await signInWithRedirect(auth, provider);
+          } else {
+             throw popupErr;
+          }
+        }
       } catch (err: any) {
         console.error("AUTH_FAULT:", err);
         
         if (err.code === 'auth/unauthorized-domain') {
           toast.error(`SECURITY: Unauthorized Host. Contact Admin.`, { duration: 10000 });
-        } else if (err.code === 'auth/popup-blocked') {
-          toast.error("AUTH ISSUE: Redirect/Popups Blocked. Please tap the button again or allow popups in your browser settings.", { duration: 10000 });
         } else if (err.code === 'auth/network-request-failed') {
           toast.error('NETWORK ERROR: Connection unstable. Check your signal.');
         } else if (err.code !== 'auth/popup-closed-by-user') {
-          toast.error(`AUTH ERROR: ${err.message}`);
+          toast.error(`AUTH ERROR: Try "Guest Mode" if using Incognito. (${err.message})`, { duration: 8000 });
         }
       } finally {
         setIsLoggingIn(false);
@@ -457,28 +473,51 @@ export default function App() {
       };
       await setDoc(doc(db, 'users', user.uid), newProfile);
       setProfile(newProfile as User);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Role assignment failure:", err);
-      toast.error("Security System: Role Assignment Failed");
+      if (err.code === 'permission-denied') {
+        toast.error("SECURITY PROTOCOL: You must be a verified Administrator to create an Admin/Tanod profile.", { duration: 8000 });
+      } else {
+        toast.error(`System Error: ${err.message}`, { duration: 8000 });
+      }
     } finally {
       setIsSettingRole(false);
     }
   };
 
-  const handleDemoLogin = (role: 'resident' | 'admin') => {
-    const uid = role === 'resident' ? 'demo_resident_uid' : 'anonymous_admin_demo';
-    const mockUser = { uid, displayName: `Demo ${role}`, email: `${role}@demo.com` } as FirebaseUser;
-    setUser(mockUser);
-    setProfile({ 
-      uid, 
-      id: uid, 
-      name: mockUser.displayName!, 
-      email: mockUser.email!, 
-      role: role === 'resident' ? 'resident' : 'superadmin',
-      status: 'approved',
-      createdAt: new Date().toISOString()
-    } as User);
-    setLoading(false);
+  const handleDemoLogin = async (role: 'resident' | 'admin') => {
+    if (!auth) return;
+    try {
+      setLoading(true);
+      toast.loading("Initiating anonymous session...", { id: 'demo-login' });
+      const result = await signInAnonymously(auth);
+      const uid = result.user.uid;
+      
+      const profileData: User = {
+        uid, 
+        id: uid, 
+        name: `Demo ${role}`, 
+        email: `${role}@demo.com`, 
+        role: role === 'resident' ? 'resident' : 'superadmin',
+        status: 'approved',
+        createdAt: new Date().toISOString()
+      };
+      // Save it to firestore so roles work
+      await setDoc(doc(db, 'users', uid), profileData);
+      
+      setUser(result.user);
+      setProfile(profileData);
+      toast.success("Guest Session Active", { id: 'demo-login' });
+    } catch (err: any) {
+      console.error("Anonymous auth failed:", err);
+      if (err.code === 'auth/operation-not-allowed') {
+        toast.error(`DEMO MODE FAILED: Anonymous sign-in is disabled. Please enable it in your Firebase Console > Authentication > Sign-in method.`, { id: 'demo-login', duration: 10000 });
+      } else {
+        toast.error(`DEMO MODE FAILED: ${err.message}`, { id: 'demo-login', duration: 8000 });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -750,7 +789,7 @@ export default function App() {
                     <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
                   </div>
                 </div>
-                <LiveMap lat={13.2236} lng={120.596} />
+                <LiveMap />
               </div>
             )}
             {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}

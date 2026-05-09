@@ -3,14 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Alert } from '../types';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Shield, MapPin, CheckCircle } from 'lucide-react';
 import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { cn } from '../lib/utils';
+import { AlertDetailsModal } from './AlertDetailsModal';
 
 export const CitizenReportTracker = ({ userId }: { userId: string }) => {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedReport, setSelectedReport] = useState<Alert | null>(null);
 
   useEffect(() => {
     if (!db) return;
@@ -43,11 +45,12 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
       <div className="grid gap-4">
         {reports.map((report, idx) => (
           <motion.div 
+            onClick={() => setSelectedReport(report)}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             key={report.id} 
-            className="group relative"
+            className="group relative cursor-pointer"
           >
             {/* Terminal Line Decorator */}
             <div className="absolute -left-3 top-0 bottom-0 w-[1px] bg-white/10 group-hover:bg-info/30 transition-colors" />
@@ -100,6 +103,13 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
           </motion.div>
         ))}
       </div>
+
+      {selectedReport && (
+        <AlertDetailsModal
+          alert={selectedReport}
+          onClose={() => setSelectedReport(null)}
+        />
+      )}
     </div>
   );
 };

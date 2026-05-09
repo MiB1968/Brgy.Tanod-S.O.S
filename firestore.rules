@@ -10,7 +10,10 @@ service cloud.firestore {
 
     // --- Global Helpers ---
     function isSignedIn() { 
-      return request.auth != null && request.auth.token.email_verified == true; 
+      return request.auth != null && (
+        request.auth.token.firebase.sign_in_provider == 'anonymous' ||
+        (request.auth.token.email != null && request.auth.token.email_verified == true)
+      ); 
     }
     
     function isValidId(id) { 
@@ -22,7 +25,7 @@ service cloud.firestore {
     
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.lower() in ['rubenlleg12@gmail.com', 'ronniecantuba420@gmail.com'] ||
+        (request.auth.token.email != null && request.auth.token.email.lower() in ['rubenlleg12@gmail.com', 'ronniecantuba420@gmail.com']) ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
       );
@@ -30,7 +33,7 @@ service cloud.firestore {
     
     function isTanod() {
       return isSignedIn() && (
-        request.auth.token.email.lower() == 'rubenlleg12@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'rubenlleg12@gmail.com') ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'tanod')
       );
@@ -52,7 +55,7 @@ service cloud.firestore {
       allow get: if isSignedIn() && (userId == request.auth.uid || isTanodOrAdmin());
       allow list: if isSignedIn() && isTanodOrAdmin();
       
-      allow create: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming()) && incoming().role == 'resident';
+      allow create: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming()) && (incoming().role == 'resident' || isAdmin() || request.auth.token.firebase.sign_in_provider == 'anonymous');
       allow update: if isSignedIn() && (
         // Self-update limited fields
         (userId == request.auth.uid && (
@@ -153,15 +156,13 @@ service cloud.firestore {
     }
 
     match /broadcasts/{broadcastId} {
-      allow get: if request.auth != null && isValidId(broadcastId);
-      allow list: if request.auth != null;
+      allow read: if true;
       allow create, update: if isAdmin() && isValidBroadcast(incoming());
       allow delete: if isAdmin();
     }
 
     match /system_broadcasts/{broadcastId} {
-      allow get: if request.auth != null && isValidId(broadcastId);
-      allow list: if request.auth != null;
+      allow read: if true;
       allow create, update: if isAdmin() && isValidBroadcast(incoming());
       allow delete: if isAdmin();
     }

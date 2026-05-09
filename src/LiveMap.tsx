@@ -6,6 +6,8 @@ import { startGPS } from "./gpsSystem";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
 import { useTanodStore } from "./store/useTanodStore";
+import { db } from "./lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 
 // ─── Map center ───────────────────────────────────────────────────────────────
 const CENTER: [number, number] = [13.2236, 120.596]; // Mamburao
@@ -131,6 +133,12 @@ const YouHereIcon = L.divIcon({
   className: "",
   html: `<div style="width:20px;height:20px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 16px rgba(59,130,246,0.9);"></div>`,
   iconSize: [20, 20], iconAnchor: [10, 10],
+});
+
+const makeResidentIcon = () => L.divIcon({
+  className: "",
+  html: `<div style="width:24px;height:24px;border-radius:50%;background:#0A0C10;border:2px solid #A78BFA;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(167,139,250,0.4);"><div style="width:8px;height:8px;border-radius:50%;background:#A78BFA;"></div></div>`,
+  iconSize: [24, 24], iconAnchor: [12, 12],
 });
 
 // ─── Haversine ────────────────────────────────────────────────────────────────
@@ -327,11 +335,25 @@ export default function LiveMap() {
   const [showPatrols, setShowPatrols] = useState(true);
   const [showSOS,     setShowSOS]     = useState(true);
   const [showRoutes,  setShowRoutes]  = useState(true);
+  const [showResidents, setShowResidents] = useState(false);
   const [showLegend,  setShowLegend]  = useState(false);
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
   
+  const [residents, setResidents] = useState<any[]>([]);
+
   const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
+
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, 'residents'), where('status', '==', 'approved'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const validData = data.filter((r: any) => r.gpsLat && r.gpsLng);
+      setResidents(validData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Inject global CSS once
   useEffect(() => {
@@ -373,6 +395,16 @@ export default function LiveMap() {
 
       {/* ── Filter toolbar (left-bottom) ── */}
       <div className="absolute bottom-4 left-4 z-[401] flex flex-col gap-2">
+        {/* Residents toggle */}
+        <button
+          onClick={() => setShowResidents(v=>!v)}
+          title="Toggle Residents"
+          className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
+            ${showResidents
+              ? "bg-purple-500/20 border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
+              : "bg-black/50 border-white/10 opacity-40 hover:opacity-70"}`}
+        >🏠</button>
+
         {/* Legend toggle */}
         <button
           onClick={() => setShowLegend(v=>!v)}
@@ -417,6 +449,7 @@ export default function LiveMap() {
         <div className="absolute bottom-4 left-[3.75rem] z-[401] bg-black/85 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3 min-w-[168px]">
           <p className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2.5">LEGEND</p>
           {([
+            { emoji:"🏠", color:"#A78BFA", label:"Verified Resident" },
             { emoji:"👮", color:"#4AEF80", label:"Officer / Patrol" },
             { emoji:"🔥", color:"#FF8C00", label:"Fire SOS"         },
             { emoji:"🚑", color:"#00D4FF", label:"Medical SOS"      },
@@ -470,6 +503,22 @@ export default function LiveMap() {
             </Marker>
           </>
         )}
+
+        {/* Verified Residents */}
+        {showResidents && residents.map((r) => (
+          <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
+            <Popup>
+              <div className="pp">
+                <p className="pp-lbl" style={{ color:"#A78BFA80" }}>Verified Resident</p>
+                <p className="pp-name">{r.firstName} {r.lastName}</p>
+                <span className="pp-badge" style={{ background:"rgba(167,139,250,0.12)", color:"#A78BFA", border:"1px solid rgba(167,139,250,0.25)" }}>
+                  🏠 {r.zone || "No Zone"}
+                </span>
+                <p className="pp-meta">{r.mobileNumber || "No Phone"}</p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
         {/* Active patrols */}
         {showPatrols && patrols.filter(p => p.isActive).map((p) =>

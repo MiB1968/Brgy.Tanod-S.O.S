@@ -22,6 +22,7 @@ import AnimatedButton from './AnimatedButton';
 import FlameAnimation from './FlameAnimation';
 import { DispatchAlert } from './Admin/DispatchAlert';
 import { WitnessIndicator } from './WitnessIndicator';
+import { AlertDetailsModal } from './AlertDetailsModal';
 import { SOSChat } from './SOSChat';
 
 import { useIncidentStore } from '../store/useIncidentStore';
@@ -53,6 +54,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState<string>('');
   const [shiftLog, setShiftLog] = useState<Alert[]>([]);
+  const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
 
   // Filtering State
@@ -631,6 +633,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
               ) : (
                 dashboardAlerts.map((alert, index) => (
                   <motion.div
+                    onClick={() => setSelectedAlertForDetails(alert)}
                     variants={itemVariants}
                     layout
                     initial="hidden"
@@ -639,7 +642,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                     transition={{ delay: index * 0.05 }}
                     key={alert.id}
                     className={cn(
-                      "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
+                      "cursor-pointer glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
                       alert.status === 'pending' && (
                         alert.aiAnalysis && alert.aiAnalysis.severityScore > 7 ? "border-emergency/50 shadow-glow-red bg-emergency/5" :
                         alert.aiAnalysis && alert.aiAnalysis.severityScore >= 5 ? "border-warning/50 shadow-glow-orange bg-warning/5" :
@@ -911,7 +914,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                  </div>
                ) : (
                  shiftLog.map(log => (
-                   <div key={log.id} className="p-4 bg-brand-bg/50 rounded-2xl border border-white/5 flex flex-col gap-2 hover:border-white/10 transition-colors">
+                   <div onClick={() => setSelectedAlertForDetails(log)} key={log.id} className="cursor-pointer p-4 bg-brand-bg/50 rounded-2xl border border-white/5 flex flex-col gap-2 hover:border-white/10 transition-colors">
                      <div className="flex justify-between items-start">
                        <span className="text-xs font-black text-white uppercase italic tracking-tighter font-mono">{log.type}</span>
                        <span className="text-[9px] font-mono text-white/40">{new Date(log.resolvedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -931,6 +934,13 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
             <InstallAppButton />
           </div>
         </div>
+
+        {selectedAlertForDetails && (
+          <AlertDetailsModal
+            alert={selectedAlertForDetails}
+            onClose={() => setSelectedAlertForDetails(null)}
+          />
+        )}
       </motion.div>
     </motion.div>
   );

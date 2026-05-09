@@ -79,7 +79,7 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
         </button>
         
         {!auth && (
-          <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest">
+          <div className="bg-emergency/10 border border-emergency/30 p-4 rounded-2xl text-emergency text-[10px] font-mono uppercase tracking-widest mt-2">
              <AlertTriangle className="w-4 h-4 mx-auto mb-2" />
              Command Link Disconnected. Authentication Unavailable.
           </div>
@@ -88,34 +88,39 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
         <button 
           disabled={isLoggingIn}
           onClick={onRegister}
-          className="w-full glass-panel border-white/10 text-white font-black py-4 rounded-3xl hover:bg-white/5 transition-all disabled:opacity-50 uppercase tracking-widest font-mono text-xs"
+          className="w-full glass-panel border-white/10 text-white font-black py-4 rounded-3xl hover:bg-white/5 transition-all disabled:opacity-50 uppercase tracking-widest font-mono text-xs mt-4"
         >
           Resident Registration
         </button>
 
-        <button 
-          onClick={onDemoLogin}
-          className={cn(
-            "w-full transition-all uppercase font-mono mt-4",
-            !auth 
-              ? "bg-info text-white py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
-              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
-          )}
-        >
-          {auth ? '[ Bypass Authentication — Resident Mode ]' : 'PROCEED AS RESIDENT (OFFLINE)'}
-        </button>
+        <div className="mt-8 border-t border-white/10 pt-6">
+          <p className="text-[10px] font-mono italic text-info mb-3 uppercase tracking-widest">Testing / Incognito Mode</p>
+          <button 
+            disabled={isLoggingIn}
+            onClick={onDemoLogin}
+            className={cn(
+              "w-full transition-all uppercase font-mono shadow-lg py-4 rounded-3xl text-[10px] tracking-widest font-black",
+              !auth 
+                ? "bg-info text-white hover:bg-info/90 active:scale-95" 
+                : "bg-white/5 text-white/40 hover:bg-white/10"
+            )}
+          >
+            {auth ? '[ GUEST ACTIVE ]' : 'PROCEED AS RESIDENT (DEMO)'}
+          </button>
 
-        <button 
-          onClick={onDemoAdminLogin}
-          className={cn(
-            "w-full transition-all uppercase font-mono mt-2",
-            !auth 
-              ? "bg-amber-500 text-black py-4 rounded-3xl text-[10px] tracking-widest font-black shadow-lg" 
-              : "text-white/20 hover:text-white/40 tracking-[0.3em] text-[8px]"
-          )}
-        >
-          {auth ? '[ Bypass Authentication — Admin Mode ]' : 'PROCEED AS ADMIN (OFFLINE)'}
-        </button>
+          <button 
+            disabled={isLoggingIn}
+            onClick={onDemoAdminLogin}
+            className={cn(
+              "w-full transition-all uppercase font-mono shadow-lg mt-3 py-4 rounded-3xl text-[10px] tracking-widest font-black",
+              !auth 
+                ? "bg-caution text-black hover:bg-caution/90 active:scale-95" 
+                : "bg-white/5 text-white/40 hover:bg-white/10"
+            )}
+          >
+            {auth ? '[ ADMIN ACTIVE ]' : 'PROCEED AS COMMANDER (DEMO)'}
+          </button>
+        </div>
       </div>
       
       <div className="absolute bottom-8 text-[10px] font-black text-white/10 uppercase tracking-[0.5em] font-mono">

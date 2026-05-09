@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import DispatchModal from './DispatchModal';
+import { AlertDetailsModal } from './AlertDetailsModal';
 import FlameAnimation from './FlameAnimation';
 import AboutModal from './AboutModal';
 import { InstallAppButton } from './InstallAppButton';
@@ -36,6 +37,7 @@ import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import LiveMap from '../LiveMap';
 import { 
   IconApprovedResidents, 
   IconPendingRegistration, 
@@ -67,6 +69,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   const { patrols } = useTanodStore();
   const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
+  const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   
   // Filtering State
@@ -525,6 +528,10 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         />
       </motion.div>
 
+      <motion.div variants={itemVariants} className="w-full h-[600px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative shadow-2xl">
+        <LiveMap />
+      </motion.div>
+
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Alerts Feed */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
@@ -607,6 +614,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
               ) : (
                 filteredAlerts.map((alert, index) => (
                   <motion.div
+                    onClick={() => setSelectedAlertForDetails(alert)}
                     layout
                     variants={itemVariants}
                     initial="hidden"
@@ -616,7 +624,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                     whileHover={{ x: 5, backgroundColor: 'rgba(255, 255, 255, 0.03)', transition: { duration: 0.2 } }}
                     key={alert.id}
                     className={cn(
-                      "glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group border-l-4",
+                      "cursor-pointer glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group border-l-4",
                       alert.status === 'pending' ? "border-l-emergency border-emergency/30 shadow-glow-red ring-1 ring-emergency/10" : 
                       alert.status === 'responding' ? "border-l-info" : "border-l-success"
                     )}
@@ -1089,6 +1097,14 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           patrols={patrols}
         />
       )}
+
+      {selectedAlertForDetails && (
+        <AlertDetailsModal
+          alert={selectedAlertForDetails}
+          onClose={() => setSelectedAlertForDetails(null)}
+        />
+      )}
+
       <div className="mt-12 mb-16">
         <BrgyTanodQR />
       </div>
