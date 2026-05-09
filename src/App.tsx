@@ -332,13 +332,6 @@ export default function App() {
     if (!auth || !db) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("AUTH_STATE_REPORT:", { 
-        loggedIn: !!firebaseUser, 
-        uid: firebaseUser?.uid, 
-        email: firebaseUser?.email,
-        timestamp: new Date().toISOString()
-      });
-
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
