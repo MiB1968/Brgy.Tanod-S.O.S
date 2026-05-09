@@ -158,8 +158,6 @@ async function startServer() {
     next();
   };
 
-  // Apply API key auth globally for /api/ as per memory instructions:
-  // "The Express server uses an API key authentication middleware for all /api/ routes in server.ts. It validates the x-api-key header against the API_SECRET_KEY environment variable. It implements a 'fail-closed' policy"
   app.use("/api/", authenticateApiKey);
 
   const authenticate = (req: any, res: any, next: any) => {
@@ -256,7 +254,12 @@ async function startServer() {
 
   app.get("/api/alerts/active", authenticate, async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      let result;
+      if (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'tanod') {
+        result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      } else {
+        result = await pool.query("SELECT * FROM alerts WHERE resident_id = $1 AND status != 'resolved' ORDER BY created_at DESC", [req.user.id]);
+      }
       res.json(result.rows);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -264,36 +267,51 @@ async function startServer() {
   });
 
   app.post("/api/alerts", authenticate, async (req, res) => {
-    // Offline sync fallback
-    const { type, location, description, id } = req.body;
+    const { type, location, description, id, status } = req.body;
     try {
+      let result;
       if (id) {
-        const result = await pool.query(
-          "INSERT INTO alerts (id, resident_id, type, location, description) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET type=$3, location=$4, description=$5 RETURNING *",
-          [id, req.user.id, type, JSON.stringify(location), description]
+        result = await pool.query(
+          "INSERT INTO alerts (id, resident_id, type, location, description, status) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO UPDATE SET type=$3, location=$4, description=$5, status=$6 RETURNING *",
+          [id, req.user.id, type, JSON.stringify(location), description, status || 'pending']
         );
-        res.json(result.rows[0]);
       } else {
-        const result = await pool.query(
-          "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
-          [req.user.id, type, JSON.stringify(location), description]
+        result = await pool.query(
+          "INSERT INTO alerts (resident_id, type, location, description, status) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+          [req.user.id, type, JSON.stringify(location), description, status || 'pending']
         );
-        res.json(result.rows[0]);
       }
+      const userResult = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
+      const userName = userResult.rows.length > 0 ? userResult.rows[0].name : 'Resident';
+      const alert = result.rows[0];
+      io.emit("sos_new", { ...alert, residentName: userName });
+      res.json(alert);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
   app.post("/api/alerts/:id", authenticate, async (req, res) => {
-    // Offline sync fallback for updating docs
-    const { type, location, description } = req.body;
+    const { type, location, description, status } = req.body;
     try {
-      const result = await pool.query(
-        "UPDATE alerts SET type=$1, location=$2, description=$3 WHERE id=$4 RETURNING *",
-        [type, JSON.stringify(location), description, req.params.id]
-      );
-      res.json(result.rows[0] || {});
+      const exists = await pool.query("SELECT id FROM alerts WHERE id=$1", [req.params.id]);
+      let result;
+      if (exists.rows.length === 0) {
+        result = await pool.query(
+          "INSERT INTO alerts (id, resident_id, type, location, description, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+          [req.params.id, req.user.id, type, JSON.stringify(location), description, status || 'pending']
+        );
+      } else {
+        result = await pool.query(
+          "UPDATE alerts SET type=COALESCE($1, type), location=COALESCE($2, location), description=COALESCE($3, description), status=COALESCE($4, status) WHERE id=$5 RETURNING *",
+          [type, location ? JSON.stringify(location) : null, description, status, req.params.id]
+        );
+      }
+      const userResult = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
+      const userName = userResult.rows.length > 0 ? userResult.rows[0].name : 'Resident';
+      const alert = result.rows[0];
+      io.emit("sos_new", { ...alert, residentName: userName });
+      res.json(alert || {});
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -307,10 +325,8 @@ async function startServer() {
         "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
         [req.user.id, type, JSON.stringify(location), description]
       );
-
       const userResult = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
       const userName = userResult.rows.length > 0 ? userResult.rows[0].name : 'Resident';
-
       const alert = result.rows[0];
       io.emit("sos_new", { ...alert, residentName: userName });
       res.json(alert);
@@ -321,7 +337,12 @@ async function startServer() {
 
   app.get("/api/sos/active", authenticate, async (req, res) => {
     try {
-      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      let result;
+      if (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'tanod') {
+        result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      } else {
+        result = await pool.query("SELECT * FROM alerts WHERE resident_id = $1 AND status != 'resolved' ORDER BY created_at DESC", [req.user.id]);
+      }
       res.json(result.rows);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

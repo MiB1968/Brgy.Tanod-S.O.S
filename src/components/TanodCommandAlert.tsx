@@ -55,13 +55,15 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
     setPendingResponse(null);
   };
 
-  const handleResponse = async (shiftId: string, response: 'accepted' | 'rejected') => {
+  const handleResponse = async (alertId: string, response: 'accepted' | 'rejected') => {
     try {
-      await updateDoc(doc(db, 'shifts', shiftId), {
-        tanodResponse: response,
-        status: response === 'accepted' ? 'active' : 'scheduled'
+      await updateDoc(doc(db, 'alerts', alertId), {
+        status: response === 'accepted' ? 'responding' : 'pending',
+        assignedTo: response === 'accepted' ? profile.id : null,
+        assignedName: response === 'accepted' ? profile.name : null,
+        updatedAt: new Date().toISOString()
       });
-      toast.success(response === 'accepted' ? 'Task Accepted' : 'Task Rejected');
+      toast.success(response === 'accepted' ? 'Dispatch Accepted' : 'Alert Rejected');
       siren.stop();
       setActiveAlert(null);
       setPendingResponse(null);

@@ -27,19 +27,9 @@ export const auth = {
 // Intercepting various Firestore & Auth functions to divert to our socket/api backend
 export const collection = (db: any, path: string) => ({ id: path });
 export const doc = (db: any, path: string, id: string) => ({ path, id });
-
-const getApiHeaders = () => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const apiKey = import.meta.env.VITE_API_SECRET_KEY;
-    if (apiKey) headers['x-api-key'] = apiKey;
-    const token = localStorage.getItem('token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return headers;
-};
-
 export const getDoc = async (docRef: any) => {
     try {
-        const res = await fetch(`/api/${docRef.path}/${docRef.id}`, { headers: getApiHeaders() });
+        const res = await fetch(`/api/${docRef.path}/${docRef.id}`);
         const data = await res.json();
         return { exists: () => res.ok, data: () => data };
     } catch {
@@ -47,32 +37,18 @@ export const getDoc = async (docRef: any) => {
     }
 };
 export const setDoc = async (docRef: any, data: any) => {
-    const res = await fetch(`/api/${docRef.path}/${docRef.id}`, {
+    return fetch(`/api/${docRef.path}/${docRef.id}`, {
         method: 'POST',
-        headers: getApiHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    return res;
-};
-export const addDoc = async (collectionRef: any, data: any) => {
-    const res = await fetch(`/api/${collectionRef.id}`, {
-        method: 'POST',
-        headers: getApiHeaders(),
-        body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const resData = await res.json();
-    return { id: resData.id };
 };
 export const updateDoc = async (docRef: any, data: any) => {
-    const res = await fetch(`/api/${docRef.path}/${docRef.id}`, {
+    return fetch(`/api/${docRef.path}/${docRef.id}`, {
         method: 'PATCH',
-        headers: getApiHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    return res;
 };
 export const onSnapshot = (query: any, callback: (snapshot: any) => void) => {
     // This is hard to polyfill perfectly without knowing the query
