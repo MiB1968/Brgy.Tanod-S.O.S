@@ -150,6 +150,18 @@ async function startServer() {
   app.use("/api/", limiter);
 
   // --- Auth Middleware ---
+  const API_SECRET_KEY = process.env.API_SECRET_KEY;
+  const authenticateApiKey = (req: any, res: any, next: any) => {
+    if (!API_SECRET_KEY) return res.status(401).json({ error: "API key not configured on server" });
+    const key = req.headers['x-api-key'] || req.query.api_key;
+    if (key !== API_SECRET_KEY) return res.status(401).json({ error: "Unauthorized: Invalid API Key" });
+    next();
+  };
+
+  // Apply API key auth globally for /api/ as per memory instructions:
+  // "The Express server uses an API key authentication middleware for all /api/ routes in server.ts. It validates the x-api-key header against the API_SECRET_KEY environment variable. It implements a 'fail-closed' policy"
+  app.use("/api/", authenticateApiKey);
+
   const authenticate = (req: any, res: any, next: any) => {
     const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Auth required" });
@@ -251,6 +263,42 @@ async function startServer() {
     }
   });
 
+  app.post("/api/alerts", authenticate, async (req, res) => {
+    // Offline sync fallback
+    const { type, location, description, id } = req.body;
+    try {
+      if (id) {
+        const result = await pool.query(
+          "INSERT INTO alerts (id, resident_id, type, location, description) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET type=$3, location=$4, description=$5 RETURNING *",
+          [id, req.user.id, type, JSON.stringify(location), description]
+        );
+        res.json(result.rows[0]);
+      } else {
+        const result = await pool.query(
+          "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
+          [req.user.id, type, JSON.stringify(location), description]
+        );
+        res.json(result.rows[0]);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/alerts/:id", authenticate, async (req, res) => {
+    // Offline sync fallback for updating docs
+    const { type, location, description } = req.body;
+    try {
+      const result = await pool.query(
+        "UPDATE alerts SET type=$1, location=$2, description=$3 WHERE id=$4 RETURNING *",
+        [type, JSON.stringify(location), description, req.params.id]
+      );
+      res.json(result.rows[0] || {});
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // --- SOS Logic ---
   app.post("/api/sos/alert", authenticate, async (req, res) => {
     const { type, location, description } = req.body;
@@ -259,8 +307,12 @@ async function startServer() {
         "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
         [req.user.id, type, JSON.stringify(location), description]
       );
+
+      const userResult = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
+      const userName = userResult.rows.length > 0 ? userResult.rows[0].name : 'Resident';
+
       const alert = result.rows[0];
-      io.emit("sos_new", alert);
+      io.emit("sos_new", { ...alert, residentName: userName });
       res.json(alert);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
