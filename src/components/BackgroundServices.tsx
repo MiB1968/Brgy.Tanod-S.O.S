@@ -49,8 +49,6 @@ export default function BackgroundServices() {
           }
           return; // STOP: Do not connect Realtime if REST fails
         }
-        
-        console.log('✅ Supabase Connection Test: SUCCESS (API Key is Valid)');
 
         tacticalChannel = supabase
           .channel(`tactical-command-${Math.random().toString(36).substring(2)}`)
