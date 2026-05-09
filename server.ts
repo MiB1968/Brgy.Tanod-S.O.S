@@ -18,9 +18,31 @@ async function startServer() {
 
   // Security
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://fonts.googleapis.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://unpkg.com",
+          "https://tile.openstreetmap.org",
+          "https://*.tile.openstreetmap.org",
+          "https://placehold.co",
+          "https://raw.githubusercontent.com",
+          "https://cdnjs.cloudflare.com",
+          "https://www.google.com",
+          "https://api.qrserver.com"
+        ],
+        fontSrc: ["'self'", "data:", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+        mediaSrc: ["'self'", "https://assets.mixkit.co"],
+        connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
-    frameguard: false,
+    frameguard: { action: "deny" },
   }));
   app.use(express.json());
 
