@@ -59,18 +59,33 @@ export const useSOSStore = create<SOSState>()(
 
     subscribeToUserAlerts: (userId) => {
       // Use socket instead of polling/snapshot
-      socket.on('alert_update', ({ alert }: { alert: Alert }) => {
-        if (alert.residentId === userId) {
-          if (alert.status !== 'resolved' && alert.status !== 'cancelled') {
-            set({ activeAlert: alert });
+      const handleAlertUpdate = (data: any) => {
+        const alert = data.alert;
+
+        // Map backend schema to frontend Alert schema
+        const formattedAlert: Alert = {
+            id: alert.id,
+            residentId: alert.resident_id || alert.residentId,
+            residentName: alert.residentName || 'Resident',
+            type: alert.type as EmergencyType,
+            location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
+            status: alert.status as AlertStatus,
+            timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
+        };
+
+        if (formattedAlert.residentId === userId) {
+          if (formattedAlert.status !== 'resolved' && formattedAlert.status !== 'cancelled') {
+            set({ activeAlert: formattedAlert });
           } else {
             set({ activeAlert: null });
           }
         }
-      });
+      };
+
+      socket.on('alert_update', handleAlertUpdate);
 
       return () => {
-        socket.off('alert_update');
+        socket.off('alert_update', handleAlertUpdate);
       };
     }
   }),

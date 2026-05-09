@@ -324,7 +324,7 @@ export default function App() {
     });
 
     return () => {
-      socket.off('sos_new');
+      socket.off('alert_update');
       socket.off('patrol_update');
       socket.off('broadcast_update');
     };
