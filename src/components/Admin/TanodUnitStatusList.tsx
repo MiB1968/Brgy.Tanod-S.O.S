@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { User, RegistryStatus, PatrolLocation } from '../../types';
 import { MapPin, Shield, Zap, User as UserIcon, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -12,6 +12,17 @@ interface TanodUnitStatusListProps {
 
 export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods, onUpdateStatus }) => {
   const { patrols } = useTanodStore();
+
+  // Performance Optimization: Precompute a lookup map of patrols keyed by tanodId.
+  // This avoids calling `patrols.find()` inside the `tanods.map()` loop, reducing
+  // complexity from O(N * M) to O(N + M).
+  const patrolMap = useMemo(() => {
+    const map = new Map<string, PatrolLocation>();
+    for (const patrol of patrols) {
+      map.set(patrol.tanodId, patrol);
+    }
+    return map;
+  }, [patrols]);
 
   return (
     <div className="glass-panel border-white/5 rounded-[32px] p-6 space-y-6">
@@ -27,7 +38,7 @@ export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tanods.map((tanod) => {
-          const patrol = patrols.find(p => p.tanodId === tanod.uid);
+          const patrol = patrolMap.get(tanod.uid);
           const isAlive = patrol && patrol.isActive;
           const tacticalStatus = patrol?.status || (isAlive ? 'patrolling' : 'offline');
 
