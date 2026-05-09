@@ -6,8 +6,8 @@ import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.log('SW registration failed: ', err);
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // SW registration failed
     });
   });
 }
