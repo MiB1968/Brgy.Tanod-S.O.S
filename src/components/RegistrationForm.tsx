@@ -228,7 +228,6 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     try {
       if (!auth || !db) {
         // Mock success for offline mode
-        console.log("Offline registration triggered, bypass active.");
         const mockUid = `offline_${Date.now()}`;
         toast.success("OFFLINE MODE: Registration request queued locally.", { icon: '📡' });
         onComplete();
