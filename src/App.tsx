@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import socket from './lib/socket';
 import * as api from './lib/api';
 import { 
