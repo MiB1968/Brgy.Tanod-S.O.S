@@ -331,7 +331,7 @@ async function startServer() {
           const result = await pool.query(query, [id]);
           return res.json(result.rows[0] || null);
         }
-        const query = "SELECT id, email, name, role, status FROM users WHERE role = 'resident'";
+        const query = "SELECT u.id, u.email, u.name, u.role, u.status, r.phone, r.address, r.gps_lat as \"gpsLat\", r.gps_lng as \"gpsLng\" FROM users u LEFT JOIN residents r ON u.id = r.id WHERE u.role = 'resident'";
         console.log(`DB_QUERY: ${query}`);
         const result = await pool.query(query);
         return res.json(result.rows);
@@ -406,6 +406,53 @@ async function startServer() {
           [JSON.stringify(data)]
         );
         io.emit("siren_update", data);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'alerts') {
+        const updateResult = await pool.query(
+          "UPDATE alerts SET status = $1, resolved_at = $2 WHERE id = $3 RETURNING *",
+          [data.status, data.status === 'resolved' ? new Date().toISOString() : null, docId]
+        );
+        const updatedAlert = updateResult.rows[0];
+        if (updatedAlert) {
+          io.emit("alert_update", {
+            type: 'update',
+            alert: {
+              ...updatedAlert,
+              location: typeof updatedAlert.location === 'string' ? JSON.parse(updatedAlert.location) : updatedAlert.location
+            }
+          });
+        }
+        return res.json({ success: true });
+      }
+
+      if (collection === 'users') {
+        await pool.query("UPDATE users SET status = $1, role = $2 WHERE id = $3", [data.status || 'pending', data.role || 'resident', docId]);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'incidents') {
+        await pool.query(
+          "INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, gps_location, description, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          [data.alertId, data.tanodId, data.tanodName, data.timestamp, data.type, JSON.stringify(data.gpsLocation), data.description, data.status]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'broadcasts' || collection === 'system_broadcasts') {
+        if (docId) {
+          await pool.query("UPDATE system_broadcasts SET isActive = $1 WHERE id = $2", [data.isActive, docId]);
+        } else {
+          await pool.query("INSERT INTO system_broadcasts (message, timestamp, isActive) VALUES ($1, $2, $3)", [data.message, new Date().toISOString(), true]);
+        }
+        io.emit("broadcast_update", data);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'patrols') {
+        await pool.query("UPDATE patrols SET is_active = $1, location = $2, last_ping = now() WHERE tanod_id = $3", [data.isActive, JSON.stringify(data.location), docId]);
+        io.emit("patrol_update", { tanod_id: docId, location: data.location, isActive: data.isActive });
         return res.json({ success: true });
       }
 

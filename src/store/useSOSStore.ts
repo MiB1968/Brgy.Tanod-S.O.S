@@ -59,10 +59,11 @@ export const useSOSStore = create<SOSState>()(
 
     subscribeToUserAlerts: (userId) => {
       // Use socket instead of polling/snapshot
-      socket.on('alert_update', ({ alert }: { alert: Alert }) => {
-        if (alert.residentId === userId) {
+      socket.on('alert_update', (data: any) => {
+        const alert = data.alert;
+        if (alert.residentId === userId || alert.resident_id === userId) {
           if (alert.status !== 'resolved' && alert.status !== 'cancelled') {
-            set({ activeAlert: alert });
+            set({ activeAlert: alert as Alert });
           } else {
             set({ activeAlert: null });
           }
