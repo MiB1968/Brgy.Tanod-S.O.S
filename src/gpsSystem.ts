@@ -24,7 +24,6 @@ export const startGPS = (
     socket = new WebSocket(SERVER);
 
     socket.onopen = () => {
-      console.log("Connected to GPS server");
     };
 
     socket.onmessage = (event) => {
