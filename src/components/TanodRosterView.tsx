@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   query, 
@@ -30,6 +30,14 @@ export default function TanodRosterView() {
       setTanods(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'tanod_roster'));
   }, []);
+
+  const patrolMap = useMemo(() => {
+    const map: Record<string, typeof patrols[0]> = {};
+    for (const p of patrols) {
+      map[p.tanodId] = p;
+    }
+    return map;
+  }, [patrols]);
 
   const handleAddUnit = async () => {
     if (!newUnitName.trim() || !newUnitEmail.trim() || !db) return;
@@ -124,7 +132,7 @@ export default function TanodRosterView() {
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 staggered-list">
         {tanods.map((t, index) => {
-          const patrolMatch = patrols.find(p => p.tanodId === t.uid);
+          const patrolMatch = patrolMap[t.uid];
           const isActuallyActive = patrolMatch?.isActive;
           const lastSeen = patrolMatch?.lastUpdate;
 
