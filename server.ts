@@ -34,7 +34,7 @@ async function startServer() {
 
   // Simple API Key Auth
   app.use("/api/", (req, res, next) => {
-    if (API_SECRET && req.headers['x-api-key'] !== API_SECRET) {
+    if (!API_SECRET || req.headers['x-api-key'] !== API_SECRET) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     next();
