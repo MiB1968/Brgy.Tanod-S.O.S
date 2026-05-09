@@ -9,7 +9,7 @@ import {
   IconRadar
 } from './TacticalIcons';
 import { Alert, User, RegistryStatus, TanodProfile } from '../types';
-import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X, Globe } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { cn } from '../lib/utils';
