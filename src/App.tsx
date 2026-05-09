@@ -288,16 +288,20 @@ export default function App() {
       const alert = data.alert;
       const formattedAlert: Alert = {
         id: alert.id,
-        residentId: alert.resident_id,
+        residentId: alert.resident_id || alert.residentId,
         residentName: alert.residentName || 'Resident',
         type: alert.type as EmergencyType,
         location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
         status: alert.status as AlertStatus,
-        timestamp: alert.created_at || new Date().toISOString()
+        timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
       };
-      addAlert(formattedAlert);
-      if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
-        toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+      if (data.type === 'update') {
+        useIncidentStore.getState().updateAlertStatus(formattedAlert.id, formattedAlert.status);
+      } else {
+        addAlert(formattedAlert);
+        if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
+          toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+        }
       }
     });
 
