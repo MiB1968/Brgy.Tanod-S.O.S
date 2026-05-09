@@ -28,7 +28,6 @@ export default function BackgroundServices() {
         return;
       }
 
-      console.log('📡 Initializing Tactical Live Link...');
       let isMounted = true;
       let tacticalChannel: any = null;
 
@@ -50,20 +49,18 @@ export default function BackgroundServices() {
           return; // STOP: Do not connect Realtime if REST fails
         }
         
-        console.log('✅ Supabase Connection Test: SUCCESS (API Key is Valid)');
-
         tacticalChannel = supabase
           .channel(`tactical-command-${Math.random().toString(36).substring(2)}`)
           .subscribe((status, err: any) => {
             if (status === 'SUBSCRIBED') {
-              console.log('✅ Tactical Live Link: ACTIVE');
+              // Tactical Live Link: ACTIVE
             } else if (status === 'CHANNEL_ERROR') {
               const transportError = err?.message?.includes('transport failure') || !err;
               const is1006 = err?.message?.includes('1006') || err?.code === 1006 || String(err).includes('1006');
               const isNormalClosure = err?.message?.includes('1000') || err?.code === 1000 || String(err).includes('1000');
               
               if (isNormalClosure) {
-                console.log('📡 Tactical Link: Connection closed normally (1000).');
+                // Tactical Link: Connection closed normally (1000).
               } else if (is1006) {
                 console.warn(`⏳ Tactical Link reconnecting (1006)...`);
               } else {
@@ -103,7 +100,6 @@ export default function BackgroundServices() {
     const pushLocation = async () => {
       // Respect Privacy: Check if location sharing is enabled
       if ((profile as TanodProfile)?.isLocationSharingEnabled === false) {
-        console.log('📡 Tactical Link: Privacy Shield ACTIVE (GPS Sharing Disabled)');
         return;
       }
 
@@ -154,7 +150,6 @@ export default function BackgroundServices() {
     
     const updateActivity = async () => {
       if ((profile as any).isLocationSharingEnabled === false) {
-        console.log('📡 Tactical Link: Privacy Shield DEPLOYED. Suspending GPS broadcasts.');
         try {
           await setDoc(doc(db, 'patrols', profile.uid), { 
             isActive: false,
@@ -177,8 +172,7 @@ export default function BackgroundServices() {
     if (isSupabaseConfigured) {
       channel = supabase
         .channel(`system-events-${Math.random().toString(36).substring(2)}`)
-        .on('broadcast', { event: 'logs_reset' }, (payload) => {
-          console.log('Daily Log Reset Signal Received:', payload);
+        .on('broadcast', { event: 'logs_reset' }, () => {
           clearActiveLogs();
           toast('📋 Daily Log Archived & Reset — 07:00 AM Cycle Complete', {
             duration: 8000,
@@ -187,13 +181,13 @@ export default function BackgroundServices() {
         })
         .subscribe((status, err: any) => {
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Supabase Real-time: Connected (System Events)');
+            // Supabase Real-time: Connected (System Events)
           } else if (status === 'CHANNEL_ERROR') {
             const is1006 = err?.message?.includes('1006') || err?.code === 1006 || String(err).includes('1006');
             const isNormalClosure = err?.message?.includes('1000') || err?.code === 1000 || String(err).includes('1000');
             
             if (isNormalClosure) {
-              console.log('📡 Supabase Real-time: Connection closed normally (1000/System Events).');
+              // Supabase Real-time: Connection closed normally (1000/System Events).
             } else if (!is1006) {
               console.error('❌ Supabase Real-time Error (System Events):', err);
             }
@@ -203,7 +197,6 @@ export default function BackgroundServices() {
 
     // 2.2 Local Mock Scheduler (Fallback for local dev if Edge Function isn't running)
     mockCleanup = scheduleDailyLogReset((date) => {
-      console.log(`[LOCAL_RESET] Mock Daily Reset triggered for ${date}`);
       clearActiveLogs();
       toast.success(`📋 Local Audit Cycle Logged — 07:00 AM (${date})`, {
         icon: '📊'
