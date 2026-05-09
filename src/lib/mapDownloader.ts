@@ -37,7 +37,7 @@ export async function downloadRegion(
 
     for (let x = startX; x <= endX; x++) {
       for (let y = startY; y <= endY; y++) {
-        tasks.push({ url: `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png` });
+        tasks.push({ url: `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}.png` });
       }
     }
   }
