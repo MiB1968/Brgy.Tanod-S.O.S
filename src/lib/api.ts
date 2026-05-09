@@ -109,5 +109,5 @@ export const generic = {
     method: 'DELETE',
     body: JSON.stringify({ path }),
   }),
-  list: (path: string) => fetchAPI(`/sync?path=${path}`),
+  list: (path: string) => fetchAPI(`/sync?path=${encodeURIComponent(path)}`),
 };

@@ -600,7 +600,7 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       {/* SOS Category Modal */}
       <AnimatePresence>
         {isChoosingCategory && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-start justify-center p-4 pt-16">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-start justify-center p-4 pt-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: -20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -658,7 +658,7 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       {/* SOS Description Modal */}
       <AnimatePresence>
         {sosTypeToSubmit && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-start justify-center p-4 pt-16">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-start justify-center p-4 pt-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: -20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

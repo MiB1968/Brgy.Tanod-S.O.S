@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { Shift, User } from '../types';
@@ -20,10 +20,14 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
   const [activeAlert, setActiveAlert] = useState<Shift | null>(null);
   const [pendingResponse, setPendingResponse] = useState<'accepted' | 'rejected' | null>(null);
 
-  const pendingShifts = shifts.filter(s => {
-    const isTarget = isTestMode || s.tanodId === profile.id;
-    return isTarget && s.tanodResponse === 'pending';
-  });
+  // ⚡ Bolt Optimization: Memoize the filtered shifts calculation
+  // Prevents re-filtering the entire array on every render
+  const pendingShifts = useMemo(() => {
+    return shifts.filter(s => {
+      const isTarget = isTestMode || s.tanodId === profile.id;
+      return isTarget && s.tanodResponse === 'pending';
+    });
+  }, [shifts, isTestMode, profile.id]);
 
   useEffect(() => {
     if (pendingShifts.length > 0 && !activeAlert) {

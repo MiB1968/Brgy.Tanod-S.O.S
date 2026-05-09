@@ -271,7 +271,7 @@ async function startServer() {
     const { path: fullPath } = req.query;
     if (!fullPath) return res.status(400).json({ error: "Path required" });
 
-    const fullPathStr = fullPath as string;
+    const fullPathStr = decodeURIComponent(fullPath as string);
     const [basePath, searchParams] = fullPathStr.split('?');
     const parts = basePath.split('/');
     const collection = parts[0];

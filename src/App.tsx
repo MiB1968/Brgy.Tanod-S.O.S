@@ -284,7 +284,8 @@ export default function App() {
   useEffect(() => {
     if (!profile) return;
 
-    socket.on('sos_new', (alert: any) => {
+    socket.on('alert_update', (data: any) => {
+      const alert = data.alert;
       const formattedAlert: Alert = {
         id: alert.id,
         residentId: alert.resident_id,
