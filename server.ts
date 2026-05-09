@@ -28,6 +28,23 @@ interface AuthRequest extends express.Request {
   user?: any;
 }
 
+// --- API Key Middleware ---
+function requireApiKey(req: express.Request, res: any, next: any) {
+  // Fail-closed design: if secret is not set, or key doesn't match, block.
+  const configuredSecret = process.env.API_SECRET_KEY;
+  if (!configuredSecret) {
+    console.error("CRITICAL: API_SECRET_KEY is not configured.");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const providedKey = req.headers['x-api-key'];
+  if (providedKey !== configuredSecret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  next();
+}
+
 // --- Auth Middleware ---
 function authenticate(req: AuthRequest, res: any, next: any) {
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
@@ -250,9 +267,18 @@ async function startServer() {
   });
 
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "https://*.basemaps.cartocdn.com"],
+        connectSrc: ["'self'", "ws:", "wss:"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
-    frameguard: false,
+    frameguard: { action: "deny" },
   }));
   app.use(express.json());
   app.use(cookieParser());
@@ -266,8 +292,11 @@ async function startServer() {
   });
   app.use("/api/", limiter);
 
+  // Protect all /api/ routes with API Key
+  app.use("/api/", requireApiKey);
+
   // --- Sync API (Mock Firestore to Postgres) ---
-  app.get("/api/sync", async (req, res) => {
+  app.get("/api/sync", authenticate, async (req: AuthRequest, res: any) => {
     const { path: fullPath } = req.query;
     if (!fullPath) return res.status(400).json({ error: "Path required" });
 
@@ -401,6 +430,9 @@ async function startServer() {
 
     try {
       if (collection === 'system' && docId === 'siren') {
+        if (!['admin', 'superadmin', 'tanod'].includes(req.user.role)) {
+           return res.status(403).json({ error: "Only admins and tanods can control the siren." });
+        }
         await pool.query(
           "INSERT INTO system_config (key, data, updated_at) VALUES ('siren', $1, now()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = now()",
           [JSON.stringify(data)]
@@ -507,6 +539,11 @@ async function startServer() {
   // --- Data Routes ---
   app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
+      // Authorization Check
+      if (req.user.id !== req.params.id && !['admin', 'superadmin', 'tanod'].includes(req.user.role)) {
+        return res.status(403).json({ error: "Unauthorized access to user profile" });
+      }
+
       const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
       res.json(result.rows[0]);
@@ -517,6 +554,11 @@ async function startServer() {
 
   app.get("/api/residents/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
+      // Authorization Check
+      if (req.user.id !== req.params.id && !['admin', 'superadmin', 'tanod'].includes(req.user.role)) {
+        return res.status(403).json({ error: "Unauthorized access to resident profile" });
+      }
+
       const result = await pool.query("SELECT * FROM residents WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "Resident not found" });
       res.json(result.rows[0]);
@@ -538,11 +580,18 @@ async function startServer() {
   app.post("/api/sos/alert", authenticate, async (req: AuthRequest, res: any) => {
     const { type, location, description } = req.body;
     try {
+      const userRes = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
+      const residentName = userRes.rows[0]?.name || 'Unknown Resident';
+
       const result = await pool.query(
         "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
         [req.user.id, type, JSON.stringify(location), description]
       );
-      const alert = result.rows[0];
+      const alert = {
+        ...result.rows[0],
+        residentName: residentName
+      };
+
       io.emit("alert_update", { type: 'new', alert });
       res.json(alert);
     } catch (err: any) {
@@ -561,6 +610,10 @@ async function startServer() {
 
   // --- Patrol Logic ---
   app.post("/api/patrol/ping", authenticate, async (req: AuthRequest, res: any) => {
+    if (!['tanod', 'admin', 'superadmin'].includes(req.user.role)) {
+       return res.status(403).json({ error: "Only authorized personnel can broadcast patrol pings" });
+    }
+
     const { location, isActive } = req.body;
     try {
       await pool.query(
@@ -622,6 +675,19 @@ async function startServer() {
   // Note: AI analysis moved to frontend via aiService.ts as per platform guidelines.
 
   // Socket Connection
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (token) {
+       try {
+         const user = jwt.verify(token, JWT_SECRET);
+         (socket as any).user = user;
+       } catch (e) {
+         console.warn("Socket Auth Failed", e);
+       }
+    }
+    next();
+  });
+
   io.on("connection", (socket) => {
     console.log("SOCKET: Connected", socket.id);
     socket.on("disconnect", () => console.log("SOCKET: Disconnected", socket.id));
@@ -629,12 +695,17 @@ async function startServer() {
 
   // Static Assets
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    // Only dynamically import vite in dev mode
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.error("Failed to load Vite server:", err);
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));

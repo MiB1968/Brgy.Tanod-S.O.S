@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node server.ts",
-    "build": "NODE_ENV=production vite build",
+    "start": "node dist-server/server.js",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "NODE_ENV=production vite build",
+    "build:backend": "esbuild server.ts --bundle --platform=node --format=esm --target=node18 --outfile=dist-server/server.js --external:express --external:pg --external:socket.io --external:bcryptjs --external:dotenv --external:jsonwebtoken --external:helmet --external:express-rate-limit --external:cookie-parser --external:zod",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },

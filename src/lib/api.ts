@@ -7,8 +7,13 @@ const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
+  // In a real app this would be injected via build environment variables.
+  // For now using the default created in .env
+  const API_SECRET_KEY = import.meta.env.VITE_API_SECRET_KEY || 'default_dev_key';
+
   const headers = {
     'Content-Type': 'application/json',
+    'x-api-key': API_SECRET_KEY,
     ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
