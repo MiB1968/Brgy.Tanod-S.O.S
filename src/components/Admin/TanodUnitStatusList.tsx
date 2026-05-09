@@ -13,6 +13,14 @@ interface TanodUnitStatusListProps {
 export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods, onUpdateStatus }) => {
   const { patrols } = useTanodStore();
 
+  const patrolMap = React.useMemo(() => {
+    const map: Record<string, PatrolLocation> = {};
+    for (const p of patrols) {
+      map[p.tanodId] = p;
+    }
+    return map;
+  }, [patrols]);
+
   return (
     <div className="glass-panel border-white/5 rounded-[32px] p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -27,7 +35,7 @@ export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tanods.map((tanod) => {
-          const patrol = patrols.find(p => p.tanodId === tanod.uid);
+          const patrol = patrolMap[tanod.uid];
           const isAlive = patrol && patrol.isActive;
           const tacticalStatus = patrol?.status || (isAlive ? 'patrolling' : 'offline');
 
