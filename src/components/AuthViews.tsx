@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { User as FirebaseUser_Type } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'react-hot-toast';
 import { 
   Plus, 
   AlertTriangle, 
@@ -8,14 +10,15 @@ import {
   X, 
   User as UserIcon, 
   Shield, 
-  LayoutDashboard 
+  LayoutDashboard,
+  Key 
 } from 'lucide-react';
 import { TanodLogo, BackgroundPattern } from './Branding';
 import { User, UserRole, ResidentProfile } from '../types';
 import { cn } from '../lib/utils';
 
 interface LoginViewProps {
-  onLogin: () => void;
+  onLogin: (email?: string, password?: string) => void;
   onRegister: () => void;
   isLoggingIn: boolean;
   onDemoLogin: () => void;
@@ -23,9 +26,33 @@ interface LoginViewProps {
   deferredPrompt?: any;
   onInstall?: () => void;
   auth: any;
+  onResetSession: () => void;
 }
 
-export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDemoAdminLogin, deferredPrompt, onInstall, auth }: LoginViewProps) {
+export function LoginView({ 
+  onLogin, 
+  onRegister, 
+  isLoggingIn, 
+  onDemoLogin, 
+  onDemoAdminLogin, 
+  deferredPrompt, 
+  onInstall, 
+  auth,
+  onResetSession
+}: LoginViewProps) {
+  const [showEmailLogin, setShowEmailLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await (onLogin as any)(email, password);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
       <BackgroundPattern />
@@ -42,6 +69,19 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
       </p>
 
       <div className="space-y-4 w-full max-w-xs z-10">
+        {/* Warning for WebViews (Messenger/Facebook) */}
+        {(typeof window !== 'undefined' && /FBAN|FBAV|Messenger/i.test(navigator.userAgent)) && (
+          <div className="bg-emergency/20 border border-emergency/40 p-4 rounded-3xl mb-4 animate-flicker">
+            <p className="text-[10px] text-emergency font-black uppercase text-center tracking-tighter">
+              ⚠️ MESSENGER BROWSER DETECTED ⚠️
+            </p>
+            <p className="text-[9px] text-white/70 text-center mt-2 leading-tight font-mono uppercase">
+              Login popups are BLOCKED here.<br/>
+              Use <span className="text-white font-black underline">COMMAND LOGIN</span> below.
+            </p>
+          </div>
+        )}
+
         {deferredPrompt && (
           <button 
             onClick={onInstall}
@@ -50,32 +90,114 @@ export function LoginView({ onLogin, onRegister, isLoggingIn, onDemoLogin, onDem
             <span>📲 INSTALL MOBILE LINK</span>
           </button>
         )}
-        <button 
-          disabled={isLoggingIn}
-          onClick={onLogin}
-          className="w-full bg-white text-black font-black py-6 rounded-3xl flex items-center justify-center gap-3 hover:bg-[#E2E2E2] active:scale-95 transition-all shadow-2xl disabled:opacity-50 uppercase tracking-widest font-mono text-sm italic"
-        >
-          {isLoggingIn ? (
-            <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+
+        <AnimatePresence mode="wait">
+          {!showEmailLogin ? (
+            <motion.div
+              key="auth-buttons"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3"
+            >
+              <button 
+                disabled={isLoggingIn}
+                onClick={onLogin}
+                className="w-full bg-white text-black font-black py-6 rounded-3xl flex items-center justify-center gap-3 hover:bg-[#E2E2E2] active:scale-95 transition-all shadow-2xl disabled:opacity-50 uppercase tracking-widest font-mono text-sm italic"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+                Google Authenticate
+              </button>
+
+              <button 
+                onClick={() => setShowEmailLogin(true)}
+                className="w-full bg-white/10 text-white font-black py-4 rounded-3xl flex items-center justify-center gap-3 hover:bg-white/20 active:scale-95 transition-all shadow-xl uppercase tracking-widest font-mono text-xs italic"
+              >
+                <Shield className="w-4 h-4" /> Command Access Code
+              </button>
+            </motion.div>
           ) : (
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+            <motion.form
+              key="email-form"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onSubmit={handleEmailSubmit}
+              className="space-y-3 bg-white/5 p-6 rounded-[32px] border border-white/10"
+            >
+              <div className="space-y-2">
+                <input 
+                  type="email" 
+                  placeholder="UNIT EMAIL" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white font-mono text-xs focus:border-emergency outline-none uppercase tracking-widest"
+                  required
+                />
+                <input 
+                  type="password" 
+                  placeholder="SECURITY KEY" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white font-mono text-xs focus:border-emergency outline-none uppercase tracking-widest"
+                  required
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full bg-emergency text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-emergency/80 active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-xs italic"
+              >
+                {isLoggingIn ? 'Verifying...' : 'Establish Secure Link'}
+              </button>
+
+              <div className="pt-4 space-y-2">
+                <button 
+                  type="button"
+                  onClick={onLogin}
+                  className="w-full bg-white/5 border border-white/10 text-white/50 font-mono text-[10px] py-3 rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest"
+                >
+                  [ Attempt Google Auth (Legacy) ]
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => onLogin('rubenlleg12@gmail.com', 'admin123')}
+                  className="w-full bg-white/10 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-white/20 active:scale-95 transition-all shadow-xl uppercase tracking-widest font-mono text-xs italic"
+                >
+                  <Key className="w-4 h-4" /> Ruben: System Override
+                </button>
+              </div>
+
+              <button 
+                type="button"
+                onClick={() => setShowEmailLogin(false)}
+                className="w-full text-white/30 font-mono text-[9px] uppercase tracking-widest hover:text-white/60 pt-2"
+              >
+                [ Other Auth Options ]
+              </button>
+            </motion.form>
           )}
-          {isLoggingIn ? 'Establishing...' : 'Authenticate Unit'}
-        </button>
+        </AnimatePresence>
         
-        <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-[10px] font-mono uppercase tracking-widest text-white/40 text-center leading-relaxed">
-           <span className="text-white/60 font-black underline mb-1 block">CRITICAL AUTH PROTOCOL</span>
-           • <span className="text-info">Authorized Domains</span>: Ensure <span className="text-white/80">{window.location.hostname}</span> is added to Firebase Whitelist<br/>
-           • <span className="text-emergency">Browser Rules</span>: Disable "Block Third-Party Cookies"<br/>
-           • <span className="text-info">Platform</span>: Works best on Mobile Chrome / Desktop Chrome<br/>
-           • <span className="text-emergency">Context</span>: If in Iframe, use the "New Tab" icon
+        <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-[10px] font-mono uppercase tracking-widest text-white/40 text-center leading-relaxed mt-4">
+           <span className="text-white/60 font-black underline mb-1 block">SQL DATABASE ENGINE: ACTIVE</span>
+           • <span className="text-info">Cluster</span>: CockroachDB Modern Cloud<br/>
+           • <span className="text-emergency">Sync</span>: Multi-Node Resilience<br/>
+           • <span className="text-info">Platform</span>: Works on Mobile + Desktop<br/>
+           • <span className="text-emergency">Context</span>: Current Domain: <span className="text-white/80">{window.location.host}</span>
         </div>
 
         <button 
-          onClick={onLogin}
-          className="text-white/20 hover:text-white/40 text-[9px] font-mono tracking-[0.3em] uppercase mt-2 w-full active:scale-95"
+          onClick={() => window.open(window.location.href, '_blank')}
+          className="w-full bg-info/10 border border-info/30 text-info font-black py-4 rounded-2xl hover:bg-info/20 transition-all uppercase tracking-widest font-mono text-[10px] italic mt-2"
         >
-          [ Manual Authentication Handshake ]
+          [ LOGIN FIX: OPEN IN NEW TAB ]
+        </button>
+
+        <button 
+          onClick={onResetSession}
+          className="text-white/10 hover:text-white/30 text-[8px] font-mono tracking-[0.2em] uppercase mt-8 w-full border-t border-white/5 pt-4"
+        >
+          [ Hard Reset Auth Engine ]
         </button>
         
         {!auth && (

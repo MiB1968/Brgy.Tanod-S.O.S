@@ -5,8 +5,7 @@ import { IconActiveSOS } from './TacticalIcons';
 import { Clock, Navigation } from 'lucide-react';
 import { format } from 'date-fns';
 import { SystemBroadcast, Alert } from '../types';
-import { db } from '../lib/firebase';
-import { updateDoc, doc } from 'firebase/firestore';
+import { db, updateDoc, doc } from '../lib/firebase';
 import toast from 'react-hot-toast';
 
 interface BroadcastOverlayProps {

@@ -1,15 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { setDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, db, storage } from '../lib/firebase';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { 
+  auth, 
+  db, 
+  storage, 
+  setDoc, 
+  doc, 
+  collection 
+} from '../lib/firebase';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { toast } from 'react-hot-toast';
 import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
 import { TanodLogo, BackgroundPattern } from './Branding';
 
@@ -24,8 +27,12 @@ const DefaultIcon = L.icon({
 function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.setView(center, 18);
+    if (center && isValidCoord(center[0], center[1])) {
+      try {
+        if ((map as any)._mapPane) {
+          map.setView(center, 18);
+        }
+      } catch (e) {}
     }
   }, [center, map]);
   
@@ -49,7 +56,6 @@ function MapUpdater({ center }: { center: [number, number] }) {
     const container = map.getContainer();
     observer.observe(container);
     
-    // Multiple fallbacks for React render cycles
     const timers = [
       setTimeout(safeInvalidate, 10),
       setTimeout(safeInvalidate, 100),
@@ -73,8 +79,6 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 function LocationPicker({ onLocationSelect, initialPos }: { onLocationSelect: (lat: number, lng: number) => void, initialPos: [number, number] }) {
   const [position, setPosition] = useState<[number, number] | null>(initialPos);
-  
-  // Update internal marker if initialPos changes from outside (e.g. detectLocation)
   useEffect(() => {
     setPosition(initialPos);
   }, [initialPos]);
@@ -87,12 +91,12 @@ function LocationPicker({ onLocationSelect, initialPos }: { onLocationSelect: (l
     },
   });
 
-  return position === null ? null : (
+  return position === null || !isValidCoord(position[0], position[1]) ? null : (
     <Marker position={position} icon={DefaultIcon} />
   );
 }
 
-export default function RegistrationForm({ onCancel, onComplete }: { onCancel: () => void, onComplete: () => void }) {
+export default function RegistrationForm({ onCancel, onComplete }: { onCancel: () => void, onComplete: (data: any) => void }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
@@ -127,19 +131,6 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     confirmPassword: ''
   });
 
-  if (!auth || !db) {
-    return (
-      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-6 text-center">
-        <div className="glass-panel p-12 rounded-[40px] border-emergency/30 max-w-sm">
-           <Shield className="w-16 h-16 text-emergency mx-auto mb-6" />
-           <h3 className="text-xl font-black italic text-white uppercase tracking-tighter mb-4">SYSTEM OFFLINE</h3>
-           <p className="text-white/60 text-sm font-medium mb-8">The secure cloud link is not configured. Registration restricted to local mode.</p>
-           <button onClick={onCancel} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold uppercase tracking-widest text-xs">ABORT MISSION</button>
-        </div>
-      </div>
-    );
-  }
-
   const fillDemoData = () => {
     setFormData({
       ...formData,
@@ -158,7 +149,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       householdCount: '4',
       specialNeeds: 'No',
       specialNeedsInfo: '',
-      gpsLat: 13.0641, // Occidental Mindoro center
+      gpsLat: 13.0641,
       gpsLng: 120.7303,
       username: 'juandemo123',
       password: 'Password123!',
@@ -190,34 +181,16 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
-          setFormData(prev => ({
-            ...prev,
-            gpsLat: lat,
-            gpsLng: lng
-          }));
+          setFormData(prev => ({ ...prev, gpsLat: lat, gpsLng: lng }));
           reverseGeocode(lat, lng);
           setDetecting(false);
-          // Feedback that high-precision lock was acquired
-          if (pos.coords.accuracy > 100) {
-            console.warn("GPS lock is weak: " + pos.coords.accuracy + "m");
-          }
         },
         (err) => {
           setDetecting(false);
-          let msg = 'Could not get your location.';
-          if (err.code === 1) msg = 'Location permission denied. Please enable it in settings.';
-          if (err.code === 2) msg = 'Location unavailable or weak GPS signal.';
-          if (err.code === 3) msg = 'Location request timed out.';
-          toast.error(msg);
+          toast.error('Location detection failed.');
         },
-        { 
-          enableHighAccuracy: true, 
-          timeout: 15000, 
-          maximumAge: 0 
-        }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
-    } else {
-      toast.error('Your browser does not support geolocation.');
     }
   };
 
@@ -226,113 +199,26 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     setLoading(true);
     
     try {
-      if (!auth || !db) {
-        // Mock success for offline mode
-        console.log("Offline registration triggered, bypass active.");
-        const mockUid = `offline_${Date.now()}`;
-        toast.success("OFFLINE MODE: Registration request queued locally.", { icon: '📡' });
-        onComplete();
+      if (formData.password !== formData.confirmPassword) {
+        toast.error('Passwords do not match.');
+        setLoading(false);
         return;
       }
 
-      let activeUser = auth.currentUser;
-      
-      // If not logged in, create account via email/password
-      if (!activeUser) {
-        if (!formData.email || !formData.password) {
-          toast.error('Email and password are required for new account registration.');
-          setLoading(false);
-          return;
-        }
-        if (formData.password !== formData.confirmPassword) {
-          toast.error('Passwords do not match.');
-          setLoading(false);
-          return;
-        }
-
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        activeUser = userCredential.user;
-        await updateProfile(activeUser, { displayName: formData.fullName });
-      }
-
-      const uid = activeUser.uid;
-      let uploadedIdUrl = 'https://placehold.co/600x400?text=NO+ID+UPLOADED';
-      let uploadedSelfieUrl = 'https://placehold.co/400x400?text=NO+SELFIE+UPLOADED';
-
-      if (idPhoto && storage) {
-        const idRef = ref(storage, `residents/${uid}/id_photo_${Date.now()}`);
-        await uploadBytes(idRef, idPhoto);
-        uploadedIdUrl = await getDownloadURL(idRef);
-      }
-
-      if (selfiePhoto && storage) {
-        const selfieRef = ref(storage, `residents/${uid}/selfie_${Date.now()}`);
-        await uploadBytes(selfieRef, selfiePhoto);
-        uploadedSelfieUrl = await getDownloadURL(selfieRef);
-      }
-
-      const residentData = {
-        ...formData,
-        age: parseInt(formData.age) || 0,
-        householdCount: parseInt(formData.householdCount) || 1,
-        uid: uid,
-        idPhotoUrl: uploadedIdUrl,
-        selfieUrl: uploadedSelfieUrl,
-        status: 'pending',
-        registeredAt: new Date().toISOString()
-      };
-
-      // Remove sensitive auth fields before saving to Firestore
-      const { password, confirmPassword, ...firestoreData } = residentData as any;
-
-      await setDoc(doc(db, 'residents', uid), firestoreData);
-      
-      // Sync to Supabase for Tactical Command link
-      if (isSupabaseConfigured) {
-        try {
-          const { error: supaErr } = await supabase.from('residents').upsert([{
-            id: uid,
-            name: formData.fullName,
-            age: parseInt(formData.age) || 0,
-            gender: formData.gender,
-            mobile: formData.mobileNumber,
-            address: formData.address,
-            house_number: formData.houseNumber,
-            street: formData.street,
-            location_lat: formData.gpsLat,
-            location_lng: formData.gpsLng,
-            status: 'pending',
-            created_at: new Date().toISOString()
-          }]);
-          if (supaErr) throw supaErr;
-        } catch (err) {
-          console.error('Supabase resident sync failed:', err);
-        }
-      }
-      
-      // Also create a basic user entry so they are recognized by auth flow
-      const userUpdate: any = {
-        uid: uid,
+      const registrationData = {
         name: formData.fullName,
-        email: activeUser.email || formData.email,
+        email: formData.email || `${formData.username}@tanod.local`,
+        password: formData.password,
         role: 'resident',
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        lat: formData.gpsLat,
-        lng: formData.gpsLng
+        details: {
+           ...formData,
+           status: 'pending'
+        }
       };
 
-      try {
-        const ngeohash = await import('ngeohash');
-        userUpdate.geohash = ngeohash.encode(formData.gpsLat, formData.gpsLng, 6);
-      } catch (e) {
-        console.warn("Geohash calculation failed during registration", e);
-      }
-
-      await setDoc(doc(db, 'users', uid), userUpdate);
-      
-      setSuccessId(uid);
-      setStep(5); // Success step
+      await onComplete(registrationData);
+      setSuccessId("PENDING_APPROVAL");
+      setStep(5);
     } catch (error: any) {
       console.error('Registration failed:', error);
       toast.error('Registration failed: ' + (error.message || 'Unknown error'));

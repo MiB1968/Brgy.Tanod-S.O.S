@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
-import { cn } from "./lib/utils";
+import { cn, isValidCoord } from "./lib/utils";
 import { startGPS } from "./gpsSystem";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
@@ -154,21 +154,29 @@ function MapController({ patrols, alerts, showP, showS }: any) {
 
   useEffect(() => {
     let alive = true;
-    const inv = () => { if(alive&&map&&(map as any)._mapPane) try{map.invalidateSize({animate:false})}catch{} };
+    const inv = () => { if(alive && map && (map as any)._mapPane) try { map.invalidateSize({animate:false}); } catch(e) {} };
     const ro = new window.ResizeObserver(inv);
-    ro.observe(map.getContainer());
+    const container = map.getContainer();
+    if (container) ro.observe(container);
     const ts = [10,100,500,1000].map(t=>setTimeout(inv,t));
     map.whenReady(()=>setTimeout(inv,0));
     return ()=>{ alive=false; ro.disconnect(); ts.forEach(clearTimeout); };
   }, [map]);
 
   useEffect(() => {
+    if (!map || !(map as any)._mapPane) return;
     const pts: [number, number][] = [];
-    if (showP) patrols.forEach((p:any)=>{ if(p.location?.lat&&p.location?.lng) pts.push([p.location.lat,p.location.lng]); });
-    if (showS) alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').forEach((a:any) =>{ if(a.location?.lat&&a.location?.lng) pts.push([a.location.lat,a.location.lng]); });
-    if (pts.length >= 2) try{ map.fitBounds(L.latLngBounds(pts),{padding:[52,52],maxZoom:16}); }catch{}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (showP) patrols.forEach((p:any)=>{ if(isValidCoord(p.location?.lat, p.location?.lng)) pts.push([p.location.lat,p.location.lng]); });
+    if (showS) alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').forEach((a:any) =>{ if(isValidCoord(a.location?.lat, a.location?.lng)) pts.push([a.location.lat,a.location.lng]); });
+    
+    if (pts.length >= 2) {
+      try { 
+        map.fitBounds(L.latLngBounds(pts),{padding:[52,52],maxZoom:16}); 
+      } catch(e) {
+        console.warn("fitBounds failed", e);
+      }
+    }
+  }, [map, patrols, alerts, showP, showS]);
 
   return null;
 }
@@ -485,11 +493,11 @@ export default function LiveMap() {
         )}
 
         {/* "You are here" marker + accuracy circle */}
-        {userPos && (
+        {userPos && isValidCoord(userPos.lat, userPos.lng) && (
           <>
             <Circle
               center={[userPos.lat, userPos.lng]}
-              radius={userPos.accuracy}
+              radius={userPos.accuracy || 10}
               pathOptions={{ color:"#3B82F6", fillColor:"#3B82F6", fillOpacity:0.07, weight:1, opacity:0.35 }}
             />
             <Marker position={[userPos.lat, userPos.lng]} icon={YouHereIcon} zIndexOffset={900}>
@@ -497,7 +505,7 @@ export default function LiveMap() {
                 <div className="pp">
                   <p className="pp-lbl" style={{ color:"#3B82F680" }}>GPS Position</p>
                   <p className="pp-name">📍 You are here</p>
-                  <p className="pp-meta">±{Math.round(userPos.accuracy)} m accuracy</p>
+                  <p className="pp-meta">±{Math.round(userPos.accuracy || 0)} m accuracy</p>
                 </div>
               </Popup>
             </Marker>
@@ -505,7 +513,7 @@ export default function LiveMap() {
         )}
 
         {/* Verified Residents */}
-        {showResidents && residents.map((r) => (
+        {showResidents && residents.filter(r => isValidCoord(r.gpsLat, r.gpsLng)).map((r) => (
           <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
             <Popup>
               <div className="pp">
@@ -521,26 +529,23 @@ export default function LiveMap() {
         ))}
 
         {/* Active patrols */}
-        {showPatrols && patrols.filter(p => p.isActive).map((p) =>
-          p.location?.lat && p.location?.lng ? (
-            <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={makeOfficerIcon()} zIndexOffset={100}>
-              <Popup>
-                <div className="pp">
-                  <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
-                  <p className="pp-name">{p.tanodName}</p>
-                  <span className="pp-badge" style={{ background:"rgba(74,239,128,0.12)", color:"#4AEF80", border:"1px solid rgba(74,239,128,0.25)" }}>
-                    🟢 ON DUTY
-                  </span>
-                  <p className="pp-meta">Last ping: {new Date(p.lastUpdate).toLocaleTimeString()}</p>
-                </div>
-              </Popup>
-            </Marker>
-          ) : null
-        )}
+        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => (
+          <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={makeOfficerIcon()} zIndexOffset={100}>
+            <Popup>
+              <div className="pp">
+                <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
+                <p className="pp-name">{p.tanodName}</p>
+                <span className="pp-badge" style={{ background:"rgba(74,239,128,0.12)", color:"#4AEF80", border:"1px solid rgba(74,239,128,0.25)" }}>
+                  🟢 ON DUTY
+                </span>
+                <p className="pp-meta">Last ping: {new Date(p.lastUpdate).toLocaleTimeString()}</p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
         {/* SOS alerts */}
-        {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').map((a) => {
-          if (!a.location?.lat || !a.location?.lng) return null;
+        {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)).map((a) => {
           const s = getSev(a.type);
           return (
             <Marker key={a.id} position={[a.location.lat, a.location.lng]} icon={makeSosIcon(a.type)} zIndexOffset={200}>

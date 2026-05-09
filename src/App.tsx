@@ -5,33 +5,32 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
-  onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  signOut,
-  User as FirebaseUser,
-  getRedirectResult,
-  browserSessionPersistence,
-  signInWithRedirect,
-  indexedDBLocalPersistence,
-  setPersistence,
-  signInAnonymously
-} from 'firebase/auth';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
+  auth, 
+  db, 
+  signInWithEmail, 
+  registerWithEmail, 
+  signOut as dbSignOut,
+  loginWithGoogle,
+  onAuthStateChanged,
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
   updateDoc,
   limit,
   Timestamp,
-  getDocs
-} from 'firebase/firestore';
-import { auth, db } from './lib/firebase';
+  getDocs,
+  getRedirectResult,
+  signInAnonymously,
+  setPersistence,
+  browserSessionPersistence
+} from './lib/firebase';
+import socket from './lib/socket';
+type FirebaseUser = any;
 import { 
   User, 
   Alert, 
@@ -139,7 +138,7 @@ export default function App() {
     isLoading: loading, 
     setIsLoading: setLoading 
   } = useAuthStore();
-  const { alerts, setAlerts } = useIncidentStore();
+  const { alerts, setAlerts, addAlert } = useIncidentStore();
   const { patrols, setPatrols } = useTanodStore();
   const { 
     isOnline, 
@@ -195,14 +194,14 @@ export default function App() {
     }
   };
 
-  const isMasterAdminEmail = useMemo(() => {
-    return user?.email === 'rubenlleg12@gmail.com' || user?.email === 'ronniecantuba420@gmail.com';
-  }, [user?.email]);
+  const isMasterAdmin = useMemo(() => {
+    return checkIsRuben(user?.uid, user?.email || undefined);
+  }, [user?.uid, user?.email]);
   
   const baseRole = useMemo(() => {
-    if (isMasterAdminEmail) return 'superadmin';
+    if (isMasterAdmin) return 'superadmin';
     return profile?.role || 'guest';
-  }, [isMasterAdminEmail, profile?.role]);
+  }, [isMasterAdmin, profile?.role]);
 
   const effectiveRole = viewOverride || baseRole;
 
@@ -212,7 +211,7 @@ export default function App() {
     return { 
       ...p, 
       role: effectiveRole as UserRole,
-      name: checkIsRuben(user?.uid) ? `${p.name} (SuperAdmin)` : p.name
+      name: checkIsRuben(user?.uid, user?.email || undefined) ? `${p.name} (SuperAdmin)` : p.name
     } as User;
   }, [profile, effectiveRole, user]);
 
@@ -339,32 +338,43 @@ export default function App() {
     if (!auth || !db) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("AUTH_STATE_REPORT:", { 
+      console.log("AUTH_STATE_CHANGED:", { 
         loggedIn: !!firebaseUser, 
         uid: firebaseUser?.uid, 
         email: firebaseUser?.email,
-        timestamp: new Date().toISOString()
+        displayName: firebaseUser?.displayName,
+        isAnonymous: firebaseUser?.isAnonymous,
+        emailVerified: firebaseUser?.emailVerified
       });
 
       setUser(firebaseUser);
+      
       if (firebaseUser) {
+        setIsLoggingIn(false); // Success! Clear button state
         try {
           if (!loading) setLoading(true);
+          console.log("AUTH_SYNC: Fetching profile for", firebaseUser.uid);
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
-            setProfile(userDoc.data() as User);
-          } else if (checkIsRuben(firebaseUser.uid) || firebaseUser.email === 'rubenlleg12@gmail.com') {
+            const data = userDoc.data() as User;
+            console.log("AUTH_SYNC: Profile found", data.role);
+            setProfile(data);
+          } else if (checkIsRuben(firebaseUser.uid, firebaseUser.email || undefined)) {
+            console.log("AUTH_SYNC: Auto-provisioning admin for", firebaseUser.email);
             const adminProfile: User = {
               uid: firebaseUser.uid,
               id: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Ruben Llego',
-              email: firebaseUser.email || 'rubenlleg12@gmail.com',
+              name: firebaseUser.displayName || 'Administrator',
+              email: firebaseUser.email || '',
               role: 'superadmin',
               createdAt: new Date().toISOString(),
-              status: 'approved'
+              status: 'approved',
+              lastActive: new Date().toISOString()
             } as User;
             await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
             setProfile(adminProfile);
+          } else {
+            console.log("AUTH_SYNC: No profile found, user must select role");
           }
 
           const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
@@ -372,12 +382,13 @@ export default function App() {
             setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
           }
         } catch (err) {
-          console.error("Profile sync error:", err);
-          toast.error("DATA_SYNC_ERROR: Profile retrieval failed.");
+          console.error("Profile sync error details:", err);
+          toast.error("DATA_SYNC_ERROR: Profile retrieval failed. Check connection.");
         } finally {
           setLoading(false);
         }
       } else {
+        console.log("AUTH_SYNC: User is null, clearing profiles");
         setProfile(null);
         setResidentProfile(null);
         setLoading(false);
@@ -391,71 +402,89 @@ export default function App() {
   useEffect(() => {
     if (!auth) return;
     
-    // Check for redirect result silently
     getRedirectResult(auth)
       .then((result) => {
         if (result) {
-          console.log("REDIRECT_FLOW_SUCCESS:", result.user.email);
+          console.log("REDIRECT_RESULT: Got user", result.user.email);
+          setUser(result.user);
         }
       })
       .catch((error) => {
-        console.warn("REDIRECT_FLOW_IGNORED_ERROR:", error);
+        if (error.code === 'auth/unauthorized-domain') {
+          console.error("REDIRECT_ERROR: Unauthorized domain", window.location.hostname);
+        } else if (error.code !== 'auth/popup-closed-by-user') {
+          console.warn("REDIRECT_RESULT_ERROR:", error);
+        }
       });
   }, [auth]);
 
-  const handleLogin = async () => {
-    if (isLoggingIn || !auth) return;
+  // Handle Auth with email/pass
+  const handleLogin = async (email?: string, password?: string) => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     
-    const isIframe = window.self !== window.top;
-
-      // In the AI Studio preview environment, the app runs in an iframe.
-      // Firebase Auth handles iframe constraints automatically, so we don't need to block it.
-      
-      try {
-        setIsLoggingIn(true);
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        
-        try {
-          await signInWithPopup(auth, provider);
-          toast.success(`Access Granted`, { icon: '🔑' });
-        } catch (popupErr: any) {
-          console.warn("POPUP BLOCKED OR FAILED. FALLING BACK TO REDIRECT.", popupErr);
-          if (popupErr.code === 'auth/popup-blocked' || popupErr.code === 'auth/cancelled-popup-request') {
-             toast.loading("Popup blocked. Switching to Redirect flow...", { duration: 3000 });
-             await signInWithRedirect(auth, provider);
-          } else {
-             throw popupErr;
-          }
-        }
-      } catch (err: any) {
-        console.error("AUTH_FAULT:", err);
-        
-        if (err.code === 'auth/unauthorized-domain') {
-          toast.error(`SECURITY: Unauthorized Host. Contact Admin.`, { duration: 10000 });
-        } else if (err.code === 'auth/network-request-failed') {
-          toast.error('NETWORK ERROR: Connection unstable. Check your signal.');
-        } else if (err.code !== 'auth/popup-closed-by-user') {
-          toast.error(`AUTH ERROR: Try "Guest Mode" if using Incognito. (${err.message})`, { duration: 8000 });
-        }
-      } finally {
-        setIsLoggingIn(false);
+    try {
+      if (email && password) {
+        await signInWithEmail(email, password);
+        toast.success(`Unit Authenticated`, { icon: '🔑' });
+      } else {
+        await loginWithGoogle();
       }
+    } catch (err: any) {
+      console.error("AUTH_FAULT:", err);
+      toast.error(`AUTH FAILURE: ${err.message}`);
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleLogout = async () => {
-    if (!auth) return;
-    try {
-      await signOut(auth);
-      setUser(null);
-      setProfile(null);
-      setResidentProfile(null);
-      setActiveTab('home');
-      toast.success("SESSION_TERMINATED: Unit logged out.");
-    } catch (err) {
-      console.error("Logout failure:", err);
-    }
+    await dbSignOut();
   };
+
+  const resetAuthSession = async () => {
+    await dbSignOut();
+  };
+
+  // Socket Listeners for Real-time Updates (Replacing Firestore snapshots)
+  useEffect(() => {
+    if (!profile) return;
+
+    socket.on('sos_new', (alert: any) => {
+      const formattedAlert: Alert = {
+        id: alert.id,
+        residentId: alert.resident_id,
+        residentName: alert.residentName || 'Resident',
+        type: alert.type as EmergencyType,
+        location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
+        status: alert.status as AlertStatus,
+        timestamp: alert.created_at || new Date().toISOString()
+      };
+      addAlert(formattedAlert);
+      if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
+        toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+      }
+    });
+
+    socket.on('patrol_update', (update: any) => {
+       const patrol: PatrolLocation = {
+         id: update.tanod_id,
+         tanodId: update.tanod_id,
+         tanodName: 'Active Tanod',
+         location: typeof update.location === 'string' ? JSON.parse(update.location) : update.location,
+         isActive: update.isActive,
+         status: update.isActive ? 'patrolling' : 'offline',
+         lastUpdate: new Date().toISOString()
+       };
+       
+       setPatrols([...patrols.filter(p => p.tanodId !== update.tanod_id), patrol]);
+    });
+
+    return () => {
+      socket.off('sos_new');
+      socket.off('patrol_update');
+    };
+  }, [profile, setAlerts, setPatrols]);
 
   const [isSettingRole, setIsSettingRole] = useState(false);
   const handleSetRole = async (role: UserRole) => {
@@ -541,7 +570,20 @@ export default function App() {
     );
   }
 
-  if (isRegistering) return <RegistrationForm onCancel={() => setIsRegistering(false)} onComplete={() => { setIsRegistering(false); window.location.reload(); }} />;
+  // Handle Registration
+  if (isRegistering) return (
+    <RegistrationForm 
+      onCancel={() => setIsRegistering(false)} 
+      onComplete={async (data: any) => {
+        try {
+          await registerWithEmail(data.email, data.password, data.name, data.role, data.details);
+          setIsRegistering(false);
+        } catch (err: any) {
+          toast.error(err.message);
+        }
+      }} 
+    />
+  );
 
   if (!user) return (
     <LoginView 
@@ -553,6 +595,7 @@ export default function App() {
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
       auth={auth}
+      onResetSession={resetAuthSession}
     />
   );
 
@@ -684,7 +727,7 @@ export default function App() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-            {(isMasterAdminEmail || checkIsRuben(user?.uid)) && (
+            {(isMasterAdmin || checkIsRuben(user?.uid, user?.email || undefined)) && (
               <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
                 <button 
                   onClick={() => { setViewOverride(null); setActiveTab('home'); }} 

@@ -41,15 +41,19 @@ export const itemVariants = {
   show: { opacity: 1, y: 0 }
 };
 
-export const isRuben = (uid?: string) => {
-  if (!uid) return false;
-  const superAdmins = [
+export const isRuben = (uid?: string, email?: string) => {
+  if (!uid && !email) return false;
+  const superAdminUids = [
     'G6fWn6Crv1Yh2Tz9fSreFmX3G1r1',
     'v1',
     'anonymous_admin_demo',
-    'FzSXHYkqqshwvnYpYbvjN5VnbLR2' // Adding Ruben's current UID from logs
+    'FzSXHYkqqshwvnYpYbvjN5VnbLR2' // Ruben
   ];
-  return superAdmins.includes(uid);
+  const superAdminEmails = [
+    'rubenlleg12@gmail.com',
+    'ronniecantuba420@gmail.com'
+  ];
+  return superAdminUids.includes(uid || '') || superAdminEmails.includes(email || '');
 };
 
 export const PATROL_TIMEOUT = 1000 * 60 * 5; // 5 minutes

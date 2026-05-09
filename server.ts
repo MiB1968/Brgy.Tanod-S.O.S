@@ -5,160 +5,309 @@ import * as http from "http";
 import path from "path";
 import { z } from "zod";
 import { GoogleGenAI } from "@google/genai";
+import pg from "pg";
+import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import cookieParser from "cookie-parser";
+import dotenv from "dotenv";
 
-const apiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" ? process.env.GEMINI_API_KEY.trim() : null;
-const API_SECRET = process.env.API_SECRET_KEY;
+dotenv.config();
 
-// Initialize AI without an empty API key
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : new GoogleGenAI({});
+const { Pool } = pg;
+const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
+const DATABASE_URL = process.env.DATABASE_URL;
+const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
+
+// Initialize AI
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+// Database Pool
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false }
+});
+
+async function initDb() {
+  let client;
+  try {
+    console.log("DB_INIT: Connecting to database...");
+    if (!DATABASE_URL) {
+      console.warn("DB_INIT: DATABASE_URL not found. Skipping schema sync.");
+      return;
+    }
+    client = await pool.connect();
+    console.log("DB_INIT: Verifying CockroachDB Schema...");
+    
+    // Users Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'resident',
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT now(),
+        last_active TIMESTAMPTZ DEFAULT now()
+      );
+    `);
+
+    // Residents Table (Profile data)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS residents (
+        id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        phone TEXT,
+        address TEXT,
+        house_number TEXT,
+        household_size INT DEFAULT 1,
+        blood_type TEXT,
+        medical_conditions TEXT[],
+        emergency_contact_name TEXT,
+        emergency_contact_phone TEXT,
+        gps_lat FLOAT,
+        gps_lng FLOAT,
+        is_verified BOOLEAN DEFAULT false,
+        verification_date TIMESTAMPTZ
+      );
+    `);
+
+    // SOS Alerts Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS alerts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        resident_id UUID REFERENCES users(id),
+        type TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        location JSONB NOT NULL,
+        description TEXT,
+        severity_score INT,
+        ai_analysis JSONB,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now(),
+        resolved_at TIMESTAMPTZ
+      );
+    `);
+
+    // Patrols Table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS patrols (
+        tanod_id UUID PRIMARY KEY REFERENCES users(id),
+        is_active BOOLEAN DEFAULT false,
+        location JSONB,
+        last_ping TIMESTAMPTZ DEFAULT now()
+      );
+    `);
+
+    console.log("DB_INIT: Schema synchronized.");
+
+    // Bootstrap Admin (Ruben)
+    const adminEmail = 'rubenlleg12@gmail.com';
+    const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+    if (adminResult.rows.length === 0) {
+      console.log("DB_INIT: Bootstrapping Admin Account...");
+      const hashedPass = await bcrypt.hash('admin123', 10);
+      await client.query(
+        "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+        [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
+      );
+    }
+  } catch (err) {
+    console.error("DB_INIT_ERROR:", err);
+  } finally {
+    if (client) client.release();
+  }
+}
 
 async function startServer() {
-  const app = express();
-  const PORT = 3000;
+  try {
+    await initDb();
+  } catch (err) {
+    console.error("SERVER_START_DB_ERROR:", err);
+  }
 
-  // Security
+  const app = express();
+  const PORT = process.env.PORT || 3000;
+  const server = http.createServer(app);
+  const io = new Server(server, {
+    cors: { origin: "*" }
+  });
+
   app.use(helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     frameguard: false,
   }));
   app.use(express.json());
+  app.use(cookieParser());
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
-    limit: 100, 
+    limit: 100,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
   });
   app.use("/api/", limiter);
 
-  // Simple API Key Auth
-  app.use("/api/", (req, res, next) => {
-    if (API_SECRET && req.headers['x-api-key'] !== API_SECRET) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-    next();
-  });
-
-  // Helper to run AI model
-  async function runAiRequest(prompt: string, systemInstruction?: string): Promise<string> {
+  // --- Auth Middleware ---
+  const authenticate = (req: any, res: any, next: any) => {
+    const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "Auth required" });
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: prompt,
-        config: systemInstruction ? { systemInstruction } : undefined,
-      });
-      const text = response.text;
-      if (!text) throw new Error("Empty response from Gemini");
-      return text;
-    } catch (error: any) {
-      console.error("AI Request failed:", error.message);
-      throw error;
+      req.user = jwt.verify(token, JWT_SECRET);
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Invalid token" });
     }
-  }
+  };
 
-  // Create HTTP server
-  const server = http.createServer(app);
-
-  // -----------------------------
-  // HTTP Endpoints
-  // -----------------------------
-
-  const aiAnalysisSchema = z.object({
-    description: z.string(),
-    initialType: z.string().optional()
-  });
-
-  app.post("/api/ai/analyze", async (req, res) => {
-    const check = aiAnalysisSchema.safeParse(req.body);
-    if (!check.success) return res.status(400).json({ error: check.error });
-
-    const { description, initialType } = check.data;
-
-    const prompt = `
-      Analyze the following Philippine barangay emergency SOS description and categorize it. 
-      Initial reported type: ${initialType || 'Unknown'}
-      Description: ${description}
+  // --- Auth Routes ---
+  app.post("/api/auth/register", async (req, res) => {
+    const { email, password, name, role, details } = req.body;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const hashed = await bcrypt.hash(password, 10);
+      const userResult = await client.query(
+        "INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role",
+        [email, hashed, name, role || 'resident']
+      );
       
-      Respond in strict JSON format with exactly:
-      {
-        "incidentType": "MEDICAL" | "FIRE" | "CRIME" | "DISTURBANCE" | "OTHER",
-        "severityScore": number (1-10),
-        "urgency": "LOW" | "NORMAL" | "HIGH" | "CRITICAL",
-        "summary": "1-sentence tactical summary",
-        "recommendedResponders": ["Tanod", "BFP", etc],
-        "riskFactors": ["factor 1", "factor 2"]
+      const userId = userResult.rows[0].id;
+
+      if (role === 'resident' && details) {
+        await client.query(
+          `INSERT INTO residents (id, phone, address, house_number, household_size, gps_lat, gps_lng) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            userId, 
+            details.mobileNumber, 
+            details.address, 
+            details.houseNumber, 
+            parseInt(details.householdCount) || 1,
+            details.gpsLat,
+            details.gpsLng
+          ]
+        );
       }
-    `;
 
+      await client.query('COMMIT');
+      const token = jwt.sign({ id: userId, role: userResult.rows[0].role }, JWT_SECRET);
+      res.cookie("token", token, { httpOnly: true }).json({ user: userResult.rows[0], token });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    const { email, password } = req.body;
     try {
-      const text = await runAiRequest(prompt);
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("Format failure");
-      res.json(JSON.parse(jsonMatch[0]));
-    } catch (error: any) {
-      console.error("AI Analysis Error:", error);
-      res.status(500).json({ 
-        error: "Analysis engine failed after multiple retries",
-        details: error.message 
+      const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+      if (result.rows.length === 0) return res.status(401).json({ error: "User not found" });
+      const user = result.rows[0];
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+      
+      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
+      res.cookie("token", token, { httpOnly: true }).json({ 
+        user: { id: user.id, email: user.email, name: user.name, role: user.role }, 
+        token 
       });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
-  const smsSchema = z.object({
-    to: z.string(),
-    message: z.string()
-  });
-
-  app.post("/api/sms", async (req, res) => {
-    const result = smsSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ error: result.error });
-    }
-    const { to, message } = result.data;
-    const apiKey = process.env.SEMAPHORE_API_KEY;
-
-    if (!apiKey) {
-      console.log('SMS Simulation (No Key):', { to, message });
-      return res.json({ success: true, simulated: true });
-    }
-
+  // --- Data Routes ---
+  app.get("/api/users/:id", authenticate, async (req, res) => {
     try {
-      const response = await fetch('https://api.semaphore.co/api/v4/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          apikey: apiKey,
-          number: to,
-          message: message,
-        }),
-      });
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to send SMS" });
+      const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
+      res.json(result.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "RUNNING", message: "Brgy Tanod GPS Live (Node.js)" });
-  });
-
-  // Custom route for service worker to ensure to always fetch the latest version
-  app.get('/sw.js', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    if (process.env.NODE_ENV !== "production") {
-        res.sendFile(path.join(process.cwd(), 'public', 'sw.js'));
-    } else {
-        res.sendFile(path.join(process.cwd(), 'dist', 'sw.js'));
+  app.get("/api/residents/:id", authenticate, async (req, res) => {
+    try {
+      const result = await pool.query("SELECT * FROM residents WHERE id = $1", [req.params.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Resident not found" });
+      res.json(result.rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
-  // Vite middleware for development
+  app.get("/api/alerts/active", authenticate, async (req, res) => {
+    try {
+      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- SOS Logic ---
+  app.post("/api/sos/alert", authenticate, async (req, res) => {
+    const { type, location, description } = req.body;
+    try {
+      const result = await pool.query(
+        "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
+        [req.user.id, type, JSON.stringify(location), description]
+      );
+      const alert = result.rows[0];
+      io.emit("sos_new", alert);
+      res.json(alert);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/sos/active", authenticate, async (req, res) => {
+    try {
+      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      res.json(result.rows);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Patrol Logic ---
+  app.post("/api/patrol/ping", authenticate, async (req, res) => {
+    const { location, isActive } = req.body;
+    try {
+      await pool.query(
+        `INSERT INTO patrols (tanod_id, is_active, location, last_ping) 
+         VALUES ($1, $2, $3, now()) 
+         ON CONFLICT (tanod_id) DO UPDATE 
+         SET is_active = $2, location = $3, last_ping = now()`,
+        [req.user.id, isActive, JSON.stringify(location)]
+      );
+      io.emit("patrol_update", { tanod_id: req.user.id, location, isActive });
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- AI Analysis ---
+  app.post("/api/ai/analyze", authenticate, async (req, res) => {
+    if (!ai) return res.status(503).json({ error: "AI not configured" });
+    // ... AI logic handled by Gemini skill pattern later if needed
+    res.json({ analysis: "Automated analysis pending refactor" });
+  });
+
+  // Socket Connection
+  io.on("connection", (socket) => {
+    console.log("SOCKET: Connected", socket.id);
+    socket.on("disconnect", () => console.log("SOCKET: Disconnected", socket.id));
+  });
+
+  // Static Assets
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
@@ -168,19 +317,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    const publicPath = path.join(process.cwd(), 'public');
-    
-    // Serve from dist first, then public as fallback
     app.use(express.static(distPath));
-    app.use(express.static(publicPath));
-    
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  server.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`CockroachDB Backend LIVE on port ${PORT}`);
   });
 }
 

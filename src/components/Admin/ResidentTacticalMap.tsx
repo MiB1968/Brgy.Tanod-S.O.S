@@ -7,7 +7,7 @@ import { db } from '../../lib/firebase';
 import { ResidentProfile } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, Filter, MapPin, Phone, User, Calendar, ShieldCheck, ExternalLink } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, isValidCoord } from '../../lib/utils';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet icon issue
@@ -52,7 +52,7 @@ export default function ResidentTacticalMap() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResidentProfile));
       // Filter out those without valid coordinates
-      const validData = data.filter(r => r.gpsLat && r.gpsLng);
+      const validData = data.filter(r => isValidCoord(r.gpsLat, r.gpsLng));
       setResidents(validData);
       setLoading(false);
     });

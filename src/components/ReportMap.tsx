@@ -2,6 +2,7 @@ import React from "react";
 import { MapContainer, Marker, Popup } from "react-leaflet";
 import L from 'leaflet';
 import { OfflineTileLayer } from './OfflineTileLayer';
+import { isValidCoord } from "../lib/utils";
 
 const IncidentIcon = L.divIcon({
   className: 'custom-div-icon',
@@ -16,6 +17,14 @@ interface ReportMapProps {
 }
 
 export default function ReportMap({ lat, lng }: ReportMapProps) {
+  if (!isValidCoord(lat, lng)) {
+    return (
+      <div className="w-full h-[200px] rounded-xl overflow-hidden border border-[#2D3139] flex items-center justify-center bg-black/40 text-white/30 text-xs font-black uppercase tracking-widest font-mono">
+        Geodata Incomplete
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-[200px] rounded-xl overflow-hidden border border-[#2D3139] shadow-2xl relative mt-4">
       <MapContainer 

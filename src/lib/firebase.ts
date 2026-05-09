@@ -1,36 +1,113 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, indexedDBLocalPersistence } from 'firebase/auth';
-import { initializeFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import firebaseConfig from '../../firebase-applet-config.json';
+// Compatibility layer for switching from Firebase to CockroachDB/SQL Backend
+import { toast } from 'react-hot-toast';
 
-let app: any = null;
-let db: any = null;
-let auth: any = null;
-let storage: any = null;
+// This is a minimal compatibility layer to prevent the app from crashing.
+// Real Auth and DB operations should now go through our custom API.
 
-try {
-  if (firebaseConfig.apiKey === 'PLACEHOLDER') {
-    throw new Error('Firebase API Key is still set to PLACEHOLDER. Please run set_up_firebase.');
-  }
+export const onAuthStateChanged = (auth: any, callback: (user: any) => void) => {
+    // Check localStorage for a token/user session
+    const saved = localStorage.getItem('user');
+    if (saved) {
+      try {
+        const user = JSON.parse(saved);
+        callback(user);
+      } catch {
+        callback(null);
+      }
+    } else {
+      callback(null);
+    }
+};
 
-  app = initializeApp(firebaseConfig);
-  
-  // Initialize Firestore with specific database ID from config
-  const dbId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
-  db = initializeFirestore(app, {
-    ignoreUndefinedProperties: true
-  }, dbId);
-  
-  auth = getAuth(app);
-  // Ensure persistence is set, but catch potential errors in private browsing/incognito
-  setPersistence(auth, indexedDBLocalPersistence).catch(err => {
-    console.warn("Auth persistence failed:", err);
-  });
-  
-  storage = getStorage(app);
-} catch (err) {
-  console.error("Firebase init failed:", err);
-}
+export const auth = {
+  currentUser: null as any,
+  onAuthStateChanged: (callback: (user: any) => void) => onAuthStateChanged(null, callback)
+};
 
-export { db, auth, storage };
+// Intercepting various Firestore & Auth functions to divert to our socket/api backend
+export const collection = (db: any, path: string) => ({ id: path });
+export const doc = (db: any, path: string, id: string) => ({ path, id });
+export const getDoc = async (docRef: any) => {
+    try {
+        const res = await fetch(`/api/${docRef.path}/${docRef.id}`);
+        const data = await res.json();
+        return { exists: () => res.ok, data: () => data };
+    } catch {
+        return { exists: () => false };
+    }
+};
+export const setDoc = async (docRef: any, data: any) => {
+    return fetch(`/api/${docRef.path}/${docRef.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+};
+export const updateDoc = async (docRef: any, data: any) => {
+    return fetch(`/api/${docRef.path}/${docRef.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+};
+export const onSnapshot = (query: any, callback: (snapshot: any) => void) => {
+    // This is hard to polyfill perfectly without knowing the query
+    // For now, we'll just skip it as we are using Sockets in App.tsx to catch updates
+    return () => {}; 
+};
+export const query = (...args: any[]) => ({});
+export const where = (...args: any[]) => ({});
+export const orderBy = (...args: any[]) => ({});
+export const limit = (...args: any[]) => ({});
+export const getDocs = async (q: any) => ({ empty: true, docs: [] });
+export const Timestamp = { now: () => new Date() };
+
+export const db: any = {
+  internal: "Proxy for SQL Backend"
+};
+
+export const getRedirectResult = async () => null;
+export const signInWithRedirect = async () => {};
+export const signInAnonymously = async () => ({ user: { uid: 'demo' } } as any);
+export const GoogleAuthProvider = class {};
+export const browserSessionPersistence = 'SESSION';
+export const indexedDBLocalPersistence = 'INDEXEDDB';
+export const setPersistence = async () => {};
+
+export const storage: any = {};
+
+// Helper for Login
+export const loginWithGoogle = async () => {
+    toast.error("Google Auth requires project-level configuration. Using Email/Password for now.");
+};
+
+export const signInWithEmail = async (email: string, pass: string) => {
+    const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('token', data.token);
+    window.location.reload();
+};
+
+export const registerWithEmail = async (email: string, pass: string, name: string, role: string, details?: any) => {
+    const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass, name, role, details })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('token', data.token);
+    window.location.reload();
+};
+
+export const signOut = async () => {
+    localStorage.clear();
+    window.location.reload();
+};

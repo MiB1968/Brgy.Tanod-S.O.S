@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { downloadRegion, OCCIDENTAL_MINDORO_BOUNDS } from '../lib/mapDownloader';
 import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
 
 // Fix for default marker icons in Leaflet with React
@@ -73,8 +73,14 @@ const createTanodIcon = (patrol: PatrolLocation) => {
 function ChangeView({ center, zoom }: { center: [number, number], zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.setView(center, zoom || map.getZoom());
+    if (center && isValidCoord(center[0], center[1])) {
+      try {
+        if ((map as any)._mapPane) {
+          map.setView(center, zoom || map.getZoom());
+        }
+      } catch (e) {
+        console.warn("Leaflet setView failed", e);
+      }
     }
   }, [center, zoom, map]);
 
@@ -95,8 +101,10 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom?: number 
       safeInvalidate();
     });
     
-    const container = map.getContainer();
-    observer.observe(container);
+    try {
+      const container = map.getContainer();
+      if (container) observer.observe(container);
+    } catch (e) {}
     
     // Multiple fallbacks for React render cycles
     const timers = [
@@ -119,7 +127,7 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom?: number 
   return null;
 }
 
-function MyLocationButton() {
+function MyLocationButton({ onLocated }: { onLocated: (lat: number, lng: number) => void }) {
   const map = useMap();
   const [locating, setLocating] = useState(false);
 
@@ -128,22 +136,10 @@ function MyLocationButton() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        map.flyTo([latitude, longitude], 17);
-        
-        const RedIcon = L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41]
-        });
-
-        L.marker([latitude, longitude], { icon: RedIcon })
-          .addTo(map)
-          .bindPopup("<div class='text-black font-black uppercase text-[10px]'>Your Position</div>")
-          .openPopup();
-          
+        try {
+          map.flyTo([latitude, longitude], 17);
+          onLocated(latitude, longitude);
+        } catch (e) {}
         setLocating(false);
       },
       (err) => {
@@ -188,6 +184,7 @@ export default function ActiveMap({
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [isDownloaded, setIsDownloaded] = useState(false);
+  const [userMarker, setUserMarker] = useState<[number, number] | null>(null);
 
   // Determine final center: 
   // 1. First active alert
@@ -248,10 +245,27 @@ export default function ActiveMap({
         />
         <ChangeView center={mapCenter} zoom={zoom} />
         
-        <MyLocationButton />
+        <MyLocationButton onLocated={(lat, lng) => setUserMarker([lat, lng])} />
+
+        {userMarker && (
+          <Marker position={userMarker} icon={L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          })}>
+            <Popup className="dark-popup">
+              <div className="p-1">
+                <p className="font-bold text-info">Your Position</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
         
         {/* Selection Marker */}
-        {onLocationSelect && selectionLocation && (
+        {onLocationSelect && selectionLocation && isValidCoord(selectionLocation.lat, selectionLocation.lng) && (
           <Marker 
             position={[selectionLocation.lat, selectionLocation.lng]} 
             draggable={true}
@@ -289,7 +303,7 @@ export default function ActiveMap({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(15,17,21,0.6)_100%)]"></div>
         </div>
         
-        {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').map(alert => (
+        {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location.lat, a.location.lng)).map(alert => (
           <React.Fragment key={alert.id}>
             {showHeatmap && alert.aiAnalysis && alert.aiAnalysis.severityScore > 6 && (
               <Circle 
@@ -363,7 +377,7 @@ export default function ActiveMap({
           </React.Fragment>
         ))}
 
-        {patrols.filter(p => p.isActive).map(patrol => (
+        {patrols.filter(p => p.isActive && isValidCoord(p.location.lat, p.location.lng)).map(patrol => (
           <React.Fragment key={patrol.id}>
             <Marker 
               position={[patrol.location.lat, patrol.location.lng]} 
