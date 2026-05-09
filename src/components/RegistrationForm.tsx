@@ -160,11 +160,9 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       specialNeedsInfo: '',
       gpsLat: 13.0641, // Occidental Mindoro center
       gpsLng: 120.7303,
-      username: 'juandemo123',
-      password: 'Password123!',
-      confirmPassword: 'Password123!'
+      username: 'juandemo123'
     });
-    toast.success('Form populated with demo data!', { icon: '⚡' });
+    toast.success('Form populated with demo data! Please set a secure password.', { icon: '⚡' });
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
