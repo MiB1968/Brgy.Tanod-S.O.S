@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Alert, EmergencyType } from '../types';
+import { Alert, EmergencyType, AlertStatus } from '../types';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { analyzeIncident } from '../services/aiService';
