@@ -12,7 +12,6 @@ export async function queueSOS(data: any) {
       data,
       timestamp: Date.now(),
     });
-    console.log('SOS queued in IndexedDB:', id);
     return id.toString();
   } catch (error) {
     console.error('Failed to queue SOS in IndexedDB:', error);
