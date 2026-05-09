@@ -37,7 +37,6 @@ export default function AdminResidents({ profile }: { profile: any }) {
         status: 'approved',
         approvedAt: new Date().toISOString()
       }, { merge: true });
-      console.log('Approve resident doc success');
       // Sync with users collection
       const residentDoc = residents.find(r => r.id === id);
       const updateData: any = { status: 'approved' };
@@ -55,7 +54,6 @@ export default function AdminResidents({ profile }: { profile: any }) {
       }
 
       await setDoc(doc(db, 'users', id), updateData, { merge: true });
-      console.log('Approve user doc success');
     } catch (err: any) {
       console.error('Approve failed:', err);
     }
