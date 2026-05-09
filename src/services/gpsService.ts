@@ -35,7 +35,6 @@ export const startGPSTracking = (
           // Check if auth still exists before attempting cloud queries
           // This avoids permission denied errors when signing out or when auth state is lost
           if (!auth.currentUser) {
-            console.log("GPS skipping: No authenticated user");
             return;
           }
           
