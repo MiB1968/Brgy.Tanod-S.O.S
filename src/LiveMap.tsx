@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import { cn, isValidCoord } from "./lib/utils";
-import { startGPS } from "./gpsSystem";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
 import { useTanodStore } from "./store/useTanodStore";
