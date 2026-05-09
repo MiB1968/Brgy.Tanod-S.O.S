@@ -1,37 +1,40 @@
 import { useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot, doc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import socket from '../lib/socket';
 import { useTanodStore } from '../store/useTanodStore';
 import { useIncidentStore } from '../store/useIncidentStore';
 import { SystemBroadcast, Alert, PatrolLocation } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadcast | null) => void, setGlobalSirenActive: (a: boolean) => void) => {
-  useEffect(() => {
-    if (!db || !user) return;
-    
-    // Broadcast listener
-    const bQ = query(collection(db, 'system_broadcasts'), where('isActive', '==', true), orderBy('timestamp', 'desc'), limit(1));
-    const unsubB = onSnapshot(bQ, (snapshot) => {
-      if (!snapshot.empty) {
-        const broadcast = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as SystemBroadcast;
-        setActiveBroadcast(broadcast);
-      } else {
-        setActiveBroadcast(null);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'system_broadcasts'));
+  const { setAlerts, addAlert } = useIncidentStore();
+  const { setPatrols } = useTanodStore();
 
-    // Siren listener
-    const unsubS = onSnapshot(doc(db, 'system', 'siren'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setGlobalSirenActive(data?.sirenActive || false);
+  useEffect(() => {
+    if (!user) return;
+
+    // Siren updates
+    socket.on('siren_update', (data: any) => {
+      setGlobalSirenActive(data?.sirenActive || false);
+    });
+
+    // Alert updates
+    socket.on('alert_update', ({ type, alert }: { type: string, alert: Alert }) => {
+      if (type === 'new') {
+        addAlert(alert);
+      } else {
+        // Handle other updates if needed
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'system/siren'));
+    });
+
+    // Patrol updates
+    socket.on('patrol_update', (patrol: any) => {
+      // Map server data to frontend type if needed
+      // This will trigger store updates usually
+    });
 
     return () => {
-      unsubB();
-      unsubS();
+      socket.off('siren_update');
+      socket.off('alert_update');
+      socket.off('patrol_update');
     };
-  }, [user]);
+  }, [user, addAlert, setAlerts, setPatrols, setGlobalSirenActive]);
 };

@@ -240,8 +240,8 @@ export default function ActiveMap({
         className="w-full h-full z-0"
       >
         <OfflineTileLayer
-          attribution="&copy; <a href=&quot;https://www.openstreetmap.org/copyright&quot;>OpenStreetMap</a> contributors"
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="&copy; <a href=&quot;https://carto.com/attributions&quot;>CARTO</a>"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
         />
         <ChangeView center={mapCenter} zoom={zoom} />
         

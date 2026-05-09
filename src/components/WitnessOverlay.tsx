@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Eye, ShieldAlert, X, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
-
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface WitnessInvite {
   id: string;
@@ -21,24 +19,33 @@ interface WitnessOverlayProps {
 export const WitnessOverlay: React.FC<WitnessOverlayProps> = ({ userId }) => {
   const [invites, setInvites] = useState<WitnessInvite[]>([]);
 
+  const fetchInvites = async () => {
+    try {
+      const data = await api.generic.list(`witness_invites?witnessUserId=${userId}&status=pending`);
+      setInvites(data);
+    } catch (err) {
+      console.error("Failed to fetch witness invites", err);
+    }
+  };
+
   useEffect(() => {
     if (!userId) return;
-    const q = query(
-      collection(db, 'witness_invites'),
-      where('witnessUserId', '==', userId),
-      where('status', '==', 'pending')
-    );
+    fetchInvites();
+    
+    socket.on('witness_invite_new', (payload: any) => {
+      if (payload.witnessUserId === userId) fetchInvites();
+    });
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      setInvites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WitnessInvite)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'witness_invites'));
-
-    return unsub;
+    return () => {
+      socket.off('witness_invite_new');
+    };
   }, [userId]);
 
   const handleRespond = async (inviteId: string, status: 'accepted' | 'rejected') => {
     try {
-      await updateDoc(doc(db, 'witness_invites', inviteId), { status });
+      await api.generic.update(`witness_invites/${inviteId}`, { status });
+      socket.emit('witness_update', { id: inviteId });
+      setInvites(prev => prev.filter(inv => inv.id !== inviteId));
     } catch (e) {
       console.error("Witness response failed:", e);
     }

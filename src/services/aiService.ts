@@ -7,6 +7,7 @@ export interface AIAnalysis {
   summary: string;
   recommendedResponders: string[];
   riskFactors: string[];
+  instructions: string[];
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -18,7 +19,8 @@ export async function analyzeIncident(description: string, initialType?: string)
     urgency: "NORMAL",
     summary: description || "SOS Alert received.",
     recommendedResponders: ["Tanod Officer"],
-    riskFactors: ["Manual verification required"]
+    riskFactors: ["Manual verification required"],
+    instructions: ["Stay calm", "Wait for responders"]
   };
 
   if (!navigator.onLine || !process.env.GEMINI_API_KEY) return fallback;
@@ -36,7 +38,7 @@ export async function analyzeIncident(description: string, initialType?: string)
         }
       ],
       config: {
-        systemInstruction: "You are a tactical emergency dispatcher. Extract structured data from reports.",
+        systemInstruction: "You are a tactical emergency dispatcher. Extract structured data from reports. Provide 3-5 immediate safety instructions for the victim.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -58,9 +60,13 @@ export async function analyzeIncident(description: string, initialType?: string)
             riskFactors: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING } 
+            },
+            instructions: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
             }
           },
-          required: ["incidentType", "severityScore", "urgency", "summary", "recommendedResponders", "riskFactors"]
+          required: ["incidentType", "severityScore", "urgency", "summary", "recommendedResponders", "riskFactors", "instructions"]
         }
       }
     });

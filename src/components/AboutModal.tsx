@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Shield, Zap, MapPin, Users, Globe, BookOpen, User, Award, Info, CheckCircle, Camera, Quote, Plus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { cn } from '../lib/utils';
 import toast from 'react-hot-toast';
 
@@ -18,15 +18,13 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
   const [devAvatar, setDevAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load developer avatar from Firestore to make it persistent
+  // Load developer avatar from standard API
   useEffect(() => {
     async function loadDevData() {
-      if (!db) return;
       try {
-        const docRef = doc(db, 'system', 'developer');
-        const snap = await getDoc(docRef);
-        if (snap.exists() && snap.data().avatarUrl) {
-          setDevAvatar(snap.data().avatarUrl);
+        const snap = await api.generic.get('system/developer');
+        if (snap && snap.avatarUrl) {
+          setDevAvatar(snap.avatarUrl);
         }
       } catch (e) {
         console.error("Failed to load dev avatar:", e);
@@ -59,17 +57,15 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
       
       setDevAvatar(compressedBase64);
       
-      if (db) {
-        try {
-          await setDoc(doc(db, 'system', 'developer'), { 
-            avatarUrl: compressedBase64,
-            updatedAt: new Date().toISOString()
-          }, { merge: true });
-          toast.success("Developer credentials updated successfully");
-        } catch (err) {
-          console.error("Upload error:", err);
-          toast.error("Cloud sync failed (check permissions)");
-        }
+      try {
+        await api.generic.update('system/developer', { 
+          avatarUrl: compressedBase64,
+          updatedAt: new Date().toISOString()
+        });
+        toast.success("Developer credentials updated successfully");
+      } catch (err) {
+        console.error("Upload error:", err);
+        toast.error("Cloud sync failed (check permissions)");
       }
     };
     reader.readAsDataURL(file);

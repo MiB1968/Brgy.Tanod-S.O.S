@@ -27,13 +27,13 @@ export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tanods.map((tanod) => {
-          const patrol = patrols.find(p => p.tanodId === tanod.uid);
+          const patrol = patrols.find(p => p.tanodId === tanod.id);
           const isAlive = patrol && patrol.isActive;
           const tacticalStatus = patrol?.status || (isAlive ? 'patrolling' : 'offline');
 
           return (
             <motion.div 
-              key={tanod.uid}
+              key={tanod.id}
               className="bg-brand-bg rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all group"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -66,7 +66,7 @@ export const TanodUnitStatusList: React.FC<TanodUnitStatusListProps> = ({ tanods
                       <span className="text-[9px] font-black text-white/30 uppercase tracking-widest font-mono">Registry Log</span>
                       <select
                           value={tanod.status}
-                          onChange={(e) => onUpdateStatus(tanod.uid, e.target.value)}
+                          onChange={(e) => onUpdateStatus(tanod.id, e.target.value)}
                           className="bg-transparent text-[10px] font-bold text-white uppercase tracking-tight font-mono outline-none cursor-pointer hover:text-success transition-colors"
                       >
                           {['Available', 'On Patrol', 'Responding', 'Off-Duty', 'Break', 'Offline'].map(status => (

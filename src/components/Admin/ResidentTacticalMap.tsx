@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import * as api from '../../lib/api';
+import socket from '../../lib/socket';
 import { ResidentProfile } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, Filter, MapPin, Phone, User, Calendar, ShieldCheck, ExternalLink } from 'lucide-react';
@@ -45,19 +45,28 @@ export default function ResidentTacticalMap() {
   const [specialNeedsFilter, setSpecialNeedsFilter] = useState<'all' | 'yes' | 'no'>('all');
 
   useEffect(() => {
-    if (!db) return;
-    // Only approved residents for the tactical map
-    const q = query(collection(db, 'residents'), where('status', '==', 'approved'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResidentProfile));
-      // Filter out those without valid coordinates
-      const validData = data.filter(r => isValidCoord(r.gpsLat, r.gpsLng));
-      setResidents(validData);
-      setLoading(false);
-    });
+    const loadResidents = async () => {
+      try {
+        const data = await api.residents.getAll();
+        // Since api.residents.getAll returns raw data from /sync?path=residents
+        const formatted = data
+          .map((r: any) => ({ ...r, ...r.details })) // Details are merged in migration
+          .filter((r: any) => r.status === 'approved' && isValidCoord(r.gpsLat, r.gpsLng));
+        
+        setResidents(formatted);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load residents map data", err);
+        setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    loadResidents();
+    socket.on('resident_update', () => loadResidents());
+
+    return () => {
+      socket.off('resident_update');
+    };
   }, []);
 
   const filteredResidents = residents.filter(r => {

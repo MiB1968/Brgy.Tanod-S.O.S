@@ -1,18 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  collection, 
-  doc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  updateDoc,
-  setDoc
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
 import { User, Alert, PatrolLocation, EmergencyType, SystemBroadcast } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { 
   Plus, 
   AlertTriangle, 
@@ -79,11 +67,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number, accuracy?: number } | null>(null);
 
   useEffect(() => {
-    if (profile?.uid) {
-      const unsubscribe = subscribeToUserAlerts(profile.uid);
+    if (profile?.id) {
+      const unsubscribe = subscribeToUserAlerts(profile.id);
       return () => unsubscribe();
     }
-  }, [profile?.uid, subscribeToUserAlerts]);
+  }, [profile?.id, subscribeToUserAlerts]);
 
   useEffect(() => {
     const checkQueue = async () => {
@@ -119,9 +107,8 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   }, [setIsOnline]);
 
   useEffect(() => {
-    if (!db) return;
-    // Removed local subscription, now handled by SOS store
-  }, [profile.uid]);
+    // Sync logic handled by stores
+  }, [profile.id]);
 
   const activeAlertIdRef = useRef<string | null>(null);
   const pendingChunksRef = useRef<Blob[]>([]);
@@ -578,11 +565,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       </motion.div>
 
       <motion.div variants={itemVariants} className="pb-8">
-        <RecentAlerts residentId={profile.uid} />
+        <RecentAlerts residentId={profile.id} />
       </motion.div>
 
       <motion.div variants={itemVariants} className="pb-16 border-t border-white/5 pt-12">
-        <CitizenReportTracker userId={profile.uid} />
+        <CitizenReportTracker userId={profile.id} />
       </motion.div>
 
       <motion.div variants={itemVariants} className="mb-16">
@@ -613,11 +600,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       {/* SOS Category Modal */}
       <AnimatePresence>
         {isChoosingCategory && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[10000] flex items-start justify-center p-4 pt-16">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
               className="bg-[#16191F] border border-white/10 w-full max-w-lg rounded-[40px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col p-8 relative"
             >
               <div className="scanline" />
@@ -671,11 +658,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       {/* SOS Description Modal */}
       <AnimatePresence>
         {sosTypeToSubmit && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[9999] flex items-start justify-center p-4 pt-16">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
               className="bg-[#16191F] border border-white/10 w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl flex flex-col p-6 md:p-8 relative"
             >
               <div className="absolute inset-0 pointer-events-none opacity-10 flex items-end justify-center">
@@ -790,7 +777,7 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
                   onClick={async () => {
                     try {
                       await removeQueuedSOS(cancellingId);
-                      await updateDoc(doc(db, 'alerts', cancellingId), { status: 'cancelled' });
+                      await api.alerts.update(cancellingId, { status: 'cancelled' });
                     } catch (error: any) {
                       useIncidentStore.getState().updateAlertStatus(cancellingId, 'cancelled');
                       console.warn('Failed to update cancel status online, cancelled locally:', error);
@@ -815,16 +802,15 @@ function RecentAlerts({ residentId }: { residentId: string }) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   useEffect(() => {
-    if (!db) return;
-    const q = query(
-      collection(db, 'alerts'),
-      where('residentId', '==', residentId),
-      orderBy('timestamp', 'desc'),
-      limit(5)
-    );
-    return onSnapshot(q, (snap) => {
-      setAlerts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Alert)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `residents/${residentId}/alerts`));
+    const fetchAlerts = async () => {
+      try {
+        const data = await api.generic.list(`alerts?residentId=${residentId}&limit=5&orderBy=timestamp:desc`);
+        setAlerts(data);
+      } catch (err) {
+        console.error("Failed to fetch recent alerts", err);
+      }
+    };
+    fetchAlerts();
   }, [residentId]);
 
   if (alerts.length === 0) return null;

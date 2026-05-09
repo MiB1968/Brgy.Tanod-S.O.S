@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Shift, User } from '../types';
 import { Howl } from 'howler';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,7 +21,7 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
   const [pendingResponse, setPendingResponse] = useState<'accepted' | 'rejected' | null>(null);
 
   const pendingShifts = shifts.filter(s => {
-    const isTarget = isTestMode || s.tanodId === profile.uid;
+    const isTarget = isTestMode || s.tanodId === profile.id;
     return isTarget && s.tanodResponse === 'pending';
   });
 
@@ -57,10 +57,13 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
 
   const handleResponse = async (shiftId: string, response: 'accepted' | 'rejected') => {
     try {
-      await updateDoc(doc(db, 'shifts', shiftId), {
+      await api.generic.update(`shifts/${shiftId}`, {
+        id: shiftId,
         tanodResponse: response,
         status: response === 'accepted' ? 'active' : 'scheduled'
       });
+      socket.emit('shift_update', { id: shiftId });
+      
       toast.success(response === 'accepted' ? 'Task Accepted' : 'Task Rejected');
       siren.stop();
       setActiveAlert(null);

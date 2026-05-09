@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getCountFromServer, addDoc, setDoc, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Alert, User, TanodProfile, SystemBroadcast } from '../types';
 import { 
   AlertTriangle, 
@@ -49,8 +49,6 @@ import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
 
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
-
 const containerVariants = {
   hidden: { opacity: 0 },
   show: {
@@ -98,29 +96,30 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   }, [alerts, profile, sirenActive]);
 
   useEffect(() => {
-    if (!db || !profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
-    // Real-time Residents stats
-    const approvedQ = query(collection(db, 'residents'), where('status', '==', 'approved'));
-    const pendingQ = query(collection(db, 'residents'), where('status', '==', 'pending'));
-    const incidentsQ = query(collection(db, 'incidents'), orderBy('createdAt', 'desc'));
+    // Initial Load
+    const loadStats = async () => {
+      try {
+        const residents = await api.residents.getAll();
+        setResidentsCount(residents.filter(r => r.status === 'approved').length);
+        setPendingRegCount(residents.filter(r => r.status === 'pending').length);
+        
+        // Incidents could be another API call or part of incidents store
+      } catch (err) {
+        console.error("Failed to load admin stats", err);
+      }
+    };
 
-    const unsubApproved = onSnapshot(approvedQ, (snapshot) => {
-      setResidentsCount(snapshot.size);
-    });
+    loadStats();
 
-    const unsubPending = onSnapshot(pendingQ, (snapshot) => {
-      setPendingRegCount(snapshot.size);
-    });
-
-    const unsubIncidents = onSnapshot(incidentsQ, (snapshot) => {
-      setRecentIncidents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // Listen for real-time updates
+    socket.on('resident_update', () => loadStats());
+    socket.on('incident_new', (incident) => setRecentIncidents(prev => [incident, ...prev].slice(0, 50)));
 
     return () => {
-      unsubApproved();
-      unsubPending();
-      unsubIncidents();
+      socket.off('resident_update');
+      socket.off('incident_new');
     };
   }, [profile]);
 
@@ -162,7 +161,6 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   });
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
-    if (!db) return;
     try {
       const updateData: any = { 
         status, 
@@ -170,7 +168,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       };
       
       if (status === 'responding') {
-        updateData.respondedBy = profile?.uid || 'unknown';
+        updateData.respondedBy = profile?.id || 'unknown';
         updateData.respondedByName = profile?.name || 'Admin Dispatch';
         updateData.respondedAt = new Date().toISOString();
       }
@@ -179,9 +177,9 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         updateData.resolvedAt = new Date().toISOString();
         updateData.resolutionNotes = `Cleared by ${profile?.name || 'Admin'}`; // Simple default
         
-        await addDoc(collection(db, 'incidents'), {
+        await api.incidents.create({
           alertId: alert.id,
-          tanodId: profile?.uid || 'unknown',
+          tanodId: profile?.id || 'unknown',
           tanodName: alert.respondedByName || profile?.name || 'Unknown',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
@@ -197,8 +195,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         });
       }
 
-      // Use setDoc merge true to be robust against missing documents
-      await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+      await api.alerts.update(alert.id, updateData);
 
       // Log Tanod Activity
       if (status === 'responding' || status === 'resolved') {
@@ -206,8 +203,8 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           ? Math.floor((new Date(updateData.respondedAt).getTime() - new Date(alert.timestamp).getTime()) / 1000)
           : undefined;
 
-        await addDoc(collection(db, 'tanod_activity_logs'), {
-          tanodId: profile?.uid || 'admin-system',
+        await api.logs.create({
+          tanodId: profile?.id || 'admin-system',
           tanodName: profile?.name || 'Admin Dispatch',
           type: status === 'responding' ? 'alert_response' : 'status_change',
           details: status === 'responding' 
@@ -233,7 +230,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             userUpdate.activeAlertId = alert.id;
           }
           
-          await setDoc(doc(db, 'users', tanodId), userUpdate, { merge: true });
+          await api.generic.update(`users/${tanodId}`, userUpdate);
         } catch (e) {
           console.warn(`[AdminDashboard] Failed to update user roster status for ${tanodId}:`, e);
         }
@@ -242,19 +239,19 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
       // Log for audit
       await logIncidentAction({ ...alert, ...updateData });
     } catch (error: any) {
-      handleFirestoreError(error, OperationType.WRITE, `alerts/${alert.id}`);
+      console.error("ADMIN_ACTION_FAULT:", error);
+      toast.error(`Fault: ${error.message}`);
     }
   };
 
   const [onDutyTanods, setOnDutyTanods] = useState<User[]>([]);
 
   const handleUpdateTanodField = async (tanodId: string, field: string, value: string) => {
-    if (!db) return;
     try {
-      await setDoc(doc(db, 'users', tanodId), {
+      await api.generic.update(`users/${tanodId}`, {
         [field]: value,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
       toast.success(`Unit ${field} updated successfully`, {
         icon: '🛡️',
         style: {
@@ -275,34 +272,20 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   const handleUpdateTanodStatus = async (tanodId: string, newStatus: string) => {
-    if (!db) return;
     try {
-      // 1. Update Firestore Users collection
-      await setDoc(doc(db, 'users', tanodId), {
+      await api.generic.update(`users/${tanodId}`, {
         status: newStatus,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
 
-      // 1b. Sync to Patrols collection for map visibility
       const isActuallyOnline = newStatus.toLowerCase() === 'on-duty' || newStatus.toLowerCase() === 'responding';
-      await setDoc(doc(db, 'patrols', tanodId), {
+      await api.generic.update(`patrols/${tanodId}`, {
         isActive: isActuallyOnline,
         lastUpdate: new Date().toISOString()
-      }, { merge: true });
+      });
 
-      // 2. Update Supabase for live map status
-      if (isSupabaseConfigured) {
-        const { error } = await supabase
-          .from('tanods')
-          .update({ status: newStatus })
-          .eq('id', tanodId);
-        
-        if (error) console.warn('Supabase status sync error:', error);
-      }
-
-      // 3. Log activity
-      await addDoc(collection(db, 'tanod_activity_logs'), {
-        tanodId: profile?.uid || 'admin',
+      await api.logs.create({
+        tanodId: profile?.id || 'admin',
         tanodName: profile?.name || 'Admin',
         targetTanodId: tanodId,
         type: 'status_change',
@@ -330,13 +313,23 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   useEffect(() => {
-    if (!db || !profile) return;
-    const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
-    return onSnapshot(q, (snapshot) => {
-      setOnDutyTanods(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'users-tanods');
-    });
+    if (!profile) return;
+    
+    const loadTanods = async () => {
+      try {
+        const data = await api.generic.list('users?role=tanod');
+        setOnDutyTanods(data);
+      } catch (err) {
+        console.error("Failed to load tanods roster", err);
+      }
+    };
+
+    loadTanods();
+    socket.on('tanod_update', () => loadTanods());
+
+    return () => {
+      socket.off('tanod_update');
+    };
   }, [profile]);
 
   return (
@@ -428,14 +421,12 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
             <button 
               onClick={async () => {
-                if (!db) return;
                 const message = window.prompt('Enter SOS Broadcast Message (e.g., Extreme Flood Evacuation):');
                 if (!message) return;
                 
                 try {
-                  const broadcastId = `SOS-${Date.now()}`;
-                  await setDoc(doc(db, 'system_broadcasts', broadcastId), {
-                    adminId: profile?.uid,
+                  await api.generic.create('system_broadcasts', {
+                    adminId: profile?.id,
                     adminName: profile?.name,
                     type: 'security',
                     message: message.toUpperCase(),
@@ -454,21 +445,19 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
             </button>
             <button 
               onClick={async () => {
-                if (!db) return;
                 try {
-                  const q = query(collection(db, 'system_broadcasts'), where('isActive', '==', true));
-                  const snapshot = await getDocs(q);
-                  if (snapshot.empty) {
+                  const broadcasts = await api.generic.list('system_broadcasts?isActive=true');
+                  if (broadcasts.length === 0) {
                     toast.error('NO ACTIVE BROADCASTS FOUND');
                     return;
                   }
                   
-                  const batchPromises = snapshot.docs.map(broadcastDoc => 
-                    updateDoc(doc(db, 'system_broadcasts', broadcastDoc.id), { isActive: false })
+                  const batchPromises = broadcasts.map((b: any) => 
+                    api.generic.update(`system_broadcasts/${b.id}`, { isActive: false })
                   );
                   
                   // Also clear global siren
-                  batchPromises.push(updateDoc(doc(db, 'system', 'siren'), { sirenActive: false }));
+                  batchPromises.push(api.system.updateSiren({ sirenActive: false }));
                   
                   await Promise.all(batchPromises);
                   toast.success('ALL ACTIVE BROADCASTS TERMINATED');
@@ -789,7 +778,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
 
       {/* Analytics */}
       <motion.div variants={itemVariants}>
-        <AdminAnalytics incidents={recentIncidents} />
+        <AdminAnalytics />
       </motion.div>
 
       {/* Broadcasts */}

@@ -87,6 +87,7 @@ export interface Alert {
     summary: string;
     recommendedResponders: string[];
     riskFactors: string[];
+    instructions: string[];
   };
 }
 

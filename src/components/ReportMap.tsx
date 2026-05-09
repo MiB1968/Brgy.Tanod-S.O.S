@@ -36,8 +36,8 @@ export default function ReportMap({ lat, lng }: ReportMapProps) {
         zoomControl={false}
       >
         <OfflineTileLayer
-          attribution="&copy; OpenStreetMap"
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution="&copy; <a href=&quot;https://carto.com/attributions&quot;>CARTO</a>"
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
         />
         <Marker position={[lat, lng]} icon={IncidentIcon}>
           <Popup>

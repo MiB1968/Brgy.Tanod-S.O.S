@@ -6,8 +6,8 @@ import { startGPS } from "./gpsSystem";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
 import { useTanodStore } from "./store/useTanodStore";
-import { db } from "./lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import * as api from "./lib/api";
+import socket from "./lib/socket";
 
 // ─── Map center ───────────────────────────────────────────────────────────────
 const CENTER: [number, number] = [13.2236, 120.596]; // Mamburao
@@ -353,14 +353,22 @@ export default function LiveMap() {
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
 
   useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, 'residents'), where('status', '==', 'approved'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const validData = data.filter((r: any) => r.gpsLat && r.gpsLng);
-      setResidents(validData);
-    });
-    return () => unsubscribe();
+    const loadResidents = async () => {
+      try {
+        const data = await api.residents.getAll();
+        const validData = data.filter((r: any) => r.gpsLat && r.gpsLng && r.status === 'approved');
+        setResidents(validData);
+      } catch (err) {
+        console.error("Failed to load residents for map", err);
+      }
+    };
+
+    loadResidents();
+    socket.on('resident_update', () => loadResidents());
+
+    return () => {
+      socket.off('resident_update');
+    };
   }, []);
 
   // Inject global CSS once
@@ -481,8 +489,8 @@ export default function LiveMap() {
         className="z-10"
       >
         <OfflineTileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
         />
 
         <MapController patrols={patrols} alerts={alerts} showP={showPatrols} showS={showSOS} />

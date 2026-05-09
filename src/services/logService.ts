@@ -1,11 +1,10 @@
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AuditLogEntry } from '../types/auditLog';
 import { Alert } from '../types';
 
 export const logIncidentAction = async (alert: Alert, actionNotes?: string) => {
-  if (!db) return;
   try {
     const entry: Partial<AuditLogEntry> = {
       incident_id: alert.id,
@@ -19,8 +18,9 @@ export const logIncidentAction = async (alert: Alert, actionNotes?: string) => {
       notes: actionNotes || alert.resolutionNotes
     };
 
-    // 1. Save to Firestore
-    await addDoc(collection(db, 'audit_logs'), entry);
+    // 1. Save to API
+    await api.generic.create('audit_logs', entry);
+    socket.emit('audit_log_new', entry);
 
     // 2. Save to Supabase (Sync for Daily Audit Log system)
     if (isSupabaseConfigured) {

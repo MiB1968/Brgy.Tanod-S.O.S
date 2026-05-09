@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, Alert, PatrolLocation } from '../types';
 import { X, Shield, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
+import toast from 'react-hot-toast';
 
 interface DispatchModalProps {
   alert: Alert;
@@ -18,24 +19,32 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!db) return;
-    // Query all tanods. We will filter status in memory to be more flexible.
-    const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
-    return onSnapshot(q, (snapshot) => {
-      const allTanods = snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User));
-      // Filter for those who are approved and NOT currently responding
-      const available = allTanods.filter(t => 
-        t.status === 'approved' || t.status === 'Available'
-      );
-      setTanods(available);
-    });
+    const fetchTanods = async () => {
+      try {
+        const data = await api.generic.list('users?role=tanod');
+        // Filter for those who are approved and NOT currently responding/offline
+        const available = data.filter((t: User) => 
+          t.status === 'approved' || t.status === 'Available' || t.status === 'On Patrol'
+        );
+        setTanods(available);
+      } catch (err) {
+        console.error("Failed to fetch tanods for dispatch", err);
+      }
+    };
+
+    fetchTanods();
+    socket.on('tanod_update', () => fetchTanods());
+    
+    return () => {
+      socket.off('tanod_update');
+    };
   }, []);
 
   const handleDispatch = async () => {
-    if (!selectedTanod || !db) return;
+    if (!selectedTanod) return;
     setSubmitting(true);
     try {
-      const tanod = tanods.find(t => t.uid === selectedTanod);
+      const tanod = tanods.find(t => t.id === selectedTanod);
       const updateData = {
         status: 'responding' as const,
         assignedTo: selectedTanod,
@@ -45,15 +54,14 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
         respondedAt: new Date().toISOString()
       };
 
-      // Use setDoc merge true to be robust against missing documents
-      await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+      await api.alerts.update(alert.id, updateData);
 
       // Update Tanod status in roster
       try {
-        await setDoc(doc(db, 'users', selectedTanod), { 
-          status: 'responding',
+        await api.generic.update(`users/${selectedTanod}`, { 
+          status: 'Responding',
           activeAlertId: alert.id
-        }, { merge: true });
+        });
       } catch (e) {
         console.warn('Failed to update Tanod status in roster:', e);
       }
@@ -78,10 +86,11 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
         }
       }
 
+      toast.success(`Unit ${tanod?.name || 'Assigned Tanod'} dispatched`);
       onClose();
     } catch (err) {
       console.error(err);
-      window.alert('Failed to dispatch tanod. Please try again.');
+      toast.error('Failed to dispatch tanod');
     } finally {
       setSubmitting(false);
     }
@@ -109,30 +118,30 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
           ) : (
             tanods.map(tanod => (
               <button
-                key={tanod.uid}
-                onClick={() => setSelectedTanod(tanod.uid)}
+                key={tanod.id}
+                onClick={() => setSelectedTanod(tanod.id)}
                 className={cn(
                   "w-full flex items-center gap-4 p-5 rounded-3xl border transition-all text-left",
-                  selectedTanod === tanod.uid 
+                  selectedTanod === tanod.id 
                     ? "bg-[#FF4B4B]/10 border-[#FF4B4B] shadow-[0_0_20px_rgba(255,75,75,0.1)]" 
                     : "bg-[#0F1115] border-[#2D3139] hover:border-[#8E9299]/30"
                 )}
               >
                 <div className={cn(
                   "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0",
-                  selectedTanod === tanod.uid ? "bg-[#FF4B4B] text-white" : "bg-[#252932] text-[#8E9299]"
+                  selectedTanod === tanod.id ? "bg-[#FF4B4B] text-white" : "bg-[#252932] text-[#8E9299]"
                 )}>
                   <Shield className="w-6 h-6" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-black text-lg text-white uppercase italic tracking-tighter truncate">{tanod.name}</p>
                   <p className="text-xs text-[#8E9299] font-bold uppercase tracking-widest">
-                    {patrols.find(p => p.tanodId === tanod.uid)?.isActive ? 'Online • Tactical Signal Active' : 'Offline • Signal Lost'}
+                    {patrols.find(p => p.tanodId === tanod.id)?.isActive ? 'Online • Tactical Signal Active' : 'Offline • Signal Lost'}
                   </p>
                 </div>
                 <div className={cn(
                   "w-6 h-6 rounded-full border-4 flex items-center justify-center transition-all",
-                  selectedTanod === tanod.uid ? "border-[#FF4B4B] bg-white scale-110" : "border-[#2D3139]"
+                  selectedTanod === tanod.id ? "border-[#FF4B4B] bg-white scale-110" : "border-[#2D3139]"
                 )} />
               </button>
             ))

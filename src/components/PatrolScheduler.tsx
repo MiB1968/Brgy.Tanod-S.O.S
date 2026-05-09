@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc, Timestamp, orderBy, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Shift, User } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Calendar, Clock, MapPin, User as UserIcon, Plus, X, Trash2, CheckCircle2, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function PatrolScheduler({ profile }: { profile: any }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -38,35 +38,39 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
     resetForm();
   };
 
+  const fetchData = async () => {
+    try {
+      const [shiftsData, usersData] = await Promise.all([
+        api.generic.list('shifts'),
+        api.generic.list('users?role=tanod')
+      ]);
+      setShifts(shiftsData);
+      setTanods(usersData.filter((u: User) => u.status === 'approved' || u.status === 'Available'));
+    } catch (err) {
+      console.error("Failed to fetch scheduling data", err);
+    }
+  };
+
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin') || !db) return;
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
-    // Listen for shifts
-    const qShift = query(collection(db, 'shifts'), orderBy('startTime', 'desc'));
-    const unsubShift = onSnapshot(qShift, (snap) => {
-      setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'shifts'));
-
-    // Listen for Tanods
-    const qTanod = query(collection(db, 'users'), orderBy('name', 'asc'));
-    const unsubTanod = onSnapshot(qTanod, (snap) => {
-      const allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
-      setTanods(allUsers.filter(u => u.role === 'tanod' && u.status === 'approved'));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'tanod_users'));
+    fetchData();
+    socket.on('shift_update', () => fetchData());
+    socket.on('tanod_update', () => fetchData());
 
     return () => {
-      unsubShift();
-      unsubTanod();
+      socket.off('shift_update');
+      socket.off('tanod_update');
     };
-  }, []);
+  }, [profile]);
 
   const handleUpsertShift = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTanod || !sector || !startTime || !endTime || !db) return;
+    if (!selectedTanod || !sector || !startTime || !endTime) return;
 
     setLoading(true);
     try {
-      const tanod = tanods.find(t => t.uid === selectedTanod);
+      const tanod = tanods.find(t => t.id === selectedTanod);
       const shiftData = {
         tanodId: selectedTanod,
         tanodName: tanod?.name || 'Unknown Officer',
@@ -80,13 +84,16 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
       };
 
       if (editingShift) {
-        await setDoc(doc(db, 'shifts', editingShift.id), shiftData, { merge: true });
+        await api.generic.update(`shifts/${editingShift.id}`, shiftData);
+        toast.success('Assignment updated');
       } else {
-        await addDoc(collection(db, 'shifts'), shiftData);
+        await api.generic.create('shifts', shiftData);
+        toast.success('New assignment deployed');
       }
       closeModal();
     } catch (error) {
       console.error("Error upserting shift:", error);
+      toast.error('Failed to save assignment');
     } finally {
       setLoading(false);
     }
@@ -101,19 +108,19 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   };
 
   const updateShiftStatus = async (id: string, status: Shift['status']) => {
-    if (!db) return;
     try {
-      await setDoc(doc(db, 'shifts', id), { status }, { merge: true });
+      await api.generic.update(`shifts/${id}`, { status });
+      toast.success(`Shift marked as ${status}`);
     } catch (error) {
       console.error("Error updating shift status:", error);
     }
   };
 
   const deleteShift = async (id: string) => {
-    if (!db) return;
     if (window.confirm('Delete this patrol assignment?')) {
       try {
-        await deleteDoc(doc(db, 'shifts', id));
+        await api.generic.delete(`shifts/${id}`);
+        toast.success('Shift deleted');
       } catch (error) {
         console.error("Error deleting shift:", error);
       }
@@ -249,7 +256,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
                     >
                       <option value="">Select an Officer...</option>
                       {tanods.map(t => (
-                        <option key={t.uid} value={t.uid}>{t.name}</option>
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </select>
                   </div>

@@ -1,17 +1,7 @@
 import { create } from 'zustand';
 import { Alert, EmergencyType } from '../types';
-import { db, auth } from '../lib/firebase';
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  setDoc,
-  doc 
-} from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { analyzeIncident } from '../services/aiService';
 import { queueSOS } from '../lib/offlineQueue';
 
@@ -31,16 +21,15 @@ export const useSOSStore = create<SOSState>()(
     
     createSOS: async (type, description, location) => {
       set({ isSending: true });
-      const alertId = crypto.randomUUID();
-      const user = auth.currentUser;
+      const storedUser = localStorage.getItem('user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
 
-      // Perform AI Analysis if online (fallback in service if offline)
+      // Perform AI Analysis
       const aiAnalysis = await analyzeIncident(description, type);
 
       const alertData: any = {
-        id: alertId,
-        residentId: user?.uid || 'anonymous',
-        residentName: user?.displayName || 'Unknown Resident',
+        residentId: user?.id || 'anonymous',
+        residentName: user?.name || 'Unknown Resident',
         type,
         location,
         status: 'pending',
@@ -50,47 +39,39 @@ export const useSOSStore = create<SOSState>()(
       };
 
       try {
-        if (navigator.onLine && db) {
-          await setDoc(doc(db, 'alerts', alertId), alertData);
+        if (navigator.onLine) {
+          const res = await api.alerts.create(alertData);
+          return res.id;
         } else {
-          // Store in IndexedDB for robust background sync
-          await queueSOS(alertData);
+          const alertId = crypto.randomUUID();
+          await queueSOS({ ...alertData, id: alertId });
+          return alertId;
         }
-        return alertId;
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, 'alerts');
-        // Even on error, attempt to queue locally
-        await queueSOS(alertData);
+        console.error("SOS creation error:", error);
+        const alertId = crypto.randomUUID();
+        await queueSOS({ ...alertData, id: alertId });
         return alertId;
       } finally {
         set({ isSending: false });
       }
     },
 
-      subscribeToUserAlerts: (userId) => {
-        if (!db) return () => {};
-        
-        const q = query(
-          collection(db, 'alerts'),
-          where('residentId', '==', userId),
-          orderBy('timestamp', 'desc'),
-          limit(1)
-        );
-
-        return onSnapshot(q, (snapshot) => {
-          if (!snapshot.empty) {
-            const data = snapshot.docs[0].data() as Alert;
-            if (data.status !== 'resolved' && data.status !== 'cancelled') {
-              set({ activeAlert: { ...data, id: snapshot.docs[0].id } });
-            } else {
-              set({ activeAlert: null });
-            }
+    subscribeToUserAlerts: (userId) => {
+      // Use socket instead of polling/snapshot
+      socket.on('alert_update', ({ alert }: { alert: Alert }) => {
+        if (alert.residentId === userId) {
+          if (alert.status !== 'resolved' && alert.status !== 'cancelled') {
+            set({ activeAlert: alert });
           } else {
             set({ activeAlert: null });
           }
-        }, (error) => {
-          console.error("SOS subscription error:", error);
-        });
-      }
-    }),
+        }
+      });
+
+      return () => {
+        socket.off('alert_update');
+      };
+    }
+  }),
 );

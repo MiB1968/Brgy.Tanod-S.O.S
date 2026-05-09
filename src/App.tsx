@@ -4,43 +4,18 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { 
-  auth, 
-  db, 
-  signInWithEmail, 
-  registerWithEmail, 
-  signOut as dbSignOut,
-  loginWithGoogle,
-  onAuthStateChanged,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-  updateDoc,
-  limit,
-  Timestamp,
-  getDocs,
-  getRedirectResult,
-  signInAnonymously,
-  setPersistence,
-  browserSessionPersistence
-} from './lib/firebase';
 import socket from './lib/socket';
-type FirebaseUser = any;
+import * as api from './lib/api';
 import { 
   User, 
   Alert, 
+  AlertStatus,
   UserRole, 
   PatrolLocation, 
   SystemBroadcast,
   EmergencyType,
   ResidentProfile
 } from './types';
-import { handleFirestoreError, OperationType } from './lib/firestore-errors';
 import { 
   LogOut, 
   Plus,
@@ -121,7 +96,6 @@ import { useSOSStore } from './store/useSOSStore';
 import { analyzeIncident } from './services/aiService';
 import { getQueueSize } from './lib/offlineQueue';
 import { cn } from './lib/utils';
-import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { 
   isRuben as checkIsRuben, 
   PATROL_TIMEOUT, 
@@ -149,7 +123,7 @@ export default function App() {
   } = useSystemStore();
   const { subscribeToUserAlerts } = useSOSStore();
   
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'resident-map' | 'roster' | 'settings' | 'logs'>('home');
@@ -161,42 +135,9 @@ export default function App() {
   const [isShaking, setIsShaking] = useState(false);
   const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
 
-  // Connection status management
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [setIsOnline]);
-
-  // PWA installation handling
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
-
-  const handleInstallApp = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        toast.success('System Linked Locally', { icon: '📲' });
-      }
-      setDeferredPrompt(null);
-    }
-  };
-
   const isMasterAdmin = useMemo(() => {
-    return checkIsRuben(user?.uid, user?.email || undefined);
-  }, [user?.uid, user?.email]);
+    return checkIsRuben(user?.id, user?.email || undefined);
+  }, [user?.id, user?.email]);
   
   const baseRole = useMemo(() => {
     if (isMasterAdmin) return 'superadmin';
@@ -207,11 +148,11 @@ export default function App() {
 
   const effectiveProfile = useMemo(() => {
     if (!profile && !user) return null;
-    const p = profile || { uid: user?.uid, name: user?.displayName, email: user?.email } as User;
+    const p = profile || { id: user?.id, name: user?.name, email: user?.email } as User;
     return { 
       ...p, 
       role: effectiveRole as UserRole,
-      name: checkIsRuben(user?.uid, user?.email || undefined) ? `${p.name} (SuperAdmin)` : p.name
+      name: checkIsRuben(user?.id, user?.email || undefined) ? `${p.name} (SuperAdmin)` : p.name
     } as User;
   }, [profile, effectiveRole, user]);
 
@@ -222,7 +163,7 @@ export default function App() {
       }
       if (effectiveRole === 'resident' && profile) {
         return alerts.some(a => 
-          a.residentId === profile.uid && 
+          a.residentId === profile.id && 
           (a.status === 'pending' || a.status === 'responding') && 
           a.assignedTo === p.tanodId
         );
@@ -231,69 +172,52 @@ export default function App() {
     });
   }, [patrols, effectiveRole, profile, alerts]);
 
-  // Global Data Listeners
+  // Authentication persistence
   useEffect(() => {
-    if (!db || !user || !profile) return;
-
-    // Listen for all alerts (if admin/tanod) or just relevant ones
-    let alertsQuery;
-    if (profile.role === 'admin' || profile.role === 'superadmin' || profile.role === 'tanod') {
-      alertsQuery = query(collection(db, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
-    } else {
-      alertsQuery = query(collection(db, 'alerts'), where('residentId', '==', user.uid), orderBy('timestamp', 'desc'), limit(50));
+    const token = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (token && storedUser) {
+      const u = JSON.parse(storedUser);
+      setUser(u);
+      setProfile(u);
     }
-
-    const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Alert));
-      setAlerts(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'alerts'));
-
-    // Listen for patrols
-    const patrolsQuery = collection(db, 'patrols');
-    const unsubPatrols = onSnapshot(patrolsQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PatrolLocation));
-      setPatrols(data);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'patrols'));
-
-    return () => {
-      unsubAlerts();
-      unsubPatrols();
-    };
-  }, [user, profile, db, setAlerts, setPatrols]);
+    setLoading(false);
+  }, [setProfile, setLoading]);
 
   // SOS Store Subscription
   useEffect(() => {
-    if (user?.uid && effectiveRole === 'resident') {
-      const unsubscribe = subscribeToUserAlerts(user.uid);
+    if (user?.id && effectiveRole === 'resident') {
+      const unsubscribe = subscribeToUserAlerts(user.id);
       return () => unsubscribe();
     }
-  }, [user?.uid, effectiveRole, subscribeToUserAlerts]);
+  }, [user?.id, effectiveRole, subscribeToUserAlerts]);
 
   // Global Siren Sync
   useEffect(() => {
-    if (!db || !user) return;
-    return onSnapshot(doc(db, 'system', 'siren'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        const active = data?.sirenActive || false;
-        setGlobalSirenActive(active);
-        if (active) {
-          setIsShaking(true);
-          setTimeout(() => setIsShaking(false), 2000);
-        }
+    if (!user) return;
+    
+    // Listen for siren via socket
+    socket.on('siren_update', (data: any) => {
+      setGlobalSirenActive(data?.sirenActive || false);
+      if (data?.sirenActive) {
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 2000);
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'system/siren'));
+    });
+
+    return () => {
+      socket.off('siren_update');
+    };
   }, [user]);
 
   const toggleGlobalSiren = async () => {
-    if (!db) return;
     try {
       const nextState = !globalSirenActive;
-      await setDoc(doc(db, 'system', 'siren'), {
+      await api.system.updateSiren({
         sirenActive: nextState,
         sirenTriggeredBy: profile?.name || 'System',
         sirenTriggeredAt: new Date().toISOString()
-      }, { merge: true });
+      });
       
       toast.success(nextState ? 'GLOBAL SIREN BROADCAST ACTIVE' : 'Global Siren Off', { 
         icon: nextState ? '📢' : '🔇',
@@ -305,26 +229,6 @@ export default function App() {
     }
   };
 
-  // Broadcast Listener
-  useEffect(() => {
-    if (!db) return;
-    const q = query(
-      collection(db, 'system_broadcasts'), 
-      where('isActive', '==', true), 
-      orderBy('timestamp', 'desc'), 
-      limit(1)
-    );
-    return onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const broadcast = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as SystemBroadcast;
-        setActiveBroadcast(broadcast);
-        if (!globalSirenActive) setGlobalSirenActive(true);
-      } else {
-        setActiveBroadcast(null);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'system_broadcasts'));
-  }, []);
-
   // Failsafe Loading
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -333,102 +237,20 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [setLoading]);
 
-  // Auth Sync
-  useEffect(() => {
-    if (!auth || !db) return;
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("AUTH_STATE_CHANGED:", { 
-        loggedIn: !!firebaseUser, 
-        uid: firebaseUser?.uid, 
-        email: firebaseUser?.email,
-        displayName: firebaseUser?.displayName,
-        isAnonymous: firebaseUser?.isAnonymous,
-        emailVerified: firebaseUser?.emailVerified
-      });
-
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        setIsLoggingIn(false); // Success! Clear button state
-        try {
-          if (!loading) setLoading(true);
-          console.log("AUTH_SYNC: Fetching profile for", firebaseUser.uid);
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data() as User;
-            console.log("AUTH_SYNC: Profile found", data.role);
-            setProfile(data);
-          } else if (checkIsRuben(firebaseUser.uid, firebaseUser.email || undefined)) {
-            console.log("AUTH_SYNC: Auto-provisioning admin for", firebaseUser.email);
-            const adminProfile: User = {
-              uid: firebaseUser.uid,
-              id: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Administrator',
-              email: firebaseUser.email || '',
-              role: 'superadmin',
-              createdAt: new Date().toISOString(),
-              status: 'approved',
-              lastActive: new Date().toISOString()
-            } as User;
-            await setDoc(doc(db, 'users', firebaseUser.uid), adminProfile);
-            setProfile(adminProfile);
-          } else {
-            console.log("AUTH_SYNC: No profile found, user must select role");
-          }
-
-          const resDoc = await getDoc(doc(db, 'residents', firebaseUser.uid));
-          if (resDoc.exists()) {
-            setResidentProfile({ id: resDoc.id, ...resDoc.data() } as ResidentProfile);
-          }
-        } catch (err) {
-          console.error("Profile sync error details:", err);
-          toast.error("DATA_SYNC_ERROR: Profile retrieval failed. Check connection.");
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        console.log("AUTH_SYNC: User is null, clearing profiles");
-        setProfile(null);
-        setResidentProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, [auth, db, setLoading, setProfile, setResidentProfile]);
-
-  // Handle Redirect Result explicitly
-  useEffect(() => {
-    if (!auth) return;
-    
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          console.log("REDIRECT_RESULT: Got user", result.user.email);
-          setUser(result.user);
-        }
-      })
-      .catch((error) => {
-        if (error.code === 'auth/unauthorized-domain') {
-          console.error("REDIRECT_ERROR: Unauthorized domain", window.location.hostname);
-        } else if (error.code !== 'auth/popup-closed-by-user') {
-          console.warn("REDIRECT_RESULT_ERROR:", error);
-        }
-      });
-  }, [auth]);
-
-  // Handle Auth with email/pass
   const handleLogin = async (email?: string, password?: string) => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
     
     try {
       if (email && password) {
-        await signInWithEmail(email, password);
+        const res = await api.auth.login({ email, password });
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('user', JSON.stringify(res.user));
+        setUser(res.user);
+        setProfile(res.user);
         toast.success(`Unit Authenticated`, { icon: '🔑' });
       } else {
-        await loginWithGoogle();
+        toast.error("Google Login migrated to Auth Provider. Use standard login for now.");
       }
     } catch (err: any) {
       console.error("AUTH_FAULT:", err);
@@ -439,11 +261,23 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await dbSignOut();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setProfile(null);
+  };
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+        setDeferredPrompt(null);
+    }
   };
 
   const resetAuthSession = async () => {
-    await dbSignOut();
+    await handleLogout();
   };
 
   // Socket Listeners for Real-time Updates (Replacing Firestore snapshots)
@@ -480,70 +314,56 @@ export default function App() {
        setPatrols([...patrols.filter(p => p.tanodId !== update.tanod_id), patrol]);
     });
 
+    socket.on('broadcast_update', (broadcast: any) => {
+      if (broadcast.isActive) {
+        setActiveBroadcast(broadcast);
+      } else {
+        setActiveBroadcast(null);
+      }
+    });
+
     return () => {
       socket.off('sos_new');
       socket.off('patrol_update');
+      socket.off('broadcast_update');
     };
   }, [profile, setAlerts, setPatrols]);
 
   const [isSettingRole, setIsSettingRole] = useState(false);
   const handleSetRole = async (role: UserRole) => {
-    if (!user || !db) return;
+    if (!user) return;
     setIsSettingRole(true);
     try {
-      const newProfile: Partial<User> = {
-        uid: user.uid,
-        name: user.displayName || 'Citizen',
-        email: user.email || '',
-        role: role,
-        createdAt: new Date().toISOString(),
-        status: role === 'resident' ? 'pending' : 'approved',
-        lastActive: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'users', user.uid), newProfile);
-      setProfile(newProfile as User);
+       // Roles are handled by DB update in this migration
+       await api.alerts.update(user.id, { role, status: 'approved' });
+       // Re-fetch profile
+       const updated = await api.auth.getProfile(user.id);
+       setProfile(updated);
+       localStorage.setItem('user', JSON.stringify(updated));
     } catch (err: any) {
       console.error("Role assignment failure:", err);
-      if (err.code === 'permission-denied') {
-        toast.error("SECURITY PROTOCOL: You must be a verified Administrator to create an Admin/Tanod profile.", { duration: 8000 });
-      } else {
-        toast.error(`System Error: ${err.message}`, { duration: 8000 });
-      }
+      toast.error(`System Error: ${err.message}`);
     } finally {
       setIsSettingRole(false);
     }
   };
 
   const handleDemoLogin = async (role: 'resident' | 'admin') => {
-    if (!auth) return;
     try {
       setLoading(true);
       toast.loading("Initiating anonymous session...", { id: 'demo-login' });
-      const result = await signInAnonymously(auth);
-      const uid = result.user.uid;
-      
-      const profileData: User = {
-        uid, 
-        id: uid, 
-        name: `Demo ${role}`, 
-        email: `${role}@demo.com`, 
-        role: role === 'resident' ? 'resident' : 'superadmin',
-        status: 'approved',
-        createdAt: new Date().toISOString()
-      };
-      // Save it to firestore so roles work
-      await setDoc(doc(db, 'users', uid), profileData);
-      
-      setUser(result.user);
-      setProfile(profileData);
+      const res = await api.auth.login({ 
+        email: role === 'admin' ? 'admin@demo.com' : 'resident@demo.com', 
+        password: 'demo' 
+      });
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(res.user));
+      setUser(res.user);
+      setProfile(res.user);
       toast.success("Guest Session Active", { id: 'demo-login' });
     } catch (err: any) {
-      console.error("Anonymous auth failed:", err);
-      if (err.code === 'auth/operation-not-allowed') {
-        toast.error(`DEMO MODE FAILED: Anonymous sign-in is disabled. Please enable it in your Firebase Console > Authentication > Sign-in method.`, { id: 'demo-login', duration: 10000 });
-      } else {
-        toast.error(`DEMO MODE FAILED: ${err.message}`, { id: 'demo-login', duration: 8000 });
-      }
+      console.error("Demo login failed:", err);
+      toast.error(`DEMO MODE FAILED: ${err.message}`, { id: 'demo-login', duration: 8000 });
     } finally {
       setLoading(false);
     }
@@ -576,7 +396,11 @@ export default function App() {
       onCancel={() => setIsRegistering(false)} 
       onComplete={async (data: any) => {
         try {
-          await registerWithEmail(data.email, data.password, data.name, data.role, data.details);
+          const res = await api.auth.register(data);
+          localStorage.setItem('token', res.token);
+          localStorage.setItem('user', JSON.stringify(res.user));
+          setUser(res.user);
+          setProfile(res.user);
           setIsRegistering(false);
         } catch (err: any) {
           toast.error(err.message);
@@ -594,7 +418,6 @@ export default function App() {
       onDemoAdminLogin={() => handleDemoLogin('admin')}
       deferredPrompt={deferredPrompt}
       onInstall={handleInstallApp}
-      auth={auth}
       onResetSession={resetAuthSession}
     />
   );
@@ -691,7 +514,7 @@ export default function App() {
         />
       )}
 
-      <WitnessOverlay userId={profile?.uid || ''} />
+      <WitnessOverlay userId={profile?.id || ''} />
 
       <NavigationSidebar 
         activeTab={activeTab}
@@ -727,7 +550,7 @@ export default function App() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-            {(isMasterAdmin || checkIsRuben(user?.uid, user?.email || undefined)) && (
+            {(isMasterAdmin || checkIsRuben(user?.id, user?.email || undefined)) && (
               <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
                 <button 
                   onClick={() => { setViewOverride(null); setActiveTab('home'); }} 

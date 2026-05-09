@@ -1,12 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  orderBy
-} from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { FileText, Shield, MapPin } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReportMap from './ReportMap';
@@ -15,26 +9,24 @@ export default function ReportsView() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
-    if (!db || !auth.currentUser) {
-      clearTimeout(fallbackTimer);
-      if (!db) setLoading(false); 
-      return; 
+  const fetchReports = async () => {
+    try {
+      const data = await api.generic.list('incidents');
+      setReports(data);
+    } catch (err) {
+      console.error("Failed to fetch incidents", err);
+    } finally {
+      setLoading(false);
     }
-    const q = query(collection(db, 'incidents'), orderBy('date', 'desc'));
-    const unsub = onSnapshot(q, (snap) => {
-      clearTimeout(fallbackTimer);
-      setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, (error) => {
-      clearTimeout(fallbackTimer);
-      setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, 'incidents');
-    });
+  };
+
+  useEffect(() => {
+    fetchReports();
+    // In many systems incidents are terminal, but we still listen for new ones
+    socket.on('incident_new', () => fetchReports());
+    
     return () => {
-      clearTimeout(fallbackTimer);
-      unsub();
+      socket.off('incident_new');
     };
   }, []);
 

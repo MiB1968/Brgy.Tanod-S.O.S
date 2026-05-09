@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { 
   IconOnlineTanods, 
@@ -28,8 +28,6 @@ import { SOSChat } from './SOSChat';
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
-
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -67,8 +65,8 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
     // 1. Tanod specific constraint
     const isRelevant = 
       (alert.status === 'pending' || 
-       alert.assignedTo === profile?.uid || 
-       alert.respondedBy === profile?.uid);
+       alert.assignedTo === profile?.id || 
+       alert.respondedBy === profile?.id);
     
     if (!isRelevant) return false;
 
@@ -125,26 +123,30 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   }, [dashboardAlerts, profile, sirenActive]);
 
   useEffect(() => {
-    if (!profile || profile.role !== 'tanod' || !db) return;
+    if (!profile || profile.role !== 'tanod') return;
 
-    // Shift log (resolved by me today)
-    const qLog = query(
-      collection(db, 'alerts'),
-      where('respondedBy', '==', profile.uid),
-      where('status', '==', 'resolved'),
-      orderBy('resolvedAt', 'desc')
-    );
-    const unsubLog = onSnapshot(qLog, (snapshot) => {
-      setShiftLog(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Alert)));
+    const loadLog = async () => {
+      try {
+        const data = await api.generic.list(`alerts?respondedBy=${profile.id}&status=resolved&orderBy=resolvedAt:desc`);
+        setShiftLog(data);
+      } catch (err) {
+        console.error("Failed to load tanod shift log", err);
+      }
+    };
+
+    loadLog();
+    socket.on('alert_update', (alert) => {
+      if (alert.respondedBy === profile.id || alert.status === 'pending') {
+        loadLog();
+      }
     });
 
     return () => {
-      unsubLog();
+      socket.off('alert_update');
     };
   }, [profile]);
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
-    if (!db) return;
     setLoadingAlertIds(prev => new Set(prev).add(alert.id));
     try {
       const updateData: any = { 
@@ -153,10 +155,10 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       };
       
       if (status === 'responding') {
-        updateData.respondedBy = profile?.uid || 'unknown';
+        updateData.respondedBy = profile?.id || 'unknown';
         updateData.respondedByName = profile?.name || 'Tanod Unit';
         updateData.respondedAt = new Date().toISOString();
-        updateData.assignedTo = profile?.uid || 'unknown';
+        updateData.assignedTo = profile?.id || 'unknown';
         updateData.assignedToName = profile?.name || 'Tanod Unit';
       }
       
@@ -164,20 +166,9 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         updateData.resolvedAt = new Date().toISOString();
         updateData.resolutionNotes = `Cleared by ${profile?.name || 'Tanod Responder'}`;
         
-        let adminName = 'Unknown Admin';
-        try {
-          const adminQuery = query(collection(db, 'users'), where('role', '==', 'admin'));
-          const adminDocs = await getDocs(adminQuery);
-          if (!adminDocs.empty) {
-            adminName = adminDocs.docs[0].data().name || 'Admin';
-          }
-        } catch (e) {
-          console.error('Failed to fetch admin');
-        }
-
-        await addDoc(collection(db, 'incidents'), {
+        await api.incidents.create({
           alertId: alert.id,
-          tanodId: profile?.uid || 'unknown',
+          tanodId: profile?.id || 'unknown',
           tanodName: profile?.name || 'Unknown Tanod',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
@@ -189,11 +180,11 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           status: 'resolved',
           respondedAt: alert.respondedAt || updateData.respondedAt || new Date().toISOString(),
           resolvedAt: updateData.resolvedAt,
-          adminOnDuty: adminName
+          adminOnDuty: 'Admin Console'
         });
       }
 
-      await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+      await api.alerts.update(alert.id, updateData);
 
       // Log Tanod Activity
       if (status === 'responding' || status === 'resolved') {
@@ -201,8 +192,8 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
           ? Math.floor((new Date(updateData.respondedAt).getTime() - new Date(alert.timestamp).getTime()) / 1000)
           : undefined;
 
-        await addDoc(collection(db, 'tanod_activity_logs'), {
-          tanodId: profile?.uid || 'unknown',
+        await api.logs.create({
+          tanodId: profile?.id || 'unknown',
           tanodName: profile?.name || 'Unknown Tanod',
           type: status === 'responding' ? 'alert_response' : 'status_change',
           details: status === 'responding' 
@@ -215,10 +206,10 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         });
       }
 
-      if (profile?.uid) {
+      if (profile?.id) {
         try {
           const userStatus = status === 'resolved' ? 'On-Duty' : status;
-          await updateDoc(doc(db, 'users', profile.uid), { 
+          await api.generic.update(`users/${profile.id}`, { 
             status: userStatus,
             activeAlertId: status === 'resolved' ? null : alert.id
           });
@@ -231,27 +222,6 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         }
       }
 
-      // Sync to Supabase
-      if (isSupabaseConfigured) {
-        try {
-          await supabase
-            .from('report_logs')
-            .upsert([{ 
-              id: alert.id,
-              incident_id: alert.id,
-              type: alert.type,
-              location_lat: alert.location.lat,
-              location_lng: alert.location.lng,
-              lat: alert.location.lat, 
-              lng: alert.location.lng,
-              status: status,
-              tanod_id: profile?.uid || null 
-            }]);
-        } catch (suErr) {
-          console.error('Supabase status sync failed:', suErr);
-        }
-      }
-      
       await logIncidentAction({ ...alert, ...updateData });
     } catch (error: any) {
       console.error("Error updating alert:", error);
@@ -265,7 +235,6 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   const handleRejectAlert = async (alert: Alert) => {
-    if (!db) return;
     try {
       const updateData: any = { 
         status: 'pending', 
@@ -277,7 +246,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
         respondedAt: null
       };
       
-      await setDoc(doc(db, 'alerts', alert.id), updateData, { merge: true });
+      await api.alerts.update(alert.id, updateData);
       
       // Log the rejection
       await logIncidentAction({ 
@@ -287,11 +256,11 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
       });
 
       // Clear tanod active alert if they were assigned
-      if (profile?.uid) {
-        await setDoc(doc(db, 'users', profile.uid), { 
+      if (profile?.id) {
+        await api.generic.update(`users/${profile.id}`, { 
           activeAlertId: null,
           status: 'On-Duty'
-        }, { merge: true });
+        });
       }
     } catch (e) {
       console.error('Failed to reject alert:', e);
@@ -299,9 +268,8 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   };
 
   const handleSaveResponderNote = async (alertId: string) => {
-    if (!db) return;
     try {
-      await updateDoc(doc(db, 'alerts', alertId), {
+      await api.alerts.update(alertId, {
         responderNotes: noteText,
         updatedAt: new Date().toISOString()
       });
@@ -414,10 +382,10 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                  </div>
                  <button
                    onClick={async () => {
-                     if (!profile || !db) return;
+                     if (!profile || !profile.id) return;
                      const currentState = (profile as TanodProfile).isLocationSharingEnabled !== false;
                      try {
-                       await updateDoc(doc(db, 'users', profile.uid), { 
+                       await api.generic.update(`users/${profile.id}`, { 
                          isLocationSharingEnabled: !currentState,
                          updatedAt: new Date().toISOString()
                        });
@@ -458,8 +426,9 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                       if (!profile) return;
                       const newStatus = e.target.value as RegistryStatus;
                       try {
-                        await updateDoc(doc(db, 'users', profile.uid), { status: newStatus });
-                        updateTanodStatus(profile.uid, newStatus);
+                        await api.generic.update(`users/${profile.id}`, { status: newStatus });
+                        updateTanodStatus(profile.id, newStatus);
+                        socket.emit('tanod_update', { id: profile.id });
                       } catch(e) {
                           console.error('Failed to update status', e);
                       }

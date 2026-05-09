@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { collection, query, where, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import * as api from '../lib/api';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, IncidentStatus } from '../types';
 import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface IncidentFormProps {
   profile: User;
@@ -26,14 +24,14 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!auth?.currentUser || !db) return;
+    if (!profile) return;
     
     setSubmitting(true);
     try {
       const incidentId = crypto.randomUUID();
       const incidentData = {
         id: incidentId,
-        tanodId: auth.currentUser.uid,
+        tanodId: profile.id,
         tanodName: profile.name,
         timestamp: new Date().toISOString(),
         location: formData.location,
@@ -44,11 +42,7 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
         status: formData.status
       };
 
-      try {
-        await setDoc(doc(db, 'incidents', incidentId), incidentData);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `incidents/${incidentId}`);
-      }
+      await api.incidents.create(incidentData);
 
       // Sync to Supabase
       if (isSupabaseConfigured) {

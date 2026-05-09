@@ -5,7 +5,7 @@ import { IconActiveSOS } from './TacticalIcons';
 import { Clock, Navigation } from 'lucide-react';
 import { format } from 'date-fns';
 import { SystemBroadcast, Alert } from '../types';
-import { db, updateDoc, doc } from '../lib/firebase';
+import * as api from '../lib/api';
 import toast from 'react-hot-toast';
 
 interface BroadcastOverlayProps {
@@ -81,9 +81,9 @@ export const BroadcastOverlay: React.FC<BroadcastOverlayProps> = ({
           {(effectiveRole === 'admin' || effectiveRole === 'superadmin') ? (
             <button 
               onClick={async () => {
-                if (activeBroadcast && db) {
+                if (activeBroadcast) {
                   try {
-                    await updateDoc(doc(db, 'system_broadcasts', activeBroadcast.id), { isActive: false });
+                    await api.generic.update(`system_broadcasts/${activeBroadcast.id}`, { isActive: false });
                     toast.success('BROADCAST TERMINATED');
                   } catch (err) {
                     toast.error('Termination failed');

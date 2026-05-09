@@ -9,11 +9,11 @@ import {
   Download, 
   AlertTriangle 
 } from 'lucide-react';
-import { User, UserRole, TanodProfile } from '../types';
+import { User, UserRole, TanodProfile, ResidentProfile } from '../types';
 import { cn } from '../lib/utils';
 import { toast } from 'react-hot-toast';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 
 export default function SettingsView({ profile, role }: { profile: User | null, role: UserRole }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -25,12 +25,14 @@ export default function SettingsView({ profile, role }: { profile: User | null, 
   const isLocationSharingEnabled = (profile as TanodProfile).isLocationSharingEnabled !== false;
 
   const handleLocationToggle = async (active: boolean) => {
-    if (!profile.uid) return;
+    if (!profile.id) return;
     try {
-      await updateDoc(doc(db, 'users', profile.uid), {
+      await api.generic.update(`users/${profile.id}`, {
         isLocationSharingEnabled: active,
         updatedAt: new Date().toISOString()
       });
+      socket.emit('tanod_update', { id: profile.id });
+      
       toast.success(active ? 'GPS Intel Link: RE-ESTABLISHED' : 'GPS Intel Link: ENCRYPTED_OFFLINE', {
         icon: active ? '📡' : '🔏',
         style: {

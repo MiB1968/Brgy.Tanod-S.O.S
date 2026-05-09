@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  orderBy
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { User, UserRole, Shift } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -17,26 +11,24 @@ export default function ScheduleView({ role, profile }: { role: UserRole, profil
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => setLoading(false), 5000);
-    if (!db || !profile) { 
-      clearTimeout(fallbackTimer);
-      if (!db) setLoading(false); 
-      return; 
+  const fetchData = async () => {
+    try {
+      const data = await api.generic.list('shifts');
+      setShifts(data);
+    } catch (err) {
+      console.error("Failed to fetch shifts", err);
+    } finally {
+      setLoading(false);
     }
-    const q = query(collection(db, 'shifts'), orderBy('startTime', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      clearTimeout(fallbackTimer);
-      setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Shift)));
-      setLoading(false);
-    }, (error) => {
-      clearTimeout(fallbackTimer);
-      setLoading(false);
-      handleFirestoreError(error, OperationType.LIST, 'shifts');
-    });
+  };
+
+  useEffect(() => {
+    if (!profile) return;
+    fetchData();
+    socket.on('shift_update', () => fetchData());
+    
     return () => {
-      clearTimeout(fallbackTimer);
-      unsub();
+      socket.off('shift_update');
     };
   }, [profile]);
 

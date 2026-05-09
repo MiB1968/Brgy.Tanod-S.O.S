@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, User, ShieldAlert, Clock, Info, CheckCircle, Activity, Shield } from 'lucide-react';
 import { Alert, ResidentProfile } from '../types';
 import ReportMap from './ReportMap';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { cn } from '../lib/utils';
 import FlameAnimation from './FlameAnimation';
 
@@ -20,14 +20,14 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   useEffect(() => {
     if (alert && alert.residentId) {
       setLoadingResident(true);
-      getDoc(doc(db, 'residents', alert.residentId))
-        .then((snapshot) => {
-          if (snapshot.exists()) {
-            setResident(snapshot.data() as ResidentProfile);
+      api.generic.get(`residents/${alert.residentId}`)
+        .then((data) => {
+          if (data) {
+            setResident(data as ResidentProfile);
           } else {
-             // Fallback to checking users collection if they're not fully approved yet or legacy
-             getDoc(doc(db, 'users', alert.residentId)).then(uSnap => {
-                if (uSnap.exists()) setResident(uSnap.data() as any);
+             // Fallback to checking users collection
+             api.generic.get(`users/${alert.residentId}`).then(uData => {
+                if (uData) setResident(uData as any);
              });
           }
         })
@@ -242,6 +242,20 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                                <span key={i} className="px-2 py-1 bg-info/10 border border-info/20 text-info text-[10px] rounded uppercase font-mono">
                                  {unit}
                                </span>
+                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {alert.aiAnalysis.instructions?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] text-white/40 uppercase mb-2">Instructions Transmitted to Subject</p>
+                          <div className="space-y-1.5">
+                             {alert.aiAnalysis.instructions.map((instruction: string, i: number) => (
+                               <div key={i} className="flex items-center gap-2 text-[11px] text-white/70 italic bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                                 <CheckCircle className="w-3 h-3 text-info shrink-0" />
+                                 <span>{instruction}</span>
+                               </div>
                              ))}
                           </div>
                         </div>

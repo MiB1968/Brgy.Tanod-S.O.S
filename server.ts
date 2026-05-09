@@ -4,7 +4,6 @@ import { rateLimit } from "express-rate-limit";
 import * as http from "http";
 import path from "path";
 import { z } from "zod";
-import { GoogleGenAI } from "@google/genai";
 import pg from "pg";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
@@ -16,11 +15,8 @@ dotenv.config();
 
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
-
-// Initialize AI
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Database Pool
 const pool = new Pool({
@@ -28,94 +24,194 @@ const pool = new Pool({
   ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false }
 });
 
-async function initDb() {
-  let client;
+interface AuthRequest extends express.Request {
+  user?: any;
+}
+
+// --- Auth Middleware ---
+function authenticate(req: AuthRequest, res: any, next: any) {
+  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Auth required" });
   try {
-    console.log("DB_INIT: Connecting to database...");
-    if (!DATABASE_URL) {
-      console.warn("DB_INIT: DATABASE_URL not found. Skipping schema sync.");
-      return;
-    }
-    client = await pool.connect();
-    console.log("DB_INIT: Verifying CockroachDB Schema...");
-    
-    // Users Table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'resident',
-        status TEXT NOT NULL DEFAULT 'pending',
-        created_at TIMESTAMPTZ DEFAULT now(),
-        last_active TIMESTAMPTZ DEFAULT now()
-      );
-    `);
-
-    // Residents Table (Profile data)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS residents (
-        id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-        phone TEXT,
-        address TEXT,
-        house_number TEXT,
-        household_size INT DEFAULT 1,
-        blood_type TEXT,
-        medical_conditions TEXT[],
-        emergency_contact_name TEXT,
-        emergency_contact_phone TEXT,
-        gps_lat FLOAT,
-        gps_lng FLOAT,
-        is_verified BOOLEAN DEFAULT false,
-        verification_date TIMESTAMPTZ
-      );
-    `);
-
-    // SOS Alerts Table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS alerts (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        resident_id UUID REFERENCES users(id),
-        type TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'active',
-        location JSONB NOT NULL,
-        description TEXT,
-        severity_score INT,
-        ai_analysis JSONB,
-        created_at TIMESTAMPTZ DEFAULT now(),
-        updated_at TIMESTAMPTZ DEFAULT now(),
-        resolved_at TIMESTAMPTZ
-      );
-    `);
-
-    // Patrols Table
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS patrols (
-        tanod_id UUID PRIMARY KEY REFERENCES users(id),
-        is_active BOOLEAN DEFAULT false,
-        location JSONB,
-        last_ping TIMESTAMPTZ DEFAULT now()
-      );
-    `);
-
-    console.log("DB_INIT: Schema synchronized.");
-
-    // Bootstrap Admin (Ruben)
-    const adminEmail = 'rubenlleg12@gmail.com';
-    const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
-    if (adminResult.rows.length === 0) {
-      console.log("DB_INIT: Bootstrapping Admin Account...");
-      const hashedPass = await bcrypt.hash('admin123', 10);
-      await client.query(
-        "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
-        [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
-      );
-    }
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
   } catch (err) {
-    console.error("DB_INIT_ERROR:", err);
-  } finally {
-    if (client) client.release();
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+async function initDb(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    let client;
+    try {
+      console.log(`DB_INIT: Attempting to connect (Attempt ${i + 1}/${retries})...`);
+      if (!DATABASE_URL) {
+        console.warn("DB_INIT: DATABASE_URL not found. Skipping.");
+        return;
+      }
+
+      // Diagnostic
+      try {
+        const url = new URL(DATABASE_URL);
+        console.log(`DB_INIT: Protocol: ${url.protocol}`);
+        console.log(`DB_INIT: Host: "${url.hostname}"`);
+        console.log(`DB_INIT: Port: ${url.port}`);
+      } catch (e: any) {
+        console.log("DB_INIT: URL Error:", e.message);
+      }
+
+      client = await pool.connect();
+      console.log("DB_INIT: Auth Successful.");
+      
+      // Syncing Schema
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          name TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'resident',
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TIMESTAMPTZ DEFAULT now(),
+          last_active TIMESTAMPTZ DEFAULT now()
+        );
+      `);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS residents (
+          id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          phone TEXT,
+          address TEXT,
+          house_number TEXT,
+          household_size INT DEFAULT 1,
+          blood_type TEXT,
+          medical_conditions TEXT[],
+          emergency_contact_name TEXT,
+          emergency_contact_phone TEXT,
+          gps_lat FLOAT,
+          gps_lng FLOAT,
+          is_verified BOOLEAN DEFAULT false,
+          verification_date TIMESTAMPTZ
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS alerts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          resident_id UUID REFERENCES users(id),
+          type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          location JSONB NOT NULL,
+          description TEXT,
+          severity_score INT,
+          ai_analysis JSONB,
+          created_at TIMESTAMPTZ DEFAULT now(),
+          updated_at TIMESTAMPTZ DEFAULT now(),
+          resolved_at TIMESTAMPTZ
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS patrols (
+          tanod_id UUID PRIMARY KEY REFERENCES users(id),
+          is_active BOOLEAN DEFAULT false,
+          location JSONB,
+          last_ping TIMESTAMPTZ DEFAULT now()
+        );
+      `);
+
+      // Bootstrap Admin
+      const adminEmail = 'rubenlleg12@gmail.com';
+      const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+      if (adminResult.rows.length === 0) {
+        const hashedPass = await bcrypt.hash('admin123', 10);
+        await client.query(
+          "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+          [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
+        );
+      }
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_config (
+          key TEXT PRIMARY KEY,
+          data JSONB NOT NULL,
+          updated_at TIMESTAMPTZ DEFAULT now()
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS system_broadcasts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          message TEXT NOT NULL,
+          timestamp TIMESTAMPTZ DEFAULT now(),
+          isActive BOOLEAN DEFAULT true
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS tanod_activity_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tanod_id UUID REFERENCES users(id),
+          tanod_name TEXT,
+          type TEXT,
+          timestamp TIMESTAMPTZ DEFAULT now(),
+          details TEXT,
+          location JSONB
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS incidents (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          alert_id UUID REFERENCES alerts(id),
+          tanod_id UUID REFERENCES users(id),
+          tanod_name TEXT,
+          timestamp TIMESTAMPTZ,
+          type TEXT,
+          gps_location JSONB,
+          description TEXT,
+          status TEXT
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS patrol_sessions (
+          id TEXT PRIMARY KEY,
+          tanod_id UUID REFERENCES users(id),
+          tanod_name TEXT,
+          start_time TIMESTAMPTZ DEFAULT now(),
+          end_time TIMESTAMPTZ,
+          route JSONB DEFAULT '[]'
+        );
+      `);
+
+      // Initialize Siren config
+      await client.query(`
+        INSERT INTO system_config (key, data) 
+        VALUES ('siren', '{"sirenActive": false}') 
+        ON CONFLICT DO NOTHING
+      `);
+
+      console.log("DB_INIT: Schema synchronized.");
+      return; // SUCCESS - Exit the retry loop
+
+    } catch (err: any) {
+      if (err.message.includes("EAI_AGAIN") || err.message.includes("ENOTFOUND")) {
+        console.error(`DB_DNS_ERROR (Attempt ${i + 1}): Host not found.`);
+      } else if (err.message.includes("password authentication failed")) {
+        console.error(`DB_AUTH_ERROR (Attempt ${i + 1}): Check password.`);
+        return; // Don't retry if auth fails
+      } else {
+        console.error(`DB_INIT_ERROR (Attempt ${i + 1}):`, err.message);
+      }
+      
+      if (i < retries - 1) {
+        console.log(`DB_INIT: Retrying in 2 seconds...`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    } finally {
+      if (client) client.release();
+    }
   }
 }
 
@@ -128,6 +224,26 @@ async function startServer() {
 
   const app = express();
   const PORT = process.env.PORT || 3000;
+
+  // IMPORTANT: Set trust proxy for rate limiting behind load balancers
+  app.set('trust proxy', 1);
+
+  app.get("/api/debug-db", (req, res) => {
+    if (!DATABASE_URL) return res.json({ status: "missing" });
+    try {
+      const url = new URL(DATABASE_URL);
+      res.json({
+        status: "configured",
+        host: url.hostname,
+        port: url.port,
+        protocol: url.protocol,
+        length: DATABASE_URL.length
+      });
+    } catch (e: any) {
+      res.json({ status: "error", message: e.message });
+    }
+  });
+
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: "*" }
@@ -143,23 +259,190 @@ async function startServer() {
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
-    limit: 100,
+    limit: 1000, // Increased
     standardHeaders: 'draft-8',
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false }, 
   });
   app.use("/api/", limiter);
 
-  // --- Auth Middleware ---
-  const authenticate = (req: any, res: any, next: any) => {
-    const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Auth required" });
+  // --- Sync API (Mock Firestore to Postgres) ---
+  app.get("/api/sync", async (req, res) => {
+    const { path: fullPath } = req.query;
+    if (!fullPath) return res.status(400).json({ error: "Path required" });
+
+    const fullPathStr = fullPath as string;
+    const [basePath, searchParams] = fullPathStr.split('?');
+    const parts = basePath.split('/');
+    const collection = parts[0];
+    const id = parts[1];
+
     try {
-      req.user = jwt.verify(token, JWT_SECRET);
-      next();
-    } catch (err) {
-      res.status(401).json({ error: "Invalid token" });
+      console.log(`SYNC_API: Request collection=${collection}, id=${id}, searchParams=${searchParams}`);
+
+      if (collection === 'system' && id === 'siren') {
+        const result = await pool.query("SELECT data FROM system_config WHERE key = 'siren'");
+        return res.json(result.rows[0]?.data || { sirenActive: false });
+      }
+
+      if (collection === 'alerts' || collection === 'active_alerts') {
+        if (id) {
+          const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [id]);
+          const alert = result.rows[0];
+          if (!alert) return res.status(404).json({ error: "Not found" });
+          return res.json({
+            ...alert,
+            location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
+            timestamp: alert.created_at
+          });
+        } else {
+          // Simplified implementation for now if searching is complex
+          const query = "SELECT * FROM alerts ORDER BY created_at DESC LIMIT 100";
+          console.log(`DB_QUERY: ${query}`);
+          const result = await pool.query(query);
+          return res.json(result.rows.map(a => ({
+            ...a,
+            location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
+            timestamp: a.created_at
+          })));
+        }
+      }
+
+      if (collection === 'incidents') {
+        const query = "SELECT * FROM incidents ORDER BY timestamp DESC LIMIT 100";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows.map(i => ({
+            id: i.id,
+            ...i
+        })));
+      }
+
+      if (collection === 'users' || collection === 'residents') {
+        if (searchParams && searchParams.includes('role=tanod')) {
+            const query = "SELECT id, email, name, role, status FROM users WHERE role = 'tanod'";
+            console.log(`DB_QUERY: ${query}`);
+            const result = await pool.query(query);
+            return res.json(result.rows);
+        }
+        if (id) {
+          const query = "SELECT id, email, name, role, status FROM users WHERE id = $1";
+          console.log(`DB_QUERY: ${query}, ID: ${id}`);
+          const result = await pool.query(query, [id]);
+          return res.json(result.rows[0] || null);
+        }
+        const query = "SELECT id, email, name, role, status FROM users WHERE role = 'resident'";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows);
+      }
+
+      if (collection === 'patrols') {
+        const query = "SELECT * FROM patrols";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows.map(p => ({
+          ...p,
+          location: typeof p.location === 'string' ? JSON.parse(p.location) : p.location,
+          lastUpdate: p.last_ping
+        })));
+      }
+
+      if (collection === 'broadcasts' || collection === 'system_broadcasts') {
+        const query = "SELECT * FROM system_broadcasts WHERE isactive = true ORDER BY timestamp DESC LIMIT 1";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows);
+      }
+
+      if (collection === 'witness_invites') {
+        // For now return empty or handle based on params if needed, but not mapping will cause error
+        // Let's return empty array to prevent failure for now if not implemented
+        return res.json([]);
+      }
+
+      if (collection === 'tanod_activity_logs') {
+        const query = "SELECT * FROM tanod_activity_logs ORDER BY timestamp DESC LIMIT 100";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows.map(l => ({
+          id: l.id,
+          ...l,
+          location: typeof l.location === 'string' ? JSON.parse(l.location) : l.location
+        })));
+      }
+
+      if (collection === 'shifts') {
+        return res.json([]);
+      }
+
+      if (collection === 'patrol_sessions') {
+        const query = "SELECT * FROM patrol_sessions ORDER BY start_time DESC LIMIT 50";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows.map(s => ({
+          id: s.id,
+          ...s,
+          route: typeof s.route === 'string' ? JSON.parse(s.route) : s.route
+        })));
+      }
+
+      res.status(404).json({ error: `Path not mapped: ${fullPathStr}` });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
-  };
+  });
+
+  app.post("/api/sync", authenticate, async (req: AuthRequest, res: any) => {
+    const { path: fullPath, id, data, options } = req.body;
+    const parts = (fullPath as string).split('/');
+    const collection = parts[0];
+    const docId = id || parts[1];
+
+    try {
+      if (collection === 'system' && docId === 'siren') {
+        await pool.query(
+          "INSERT INTO system_config (key, data, updated_at) VALUES ('siren', $1, now()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = now()",
+          [JSON.stringify(data)]
+        );
+        io.emit("siren_update", data);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'patrol_sessions') {
+        if (options?.merge) {
+          const current = await pool.query("SELECT route FROM patrol_sessions WHERE id = $1", [docId]);
+          let newRoute = data.route;
+          if (data.route?._type === 'arrayUnion' && current.rows[0]) {
+             newRoute = [...(current.rows[0].route || []), ...data.route.elements];
+          }
+          
+          await pool.query(
+            "UPDATE patrol_sessions SET route = COALESCE($1, route), end_time = COALESCE($2, end_time) WHERE id = $3",
+            [newRoute ? JSON.stringify(newRoute) : null, data.endTime || null, docId]
+          );
+        } else {
+          await pool.query(
+            "INSERT INTO patrol_sessions (id, tanod_id, tanod_name, start_time, route) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO UPDATE SET route = $5",
+            [docId, data.tanodId, data.tanodName, data.startTime, JSON.stringify(data.route || [])]
+          );
+        }
+        return res.json({ success: true, id: docId });
+      }
+
+      if (collection === 'tanod_activity_logs') {
+        await pool.query(
+          "INSERT INTO tanod_activity_logs (tanod_id, tanod_name, type, timestamp, details, location) VALUES ($1, $2, $3, $4, $5, $6)",
+          [data.tanodId, data.tanodName, data.type, data.timestamp, data.details, JSON.stringify(data.location || null)]
+        );
+        return res.json({ success: true });
+      }
+
+      res.status(404).json({ error: "Path not mapped" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // --- Auth Routes ---
   app.post("/api/auth/register", async (req, res) => {
@@ -222,7 +505,7 @@ async function startServer() {
   });
 
   // --- Data Routes ---
-  app.get("/api/users/:id", authenticate, async (req, res) => {
+  app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
       const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
@@ -232,7 +515,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/residents/:id", authenticate, async (req, res) => {
+  app.get("/api/residents/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
       const result = await pool.query("SELECT * FROM residents WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "Resident not found" });
@@ -242,7 +525,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/alerts/active", authenticate, async (req, res) => {
+  app.get("/api/alerts/active", authenticate, async (req: AuthRequest, res: any) => {
     try {
       const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
       res.json(result.rows);
@@ -252,7 +535,7 @@ async function startServer() {
   });
 
   // --- SOS Logic ---
-  app.post("/api/sos/alert", authenticate, async (req, res) => {
+  app.post("/api/sos/alert", authenticate, async (req: AuthRequest, res: any) => {
     const { type, location, description } = req.body;
     try {
       const result = await pool.query(
@@ -260,14 +543,14 @@ async function startServer() {
         [req.user.id, type, JSON.stringify(location), description]
       );
       const alert = result.rows[0];
-      io.emit("sos_new", alert);
+      io.emit("alert_update", { type: 'new', alert });
       res.json(alert);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.get("/api/sos/active", authenticate, async (req, res) => {
+  app.get("/api/sos/active", authenticate, async (req: AuthRequest, res: any) => {
     try {
       const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
       res.json(result.rows);
@@ -277,7 +560,7 @@ async function startServer() {
   });
 
   // --- Patrol Logic ---
-  app.post("/api/patrol/ping", authenticate, async (req, res) => {
+  app.post("/api/patrol/ping", authenticate, async (req: AuthRequest, res: any) => {
     const { location, isActive } = req.body;
     try {
       await pool.query(
@@ -294,12 +577,49 @@ async function startServer() {
     }
   });
 
-  // --- AI Analysis ---
-  app.post("/api/ai/analyze", authenticate, async (req, res) => {
-    if (!ai) return res.status(503).json({ error: "AI not configured" });
-    // ... AI logic handled by Gemini skill pattern later if needed
-    res.json({ analysis: "Automated analysis pending refactor" });
+  // --- Analytics Logic ---
+  app.get("/api/analytics/dashboard", authenticate, async (req: AuthRequest, res: any) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
+
+    try {
+      const stats = await pool.query(`
+        SELECT 
+          (SELECT count(*) FROM users WHERE role = 'resident') as total_residents,
+          (SELECT count(*) FROM users WHERE role = 'resident' AND status = 'verified') as verified_residents,
+          (SELECT count(*) FROM alerts) as total_alerts,
+          (SELECT count(*) FROM alerts WHERE status = 'active') as active_alerts,
+          (SELECT count(*) FROM users WHERE role = 'tanod' AND status = 'verified') as total_tanods
+      `);
+
+      const alertsByType = await pool.query(`
+        SELECT type, count(*) as count 
+        FROM alerts 
+        GROUP BY type 
+        ORDER BY count DESC
+      `);
+
+      const alertsHistory = await pool.query(`
+        SELECT 
+          date_trunc('day', created_at) as day, 
+          count(*) as count 
+        FROM alerts 
+        WHERE created_at > now() - interval '7 days'
+        GROUP BY day 
+        ORDER BY day ASC
+      `);
+
+      res.json({
+        overview: stats.rows[0],
+        alertsByType: alertsByType.rows,
+        alertsHistory: alertsHistory.rows
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
+
+  // --- AI Analysis (Guardian AI) ---
+  // Note: AI analysis moved to frontend via aiService.ts as per platform guidelines.
 
   // Socket Connection
   io.on("connection", (socket) => {

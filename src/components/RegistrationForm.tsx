@@ -1,12 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  auth, 
-  db, 
-  storage, 
-  setDoc, 
-  doc, 
-  collection 
-} from '../lib/firebase';
+import * as api from '../lib/api';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { toast } from 'react-hot-toast';
@@ -101,13 +94,12 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
-  const currentUser = auth?.currentUser;
   
   const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [selfiePhoto, setSelfiePhoto] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
-    fullName: currentUser?.displayName || '',
+    fullName: '',
     age: '',
     gender: 'Male',
     dob: '',
@@ -117,7 +109,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     mobileNumber: '',
     altContactName: '',
     altContactNumber: '',
-    email: currentUser?.email || '',
+    email: '',
     houseNumber: '',
     street: '',
     householdCount: '1',
@@ -126,7 +118,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     gpsLat: 13.0641,
     gpsLng: 120.7303,
     address: '',
-    username: currentUser?.email?.split('@')[0] || '',
+    username: '',
     password: '',
     confirmPassword: ''
   });
@@ -419,8 +411,8 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                     scrollWheelZoom={false}
                   >
                     <OfflineTileLayer 
-                      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution="&copy; OpenStreetMap"
+                      url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                     />
                     <MapUpdater center={[formData.gpsLat, formData.gpsLng]} />
                     <LocationPicker 

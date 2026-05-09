@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { ResidentProfile } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Check, X, Eye, Search, Filter, MapPin, Phone, User, Calendar, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'react-hot-toast';
 
 export default function AdminResidents({ profile }: { profile: any }) {
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
@@ -16,66 +16,83 @@ export default function AdminResidents({ profile }: { profile: any }) {
   const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin') || !db) return;
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
-    const q = filter === 'all' 
-      ? query(collection(db, 'residents'))
-      : query(collection(db, 'residents'), where('status', '==', filter));
-      
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResidentProfile));
-      setResidents(list);
-      setLoading(false);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'residents'));
-    return unsubscribe;
-  }, [filter]);
+    const fetchResidents = async () => {
+      try {
+        const data = await api.residents.getAll();
+        const formatted = data.map((r: any) => ({ 
+          id: r.id, 
+          ...r, 
+          ...(r.details || {}) 
+        } as ResidentProfile));
+        
+        const filteredList = filter === 'all' 
+          ? formatted 
+          : formatted.filter((r: ResidentProfile) => r.status === filter);
+          
+        setResidents(filteredList);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch residents", err);
+        setLoading(false);
+      }
+    };
+
+    fetchResidents();
+    socket.on('resident_update', () => fetchResidents());
+    
+    return () => {
+      socket.off('resident_update');
+    };
+  }, [filter, profile]);
 
   const handleApprove = async (id: string, name: string) => {
-    if (!db) return;
     try {
-      await setDoc(doc(db, 'residents', id), {
+      const residentDoc = residents.find(r => r.id === id);
+      const updateData: any = { 
         status: 'approved',
         approvedAt: new Date().toISOString()
-      }, { merge: true });
-      console.log('Approve resident doc success');
-      // Sync with users collection
-      const residentDoc = residents.find(r => r.id === id);
-      const updateData: any = { status: 'approved' };
+      };
       
       if (residentDoc) {
-        // Compute geohash for witness discovery
+        // In this migration, geohash logic is ideally backend-side
+        // but we'll include it in the update payload if needed
         try {
           const ngeohash = await import('ngeohash');
           updateData.geohash = ngeohash.encode(residentDoc.gpsLat, residentDoc.gpsLng, 6);
-          updateData.lat = residentDoc.gpsLat;
-          updateData.lng = residentDoc.gpsLng;
         } catch (e) {
-          console.warn("Geohash calculation failed during approval", e);
+          console.warn("Geohash calculation skipped in frontend", e);
         }
       }
 
-      await setDoc(doc(db, 'users', id), updateData, { merge: true });
-      console.log('Approve user doc success');
+      await api.residents.update(id, updateData);
+      
+      // Also update the main user profile status
+      await api.auth.updateProfile(id, { status: 'approved' });
+      
+      toast.success(`${name} approved`);
     } catch (err: any) {
       console.error('Approve failed:', err);
+      toast.error('Approval failed');
     }
   };
 
   const handleReject = async (id: string, reason: string) => {
-    if (!db) return;
     try {
-      await setDoc(doc(db, 'residents', id), {
+      await api.residents.update(id, {
         status: 'rejected',
         rejectionReason: reason
-      }, { merge: true });
+      });
       // Sync with users collection
-      await setDoc(doc(db, 'users', id), {
-        status: 'rejected'
-      }, { merge: true });
+      await api.auth.updateProfile(id, { status: 'rejected' });
+      
       setRejectingResident(null);
       setRejectReason('');
+      toast.success('Registration rejected');
     } catch (err: any) {
       console.error('Reject failed:', err);
+      toast.error('Rejection failed');
     }
   };
 

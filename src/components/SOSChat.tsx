@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../lib/firebase';
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  serverTimestamp 
-} from 'firebase/firestore';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { SOSChatMessage, User } from '../types';
 import { Send, MessageSquare, Shield, User as UserIcon, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface SOSChatProps {
   alertId: string;
@@ -27,24 +19,31 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!db || !alertId) return;
+    if (!alertId) return;
 
-    const messagesRef = collection(db, 'alerts', alertId, 'messages');
-    const q = query(messagesRef, orderBy('timestamp', 'asc'));
+    const loadMessages = async () => {
+      try {
+        const msgs = await api.chat.getMessages(alertId);
+        setMessages(msgs);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load chat messages", err);
+        setLoading(false);
+      }
+    };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as SOSChatMessage[];
-      setMessages(msgs);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `alerts/${alertId}/messages`);
-      setLoading(false);
+    loadMessages();
+
+    // Listen for new messages
+    socket.on('sos_chat_message', (data) => {
+      if (data.alertId === alertId) {
+        setMessages(prev => [...prev, data.message]);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      socket.off('sos_chat_message');
+    };
   }, [alertId]);
 
   useEffect(() => {
@@ -55,10 +54,10 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !db || !auth.currentUser) return;
+    if (!newMessage.trim()) return;
 
     const msgData = {
-      senderId: currentUser.uid,
+      senderId: currentUser.id,
       senderName: currentUser.name,
       senderRole: currentUser.role,
       message: newMessage.trim(),
@@ -68,9 +67,9 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
     setNewMessage('');
 
     try {
-      await addDoc(collection(db, 'alerts', alertId, 'messages'), msgData);
+      await api.chat.sendMessage(alertId, msgData);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, `alerts/${alertId}/messages`);
+      console.error("Failed to send message", error);
     }
   };
 

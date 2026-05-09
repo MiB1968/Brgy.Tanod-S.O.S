@@ -1,15 +1,8 @@
 import { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  addDoc
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { User, PatrolLocation } from '../types';
 import { useTanodStore } from '../store/useTanodStore';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TanodLogo } from './Branding';
@@ -23,19 +16,29 @@ export default function TanodRosterView() {
   const [newUnitName, setNewUnitName] = useState('');
   const [newUnitEmail, setNewUnitEmail] = useState('');
 
+  const fetchTanods = async () => {
+    try {
+      const data = await api.generic.list('users?role=tanod');
+      setTanods(data);
+    } catch (err) {
+      console.error("Failed to fetch roster", err);
+    }
+  };
+
   useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, 'users'), where('role', '==', 'tanod'));
-    return onSnapshot(q, (snap) => {
-      setTanods(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'tanod_roster'));
+    fetchTanods();
+    socket.on('tanod_update', () => fetchTanods());
+    
+    return () => {
+      socket.off('tanod_update');
+    };
   }, []);
 
   const handleAddUnit = async () => {
-    if (!newUnitName.trim() || !newUnitEmail.trim() || !db) return;
+    if (!newUnitName.trim() || !newUnitEmail.trim()) return;
     try {
-      await addDoc(collection(db, 'users'), {
-        uid: Date.now().toString(),
+      await api.generic.create('users', {
+        id: Date.now().toString(),
         name: newUnitName,
         email: newUnitEmail,
         role: 'tanod',
@@ -46,8 +49,10 @@ export default function TanodRosterView() {
       setNewUnitName('');
       setNewUnitEmail('');
       toast.success('Unit Registered Successfully');
+      socket.emit('tanod_update', {});
     } catch (e: any) {
-      handleFirestoreError(e, OperationType.WRITE, 'users');
+      console.error("Failed to add unit", e);
+      toast.error('Failed to register unit');
     }
   };
 
@@ -124,7 +129,7 @@ export default function TanodRosterView() {
 
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 staggered-list">
         {tanods.map((t, index) => {
-          const patrolMatch = patrols.find(p => p.tanodId === t.uid);
+          const patrolMatch = patrols.find(p => p.tanodId === t.id);
           const isActuallyActive = patrolMatch?.isActive;
           const lastSeen = patrolMatch?.lastUpdate;
 
@@ -133,7 +138,7 @@ export default function TanodRosterView() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              key={t.uid} 
+              key={t.id} 
               className="glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group hover:border-white/10 hover:bg-white/5 transition-all shadow-command skew-card"
             >
               <div className="absolute inset-0 tactical-grid opacity-5" />
@@ -148,7 +153,7 @@ export default function TanodRosterView() {
                     <h4 className="text-2xl font-black italic tracking-tighter text-white truncate uppercase font-mono leading-none">{t.name}</h4>
                     {isActuallyActive && <span className="w-2 h-2 bg-success rounded-full animate-pulse shadow-glow-success" />}
                   </div>
-                  <p className="font-mono text-white/30 text-[9px] uppercase font-bold tracking-[0.2em]">{t.id || `UNIT-${t.uid?.slice(0, 4).toUpperCase()}`}</p>
+                  <p className="font-mono text-white/30 text-[9px] uppercase font-bold tracking-[0.2em]">{t.id || `UNIT-${t.id?.slice(0, 4).toUpperCase()}`}</p>
                 </div>
               </div>
 

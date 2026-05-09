@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, onSnapshot, doc, updateDoc, serverTimestamp, where } from 'firebase/firestore';
-import { db, auth } from '../../lib/firebase';
+import * as api from '../../lib/api';
+import socket from '../../lib/socket';
 import { SystemBroadcast } from '../../types';
 import { motion } from 'motion/react';
 import { Megaphone, Plus, X, Globe } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../../lib/firestore-errors';
 
 export function ManageBroadcasts() {
   const [broadcasts, setBroadcasts] = useState<SystemBroadcast[]>([]);
@@ -14,37 +13,46 @@ export function ManageBroadcasts() {
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'broadcasts'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as SystemBroadcast));
-      setBroadcasts(data);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'broadcasts'));
-    return unsubscribe;
+    const loadBroadcasts = async () => {
+      try {
+        const data = await api.generic.list('broadcasts');
+        setBroadcasts(data);
+      } catch (err) {
+        console.error("Failed to load broadcasts", err);
+      }
+    };
+
+    loadBroadcasts();
+    socket.on('broadcast_update', () => loadBroadcasts());
+
+    return () => {
+      socket.off('broadcast_update');
+    };
   }, []);
 
   const handleAdd = async () => {
-    if (!message || !auth.currentUser) return;
+    if (!message) return;
     try {
-      await addDoc(collection(db, 'broadcasts'), {
-        adminId: auth.currentUser.uid,
-        adminName: 'Admin', // In real app fetch properly
+      await api.generic.create('broadcasts', {
+        adminId: 'current-admin-id', // ideally passed from props
+        adminName: 'Admin',
         message,
         type,
         isActive: true,
-        timestamp: serverTimestamp(),
+        timestamp: new Date().toISOString(),
       });
       setMessage('');
       setIsAdding(false);
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'broadcasts');
+      console.error("Failed to add broadcast", err);
     }
   };
 
   const toggleBroadcast = async (broadcast: SystemBroadcast) => {
     try {
-      await updateDoc(doc(db, 'broadcasts', broadcast.id), { isActive: !broadcast.isActive });
+      await api.generic.update(`broadcasts/${broadcast.id}`, { isActive: !broadcast.isActive });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `broadcasts/${broadcast.id}`);
+      console.error("Failed to toggle broadcast", err);
     }
   };
 

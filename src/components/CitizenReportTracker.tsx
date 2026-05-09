@@ -1,11 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Alert } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Shield, MapPin, CheckCircle } from 'lucide-react';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { cn } from '../lib/utils';
 import { AlertDetailsModal } from './AlertDetailsModal';
 
@@ -15,20 +14,27 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
   const [selectedReport, setSelectedReport] = useState<Alert | null>(null);
 
   useEffect(() => {
-    if (!db) return;
-    // We'll show the user's alerts as 'Reports' but with a more detailed 'Terminal' view
-    // In a real system, this would link to documented Incidents
-    const q = query(
-      collection(db, 'alerts'),
-      where('residentId', '==', userId),
-      orderBy('timestamp', 'desc'),
-      limit(5)
-    );
+    const fetchReports = async () => {
+      try {
+        const data = await api.alerts.getAll();
+        // Filter in memory for user reports
+        const myReports = data
+          .filter((a: Alert) => a.residentId === userId)
+          .slice(0, 5);
+        setReports(myReports);
+      } catch (err) {
+        console.error("Failed to fetch reports", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+    socket.on('alert_update', () => fetchReports());
     
-    return onSnapshot(q, (snapshot) => {
-      setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'citizen_reports'));
+    return () => {
+      socket.off('alert_update');
+    };
   }, [userId]);
 
   if (reports.length === 0 && !loading) return null;

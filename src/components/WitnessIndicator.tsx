@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import * as api from '../lib/api';
+import socket from '../lib/socket';
 import { Eye, Users } from 'lucide-react';
 import { WitnessRequest } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface WitnessIndicatorProps {
   alertId: string;
@@ -13,17 +12,25 @@ interface WitnessIndicatorProps {
 export const WitnessIndicator: React.FC<WitnessIndicatorProps> = ({ alertId }) => {
   const [witnesses, setWitnesses] = useState<WitnessRequest[]>([]);
 
+  const fetchWitnesses = async () => {
+    try {
+      const data = await api.generic.list(`witness_invites?alertId=${alertId}&status=accepted`);
+      setWitnesses(data);
+    } catch (err) {
+      console.error("Failed to fetch witnesses", err);
+    }
+  };
+
   useEffect(() => {
     if (!alertId) return;
-    const q = query(
-      collection(db, 'witness_invites'),
-      where('alertId', '==', alertId),
-      where('status', '==', 'accepted')
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
-        setWitnesses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WitnessRequest)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'witness_invites_active'));
-    return unsub;
+    fetchWitnesses();
+    socket.on('witness_update', (payload: any) => {
+      if (payload.alertId === alertId) fetchWitnesses();
+    });
+    
+    return () => {
+      socket.off('witness_update');
+    };
   }, [alertId]);
 
   if (witnesses.length === 0) return null;
