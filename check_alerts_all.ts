@@ -1,4 +1,4 @@
-import { pool } from './src/server/db/index';
+import { pool } from './server/db/index';
 
 async function checkTableDefinition() {
   try {

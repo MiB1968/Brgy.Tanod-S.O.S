@@ -26,7 +26,7 @@ export function ResidentHero({ profile, setIsAboutOpen, guardianMode, setGuardia
         </div>
         <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase text-white font-display leading-none flex items-center gap-4">
           <TanodLogo size={48} animated={true} />
-          PROTECT<span className="text-tactical-blue">LOCAL</span>
+          PROTECT <span className="text-tactical-blue">LOCAL</span>
         </h2>
         <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em] mt-3 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/10">Personal Safety & Emergency Transmission Terminal</p>
       </div>

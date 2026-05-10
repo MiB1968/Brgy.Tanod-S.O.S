@@ -12,12 +12,12 @@ export default defineConfig(({mode}) => {
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
     build: {
-      outDir: 'dist',
+      outDir: 'dist/client',
       emptyOutDir: true,
     },
     resolve: {
       alias: [
-        { find: '@', replacement: path.resolve(__dirname, './') },
+        { find: '@', replacement: path.resolve(__dirname, 'src') },
       ],
     },
     server: {
@@ -26,6 +26,7 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
     },
     optimizeDeps: {
+      exclude: ['server'],
     },
     
   };
