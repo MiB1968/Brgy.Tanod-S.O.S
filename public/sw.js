@@ -1,4 +1,4 @@
-// Service Worker unregistration pattern to fix aggressive caching issues
+// Service Worker unregistration pattern to prevent aggressive caching issues
 self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
