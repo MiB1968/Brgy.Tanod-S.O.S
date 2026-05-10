@@ -137,12 +137,16 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
             <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Incident Description</label>
             <textarea 
               required
-              rows={3}
+              rows={4}
+              maxLength={500}
               placeholder="Provide a detailed narrative of the event..."
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none resize-none" 
             />
+            <div className="text-[10px] text-[#8E9299] text-right">
+              {formData.description.length} / 500 characters
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

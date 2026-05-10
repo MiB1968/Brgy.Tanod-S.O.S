@@ -35,6 +35,9 @@ export default function SirenController({ globalSirenActive, profile, alerts }: 
       if (!siren.playing()) {
         siren.volume(1.0);
         siren.play();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
         setTimeout(() => { if (!globalSirenActive) siren.stop(); }, 10000);
       }
     } else {

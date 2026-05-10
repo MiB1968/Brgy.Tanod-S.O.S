@@ -228,6 +228,23 @@ export default function App() {
     };
   }, [user]);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      triggerSync(); // Flush queue
+      toast.success("Connection Restored: Syncing Incident Log...");
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [setIsOnline, triggerSync]);
+
   const toggleGlobalSiren = async () => {
     try {
       const nextState = !globalSirenActive;
@@ -316,6 +333,12 @@ export default function App() {
       addAlert(formattedAlert);
       if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
         toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+      }
+      if (profile && profile.role === 'resident' && formattedAlert.residentId === profile.id) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+        toast.success(`SOS Update: ${formattedAlert.status}`);
       }
     });
 

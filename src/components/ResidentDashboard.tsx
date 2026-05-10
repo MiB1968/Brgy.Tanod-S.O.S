@@ -693,9 +693,13 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
                   <textarea 
                     value={sosDescription}
                     onChange={(e) => setSosDescription(e.target.value)}
+                    maxLength={500}
                     placeholder="DETAILS: Location, nature, casualties..."
-                    className="w-full bg-brand-bg border border-white/5 rounded-3xl p-6 text-white placeholder:text-white/20 focus:outline-none focus:border-emergency min-h-[120px] font-mono text-sm leading-relaxed shadow-inner"
+                    className="w-full bg-brand-bg border border-white/5 rounded-3xl p-6 text-white placeholder:text-white/20 focus:outline-none focus:border-emergency min-h-[160px] font-mono text-sm leading-relaxed shadow-inner"
                   />
+                  <div className="text-[10px] text-white/30 text-right mt-2 font-mono">
+                    {sosDescription.length} / 500 characters
+                  </div>
 
                   <div className="flex items-center justify-between p-4 bg-brand-bg/50 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-3">

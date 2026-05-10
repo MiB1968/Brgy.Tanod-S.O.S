@@ -149,6 +149,21 @@ async function initDb(retries = 3) {
       `);
 
       await client.query(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          incident_id UUID,
+          type TEXT,
+          status TEXT,
+          citizen_id UUID,
+          tanod_assigned TEXT,
+          location_lat FLOAT,
+          location_lng FLOAT,
+          created_at TIMESTAMPTZ DEFAULT now(),
+          notes TEXT
+        );
+      `);
+
+      await client.query(`
         CREATE TABLE IF NOT EXISTS tanod_activity_logs (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           tanod_id UUID REFERENCES users(id),
@@ -223,7 +238,7 @@ async function startServer() {
   }
 
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = 3000;
 
   // IMPORTANT: Set trust proxy for rate limiting behind load balancers
   app.set('trust proxy', 1);
@@ -361,6 +376,13 @@ async function startServer() {
         return res.json([]);
       }
 
+      if (collection === 'audit_logs') {
+        const query = "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100";
+        console.log(`DB_QUERY: ${query}`);
+        const result = await pool.query(query);
+        return res.json(result.rows);
+      }
+
       if (collection === 'tanod_activity_logs') {
         const query = "SELECT * FROM tanod_activity_logs ORDER BY timestamp DESC LIMIT 100";
         console.log(`DB_QUERY: ${query}`);
@@ -428,6 +450,14 @@ async function startServer() {
           );
         }
         return res.json({ success: true, id: docId });
+      }
+
+      if (collection === 'audit_logs') {
+        await pool.query(
+          "INSERT INTO audit_logs (incident_id, type, status, citizen_id, tanod_assigned, location_lat, location_lng, created_at, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          [data.incident_id, data.type, data.status, data.citizen_id, data.tanod_assigned, data.location_lat, data.location_lng, data.created_at, data.notes]
+        );
+        return res.json({ success: true });
       }
 
       if (collection === 'tanod_activity_logs') {
@@ -514,6 +544,37 @@ async function startServer() {
       }
 
       res.status(404).json({ error: "Path not mapped" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    
+    const { status, role } = req.body;
+    const updates = [];
+    const values = [];
+    let i = 1;
+    
+    if (status) { updates.push(`status = $${i++}`); values.push(status); }
+    if (role) { updates.push(`role = $${i++}`); values.push(role); }
+    
+    if (updates.length === 0) return res.status(400).json({ error: "Nothing to update" });
+    
+    values.push(req.params.id);
+    
+    try {
+      const result = await pool.query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
+        values
+      );
+      
+      if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
+      
+      res.json({ success: true, user: result.rows[0] });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

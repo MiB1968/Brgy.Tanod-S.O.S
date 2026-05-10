@@ -632,8 +632,8 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                              </div>
                              <p className="text-xs font-bold text-white/90 leading-relaxed mb-4 italic font-mono">"{alert.aiAnalysis.summary}"</p>
                              <div className="flex flex-wrap gap-2">
-                                {(alert.aiAnalysis.riskFactors || []).slice(0, 3).map(risk => (
-                                  <span key={risk} className="text-[8px] font-black bg-white/5 border border-white/5 px-2 py-1 rounded text-white/40 uppercase tracking-tighter font-mono">⚠ {risk}</span>
+                                {(alert.aiAnalysis.riskFactors || []).slice(0, 3).map((risk, index) => (
+                                  <span key={risk + index} className="text-[8px] font-black bg-white/5 border border-white/5 px-2 py-1 rounded text-white/40 uppercase tracking-tighter font-mono">⚠ {risk}</span>
                                 ))}
                              </div>
                           </div>
@@ -720,11 +720,11 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                     <p className="text-white/20 font-black uppercase text-[10px] tracking-widest font-mono italic">No archived intelligence reports found.</p>
                   </div>
                 ) : (
-                  recentIncidents.slice(0, 6).map(incident => (
+                  recentIncidents.slice(0, 6).map((incident, index) => (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      key={incident.id}
+                      key={incident.id || index}
                       className="glass-panel border-white/5 rounded-3xl p-5 hover:border-white/10 transition-all"
                     >
                       <div className="flex justify-between items-start mb-3">
@@ -788,13 +788,13 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                   <p className="text-[10px] text-white font-black uppercase tracking-widest font-mono text-center">Zero Units Detected</p>
                 </div>
               ) : (
-                onDutyTanods.map(t => {
+                onDutyTanods.map((t, index) => {
                   const pMatch = patrols.find(p => p.tanodId === t.uid);
                   const isOnline = pMatch?.isActive;
                   const lastUpdate = pMatch?.lastUpdate;
 
                   return (
-                    <div key={t.uid} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
+                    <div key={t.uid || t.id || index} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
                       <div className="w-14 h-14 rounded-[20px] bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 group-hover:border-info/20 shadow-inner group-hover:shadow-info/10 transition-all relative z-10">
                         <Shield className={cn(
                           "w-7 h-7 transition-colors",

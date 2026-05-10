@@ -97,9 +97,9 @@ export default function AdminResidents({ profile }: { profile: any }) {
   };
 
   const filteredResidents = residents.filter(r => 
-    r.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.idNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.mobileNumber.includes(searchTerm)
+    (r.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.idNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.mobileNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -287,12 +287,42 @@ export default function AdminResidents({ profile }: { profile: any }) {
                     </button>
                   </>
                 ) : (
-                  <button 
-                    onClick={() => setSelectedResident(null)}
-                    className="w-full py-3 md:py-4 bg-[#252932] text-white font-bold rounded-xl md:rounded-2xl hover:bg-[#2D3139] transition-all text-sm"
-                  >
-                    CLOSE PROFILE
-                  </button>
+                  <>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await api.residents.updateRole(selectedResident.id, 'tanod');
+                          toast.success('Promoted to Tanod');
+                          setSelectedResident(null);
+                        } catch (e) {
+                          toast.error('Failed to promote');
+                        }
+                      }}
+                      className="flex-1 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 transition-all text-sm"
+                    >
+                      PROMOTE TO TANOD
+                    </button>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await api.residents.updateRole(selectedResident.id, 'admin');
+                          toast.success('Promoted to Admin');
+                          setSelectedResident(null);
+                        } catch (e) {
+                          toast.error('Failed to promote');
+                        }
+                      }}
+                      className="flex-1 py-3 bg-red-800 text-white font-bold rounded-xl hover:bg-red-900 transition-all text-sm"
+                    >
+                      PROMOTE TO ADMIN
+                    </button>
+                    <button 
+                      onClick={() => setSelectedResident(null)}
+                      className="flex-1 py-3 bg-[#252932] text-white font-bold rounded-xl hover:bg-[#2D3139] transition-all text-sm"
+                    >
+                      CLOSE PROFILE
+                    </button>
+                  </>
                 )}
               </div>
             </motion.div>

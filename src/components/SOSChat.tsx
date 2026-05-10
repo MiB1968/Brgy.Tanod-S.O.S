@@ -24,7 +24,7 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
     const loadMessages = async () => {
       try {
         const msgs = await api.chat.getMessages(alertId);
-        setMessages(msgs);
+        setMessages(Array.isArray(msgs) ? msgs : []);
         setLoading(false);
       } catch (err) {
         console.error("Failed to load chat messages", err);

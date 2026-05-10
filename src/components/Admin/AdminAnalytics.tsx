@@ -12,7 +12,9 @@ export default function AdminAnalytics() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const res = await fetch('/api/analytics/dashboard');
+        const res = await fetch('/api/analytics/dashboard', {
+          credentials: 'include'
+        });
         if (res.ok) {
           const json = await res.json();
           setData(json);
