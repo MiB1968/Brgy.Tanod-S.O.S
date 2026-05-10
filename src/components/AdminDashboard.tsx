@@ -29,6 +29,8 @@ import AboutModal from './AboutModal';
 import { InstallAppButton } from './InstallAppButton';
 import { TanodLogo } from './Branding';
 import { ReviewArchivedLogsDrawer } from './Admin/ReviewArchivedLogsDrawer';
+import { SOSBroadcastPanel } from './Admin/SOSBroadcastPanel';
+import { AdminStatsGrid } from './Admin/AdminStatsGrid';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import AdminAnalytics from './Admin/AdminAnalytics';
@@ -415,111 +417,16 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         role={profile?.role} 
       />
 
-      {/* Broadcast System SOS Panel */}
-      <motion.div variants={itemVariants} className="glass-panel border-white/10 rounded-[40px] p-8 overflow-hidden relative group">
-        <div className="scanline opacity-10 pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="p-6 rounded-[32px] bg-emergency/10 border border-emergency/20 text-emergency shadow-[0_0_30px_rgba(239,68,68,0.2)] animate-pulse">
-              <IconActiveSOS className="w-10 h-10" glow />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black italic tracking-tighter uppercase text-white font-mono">Tactical Broadcast Center</h3>
-              <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em] mt-1">Deploy high-priority alerts to all active units and residents</p>
-            </div>
-          </div>
+      <SOSBroadcastPanel profile={profile} />
 
-          <div className="flex flex-wrap gap-4 w-full md:w-auto">
-            <button 
-              onClick={async () => {
-                const message = window.prompt('Enter SOS Broadcast Message (e.g., Extreme Flood Evacuation):');
-                if (!message) return;
-                
-                try {
-                  await api.generic.create('system_broadcasts', {
-                    adminId: profile?.id,
-                    adminName: profile?.name,
-                    type: 'security',
-                    message: message.toUpperCase(),
-                    isActive: true,
-                    timestamp: new Date().toISOString()
-                  });
-                  toast.success('SOS BROADCAST DEPLOYED SYSTEM-WIDE');
-                } catch (error) {
-                  toast.error('Tactical failure deploying broadcast');
-                }
-              }}
-              className="flex-1 md:flex-none items-center justify-center gap-3 px-8 py-5 rounded-[28px] bg-emergency text-black font-black hover:bg-emergency/90 transition-all hover:scale-[1.02] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_40px_rgba(239,68,68,0.4)] flex"
-            >
-              <Radio className="w-5 h-5 animate-pulse" />
-              BROADCAST SYSTEM SOS
-            </button>
-            <button 
-              onClick={async () => {
-                try {
-                  const broadcasts = await api.generic.list('system_broadcasts?isActive=true');
-                  if (broadcasts.length === 0) {
-                    toast.error('NO ACTIVE BROADCASTS FOUND');
-                    return;
-                  }
-                  
-                  const batchPromises = broadcasts.map((b: any) => 
-                    api.generic.update(`system_broadcasts/${b.id}`, { isActive: false })
-                  );
-                  
-                  // Also clear global siren
-                  batchPromises.push(api.system.updateSiren({ sirenActive: false }));
-                  
-                  await Promise.all(batchPromises);
-                  toast.success('ALL ACTIVE BROADCASTS TERMINATED');
-                } catch (error) {
-                  console.error('Broadcast termination failed:', error);
-                  toast.error('Cleanup failed');
-                }
-              }}
-              className="flex-1 md:flex-none px-8 py-5 rounded-[28px] bg-white/5 border border-white/10 text-white/60 font-black hover:bg-white/10 transition-all uppercase tracking-[0.1em] font-mono text-xs"
-            >
-              TERMINAL CLEAR
-            </button>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Stats Grid */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard 
-          label="Approved Residents" 
-          value={residentsCount} 
-          icon={IconApprovedResidents} 
-          color="text-info" 
-          bg="bg-info/10" 
-          onClick={() => onTabChange('residents')}
-        />
-        <StatCard 
-          label="Pending Registration" 
-          value={pendingRegCount} 
-          icon={IconPendingRegistration} 
-          color="text-caution" 
-          bg="bg-caution/10" 
-          pulse={pendingRegCount > 0}
-          onClick={() => onTabChange('residents')}
-        />
-        <StatCard 
-          label="Active SOS Alerts" 
-          value={activeAlertsCount} 
-          icon={IconActiveSOS} 
-          color="text-emergency" 
-          bg="bg-emergency/10" 
-          pulse={pendingAlertsCount > 0}
-        />
-        <StatCard 
-          label="Online Tanods" 
-          value={onDutyTanods.filter(t => (t.status as string)?.toLowerCase() === 'on-duty' || (t.status as string)?.toLowerCase() === 'responding').length} 
-          icon={IconOnlineTanods}
-          color="text-success" 
-          bg="bg-success/10" 
-        />
-      </motion.div>
+      <AdminStatsGrid 
+        residentsCount={residentsCount}
+        pendingRegCount={pendingRegCount} 
+        activeAlertsCount={activeAlertsCount}
+        pendingAlertsCount={pendingAlertsCount}
+        onDutyTanods={onDutyTanods}
+        onTabChange={onTabChange}
+      />
 
       <motion.div variants={itemVariants}>
         <TanodUnitStatusList 
@@ -1114,29 +1021,4 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   );
 }
 
-function StatCard({ label, value, icon: Icon, color, bg, pulse, onClick }: any) {
-  return (
-    <motion.div 
-      variants={itemVariants}
-      whileHover={{ y: -5, transition: { duration: 0.2 } }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className={cn(
-        "glass-panel border-white/5 rounded-[40px] p-8 relative overflow-hidden group transition-all hover:bg-brand-card hover:border-white/10 active:shadow-inner",
-        onClick ? "cursor-pointer" : ""
-      )}
-    >
-      <div className="absolute inset-0 tactical-grid opacity-10" />
-      <div className="scanline opacity-5" />
-      <div className={cn("p-5 rounded-[24px] inline-flex mb-8 transition-all group-hover:scale-110 shadow-2xl relative z-10", bg, color, pulse && "animate-pulse shadow-glow-red")}>
-        <Icon className="w-7 h-7" glow={pulse} />
-      </div>
-      <div className="relative z-10">
-        <h4 className="text-[10px] font-black uppercase text-white/30 tracking-[0.4em] mb-3 font-mono">{label}</h4>
-        <p className="text-5xl font-black text-white italic tracking-tighter font-mono leading-none outline-text">{value}</p>
-      </div>
-      <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/2 rounded-full blur-3xl group-hover:scale-150 transition-all duration-700"></div>
-    </motion.div>
-  );
-}
 

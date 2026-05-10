@@ -67,7 +67,8 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
 
   const isPendingAlert = (alert: Alert) => {
     const status = alert.status?.toLowerCase();
-    return status === 'pending';
+    // Allow responding if it is pending or active, and not yet assigned
+    return (status === 'pending' || status === 'active') && !alert.assignedTo;
   };
 
    // Filter alerts for this tanod
