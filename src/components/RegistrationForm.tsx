@@ -363,7 +363,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Government ID Type</label>
-                  <select value={formData.idType} onChange={e => setFormData({...formData, idType: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all">
+                  <select value={formData.idType} onChange={e => setFormData({...formData, idType: e.target.value, idNumber: e.target.value === '' ? '' : formData.idNumber})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all">
                     <option value="">No ID / Skip for now</option>
                     <option>PhilSys</option>
                     <option>Voter's ID</option>
@@ -376,7 +376,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">ID Reference Number</label>
-                  <input placeholder="XXXX-XXXX-XXXX" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                  <input disabled={!formData.idType} required={!!formData.idType} placeholder="XXXX-XXXX-XXXX" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Primary Mobile Terminal</label>
