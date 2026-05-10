@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, Alert, PatrolLocation } from '../types';
 import { X, Shield, Send } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -66,24 +65,22 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
         console.warn('Failed to update Tanod status in roster:', e);
       }
 
-      // Sync to Supabase
-      if (isSupabaseConfigured) {
-        try {
-          await supabase.from('report_logs').upsert([{
-            id: alert.id,
-            incident_id: alert.id,
-            type: alert.type,
-            status: 'responding',
-            tanod_assigned: tanod?.name || 'Assigned Tanod',
-            tanod_id: selectedTanod,
-            location_lat: alert.location.lat,
-            location_lng: alert.location.lng,
-            lat: alert.location.lat,
-            lng: alert.location.lng
-          }]);
-        } catch (suErr) {
-          console.error('Supabase dispatch sync failed:', suErr);
-        }
+      // Sync to Central DB via backend
+      try {
+        await api.generic.update(`report_logs/${alert.id}`, {
+          id: alert.id,
+          incident_id: alert.id,
+          type: alert.type,
+          status: 'responding',
+          tanod_assigned: tanod?.name || 'Assigned Tanod',
+          tanod_id: selectedTanod,
+          location_lat: alert.location.lat,
+          location_lng: alert.location.lng,
+          lat: alert.location.lat,
+          lng: alert.location.lng
+        });
+      } catch (suErr) {
+        console.error('Report log dispatch sync failed:', suErr);
       }
 
       toast.success(`Unit ${tanod?.name || 'Assigned Tanod'} dispatched`);

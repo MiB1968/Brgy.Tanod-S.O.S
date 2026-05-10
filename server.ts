@@ -20,7 +20,13 @@ dotenv.config();
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
 const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
+const JWT_SECRET = process.env.JWT_SECRET;
+const API_SECRET_KEY = process.env.API_SECRET_KEY;
+
+if (!JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET environment variable is missing.");
+  process.exit(1);
+}
 
 // Database Pool
 const pool = new Pool({
@@ -279,6 +285,26 @@ async function startServer() {
   }));
   app.use(express.json());
   app.use(cookieParser());
+
+  // --- API Key Auth Middleware ---
+  function apiKeyAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+    if (!req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    const providedKey = req.headers['x-api-key'];
+    if (!API_SECRET_KEY) {
+      return res.status(500).json({ error: "Server API Key not configured." });
+    }
+
+    if (providedKey !== API_SECRET_KEY) {
+      return res.status(403).json({ error: "Forbidden: Invalid API Key" });
+    }
+
+    next();
+  }
+
+  app.use(apiKeyAuth);
 
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
