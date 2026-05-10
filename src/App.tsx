@@ -95,7 +95,7 @@ import { useSOSStore } from './store/useSOSStore';
 // Service & Lib imports
 import { analyzeIncident } from './services/aiService';
 import { getQueueSize } from './lib/offlineQueue';
-import { cn } from './lib/utils';
+import { cn, isValidCoord } from './lib/utils';
 import { 
   isRuben as checkIsRuben, 
   PATROL_TIMEOUT, 
@@ -113,7 +113,7 @@ export default function App() {
     setIsLoading: setLoading 
   } = useAuthStore();
   const { alerts, setAlerts, addAlert } = useIncidentStore();
-  const { patrols, setPatrols, setTanods, updateTanodStatus } = useTanodStore();
+  const { patrols, setPatrols, setTanods, updateTanodStatus, updatePatrol } = useTanodStore();
   const { 
     isOnline, 
     setIsOnline, 
@@ -159,10 +159,16 @@ export default function App() {
 
   const visiblePatrols = useMemo(() => {
     return patrols.filter(p => {
+      // Basic coordinates check
+      if (!p.location || !isValidCoord(p.location.lat, p.location.lng)) return false;
+
       if (['admin', 'superadmin', 'tanod'].includes(effectiveRole)) {
-        return p.isActive && (Date.now() - new Date(p.lastUpdate).getTime() < PATROL_TIMEOUT);
+        // For staff, show all who are marked active OR have pinged recently
+        const isRecentlyActive = p.lastUpdate ? (Date.now() - new Date(p.lastUpdate).getTime() < PATROL_TIMEOUT) : false;
+        return p.isActive || isRecentlyActive;
       }
       if (effectiveRole === 'resident' && profile) {
+        // Residents only see Tanods assigned to them
         return alerts.some(a => 
           a.residentId === profile.id && 
           (a.status === 'pending' || a.status === 'responding') && 
@@ -352,14 +358,16 @@ export default function App() {
 
     socket.on('alert_update', (data: any) => {
       const alert = data.alert;
+      if (!alert) return;
+      
       const formattedAlert: Alert = {
         id: alert.id,
-        residentId: alert.resident_id,
+        residentId: alert.resident_id || alert.residentId,
         residentName: alert.residentName || 'Resident',
         type: alert.type as EmergencyType,
         location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
         status: alert.status as AlertStatus,
-        timestamp: alert.created_at || new Date().toISOString()
+        timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
       };
       addAlert(formattedAlert);
       if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
@@ -379,16 +387,24 @@ export default function App() {
 
     socket.on('patrol_update', (update: any) => {
        const patrol: PatrolLocation = {
-         id: update.tanod_id,
-         tanodId: update.tanod_id,
-         tanodName: 'Active Tanod',
+         id: update.tanodId || update.tanod_id,
+         tanodId: update.tanodId || update.tanod_id,
+         tanodName: update.tanodName || update.tanod_name || 'Active Tanod',
          location: typeof update.location === 'string' ? JSON.parse(update.location) : update.location,
-         isActive: update.isActive,
-         status: update.isActive ? 'patrolling' : 'offline',
+         isActive: update.isActive ?? update.is_active,
+         status: (update.isActive ?? update.is_active) ? (update.status || 'patrolling') : 'offline',
          lastUpdate: new Date().toISOString()
        };
        
-       setPatrols(prev => [...prev.filter(p => p.tanodId !== update.tanod_id), patrol]);
+       updatePatrol(patrol);
+    });
+
+    socket.on('patrol_location', (data: any) => {
+      updatePatrol({
+        tanodId: data.tanodId,
+        isActive: true,
+        ...data
+      } as PatrolLocation);
     });
 
     socket.on('broadcast_update', (broadcast: any) => {
@@ -408,7 +424,9 @@ export default function App() {
     return () => {
       socket.off('alert_update');
       socket.off('patrol_update');
+      socket.off('patrol_location');
       socket.off('broadcast_update');
+      socket.off('tanod_update');
     };
   }, [profile, setAlerts, setPatrols]);
 
@@ -417,8 +435,8 @@ export default function App() {
     if (!user) return;
     setIsSettingRole(true);
     try {
-       // Roles are handled by DB update in this migration
-       await api.alerts.update(user.id, { role, status: 'approved' });
+       // Roles are handled by DB update
+       await api.generic.update(`users/${user.id}`, { role, status: 'approved' });
        // Re-fetch profile
        const updated = await api.auth.getProfile(user.id);
        setProfile(updated);

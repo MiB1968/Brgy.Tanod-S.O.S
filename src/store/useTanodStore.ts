@@ -24,9 +24,29 @@ export const useTanodStore = create<TanodState>((set) => ({
   activityLogs: [],
   patrolSessions: [],
   tanods: [],
-  updatePatrol: (patrol: PatrolLocation) => set((state) => ({
-    patrols: state.patrols.map((p) => p.id === patrol.id ? { ...p, ...patrol } : p)
-  })),
+  updatePatrol: (patrol: PatrolLocation) => set((state) => {
+    const tid = patrol.tanodId || patrol.id;
+    if (!tid) return state;
+
+    const normalizedPatrol = {
+      ...patrol,
+      id: tid,
+      tanodId: tid,
+      lastUpdate: patrol.lastUpdate || new Date().toISOString()
+    };
+
+    const exists = state.patrols.find((p) => p.tanodId === tid);
+    if (exists) {
+      return {
+        patrols: state.patrols.map((p) => 
+          (p.tanodId === tid) ? { ...p, ...normalizedPatrol } : p
+        )
+      };
+    }
+    return {
+      patrols: [...state.patrols, normalizedPatrol]
+    };
+  }),
   setPatrols: (patrols) => set((state) => ({
     patrols: typeof patrols === 'function' ? patrols(state.patrols) : patrols
   })),

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Howl } from 'howler';
-import { User, Alert } from '../types';
+import { User, Alert, AlertStatus } from '../types';
 
 // Siren sound
 export const siren = new Howl({
@@ -16,10 +16,13 @@ interface SirenControllerProps {
 }
 
 export default function SirenController({ globalSirenActive, profile, alerts }: SirenControllerProps) {
+  const lastAlertIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     // Alert sound logic
     if (globalSirenActive) {
       if (!siren.playing()) {
+        siren.volume(1.0);
         siren.play();
       }
       return; 
@@ -30,18 +33,35 @@ export default function SirenController({ globalSirenActive, profile, alerts }: 
       return;
     }
 
-    const hasActive = alerts.some(a => a.status === 'pending');
-    if (hasActive) {
-      if (!siren.playing()) {
+    const pendingAlerts = alerts.filter(a => a.status === 'pending');
+    const newestAlert = pendingAlerts[0]; // Alerts are usually sorted DESC by created_at
+
+    if (newestAlert) {
+      const isNew = newestAlert.id !== lastAlertIdRef.current;
+      
+      if (isNew || !siren.playing()) {
+        lastAlertIdRef.current = newestAlert.id;
+        
+        // Force play on new alert
+        siren.stop(); 
         siren.volume(1.0);
         siren.play();
+        
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate([200, 100, 200]);
+          navigator.vibrate([300, 100, 300, 100, 300]);
         }
-        setTimeout(() => { if (!globalSirenActive) siren.stop(); }, 10000);
+        
+        // Auto-stop after 15 seconds to avoid annoyance, unless global siren is on
+        const timer = setTimeout(() => { 
+          if (!globalSirenActive) siren.fade(1.0, 0, 2000); 
+          setTimeout(() => { if (!globalSirenActive) siren.stop(); }, 2000);
+        }, 15000);
+        
+        return () => clearTimeout(timer);
       }
     } else {
       siren.stop();
+      lastAlertIdRef.current = null;
     }
     
     return () => { if (!globalSirenActive) siren.stop(); };

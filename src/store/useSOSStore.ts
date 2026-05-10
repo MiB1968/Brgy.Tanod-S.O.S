@@ -34,7 +34,7 @@ export const useSOSStore = create<SOSState>()(
         location,
         status: 'pending',
         timestamp: new Date().toISOString(),
-        customMessage: description,
+        description, // Use 'description' instead of 'customMessage'
         aiAnalysis
       };
 
@@ -59,10 +59,23 @@ export const useSOSStore = create<SOSState>()(
 
     subscribeToUserAlerts: (userId) => {
       // Use socket instead of polling/snapshot
-      socket.on('alert_update', ({ alert }: { alert: Alert }) => {
-        if (alert.residentId === userId) {
-          if (alert.status !== 'resolved' && alert.status !== 'cancelled') {
-            set({ activeAlert: alert });
+      socket.on('alert_update', (data: any) => {
+        const rawAlert = data.alert;
+        if (!rawAlert) return;
+
+        // Normalize fields from DB format to Store format
+        const normalizedAlert: Alert = {
+          ...rawAlert,
+          id: rawAlert.id,
+          residentId: rawAlert.resident_id || rawAlert.residentId,
+          residentName: rawAlert.residentName || 'Resident',
+          location: typeof rawAlert.location === 'string' ? JSON.parse(rawAlert.location) : rawAlert.location,
+          timestamp: rawAlert.created_at || rawAlert.timestamp
+        };
+
+        if (normalizedAlert.residentId === userId) {
+          if (normalizedAlert.status !== 'resolved' && normalizedAlert.status !== 'cancelled') {
+            set({ activeAlert: normalizedAlert });
           } else {
             set({ activeAlert: null });
           }

@@ -438,7 +438,8 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
 
                         await api.generic.update(`patrols/${profile.id}`, { 
                           isActive: isOnline,
-                          status: newStatus.toLowerCase().includes('responding') ? 'responding' : (isOnline ? 'patrolling' : 'offline')
+                          status: newStatus.toLowerCase().includes('responding') ? 'responding' : (isOnline ? 'patrolling' : 'offline'),
+                          tanodName: profile.name
                         });
 
                         updateTanodStatus(profile.id, newStatus);

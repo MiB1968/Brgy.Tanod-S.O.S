@@ -65,7 +65,7 @@ const itemVariants = {
 
 export default function AdminDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren, activeBroadcast }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void, activeBroadcast: SystemBroadcast | null }) {
   const { alerts } = useIncidentStore();
-  const { patrols } = useTanodStore();
+  const { patrols, tanods } = useTanodStore();
   const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
@@ -296,8 +296,11 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         newStatus.toLowerCase() === 'responding' || 
         newStatus.toLowerCase() === 'available';
         
+      const tanod = tanods.find(t => t.id === tanodId);
       await api.generic.update(`patrols/${tanodId}`, {
         isActive: isActuallyOnline,
+        status: newStatus.toLowerCase().includes('responding') ? 'responding' : (isActuallyOnline ? 'patrolling' : 'offline'),
+        tanodName: tanod?.name || 'Active Tanod',
         lastUpdate: new Date().toISOString()
       });
 

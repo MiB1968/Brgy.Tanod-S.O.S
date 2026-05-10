@@ -59,8 +59,11 @@ export default function BackgroundServices() {
     socket.on('resident_update', () => loadInitialData());
     socket.on('patrol_location', (data: any) => {
         // Individual location update broadcast
-        // Assume data contains essential update fields and tanodId is on it
-        updatePatrol({ id: data.tanodId, ...data } as PatrolLocation);
+        updatePatrol({ 
+          tanodId: data.tanodId, 
+          isActive: true, // If we receive location, they are definitely active
+          ...data 
+        } as PatrolLocation);
     });
 
     return () => {
@@ -142,7 +145,9 @@ export default function BackgroundServices() {
         // Broadcast to other clients
         socket.emit('patrol_location', {
           tanodId: profile.id,
+          tanodName: profile.name,
           location: loc,
+          isActive: true,
           status: tacticalStatus
         });
 

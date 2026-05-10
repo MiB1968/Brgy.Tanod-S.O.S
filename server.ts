@@ -128,8 +128,10 @@ async function initDb(retries = 3) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS patrols (
           tanod_id UUID PRIMARY KEY REFERENCES users(id),
+          tanod_name TEXT,
           is_active BOOLEAN DEFAULT false,
           location JSONB,
+          status TEXT,
           last_ping TIMESTAMPTZ DEFAULT now()
         );
       `);
@@ -376,7 +378,11 @@ async function startServer() {
         console.log(`DB_QUERY: ${query}`);
         const result = await pool.query(query);
         return res.json(result.rows.map(p => ({
-          ...p,
+          id: p.tanod_id,
+          tanodId: p.tanod_id,
+          tanodName: p.tanod_name,
+          isActive: p.is_active,
+          status: p.status,
           location: typeof p.location === 'string' ? JSON.parse(p.location) : p.location,
           lastUpdate: p.last_ping
         })));
@@ -591,25 +597,32 @@ async function startServer() {
         const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
         
         // Use UPSERT for patrols since they might not exist yet when a tanod goes online
+        const isActive = safeData.is_active;
+        const location = safeData.location ? JSON.stringify(safeData.location) : null;
+        const status = safeData.status;
+        const tanodName = safeData.tanod_name;
+
         await pool.query(
           `INSERT INTO patrols (tanod_id, is_active, location, status, tanod_name, last_ping)
-           VALUES ($1, $2, $3, $4, $5, now())
+           VALUES ($1, COALESCE($2, true), COALESCE($3, '{}'::jsonb), COALESCE($4, 'Available'), COALESCE($5, 'Active Tanod'), now())
            ON CONFLICT (tanod_id) DO UPDATE SET 
-           is_active = EXCLUDED.is_active,
-           location = EXCLUDED.location,
-           status = EXCLUDED.status,
-           tanod_name = EXCLUDED.tanod_name,
+           is_active = COALESCE(EXCLUDED.is_active, patrols.is_active),
+           location = CASE WHEN EXCLUDED.location = '{}'::jsonb AND patrols.location IS NOT NULL THEN patrols.location ELSE EXCLUDED.location END,
+           status = COALESCE(EXCLUDED.status, patrols.status),
+           tanod_name = CASE WHEN EXCLUDED.tanod_name = 'Active Tanod' AND patrols.tanod_name IS NOT NULL THEN patrols.tanod_name ELSE EXCLUDED.tanod_name END,
            last_ping = now()`,
-          [
-            docId, 
-            safeData.is_active ?? true, 
-            JSON.stringify(safeData.location || {}), 
-            safeData.status || 'Available', 
-            safeData.tanod_name || 'Active Tanod'
-          ]
+          [docId, isActive, location, status, tanodName]
         );
         
-        io.emit("patrol_update", { tanod_id: docId, ...safeData });
+        io.emit("patrol_update", { 
+          tanod_id: docId,
+          tanodId: docId,
+          tanodName,
+          isActive,
+          location: safeData.location,
+          status,
+          lastUpdate: new Date().toISOString()
+        });
         return res.json({ success: true });
       }
 
@@ -881,7 +894,10 @@ async function startServer() {
         "INSERT INTO alerts (resident_id, type, location, description) VALUES ($1, $2, $3, $4) RETURNING *",
         [req.user.id, type, JSON.stringify(location), description]
       );
-      const alert = result.rows[0];
+      const alertBase = result.rows[0];
+      const userResult = await pool.query("SELECT name FROM users WHERE id = $1", [req.user.id]);
+      const alert = { ...alertBase, residentName: userResult.rows[0]?.name || 'Resident' };
+      
       io.emit("alert_update", { type: 'new', alert });
       res.json(alert);
     } catch (err: any) {
