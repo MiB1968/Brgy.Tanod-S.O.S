@@ -506,6 +506,9 @@ async function startServer() {
 
   // --- Data Routes ---
   app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
+    if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
     try {
       const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
@@ -516,6 +519,9 @@ async function startServer() {
   });
 
   app.get("/api/residents/:id", authenticate, async (req: AuthRequest, res: any) => {
+    if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
     try {
       const result = await pool.query("SELECT * FROM residents WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "Resident not found" });
