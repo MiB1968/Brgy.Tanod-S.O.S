@@ -1,12 +1,36 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import * as sosController from '../controllers/sosController';
+import { sosRateLimiter, strictRateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
-router.post('/alert', authenticate, sosController.createAlert);
-router.post('/alert/:id/cancel', authenticate, sosController.cancelAlert);
-router.get('/active', authenticate, sosController.getActiveAlerts);
-router.post('/nearest', authenticate, sosController.findNearest);
+// === HIGH RISK EMERGENCY ENDPOINTS ===
+router.post(
+  '/alert',
+  authenticate,
+  sosRateLimiter,           // ← Very important
+  sosController.createSOS
+);
+
+router.post(
+  '/alert/:id/cancel',
+  authenticate,
+  sosController.cancelSOS
+);
+
+router.get(
+  '/active',
+  authenticate,
+  sosController.getActiveAlerts
+);
+
+router.post(
+  '/nearest',
+  authenticate,
+  strictRateLimiter,
+  sosController.findNearest
+);
 
 export default router;
+

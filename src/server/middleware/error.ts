@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import * as response from '../utils/response';
 
-export interface AppError extends Error {
-  status?: number;
-  code?: string;
+export class AppError extends Error {
+  constructor(
+    public message: string,
+    public status = 500,
+    public code = 'INTERNAL_SERVER_ERROR'
+  ) {
+    super(message);
+    this.name = 'AppError';
+    Object.setPrototypeOf(this, AppError.prototype);
+  }
 }
+
 
 export function errorHandler(err: AppError, req: Request, res: Response, next: NextFunction) {
   console.error(`[ERROR] ${new Date().toISOString()} - ${err.message}`);

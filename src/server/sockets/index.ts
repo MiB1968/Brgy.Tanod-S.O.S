@@ -1,105 +1,65 @@
 import { Server as HttpServer } from 'http';
-import { Server, Socket } from 'socket.io';
-import jwt from 'jsonwebtoken';
+import { Server } from 'socket.io';
+import { AuthenticatedSocket } from '../types';
+import { socketAuthMiddleware } from '../middleware/socketAuth';
+import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
+import { setupIncidentHandlers } from './handlers/incident.handler';
 import { config } from '../config/index';
-
-interface LocationEntry {
-  user_id: string;
-  role: string;
-  lat: number;
-  lng: number;
-  name?: string;
-  timestamp?: string;
-}
-
-const activeLocations: Record<string, LocationEntry> = {};
-
-export function getActiveLocations(): LocationEntry[] {
-  return Object.values(activeLocations);
-}
 
 let io: Server;
 
-export function initSocket(server: HttpServer) {
+export { getActiveLocations };
+
+export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
-    cors: { origin: config.corsOrigin }
+    cors: {
+      origin: config.corsOrigin,
+      credentials: true,
+    },
+    pingTimeout: 60000,      // 60 seconds
+    pingInterval: 25000,     // 25 seconds
+    transports: ['websocket', 'polling'],
   });
 
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return next(); 
-    }
-    try {
-      const decoded = jwt.verify(token, config.jwtSecret);
-      (socket as any).user = decoded;
-      next();
-    } catch (err) {
-      next(new Error('Authentication error'));
-    }
-  });
+  // Global Socket Authentication
+  io.use(socketAuthMiddleware as any);
 
-  io.on('connection', (socket: Socket) => {
-    const user = (socket as any).user;
-    const socketId = socket.id;
-    console.log(`Socket connected: ${socketId} (User: ${user?.email || 'Anonymous'})`);
+  io.on('connection', (socket: AuthenticatedSocket) => {
+    const { id, role, barangayId } = socket.data.user;
 
-    if (user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'tanod') {
+    console.log(`[Socket] Connected → ${role} ${id} | Barangay: ${barangayId}`);
+
+    // Role-based room joining
+    if (role === 'TANOD' || role === 'ADMIN' || role === 'CAPTAIN' || (role as string) === 'admin' || (role as string) === 'superadmin' || (role as string) === 'tanod') {
       socket.join('responders');
-      // Send initial full map to newly connected responder
-      socket.emit('location_map', activeLocations);
+      socket.join(`barangay_${barangayId}`);
+    } else {
+      socket.join(`citizen_${id}`);
+      socket.join(`barangay_${barangayId}`);
     }
 
-    // Location Tracking
-    socket.on('location_update', (data: LocationEntry) => {
-      if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
-      
-      const newEntry = {
-        ...data,
-        timestamp: new Date().toISOString()
-      };
-      
-      activeLocations[data.user_id] = newEntry;
-
-      // Broadcast DELTA location map to responders only
-      io.to('responders').emit('location_update_delta', newEntry);
-    });
+    // Register feature handlers
+    setupLocationHandlers(io, socket);
+    setupIncidentHandlers(io, socket);
 
     // Heartbeat
-    socket.on('ping', () => {
-      socket.emit('pong');
-    });
+    socket.on('ping', () => socket.emit('pong'));
 
     socket.on('disconnect', (reason) => {
-      console.log(`Socket disconnected: ${socketId} (Reason: ${reason})`);
+      console.log(`[Socket] Disconnected → ${role} ${id} | Reason: ${reason}`);
+      // Cleanup can be handled in individual handlers
     });
   });
 
-  // Stale Location Expiry Task (runs every 1 minute)
-  setInterval(() => {
-    const now = Date.now();
-    const expiryMs = 5 * 60 * 1000; // 5 minutes
+  // Start background tasks
+  startLocationExpiryTask(io);
 
-    Object.keys(activeLocations).forEach((userId) => {
-      const loc = activeLocations[userId];
-      if (loc.timestamp) {
-        const timeDiff = now - new Date(loc.timestamp).getTime();
-        if (timeDiff > expiryMs) {
-          delete activeLocations[userId];
-          // Broadcast delta indicating removal
-          if (io) io.to('responders').emit('location_remove_delta', { user_id: userId });
-        }
-      }
-    });
-  }, 60000);
-
+  console.log('[Socket] Socket.IO initialized successfully');
   return io;
 }
 
-export function getIO() {
-  if (!io) {
-    throw new Error('Socket.io not initialized!');
-  }
+export function getIO(): Server {
+  if (!io) throw new Error('Socket.IO not initialized');
   return io;
 }
 
@@ -107,6 +67,11 @@ export function emitToAll(event: string, data: any) {
   if (io) io.emit(event, data);
 }
 
+// Helper emitters
 export function emitToResponders(event: string, data: any) {
-  if (io) io.to('responders').emit(event, data);
+  io?.to('responders').emit(event, data);
+}
+
+export function emitToBarangay(barangayId: string, event: string, data: any) {
+  io?.to(`barangay_${barangayId}`).emit(event, data);
 }
