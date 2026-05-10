@@ -7,6 +7,7 @@ const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const headers = {
+    "x-api-key": import.meta.env.VITE_API_SECRET_KEY || "dev-secret-123",
     'Content-Type': 'application/json',
     ...options.headers,
   };

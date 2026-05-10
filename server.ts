@@ -29,7 +29,12 @@ interface AuthRequest extends express.Request {
 }
 
 // --- Auth Middleware ---
+const API_SECRET_KEY = process.env.API_SECRET_KEY;
+
 function authenticate(req: AuthRequest, res: any, next: any) {
+  const apiKeyHeader = req.headers["x-api-key"];
+  if (!API_SECRET_KEY) throw new Error("API_SECRET_KEY missing");
+  if (apiKeyHeader !== API_SECRET_KEY) return res.status(401).json({ error: "Invalid API Key" });
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ error: "Auth required" });
   try {
@@ -714,6 +719,92 @@ async function startServer() {
     }
   });
 
+  // --- AI Analysis Endpoint ---
+
+  app.post("/api/ai/analyze-guardian", authenticate, async (req: AuthRequest, res: any) => {
+
+    const { alertId, transcribedText } = req.body;
+
+    if (!alertId || !transcribedText) return res.status(400).json({ error: "Missing alertId or transcribedText" });
+
+    if (!apiKey) return res.status(500).json({ error: "Gemini API Key missing" });
+
+    try {
+
+      const { GoogleGenAI } = await import("@google/genai");
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      const prompt = `You are an emergency triage AI for a local community. Given the following transcribed text from an SOS activation, categorize the emergency into EXACTLY ONE of the following categories: "medical", "crime", "fire", or "other". Provide a brief 1-sentence reason. Return ONLY a JSON object in this exact format: {"category": "medical|crime|fire|other", "reason": "Your brief reason"}. The transcribed text is: "${transcribedText}"`;
+
+      const response = await ai.models.generateContent({
+         model: "gemini-2.5-flash",
+         contents: prompt,
+         config: {
+           responseMimeType: "application/json"
+         }
+      });
+
+      const text = response.text;
+      const aiResult = JSON.parse(text);
+
+      const aiAnalysisObj = {
+
+         summary: `Guardian AI auto-detected ${aiResult.category} emergency: ${aiResult.reason}`,
+
+         keywords: ["guardian-ai-auto"],
+
+         severity_assessment: "medium"
+
+      };
+
+
+
+      await pool.query(
+
+        "UPDATE alerts SET ai_analysis = $1, type = COALESCE($2, type) WHERE id = $3",
+
+        [JSON.stringify(aiAnalysisObj), aiResult.category, alertId]
+
+      );
+
+
+
+      await pool.query(
+
+        "INSERT INTO tanod_activity_logs (tanod_id, tanod_name, type, timestamp, details) VALUES ($1, $2, $3, $4, $5)",
+
+        [
+
+           req.user.id,
+
+           req.user.name,
+
+           "ai_analysis",
+
+           new Date().toISOString(),
+
+           `Guardian AI auto-categorized alert ${alertId} as ${aiResult.category}. Reason: ${aiResult.reason}`
+
+        ]
+
+      );
+
+
+
+      res.json({ success: true, analysis: aiAnalysisObj });
+
+    } catch (err: any) {
+
+      console.error("AI Analysis error:", err);
+
+      res.status(500).json({ error: "AI analysis failed" });
+
+    }
+
+  });
+
+
   // --- Analytics Logic ---
   app.get("/api/analytics/dashboard", authenticate, async (req: AuthRequest, res: any) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
@@ -755,7 +846,6 @@ async function startServer() {
     }
   });
 
-  // --- AI Analysis (Guardian AI) ---
   // Note: AI analysis moved to frontend via aiService.ts as per platform guidelines.
 
   // Socket Connection

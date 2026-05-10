@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import TacticalCard from './TacticalCard';
 import ActiveMap from './ActiveMap';
-import { useShoutDetection } from '../hooks/useShoutDetection';
+import { useGuardianAI, GuardianThreat } from '../hooks/useGuardianAI';
 import { useVideoRecorder } from '../hooks/useVideoRecorder';
 import { analyzeIncident } from '../services/aiService';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
@@ -112,21 +112,32 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
 
   const activeAlertIdRef = useRef<string | null>(null);
   const pendingChunksRef = useRef<Blob[]>([]);
-  const [guardianMode, setGuardianMode] = useState(false);
 
-  const handleSOSRef = useRef<((type?: EmergencyType, description?: string) => Promise<void>) | null>(null);
+  const handleSOSRef = useRef<((type?: EmergencyType, description?: string) => Promise<string | undefined>) | null>(null);
 
-  const handleShout = useCallback(() => {
-    toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', {
+  const handleThreat = useCallback((threat: GuardianThreat) => {
+    toast.error('THREAT DETECTED: AUTO-INITIATING SOS', {
       duration: 5000,
       icon: '🔊'
     });
     if (handleSOSRef.current) {
-      handleSOSRef.current('other', 'Dynamic AI Alert: High-decibel sound/shout detected.');
+      handleSOSRef.current('other', threat.text).then(alertId => {
+        if (alertId && threat.type === 'keyword') {
+          // Send to AI for further analysis after creating the alert
+          api.generic.create('ai/analyze-guardian', {
+              alertId,
+              transcribedText: threat.text
+          }).catch(err => console.error("AI Analysis failed:", err));
+        }
+      }).catch(err => console.error("Auto SOS failed:", err));
     }
   }, []);
 
-  const { isListening, startListening, stopListening } = useShoutDetection(handleShout);
+  const { guardianMode, setGuardianMode, isListening, error: guardianError } = useGuardianAI(handleThreat);
+
+  if (guardianError) {
+    throw guardianError; // Handled by GlobalErrorBoundary
+  }
 
   const handleVideoChunk = useCallback((chunk: Blob) => {
     if (!activeAlertIdRef.current) {
@@ -150,14 +161,6 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   }, []);
 
   const { isRecording, startRecording, stopRecording } = useVideoRecorder(handleVideoChunk);
-  
-  useEffect(() => {
-    if (guardianMode) {
-      startListening();
-    } else {
-      stopListening();
-    }
-  }, [guardianMode, startListening, stopListening]);
 
   useEffect(() => {
     if (!activeAlert && isRecording) {
@@ -168,8 +171,8 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   }, [activeAlert, isRecording, stopRecording]);
 
 
-  const handleSOS = async (type: EmergencyType = 'other', description: string) => {
-    if (activeAlert || isSending) return;
+  const handleSOS = async (type: EmergencyType = 'other', description: string): Promise<string | undefined> => {
+    if (activeAlert || isSending) return undefined;
     
     try {
       let location = manualLocation;
@@ -206,8 +209,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       }, 1500);
 
       toast.success('SOS Protocol Initiated. Units alerted.');
+
+      return alertId;
     } catch (err: any) {
       toast.error('Emergency transmission failed. Call hotlines.');
+      return undefined;
     }
   };
 
@@ -748,7 +754,7 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
                 <AnimatedButton 
                   isLoading={isSending}
                   isSuccess={sosSuccess}
-                  onClick={() => handleSOS(sosTypeToSubmit, sosDescription)}
+                  onClick={async () => { await handleSOS(sosTypeToSubmit, sosDescription); }}
                   label="Transmit Alert"
                   successLabel="Alert Transmitted"
                   className="flex-[2]"
