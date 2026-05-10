@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { Eye, ShieldAlert, X, MapPin } from 'lucide-react';
+import { Eye, ShieldAlert, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface WitnessInvite {
