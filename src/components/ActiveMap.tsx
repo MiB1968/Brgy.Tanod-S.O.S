@@ -7,11 +7,13 @@ import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Fix for default marker icons in Leaflet with React
 const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
