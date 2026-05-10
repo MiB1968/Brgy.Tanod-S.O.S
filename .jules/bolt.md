@@ -1,0 +1,3 @@
+## 2024-06-25 - [React Performance - Leaflet Map Markers Re-render]
+**Learning:** In highly dynamic maps built with React-Leaflet (`LiveMap.tsx`), repeatedly filtering arrays inside the render cycle (e.g., `alerts.filter(...)`, `patrols.filter(...)`) for active items and regenerating complex HTML icons with functions (`makeResidentIcon()`) causes expensive re-renders and excessive garbage collection, especially during real-time map panning/zooming.
+**Action:** Use `useMemo` to cache filtered marker lists and pre-instantiate/cache static `L.divIcon` objects outside the render cycle or in `useMemo` where appropriate.
