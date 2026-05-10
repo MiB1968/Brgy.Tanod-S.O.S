@@ -75,7 +75,7 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
                   timestamp: alert.timestamp,
                   location: `${alert.location.lat},${alert.location.lng}`,
                   type: alert.type,
-                  description: alert.customMessage || 'No description',
+                  description: alert.description || 'No description',
                   status: 'pending'
                 }}
                 onDispatch={() => onUpdateStatus(alert, 'responding')}

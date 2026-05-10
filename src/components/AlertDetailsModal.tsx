@@ -184,10 +184,10 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                   </div>
                 </div>
                 
-                {alert.customMessage && (
+                {alert.description && (
                   <div className="mt-4 p-3 bg-[#FF4B4B]/10 border border-[#FF4B4B]/20 rounded-lg">
                     <p className="text-[10px] text-[#FF4B4B] uppercase tracking-widest mb-1 font-bold">Incoming Message</p>
-                    <p className="text-sm text-white/90 italic">"{alert.customMessage}"</p>
+                    <p className="text-sm text-white/90 italic">"{alert.description}"</p>
                   </div>
                 )}
               </div>

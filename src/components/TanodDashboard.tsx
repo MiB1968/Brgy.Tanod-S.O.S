@@ -69,7 +69,7 @@ export default function TanodDashboard({
           citizenName: alert.residentName || 'Resident',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
-          location: alert.customMessage || 'GPS Response',
+          location: alert.description || 'GPS Response',
           type: alert.type,
           description: `Resolved SOS Alert from ${alert.residentName}.\nResolution note: ${updateData.resolutionNotes}`,
           status: 'resolved'
@@ -91,7 +91,8 @@ export default function TanodDashboard({
       await logIncidentAction({ ...alert, ...updateData });
       toast.success(`Operational Status: ${status.toUpperCase()}`);
     } catch (error: any) {
-      toast.error(`Fault: ${error.message}`);
+      const errorMessage = error?.message || typeof error === 'string' ? error : JSON.stringify(error) || 'Unknown error occurred';
+      toast.error(`Fault: ${errorMessage}`);
     }
   };
 

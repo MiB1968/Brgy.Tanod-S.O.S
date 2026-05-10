@@ -145,10 +145,10 @@ export default function AdminDashboard({
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
           timestamp: new Date().toISOString(),
-          location: alert.customMessage || 'Location via GPS',
+          location: alert.description || 'Location via GPS',
           gpsLocation: alert.location,
           type: alert.type,
-          description: `Automatically created from a resolved alert.\nCitizen: ${alert.residentName}\nResponse note: ${updateData.resolutionNotes}`,
+          description: `Automatically created from a resolved alert.\nCitizen: ${alert.residentName || 'Unknown Resident'}\nResponse note: ${updateData.resolutionNotes}`,
           status: 'resolved',
           respondedAt: alert.respondedAt || updateData.respondedAt || new Date().toISOString(),
           resolvedAt: updateData.resolvedAt,
@@ -189,7 +189,8 @@ export default function AdminDashboard({
       await logIncidentAction({ ...alert, ...updateData });
     } catch (error: any) {
       console.error("ADMIN_ACTION_FAULT:", error);
-      toast.error(`Fault: ${error.message}`);
+      const errorMessage = error?.message || typeof error === 'string' ? error : JSON.stringify(error) || 'Unknown error occurred';
+      toast.error(`Fault: ${errorMessage}`);
     }
   };
 

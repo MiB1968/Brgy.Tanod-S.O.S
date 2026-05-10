@@ -59,7 +59,7 @@ export interface Alert {
   residentName: string;
   residentMobile?: string;
   type: EmergencyType;
-  customMessage?: string;
+  description?: string;
   location: {
     lat: number;
     lng: number;

@@ -41,6 +41,9 @@
   .animate-shimmer {
     animation: shimmer 2.5s infinite;
   }
+  .shadow-glow-red {
+    box-shadow: var(--shadow-glow-red);
+  }
 }
 
 @keyframes scan-fast {
