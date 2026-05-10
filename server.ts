@@ -17,6 +17,10 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : false;
+
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
 const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
@@ -273,13 +277,32 @@ async function startServer() {
 
   const server = http.createServer(app);
   const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { origin: allowedOrigins }
   });
 
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://unpkg.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://*.basemaps.cartocdn.com",
+          "https://*.tile.openstreetmap.org",
+          "https://unpkg.com",
+          "https://raw.githubusercontent.com",
+          "https://cdnjs.cloudflare.com",
+          "https://www.google.com",
+          "https://api.qrserver.com"
+        ],
+        connectSrc: ["'self'", "ws:", "wss:", "https://nominatim.openstreetmap.org"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        mediaSrc: ["'self'", "https://assets.mixkit.co"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
-    frameguard: false,
   }));
   app.use(express.json());
   app.use(cookieParser());
