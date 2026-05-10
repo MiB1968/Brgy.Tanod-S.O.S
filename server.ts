@@ -246,7 +246,7 @@ async function startServer() {
 
   const server = http.createServer(app);
   const io = new Server(server, {
-    cors: { origin: "*" }
+    cors: { origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : false }
   });
 
   app.use(helmet({
