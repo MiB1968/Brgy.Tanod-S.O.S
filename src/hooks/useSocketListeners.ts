@@ -44,8 +44,8 @@ export function useSocketListeners(
       }
     };
 
-    socket.on('alert_update', (data: any) => {
-      const alert = data.alert;
+    const handleAlert = (data: any) => {
+      const alert = data.alert || data; // Handle both alert_new and alert_update structures
       if (!alert) return;
       
       const formattedAlert: Alert = {
@@ -61,19 +61,23 @@ export function useSocketListeners(
       addAlert(formattedAlert);
       
       if (profile.role === 'admin' || profile.role === 'tanod' || effectiveRole === 'superadmin') {
-        toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
-        if (formattedAlert.status === 'pending') {
+        const isNew = !data.alert; // If data is the alert itself, it's alert_new
+        if (isNew || formattedAlert.status === 'pending') {
+          toast.error(`🚨 SOS EMERGENCY: ${formattedAlert.type}`, { duration: 10000, id: `sos-${formattedAlert.id}` });
           showSOSNotification(formattedAlert);
         }
       }
       
       if (profile.role === 'resident' && formattedAlert.residentId === profile.id) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(200);
+          navigator.vibrate([200, 100, 200]);
         }
-        toast.success(`SOS Update: ${formattedAlert.status}`);
+        toast.success(`SOS Update: ${formattedAlert.status}`, { id: `res-sos-${formattedAlert.id}` });
       }
-    });
+    };
+
+    socket.on('alert_new', handleAlert);
+    socket.on('alert_update', handleAlert);
 
     socket.on('patrol_update', (update: any) => {
        const patrol: PatrolLocation = {
@@ -106,9 +110,13 @@ export function useSocketListeners(
     });
 
     socket.on('tanod_update', (update: any) => {
-      if (update.status) {
+      if (update.id && update.status) {
         updateTanodStatus(update.id, update.status);
       }
+    });
+
+    socket.on('resident_update', (update: any) => {
+       // Optional: Update resident status in local store if needed
     });
 
     socket.on('siren_update', (data: any) => {
@@ -120,11 +128,13 @@ export function useSocketListeners(
     });
 
     return () => {
-      socket.off('alert_update');
+      socket.off('alert_new', handleAlert);
+      socket.off('alert_update', handleAlert);
       socket.off('patrol_update');
       socket.off('patrol_location');
       socket.off('broadcast_update');
       socket.off('tanod_update');
+      socket.off('resident_update');
       socket.off('siren_update');
     };
   }, [profile, effectiveRole, addAlert, updatePatrol, updateTanodStatus, setActiveBroadcast, setGlobalSirenActive, setIsShaking, setActiveTab]);

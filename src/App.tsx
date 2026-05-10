@@ -70,6 +70,7 @@ import { WitnessOverlay } from './components/WitnessOverlay';
 import { Toaster, toast } from 'react-hot-toast';
 import { TanodLogo, BackgroundPattern } from './components/Branding';
 import TanodCommandAlert from './components/TanodCommandAlert';
+import SOSAlertSiren from './components/SOSAlertSiren';
 import BackgroundServices from './components/BackgroundServices';
 import SirenController from './components/SirenController';
 import DashboardView from './components/DashboardView';
@@ -672,6 +673,7 @@ export default function App() {
           profile={effectiveProfile} 
           alerts={alerts} 
         />
+        <SOSAlertSiren userRole={effectiveRole} />
         <BackgroundServices />
       </main>
     </div>

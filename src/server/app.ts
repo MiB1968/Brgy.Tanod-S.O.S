@@ -12,12 +12,16 @@ import authRoutes from './routes/authRoutes';
 import syncRoutes from './routes/syncRoutes';
 import systemRoutes from './routes/systemRoutes';
 import sosRoutes from './routes/sosRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Trust proxy for Cloud Run/Nginx
+app.set('trust proxy', 1);
 
 // Security Middleware
 app.use(helmet({
@@ -40,7 +44,7 @@ const globalLimiter = rateLimit({
   limit: 1000,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  // Cloud Run sets X-Forwarded-For properly, trust it.
 });
 
 const authLimiter = rateLimit({
@@ -49,7 +53,6 @@ const authLimiter = rateLimit({
   message: { success: false, error: { code: 'TOO_MANY_REQUESTS', message: 'Too many login attempts. Please try again later.' } },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
 });
 
 const sosLimiter = rateLimit({
@@ -58,7 +61,6 @@ const sosLimiter = rateLimit({
   message: { success: false, error: { code: 'TOO_MANY_REQUESTS', message: 'Too many SOS requests. Please use the existing alert chat.' } },
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
 });
 
 app.use('/api/', globalLimiter);
@@ -71,6 +73,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/sos', sosRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health Check
 app.get('/api/health', async (req, res) => {

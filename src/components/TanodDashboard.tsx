@@ -66,6 +66,7 @@ export default function TanodDashboard({
           alertId: alert.id,
           tanodId: profile?.id || 'unknown',
           tanodName: profile?.name || 'Unknown',
+          citizenName: alert.residentName || 'Resident',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
           location: alert.customMessage || 'GPS Response',

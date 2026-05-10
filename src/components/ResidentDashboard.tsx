@@ -122,25 +122,48 @@ export default function ResidentDashboard({
       <AnimatePresence>
         {activeAlert && (
           <motion.div initial={{ opacity: 0, y: -40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-panel border-emergency/50 rounded-[48px] p-8 shadow-glow-red relative overflow-hidden">
-             <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-               <div className="flex items-center gap-8">
-                 <div className="w-20 h-20 bg-emergency rounded-[28px] flex items-center justify-center sos-glow">
-                   <Zap className="text-white w-10 h-10" />
-                 </div>
-                 <div>
-                   <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono">Emergency Incident Live</h4>
-                   <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] font-mono">{activeAlert.status.toUpperCase()} • {activeAlert.type}</p>
-                 </div>
-               </div>
-               <div className="flex-1 max-w-lg w-full">
-                  <div className="h-2 bg-brand-bg rounded-full overflow-hidden mb-2">
-                    <motion.div 
-                      className="h-full bg-emergency shadow-glow-red"
-                      animate={{ width: activeAlert.status === 'pending' ? '33.33%' : activeAlert.status === 'responding' ? '66.66%' : '100%' }}
-                    />
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                <div className="flex items-center gap-8">
+                  <div className="w-20 h-20 bg-emergency rounded-[28px] flex items-center justify-center sos-glow">
+                    <Zap className="text-white w-10 h-10" />
                   </div>
-               </div>
-             </div>
+                  <div>
+                    <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono">Emergency Incident Live</h4>
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] font-mono">{activeAlert.status.toUpperCase()} • {activeAlert.type}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col md:flex-row items-center gap-4 flex-1 max-w-2xl w-full">
+                  <div className="flex-1 w-full">
+                    <div className="h-2 bg-brand-bg rounded-full overflow-hidden mb-2">
+                      <motion.div 
+                        className="h-full bg-emergency shadow-glow-red"
+                        animate={{ width: activeAlert.status === 'pending' ? '33.33%' : activeAlert.status === 'responding' ? '66.66%' : '100%' }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[8px] font-mono text-white/20 uppercase tracking-widest">
+                       <span>Dispatch</span>
+                       <span>En Route</span>
+                       <span>On Scene</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      if (window.confirm('ARE YOU SURE YOU WANT TO ABORT THIS EMERGENCY ALERT? False alerts may result in penalties.')) {
+                        try {
+                          const { cancelSOS } = useSOSStore.getState();
+                          await cancelSOS(activeAlert.id);
+                          toast.success('SOS ABORTED SUCCESSFULLY');
+                        } catch (err) {
+                          toast.error('ABORT FAILED: Please call hotline');
+                        }
+                      }
+                    }}
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-emergency/20 hover:text-emergency hover:border-emergency/30 transition-all active:scale-95 whitespace-nowrap"
+                  >
+                    Abort SOS
+                  </button>
+                </div>
+              </div>
              <div className="mt-8 border-t border-white/5 pt-8">
                <SOSChat alertId={activeAlert.id} currentUser={profile} />
              </div>

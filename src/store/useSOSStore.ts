@@ -10,6 +10,7 @@ interface SOSState {
   isSending: boolean;
   setActiveAlert: (alert: Alert | null) => void;
   createSOS: (type: EmergencyType, description: string, location: { lat: number, lng: number }) => Promise<string | null>;
+  cancelSOS: (id: string) => Promise<void>;
   subscribeToUserAlerts: (userId: string) => () => void;
 }
 
@@ -34,34 +35,48 @@ export const useSOSStore = create<SOSState>()(
         location,
         status: 'pending',
         timestamp: new Date().toISOString(),
-        description, // Use 'description' instead of 'customMessage'
+        description,
         aiAnalysis
       };
 
       try {
+        let finalAlertId;
         if (navigator.onLine) {
           const res = await api.alerts.create(alertData);
-          return res.id;
+          finalAlertId = res.id;
         } else {
-          const alertId = crypto.randomUUID();
-          await queueSOS({ ...alertData, id: alertId });
-          return alertId;
+          finalAlertId = crypto.randomUUID();
+          await queueSOS({ ...alertData, id: finalAlertId });
         }
+        
+        // Optimistic update
+        set({ activeAlert: { ...alertData, id: finalAlertId } });
+        return finalAlertId;
       } catch (error) {
         console.error("SOS creation error:", error);
         const alertId = crypto.randomUUID();
         await queueSOS({ ...alertData, id: alertId });
+        set({ activeAlert: { ...alertData, id: alertId } });
         return alertId;
       } finally {
         set({ isSending: false });
       }
     },
 
+    cancelSOS: async (id) => {
+      try {
+        await api.alerts.cancel(id);
+        set({ activeAlert: null });
+      } catch (error) {
+        console.error("SOS cancel error:", error);
+        throw error;
+      }
+    },
+
     subscribeToUserAlerts: (userId) => {
-      // Use socket instead of polling/snapshot
-      socket.on('alert_update', (data: any) => {
-        const rawAlert = data.alert;
-        if (!rawAlert) return;
+      const handleAlert = (data: any) => {
+        const rawAlert = data.alert || data;
+        if (!rawAlert || !rawAlert.id) return;
 
         // Normalize fields from DB format to Store format
         const normalizedAlert: Alert = {
@@ -76,14 +91,18 @@ export const useSOSStore = create<SOSState>()(
         if (normalizedAlert.residentId === userId) {
           if (normalizedAlert.status !== 'resolved' && normalizedAlert.status !== 'cancelled') {
             set({ activeAlert: normalizedAlert });
-          } else {
+          } else if (normalizedAlert.status === 'resolved' || normalizedAlert.status === 'cancelled') {
             set({ activeAlert: null });
           }
         }
-      });
+      };
+
+      socket.on('alert_new', handleAlert);
+      socket.on('alert_update', handleAlert);
 
       return () => {
-        socket.off('alert_update');
+        socket.off('alert_new', handleAlert);
+        socket.off('alert_update', handleAlert);
       };
     }
   }),

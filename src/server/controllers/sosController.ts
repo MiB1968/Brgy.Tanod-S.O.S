@@ -5,7 +5,7 @@ import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 
 export const createAlert = async (req: AuthRequest, res: Response) => {
-  const { type, location, customMessage, severity } = req.body;
+  const { type, location, description, severity } = req.body;
   const userId = req.user?.id;
 
   if (!type || !location) {
@@ -25,9 +25,9 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
 
     const result = await pool.query(
       `INSERT INTO alerts (
-        resident_id, type, location, custom_message, status, severity_score, created_at, updated_at
+        resident_id, type, location, description, status, severity_score, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, 'pending', $5, now(), now()) RETURNING *`,
-      [userId, type, JSON.stringify(location), customMessage || '', severity || 3]
+      [userId, type, JSON.stringify(location), description || '', severity || 3]
     );
 
     const alert = result.rows[0];
@@ -54,6 +54,46 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
   } catch (err: any) {
     console.error("SOS_ALERT_ERROR:", err);
     return response.error(res, "Failed to initiate SOS alert. Please try calling emergency hotline.");
+  }
+};
+
+export const cancelAlert = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    const alertCheck = await pool.query(
+      "SELECT resident_id, status FROM alerts WHERE id = $1",
+      [id]
+    );
+
+    if (alertCheck.rows.length === 0) {
+      return response.error(res, "Alert not found", "NOT_FOUND", 404);
+    }
+
+    const alert = alertCheck.rows[0];
+    if (alert.resident_id !== userId && req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {
+      return response.error(res, "Permission denied", "FORBIDDEN", 403);
+    }
+
+    if (alert.status === 'resolved' || alert.status === 'cancelled') {
+        return response.error(res, "Alert is already completed", "CONFLICT", 409);
+    }
+
+    const result = await pool.query(
+      "UPDATE alerts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    const updatedAlert = result.rows[0];
+    socketService.emitToAll("alert_update", { alert: updatedAlert });
+
+    return res.json({
+      success: true,
+      data: updatedAlert
+    });
+  } catch (err: any) {
+    return response.error(res, err.message);
   }
 };
 

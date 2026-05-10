@@ -13,17 +13,30 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(error.error || 'API Request failed');
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      const message = error.error?.message || error.error || error.message || 'API Request failed';
+      throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+    }
+
+    return response.json();
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection.');
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export const auth = {
@@ -48,6 +61,9 @@ export const alerts = {
     body: JSON.stringify(data),
   }),
   getActive: () => fetchAPI('/sos/active'),
+  cancel: (id: string) => fetchAPI(`/sos/alert/${id}/cancel`, {
+    method: 'POST'
+  }),
   getAll: () => fetchAPI('/sync?path=alerts'),
   update: (id: string, data: any) => fetchAPI(`/sync`, {
     method: 'POST',

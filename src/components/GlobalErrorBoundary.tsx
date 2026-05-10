@@ -38,10 +38,11 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             
             <p className="text-white/30 font-bold mb-2 text-[10px] uppercase">[RECOVERY_SUGGESTION]</p>
             <p className="text-white/40 text-[10px] leading-relaxed">
-              1. Check AI Studio Settings (Gear Icon) for missing Supabase keys.<br/>
-              2. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are present.<br/>
-              3. Try clearing browser cache and refreshing.<br/>
-              4. If the error persists, the current build might be unstable.
+              1. Check database connection status in the footer / top bar.<br/>
+              2. Verify your session (try logging out and back in).<br/>
+              3. Ensure your GPS permissions are granted if tracking is active.<br/>
+              4. Try clearing browser cache and refreshing.<br/>
+              5. If the error persists, the current build might be undergoing updates.
             </p>
           </div>
           

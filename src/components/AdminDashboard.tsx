@@ -141,6 +141,7 @@ export default function AdminDashboard({
           alertId: alert.id,
           tanodId: profile?.id || 'unknown',
           tanodName: alert.respondedByName || profile?.name || 'Unknown',
+          citizenName: alert.residentName || 'Resident',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
           timestamp: new Date().toISOString(),

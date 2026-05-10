@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { useAuthStore } from '../store/useAuthStore';
@@ -10,71 +10,86 @@ import { flushSOSQueue, getQueueSize } from '../lib/offlineQueue';
 import { useSystemStore } from '../store/useSystemStore';
 import { Alert, PatrolLocation, TanodProfile, User } from '../types';
 import { scheduleDailyLogReset } from '../lib/scheduler';
+import { withRetry } from '../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function BackgroundServices() {
   const { profile } = useAuthStore();
-  const { setAlerts } = useIncidentStore();
-  const { setPatrols, updatePatrol, setShifts, setActivityLogs, setPatrolSessions } = useTanodStore();
+  const { setAlerts, addAlert } = useIncidentStore();
+  const { setPatrols, updatePatrol, setShifts, setActivityLogs, setPatrolSessions, setTanods } = useTanodStore();
   const { clearActiveLogs } = useLogStore();
   const { isOnline, setQueuedSOSCount, lastSyncTime } = useSystemStore();
 
+  const isInitialLoadDone = useRef(false);
+
   // 1. Data Listeners (WebSockets)
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) {
+      isInitialLoadDone.current = false;
+      return;
+    }
 
-    // A. Initial Load
+    // A. Initial Load with Retry
     const loadInitialData = async () => {
       try {
-        const [alertsData, patrolsData, shiftsData] = await Promise.all([
+        console.log("[SYSTEM] Starting optimized initial load...");
+        
+        const [alertsData, patrolsData, shiftsData, tanodsData] = await withRetry(() => Promise.all([
           api.alerts.getAll(),
           api.generic.list('patrols'),
-          api.generic.list('shifts')
-        ]);
+          api.generic.list('shifts'),
+          api.generic.list('users?role=tanod')
+        ]));
         
         setAlerts(alertsData);
         setPatrols(patrolsData);
         setShifts(shiftsData);
+        setTanods(tanodsData);
 
         if (profile.role === 'admin' || profile.role === 'superadmin') {
-          const [logsData, sessionsData] = await Promise.all([
+          const [logsData, sessionsData] = await withRetry(() => Promise.all([
             api.logs.getAll(),
             api.generic.list('patrol_sessions')
-          ]);
+          ]));
           setActivityLogs(logsData);
           setPatrolSessions(sessionsData);
         }
+        
+        isInitialLoadDone.current = true;
       } catch (err) {
-        console.error("Background initial load failed. Error details:", err);
+        console.error("Critical: Initial load failed after retries.", err);
+        toast.error("Network instability detected. Some data may be stale.", { id: 'load-error' });
       }
     };
 
-    loadInitialData();
+    if (!isInitialLoadDone.current) {
+      loadInitialData();
+    }
 
-    // B. Real-time updates
-    socket.on('alert_update', () => loadInitialData());
-    socket.on('patrol_update', () => loadInitialData());
-    socket.on('log_new', () => loadInitialData());
-    socket.on('broadcast_update', () => loadInitialData());
-    socket.on('resident_update', () => loadInitialData());
-    socket.on('patrol_location', (data: any) => {
-        // Individual location update broadcast
-        updatePatrol({ 
-          tanodId: data.tanodId, 
-          isActive: true, // If we receive location, they are definitely active
-          ...data 
-        } as PatrolLocation);
-    });
+    // B. Real-time updates - AVOID FULL REFRESHES
+    // We already have useSocketListeners for granular updates.
+    // BackgroundServices should only handle "meta" events or admin-specific re-syncs.
+    
+    const handleSyncEvent = () => {
+      // Use a debounced or scheduled minor refresh if really needed, 
+      // but granular is better. For now, let's just listen to log events
+      // which aren't handled by granular listeners.
+      if (profile.role === 'admin' || profile.role === 'superadmin') {
+        withRetry(() => api.logs.getAll()).then(setActivityLogs).catch(() => {});
+      }
+    };
+
+    socket.on('log_new', handleSyncEvent);
+    socket.on('broadcast_update', loadInitialData); // Broadcasts are rare, full refresh is okay
+    
+    // Note: alert_update and patrol_update are handled by useSocketListeners.tsx
+    // We REMOVED the loadInitialData triggers from here to prevent racing.
 
     return () => {
-      socket.off('alert_update');
-      socket.off('patrol_update');
-      socket.off('log_new');
-      socket.off('broadcast_update');
-      socket.off('resident_update');
-      socket.off('patrol_location');
+      socket.off('log_new', handleSyncEvent);
+      socket.off('broadcast_update', loadInitialData);
     };
-  }, [profile, setAlerts, setPatrols, setShifts, setActivityLogs, setPatrolSessions]);
+  }, [profile, setAlerts, setPatrols, setShifts, setActivityLogs, setPatrolSessions, setTanods]);
 
   // 2. Tanod Location Heartbeat & Patrol Route Recording
   useEffect(() => {
@@ -222,7 +237,21 @@ export default function BackgroundServices() {
         toast.loading(`Syncing ${size} queued SOS alerts...`, { id: 'sync-sos' });
         try {
           await flushSOSQueue(async (data) => {
-            await api.alerts.create(data);
+            // Sanitize: replace customMessage with description if present
+            const sanitizedData = { ...data };
+            if (sanitizedData.customMessage && !sanitizedData.description) {
+               sanitizedData.description = sanitizedData.customMessage;
+               delete sanitizedData.customMessage;
+            }
+            try {
+              await api.alerts.create(sanitizedData);
+            } catch (err: any) {
+              if (err.message?.includes("You already have an active SOS alert")) {
+                console.warn("Discarding queued SOS because one is already active:", err);
+                return; // Discard it by returning successfully
+              }
+              throw err;
+            }
           });
           
           const remaining = await getQueueSize();

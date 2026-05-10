@@ -55,6 +55,13 @@ export async function initDb(retries = 3) {
           description TEXT,
           severity_score INT,
           ai_analysis JSONB,
+          assigned_to UUID,
+          assigned_to_name TEXT,
+          responded_by UUID,
+          responded_by_name TEXT,
+          responded_at TIMESTAMPTZ,
+          resolution_notes TEXT,
+          responder_notes TEXT,
           created_at TIMESTAMPTZ DEFAULT now(),
           updated_at TIMESTAMPTZ DEFAULT now(),
           resolved_at TIMESTAMPTZ
@@ -101,7 +108,10 @@ export async function initDb(retries = 3) {
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           message TEXT NOT NULL,
           timestamp TIMESTAMPTZ DEFAULT now(),
-          isActive BOOLEAN DEFAULT true
+          isactive BOOLEAN DEFAULT true,
+          admin_id UUID,
+          admin_name TEXT,
+          type TEXT
         );
       `);
 
@@ -109,8 +119,23 @@ export async function initDb(retries = 3) {
         CREATE TABLE IF NOT EXISTS witness_invites (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           alert_id UUID REFERENCES alerts(id) ON DELETE CASCADE,
-          invited_by UUID REFERENCES users(id),
+          witness_user_id UUID REFERENCES users(id),
           status TEXT NOT NULL DEFAULT 'pending',
+          timestamp TIMESTAMPTZ DEFAULT now()
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS shifts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          tanod_id UUID REFERENCES users(id),
+          tanod_name TEXT,
+          start_time TIMESTAMPTZ,
+          end_time TIMESTAMPTZ,
+          sector TEXT,
+          status TEXT DEFAULT 'scheduled',
+          tanod_response TEXT DEFAULT 'pending',
+          notes TEXT,
           created_at TIMESTAMPTZ DEFAULT now()
         );
       `);
@@ -155,7 +180,14 @@ export async function initDb(retries = 3) {
           description TEXT,
           persons_involved TEXT,
           actions_taken TEXT,
-          status TEXT
+          status TEXT,
+          assigned_to UUID,
+          assigned_to_name TEXT,
+          responded_by UUID,
+          responded_by_name TEXT,
+          responded_at TIMESTAMPTZ,
+          resolution_notes TEXT,
+          responder_notes TEXT
         );
       `);
 
