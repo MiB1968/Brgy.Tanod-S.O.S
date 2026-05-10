@@ -6,14 +6,16 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node dist/server.js",
-    "build": "rimraf dist && NODE_ENV=production vite build && npx esbuild server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.js --external:vite --packages=external",
+    "start": "node dist/server.mjs",
+    "build": "rimraf dist && NODE_ENV=production vite build && npx esbuild server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.mjs --external:vite --packages=external",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/orbitron": "^5.2.8",
+    "@fontsource/rajdhani": "^5.2.7",
     "@google/genai": "^1.52.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/bcryptjs": "^2.4.6",

@@ -1,170 +1,78 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=Outfit:wght@400;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
 @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
 
 @import "tailwindcss";
 
-@keyframes logo-ping {
-  0% { transform: scale(1); opacity: 0.3; }
-  70% { transform: scale(1.15); opacity: 0; }
-  100% { opacity: 0; }
+:root {
+  --bg-primary: #040b1a;
+  --bg-secondary: #071427;
+  --panel-bg: rgba(7, 20, 39, 0.75);
+
+  --blue-primary: #00aaff;
+  --blue-glow: #0088ff;
+  --red-primary: #ff2d55;
+  --cyan-primary: #00f0ff;
+
+  --text-primary: #ffffff;
+  --text-secondary: #8aa4c8;
+
+  --border-glow: rgba(0, 170, 255, 0.4);
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
-  --font-mono: "JetBrains Mono", "Space Mono", monospace;
+  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Orbitron", sans-serif;
+  --font-mono: "Rajdhani", monospace;
 
-  /* Command Center Palette */
-  --color-brand-bg: #0B0F19;
-  --color-brand-card: #161B26;
+  /* Tactical Palette */
+  --color-tactical-blue: #00AEEF;
+  --color-tactical-cyan: #00F0FF;
+  --color-tactical-red: #FF3B5C;
+  --color-tactical-dark: #040B1A;
   --color-emergency: #FF3B30;
-  --color-warning: #FF9500;
-  --color-caution: #FFD60A;
-  --color-success: #34C759;
-  --color-info: #007AFF;
   
-  --shadow-command: 0 0 20px 0 rgba(0, 0, 0, 0.5);
-  --shadow-glow-red: 0 0 15px rgba(239, 68, 68, 0.5);
-  --shadow-glow-white: 0 0 20px rgba(255, 255, 255, 0.4);
-  --shadow-glow-orange: 0 0 15px rgba(255, 149, 0, 0.3);
-  --shadow-glow-amber: 0 0 15px rgba(255, 214, 10, 0.3);
-}
-
-@layer utilities {
-  .pattern-diagonal {
-    background-image: repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 50%);
-    background-size: 10px 10px;
-  }
-  .animate-scan-fast {
-    animation: scan-fast 1.5s linear infinite;
-  }
-  .animate-shimmer {
-    animation: shimmer 2.5s infinite;
-  }
-  .shadow-glow-red {
-    box-shadow: var(--shadow-glow-red);
-  }
-}
-
-@keyframes scan-fast {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  --shadow-tactical: 0 0 30px rgba(0,170,255,0.35);
 }
 
 @layer base {
   body {
-    @apply bg-brand-bg text-white selection:bg-emergency selection:text-white;
+    background: radial-gradient(circle at top, #0d1c3d 0%, #040b1a 45%), #040b1a;
+    color: white;
+    font-family: 'Orbitron', sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 }
 
-.glass-panel {
-  @apply bg-brand-card/80 backdrop-blur-md border border-white/5;
+@layer utilities {
+  .tactical-panel {
+    background: rgba(8, 15, 30, 0.78);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(0, 170, 255, 0.25);
+    box-shadow: 0 0 20px rgba(0, 170, 255, 0.12), inset 0 0 30px rgba(0, 170, 255, 0.05);
+    border-radius: 24px;
+  }
+
+  .tactical-glow {
+    box-shadow: 0 0 12px rgba(0, 170, 255, 0.5), 0 0 30px rgba(0, 170, 255, 0.2);
+  }
+
+  .tactical-grid {
+    background-image: linear-gradient(rgba(0,170,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,170,255,0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  .animate-radar { animation: radarSweep 8s linear infinite; }
+  .animate-glow { animation: pulseGlow 2s infinite; }
 }
 
-.sos-glow {
-  animation: sos-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 8px rgba(0,170,255,0.2); }
+  50% { box-shadow: 0 0 20px rgba(0,170,255,0.5), 0 0 40px rgba(0,170,255,0.3); }
+  100% { box-shadow: 0 0 8px rgba(0,170,255,0.2); }
 }
 
-.scanline {
-  width: 100%;
-  height: 100px;
-  z-index: 5;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
-  opacity: 0.1;
-  position: absolute;
-  top: -100px;
-  animation: scanline 8s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes scanline {
-  0% { top: -100px; }
-  100% { top: 100%; }
-}
-
-@keyframes sos-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
-  50% { opacity: 0.9; transform: scale(1.02); box-shadow: 0 0 30px 10px rgba(255, 59, 48, 0); }
-}
-
-@keyframes flicker {
-  0% { opacity: 0.8; }
-  5% { opacity: 0.5; }
-  10% { opacity: 0.9; }
-  15% { opacity: 0.6; }
-  25% { opacity: 0.5; }
-  30% { opacity: 1; }
-  100% { opacity: 1; }
-}
-
-.animate-flicker {
-  animation: flicker 4s linear infinite;
-}
-
-.tactical-grid {
-  background-size: 30px 30px;
-  background-image: 
-    linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
-}
-
-.skew-card {
-  transform: skewX(-1deg);
-}
-
-.outline-text {
-  text-shadow: 
-    -1px -1px 0 rgba(255,255,255,0.1),
-    1px -1px 0 rgba(255,255,255,0.1),
-    -1px 1px 0 rgba(255,255,255,0.1),
-    1px 1px 0 rgba(255,255,255,0.1);
-}
-
-.brutalist-border {
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 4px 4px 0px 0px rgba(255,255,255,0.05);
-}
-
-.PoliceLights {
-  animation: police-lights 0.8s linear infinite;
-}
-
-@keyframes police-lights {
-  0% { background: linear-gradient(90deg, rgba(255, 0, 0, 0.4) 0%, rgba(0, 0, 255, 0) 50%, rgba(255, 0, 0, 0.4) 100%); }
-  50% { background: linear-gradient(90deg, rgba(255, 0, 0, 0) 0%, rgba(0, 0, 255, 0.4) 50%, rgba(255, 0, 0, 0) 100%); }
-  100% { background: linear-gradient(90deg, rgba(255, 0, 0, 0.4) 0%, rgba(0, 0, 255, 0) 50%, rgba(255, 0, 0, 0.4) 100%); }
-}
-
-.shadow-glow-blue {
-  box-shadow: 0 0 15px rgba(0, 122, 255, 0.5);
-}
-
-.shadow-glow-green {
-  box-shadow: 0 0 15px rgba(52, 199, 89, 0.5);
-}
-
-.shadow-glow-gold {
-  box-shadow: 0 0 20px rgba(255, 214, 10, 0.4);
-}
-
-/* Custom Scrollbar Tactical */
-.scrollbar-tactical::-webkit-scrollbar {
-  width: 4px;
-}
-.scrollbar-tactical::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
-}
-.scrollbar-tactical::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-.scrollbar-tactical::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+@keyframes radarSweep {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 

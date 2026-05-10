@@ -117,7 +117,7 @@ export default function ResidentDashboard({
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-8 pb-32 tactical-grid min-h-screen p-4 md:p-8">
-      <ResidentHero profile={profile} setIsAboutOpen={setIsAboutOpen} />
+      <ResidentHero profile={profile} setIsAboutOpen={setIsAboutOpen} guardianMode={guardianMode} setGuardianMode={setGuardianMode} />
 
       <AnimatePresence>
         {activeAlert && (
