@@ -32,13 +32,7 @@ import { BrgyTanodQR } from './BrgyTanodQR';
 import { InstallAppButton } from './InstallAppButton';
 import { CitizenReportTracker } from './CitizenReportTracker';
 import { SOSChat } from './SOSChat';
-
-const SOS_SUGGESTIONS: Record<string, string[]> = {
-  'crime': ['Disturbance', 'Theft', 'Attempted Entry', 'Vandalism', 'Suspicious Activity'],
-  'fire': ['Smoke Seen', 'Structural Fire', 'Grass/Brush Fire', 'Electrical Fire', 'Chemical Smell'],
-  'medical': ['Unresponsive', 'Fall/Injury', 'Difficulty Breathing', 'Seizure'],
-  'flood': ['Rising Water', 'Flash Flood', 'Blocked Drainage', 'Home Inundation'],
-};
+import { SOS_SUGGESTIONS } from './Resident/SosConstants';
 
 const containerVariants = {
   hidden: { opacity: 0 },

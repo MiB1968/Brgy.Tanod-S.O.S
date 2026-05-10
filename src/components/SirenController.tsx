@@ -25,13 +25,23 @@ export default function SirenController({ globalSirenActive, profile, alerts }: 
       return; 
     }
 
-    if (!profile || (profile.role !== 'tanod' && profile.role !== 'admin' && profile.role !== 'superadmin')) {
+    if (!profile) {
       siren.stop();
       return;
     }
 
-    const hasActive = alerts.some(a => a.status === 'pending');
-    if (hasActive) {
+    // Determine if siren should sound based on role and alert context
+    let shouldSound = false;
+
+    if (profile.role === 'tanod' || profile.role === 'admin' || profile.role === 'superadmin') {
+      // Responders and Admins hear sirens for ANY pending alert
+      shouldSound = alerts.some(a => a.status === 'pending');
+    } else if (profile.role === 'resident') {
+      // Residents ONLY hear sirens for THEIR OWN pending alerts
+      shouldSound = alerts.some(a => a.status === 'pending' && a.residentId === profile.id);
+    }
+
+    if (shouldSound) {
       if (!siren.playing()) {
         siren.volume(1.0);
         siren.play();

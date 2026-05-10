@@ -28,16 +28,26 @@ const pool = new Pool({
   ssl: DATABASE_URL?.includes("localhost") ? false : { rejectUnauthorized: false }
 });
 
-interface AuthRequest extends express.Request {
-  user?: any;
+export interface JWTPayload {
+  id: string;
+  role: 'resident' | 'tanod' | 'admin' | 'superadmin';
+  name?: string;
+  email?: string;
+}
+
+export interface AuthRequest extends express.Request {
+  user?: JWTPayload;
 }
 
 // --- Auth Middleware ---
-function authenticate(req: AuthRequest, res: any, next: any) {
+export function authenticate(req: AuthRequest, res: express.Response, next: express.NextFunction) {
   const token = req.cookies.token;
-  if (!token) return res.status(401).json({ error: "Auth required" });
+  if (!token) {
+    res.status(401).json({ error: "Auth required" });
+    return;
+  }
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET) as JWTPayload;
     next();
   } catch (err) {
     res.status(401).json({ error: "Invalid token" });
@@ -610,8 +620,8 @@ async function startServer() {
   });
 
   // --- Data Routes ---
-  app.patch("/api/users/:id/role", authenticate, async (req: AuthRequest, res: any) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+  const handleRoleUpdate = async (req: AuthRequest, res: any) => {
+    if (req.user!.role !== 'admin' && req.user!.role !== 'superadmin') {
       return res.status(403).json({ error: "Forbidden: Admin access required" });
     }
 
@@ -632,7 +642,7 @@ async function startServer() {
 
       await pool.query(
         "INSERT INTO tanod_activity_logs (tanod_id, tanod_name, type, details) VALUES ($1, $2, $3, $4)",
-        [req.user.id, req.user.name || 'Admin', 'role_update', `Promoted user ${targetUserId} to ${role}`]
+        [req.user!.id, req.user!.name || 'Admin', 'role_update', `Promoted user ${targetUserId} to ${role}`]
       );
 
       res.json({ success: true, message: `User promoted to ${role}` });
@@ -640,7 +650,9 @@ async function startServer() {
       console.error("Role update failed:", err);
       res.status(500).json({ error: err.message });
     }
-  });
+  };
+
+  app.patch("/api/users/:id/role", authenticate, handleRoleUpdate);
 
   app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
@@ -832,6 +844,17 @@ async function startServer() {
   // Socket Connection
   io.on("connection", (socket) => {
     console.log("SOCKET: Connected", socket.id);
+
+    // Relay location updates to all connected clients
+    socket.on("location_update", (data) => {
+      socket.broadcast.emit("location_update", data);
+    });
+
+    // Relay audit log updates to all connected clients
+    socket.on("audit_log_new", (entry) => {
+      socket.broadcast.emit("audit_log_new", entry);
+    });
+
     socket.on("disconnect", () => console.log("SOCKET: Disconnected", socket.id));
   });
 
@@ -849,9 +872,16 @@ async function startServer() {
     app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
-  server.listen(Number(PORT), "0.0.0.0", () => {
+  const serverInstance = server.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`CockroachDB Backend LIVE on port ${PORT}`);
   });
+
+  return { app, server: serverInstance };
 }
 
-startServer();
+// Only start the server if not imported as a module (e.g., during tests)
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+export const _testAppPromise = process.env.NODE_ENV === 'test' ? startServer() : null;
