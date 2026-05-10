@@ -26,10 +26,11 @@ export const useShoutDetection = (onShout: () => void, threshold = -20) => {
       const checkVolume = () => {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
+        const len = dataArray.length;
+        for (let i = 0; i < len; i++) {
           sum += dataArray[i];
         }
-        const average = sum / dataArray.length;
+        const average = sum / len;
         
         // Very basic volume threshold mapping to dB estimation
         // This is heuristic-based and needs tuning
