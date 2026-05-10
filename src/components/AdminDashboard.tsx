@@ -35,7 +35,6 @@ import AdminAnalytics from './Admin/AdminAnalytics';
 import { ManageBroadcasts } from './Admin/ManageBroadcasts';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import LiveMap from '../LiveMap';
 import { 

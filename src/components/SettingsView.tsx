@@ -145,9 +145,12 @@ export default function SettingsView({ profile, role }: { profile: User | null, 
              </button>
              
              <button 
-               onClick={() => {
+               onClick={async () => {
                 if(confirm('PURGE LOCAL TERMINAL DATA? THIS CANNOT BE UNDONE.')) {
-                  localStorage.clear();
+                  localStorage.removeItem('user');
+                  try {
+                    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                  } catch (e) {}
                   window.location.reload();
                 }
                }}

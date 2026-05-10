@@ -10,13 +10,17 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import { GoogleGenAI, Type } from "@google/genai";
 
 dotenv.config();
 
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
 const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("FATAL ERROR: JWT_SECRET environment variable is missing.");
+}
 
 // Database Pool
 const pool = new Pool({
@@ -30,7 +34,7 @@ interface AuthRequest extends express.Request {
 
 // --- Auth Middleware ---
 function authenticate(req: AuthRequest, res: any, next: any) {
-  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.token;
   if (!token) return res.status(401).json({ error: "Auth required" });
   try {
     req.user = jwt.verify(token, JWT_SECRET);
@@ -121,14 +125,20 @@ async function initDb(retries = 3) {
       `);
 
       // Bootstrap Admin
-      const adminEmail = 'rubenlleg12@gmail.com';
-      const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
-      if (adminResult.rows.length === 0) {
-        const hashedPass = await bcrypt.hash('admin123', 10);
-        await client.query(
-          "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
-          [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
-        );
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminPassword = process.env.ADMIN_PASSWORD;
+
+      if (adminEmail && adminPassword) {
+        const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+        if (adminResult.rows.length === 0) {
+          const hashedPass = await bcrypt.hash(adminPassword, 10);
+          await client.query(
+            "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+            [adminEmail, hashedPass, 'SuperAdmin', 'admin', 'verified']
+          );
+        }
+      } else {
+        console.warn("DB_INIT: ADMIN_EMAIL or ADMIN_PASSWORD not set in environment. Skipping admin bootstrap.");
       }
 
       await client.query(`
@@ -267,6 +277,13 @@ async function startServer() {
   app.use("/api/", limiter);
 
   // --- Sync API (Mock Firestore to Postgres) ---
+  const ALLOWED_COLLECTIONS = [
+    'alerts', 'active_alerts', 'broadcasts', 'incidents',
+    'patrol_sessions', 'patrols', 'residents', 'shifts',
+    'system', 'system_broadcasts', 'tanod_activity_logs',
+    'users', 'witness_invites', 'audit_logs'
+  ];
+
   app.get("/api/sync", async (req, res) => {
     const { path: fullPath } = req.query;
     if (!fullPath) return res.status(400).json({ error: "Path required" });
@@ -276,6 +293,10 @@ async function startServer() {
     const parts = basePath.split('/');
     const collection = parts[0];
     const id = parts[1];
+
+    if (!ALLOWED_COLLECTIONS.includes(collection)) {
+      return res.status(403).json({ error: "Unauthorized collection access" });
+    }
 
     try {
       console.log(`SYNC_API: Request collection=${collection}, id=${id}, searchParams=${searchParams}`);
@@ -398,6 +419,10 @@ async function startServer() {
     const parts = (fullPath as string).split('/');
     const collection = parts[0];
     const docId = id || parts[1];
+
+    if (!ALLOWED_COLLECTIONS.includes(collection)) {
+      return res.status(403).json({ error: "Unauthorized collection access" });
+    }
 
     try {
       if (collection === 'system' && docId === 'siren') {
@@ -579,7 +604,44 @@ async function startServer() {
     }
   });
 
+  app.post("/api/auth/logout", async (req, res) => {
+    res.clearCookie("token", { httpOnly: true, path: "/" });
+    res.json({ success: true });
+  });
+
   // --- Data Routes ---
+  app.patch("/api/users/:id/role", authenticate, async (req: AuthRequest, res: any) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+
+    const { role } = req.body;
+    const targetUserId = req.params.id;
+
+    if (!role || !['resident', 'tanod', 'admin'].includes(role)) {
+      return res.status(400).json({ error: "Invalid role specified" });
+    }
+
+    try {
+      const userCheck = await pool.query("SELECT id FROM users WHERE id = $1", [targetUserId]);
+      if (userCheck.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      await pool.query("UPDATE users SET role = $1 WHERE id = $2", [role, targetUserId]);
+
+      await pool.query(
+        "INSERT INTO tanod_activity_logs (tanod_id, tanod_name, type, details) VALUES ($1, $2, $3, $4)",
+        [req.user.id, req.user.name || 'Admin', 'role_update', `Promoted user ${targetUserId} to ${role}`]
+      );
+
+      res.json({ success: true, message: `User promoted to ${role}` });
+    } catch (err: any) {
+      console.error("Role update failed:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
       const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
@@ -695,7 +757,77 @@ async function startServer() {
   });
 
   // --- AI Analysis (Guardian AI) ---
-  // Note: AI analysis moved to frontend via aiService.ts as per platform guidelines.
+  app.post("/api/ai/analyze", authenticate, async (req: AuthRequest, res: any) => {
+    const { description, initialType } = req.body;
+
+    const fallback = {
+      incidentType: (initialType as any)?.toUpperCase() || "OTHER",
+      severityScore: 5,
+      urgency: "NORMAL",
+      summary: description || "SOS Alert received.",
+      recommendedResponders: ["Tanod Officer"],
+      riskFactors: ["Manual verification required"],
+      instructions: ["Stay calm", "Wait for responders"]
+    };
+
+    if (!process.env.GEMINI_API_KEY) return res.json(fallback);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        contents: [
+          {
+            text: `Analyze this emergency incident report for a Philippine Barangay:
+            Description: "${description}"
+            Initial Category: "${initialType}"
+
+            Provide a structured emergency assessment.`
+          }
+        ],
+        config: {
+          systemInstruction: "You are a tactical emergency dispatcher. Extract structured data from reports. Provide 3-5 immediate safety instructions for the victim.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              incidentType: {
+                type: Type.STRING,
+                enum: ["MEDICAL", "FIRE", "CRIME", "DISTURBANCE", "OTHER"]
+              },
+              severityScore: { type: Type.NUMBER, description: "1-10 scale" },
+              urgency: {
+                type: Type.STRING,
+                enum: ["LOW", "NORMAL", "HIGH", "CRITICAL"]
+              },
+              summary: { type: Type.STRING },
+              recommendedResponders: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              riskFactors: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              instructions: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            },
+            required: ["incidentType", "severityScore", "urgency", "summary", "recommendedResponders", "riskFactors", "instructions"]
+          }
+        }
+      });
+
+      if (response.text) {
+        return res.json(JSON.parse(response.text.trim()));
+      }
+      return res.json(fallback);
+    } catch (error) {
+      console.error("AI Analysis failed:", error);
+      return res.json(fallback);
+    }
+  });
 
   // Socket Connection
   io.on("connection", (socket) => {

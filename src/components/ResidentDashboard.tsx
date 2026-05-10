@@ -19,7 +19,6 @@ import ActiveMap from './ActiveMap';
 import { useShoutDetection } from '../hooks/useShoutDetection';
 import { useVideoRecorder } from '../hooks/useVideoRecorder';
 import { analyzeIncident } from '../services/aiService';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { useSystemStore } from '../store/useSystemStore';
 import { useSOSStore } from '../store/useSOSStore';
 import { useIncidentStore } from '../store/useIncidentStore';

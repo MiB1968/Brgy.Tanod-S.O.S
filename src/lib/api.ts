@@ -6,16 +6,15 @@
 const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -34,6 +33,9 @@ export const auth = {
   register: (data: any) => fetchAPI('/auth/register', {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  logout: () => fetchAPI('/auth/logout', {
+    method: 'POST'
   }),
   getProfile: (id: string) => fetchAPI(`/users/${id}`),
   updateProfile: (id: string, data: any) => fetchAPI(`/sync?path=users/${id}`, {
@@ -110,4 +112,11 @@ export const generic = {
     body: JSON.stringify({ path }),
   }),
   list: (path: string) => fetchAPI(`/sync?path=${encodeURIComponent(path)}`),
+};
+
+export const admin = {
+  updateRole: (id: string, role: string) => fetchAPI(`/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  }),
 };

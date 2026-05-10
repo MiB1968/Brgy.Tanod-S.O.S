@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { 
   IconOnlineTanods, 
   IconNewIncident,

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { AuditLogArchive } from '../../types/auditLog';
 import { mockArchives } from '../../data/mock/auditLogArchives';
 import { User } from '../../types';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 
 export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,19 +15,11 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
   const fetchArchives = async () => {
     setIsLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
-      }
-      const { data, error } = await supabase
-        .from('audit_log_archives')
-        .select('*')
-        .order('archived_at', { ascending: false });
-      
-      if (error) throw error;
-      setArchives(data || []);
+      // Postgres migration placeholder - returning mocks for now
+      // A full migration would hit the /api/admin/archives endpoint
+      setArchives(mockArchives);
     } catch (err) {
-      console.error('Failed to fetch archives from Supabase:', err);
-      // Fallback to mock for development if Supabase fails
+      console.error('Failed to fetch archives:', err);
       setArchives(mockArchives);
     } finally {
       setIsLoading(false);

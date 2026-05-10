@@ -6,40 +6,21 @@
  * Note: Adapted from mobile (React Native) to Web Standard
  * to support the TanodNet Intelligence environment.
  */
+import socket from './lib/socket';
 
-let socket: WebSocket | null = null;
 let watchId: number | null = null;
-
-// Replace localhost with your Railway domain
-const SERVER = "wss://brgytanod-sos-production.up.railway.app/ws/gps"; 
-// Note: Use 'wss://' for secure websockets, not 'ws://'
 
 export const startGPS = (
   userId: string,
   role: "citizen" | "tanod",
   onUpdate: (data: any) => void
 ) => {
-  // Attempt socket connection for live streaming
-  try {
-    socket = new WebSocket(SERVER);
 
-    socket.onopen = () => {
-      console.log("Connected to GPS server");
-    };
+  const handleLocationUpdate = (msg: any) => {
+    onUpdate(msg);
+  };
 
-    socket.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      if (msg.type === "location_update") {
-        onUpdate(msg.data);
-      }
-    };
-    
-    socket.onerror = () => {
-      console.warn("GPS Socket server not reachable. Ensure backend is running.");
-    };
-  } catch (e) {
-    console.error("Socket error", e);
-  }
+  socket.on("location_update", handleLocationUpdate);
 
   // Start tracking using Browser Geolocation API
   if ("geolocation" in navigator) {
@@ -53,10 +34,7 @@ export const startGPS = (
           timestamp: Date.now(),
         };
 
-        // Send to WebSocket if connected
-        if (socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify(payload));
-        }
+        socket.emit("location_update", payload);
 
         // Also update local listeners
         onUpdate({ [userId]: payload });
@@ -71,7 +49,7 @@ export const startGPS = (
   }
 
   return () => {
-    if (socket) socket.close();
+    socket.off("location_update", handleLocationUpdate);
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   };
 };

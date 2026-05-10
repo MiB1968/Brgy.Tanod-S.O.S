@@ -6,9 +6,7 @@ export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: numb
 
   const response = await fetch('/api/storage/upload', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
-    },
+    credentials: 'include',
     body: formData
   });
 

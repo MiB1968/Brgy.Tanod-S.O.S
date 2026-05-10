@@ -174,9 +174,8 @@ export default function App() {
 
   // Authentication persistence
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
-    if (token && storedUser) {
+    if (storedUser) {
       const u = JSON.parse(storedUser);
       setUser(u);
       setProfile(u);
@@ -262,7 +261,6 @@ export default function App() {
     try {
       if (email && password) {
         const res = await api.auth.login({ email, password });
-        localStorage.setItem('token', res.token);
         localStorage.setItem('user', JSON.stringify(res.user));
         setUser(res.user);
         setProfile(res.user);
@@ -279,8 +277,12 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    localStorage.removeItem('token');
     localStorage.removeItem('user');
+    try {
+      await api.auth.logout();
+    } catch (e) {
+      console.error("Logout API failed", e);
+    }
     setUser(null);
     setProfile(null);
   };
@@ -375,7 +377,6 @@ export default function App() {
         email: role === 'admin' ? 'admin@demo.com' : 'resident@demo.com', 
         password: 'demo' 
       });
-      localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
       setUser(res.user);
       setProfile(res.user);
@@ -416,7 +417,6 @@ export default function App() {
       onComplete={async (data: any) => {
         try {
           const res = await api.auth.register(data);
-          localStorage.setItem('token', res.token);
           localStorage.setItem('user', JSON.stringify(res.user));
           setUser(res.user);
           setProfile(res.user);

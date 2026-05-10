@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { ResidentProfile } from '../types';
-import { Check, X, Eye, Search, Filter, MapPin, Phone, User, Calendar, ExternalLink } from 'lucide-react';
+import { Check, X, Eye, Search, Filter, MapPin, Phone, User, Calendar, ExternalLink, ShieldAlert, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
@@ -72,9 +72,30 @@ export default function AdminResidents({ profile }: { profile: any }) {
       await api.auth.updateProfile(id, { status: 'approved' });
       
       toast.success(`${name} approved`);
+      setResidents(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r));
     } catch (err: any) {
       console.error('Approve failed:', err);
       toast.error('Approval failed');
+    }
+  };
+
+  const handlePromote = async (id: string, name: string, newRole: 'tanod' | 'admin') => {
+    if (window.confirm(`Are you sure you want to promote ${name} to ${newRole.toUpperCase()}?`)) {
+      try {
+        await api.admin.updateRole(id, newRole);
+        toast.success(`${name} promoted to ${newRole.toUpperCase()}`);
+
+        // Refresh resident state
+        const data = await api.residents.getAll();
+        const formatted = data.map((r: any) => ({
+          id: r.id,
+          ...r,
+          ...(r.details || {})
+        } as ResidentProfile));
+        setResidents(formatted);
+      } catch (err: any) {
+        toast.error(`Promotion failed: ${err.message}`);
+      }
     }
   };
 
@@ -188,6 +209,24 @@ export default function AdminResidents({ profile }: { profile: any }) {
                     </button>
                   </>
                 )}
+                {resident.status === 'approved' && profile?.role === 'admin' && (
+                  <>
+                    <button
+                      title="Promote to Tanod"
+                      onClick={() => handlePromote(resident.id, resident.fullName, 'tanod')}
+                      className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                    >
+                      <ShieldAlert className="w-4 h-4" />
+                    </button>
+                    <button
+                      title="Promote to Admin"
+                      onClick={() => handlePromote(resident.id, resident.fullName, 'admin')}
+                      className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all"
+                    >
+                      <Star className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           ))}
@@ -287,12 +326,30 @@ export default function AdminResidents({ profile }: { profile: any }) {
                     </button>
                   </>
                 ) : (
-                  <button 
-                    onClick={() => setSelectedResident(null)}
-                    className="w-full py-3 md:py-4 bg-[#252932] text-white font-bold rounded-xl md:rounded-2xl hover:bg-[#2D3139] transition-all text-sm"
-                  >
-                    CLOSE PROFILE
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setSelectedResident(null)}
+                      className="flex-1 py-3 md:py-4 bg-[#252932] text-white font-bold rounded-xl md:rounded-2xl hover:bg-[#2D3139] transition-all text-sm"
+                    >
+                      CLOSE PROFILE
+                    </button>
+                    {profile?.role === 'admin' && selectedResident.status === 'approved' && (
+                      <>
+                        <button
+                          onClick={() => { handlePromote(selectedResident.id, selectedResident.fullName, 'tanod'); setSelectedResident(null); }}
+                          className="flex-1 py-3 md:py-4 bg-blue-600 text-white font-bold rounded-xl md:rounded-2xl hover:bg-blue-700 transition-all text-sm"
+                        >
+                          MAKE TANOD
+                        </button>
+                        <button
+                          onClick={() => { handlePromote(selectedResident.id, selectedResident.fullName, 'admin'); setSelectedResident(null); }}
+                          className="flex-1 py-3 md:py-4 bg-purple-600 text-white font-bold rounded-xl md:rounded-2xl hover:bg-purple-700 transition-all text-sm"
+                        >
+                          MAKE ADMIN
+                        </button>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>

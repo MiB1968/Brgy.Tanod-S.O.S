@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import * as api from '../lib/api';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { User, IncidentStatus } from '../types';
 import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
@@ -43,31 +42,6 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
       };
 
       await api.incidents.create(incidentData);
-
-      // Sync to Supabase
-      if (isSupabaseConfigured) {
-        try {
-          let coords = { lat: 0, lng: 0 };
-          try {
-            const pos = await new Promise<GeolocationPosition>((res, rej) => 
-              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 2000 })
-            );
-            coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          } catch (e) { /* ignore location error */ }
-
-          await supabase.from('report_logs').upsert([{
-            id: incidentId,
-            incident_id: incidentId,
-            type: formData.type,
-            status: formData.status,
-            tanod_assigned: profile.name,
-            location_lat: coords.lat,
-            location_lng: coords.lng
-          }]);
-        } catch (supaErr) {
-          console.error('Supabase incident sync failed:', supaErr);
-        }
-      }
 
       setIsSuccess(true);
       setTimeout(() => {
