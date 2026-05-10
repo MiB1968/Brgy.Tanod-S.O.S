@@ -336,7 +336,17 @@ async function startServer() {
       }
 
       if (collection === 'incidents') {
-        const query = "SELECT * FROM incidents ORDER BY timestamp DESC LIMIT 100";
+        const query = `
+          SELECT
+            i.*,
+            a.severity_score,
+            a.ai_analysis,
+            u.name as citizen_name
+          FROM incidents i
+          LEFT JOIN alerts a ON i.alert_id = a.id
+          LEFT JOIN users u ON a.resident_id = u.id
+          ORDER BY i.timestamp DESC LIMIT 100
+        `;
         console.log(`DB_QUERY: ${query}`);
         const result = await pool.query(query);
         return res.json(result.rows.map(i => ({
@@ -389,7 +399,19 @@ async function startServer() {
       }
 
       if (collection === 'audit_logs') {
-        const query = "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100";
+        const query = `
+          SELECT
+            l.*,
+            u.name as citizen_name,
+            a.severity_score,
+            a.ai_analysis,
+            a.description,
+            a.resolved_at as alert_resolved_at
+          FROM audit_logs l
+          LEFT JOIN users u ON l.citizen_id = u.id
+          LEFT JOIN alerts a ON l.incident_id = a.id
+          ORDER BY l.created_at DESC LIMIT 500
+        `;
         console.log(`DB_QUERY: ${query}`);
         const result = await pool.query(query);
         return res.json(result.rows);
