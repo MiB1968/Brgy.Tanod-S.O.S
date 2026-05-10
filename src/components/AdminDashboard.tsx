@@ -75,9 +75,20 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
   const [filterTime, setFilterTime] = useState<string>('ALL');
 
+  const isActiveAlert = (alert: Alert) => {
+    const status = alert.status?.toLowerCase();
+    console.log(`Debug Alert ${alert.id} status:`, status);
+    return status === 'pending' || status === 'active';
+  };
+  const isRespondedAlert = (alert: Alert) => alert.status?.toLowerCase() === 'responding';
+  const isResolvedAlert = (alert: Alert) => {
+    const status = alert.status?.toLowerCase();
+    return status === 'resolved' || status === 'cancelled';
+  };
+
   // derive stats from alerts store to ensure real-time consistency
-  const activeAlertsCount = alerts.filter(a => a.status === 'pending' || a.status === 'responding').length;
-  const pendingAlertsCount = alerts.filter(a => a.status === 'pending').length;
+  const activeAlertsCount = alerts.filter(a => !isResolvedAlert(a)).length;
+  const pendingAlertsCount = alerts.filter(a => isActiveAlert(a)).length;
   
   const [residentsCount, setResidentsCount] = useState(0);
   const [pendingRegCount, setPendingRegCount] = useState(0);
@@ -87,7 +98,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
 
     // Handle flashing lights only, sound is global in App.tsx
-    const hasActive = alerts.some(a => a.status === 'pending');
+    const hasActive = alerts.some(a => isActiveAlert(a));
     if (hasActive || sirenActive) {
       setIsFlashing(true);
     } else {
@@ -614,17 +625,17 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                     key={alert.id}
                     className={cn(
                       "cursor-pointer glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group border-l-4",
-                      alert.status === 'pending' ? "border-l-emergency border-emergency/30 shadow-glow-red ring-1 ring-emergency/10" : 
-                      alert.status === 'responding' ? "border-l-info" : "border-l-success"
+                      isActiveAlert(alert) ? "border-l-emergency border-emergency/30 shadow-glow-red ring-1 ring-emergency/10" : 
+                      isRespondedAlert(alert) ? "border-l-info" : "border-l-success"
                     )}
                   >
                     <div className="absolute inset-0 tactical-grid opacity-5 pointer-events-none" />
-                    {alert.status === 'pending' && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
+                    {isActiveAlert(alert) && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
                       <div className="absolute -bottom-8 -right-8 opacity-10 pointer-events-none rotate-12 group-hover:opacity-20 transition-opacity">
                         <FlameAnimation size="lg" />
                       </div>
                     )}
-                    {alert.status === 'pending' && (
+                    {isActiveAlert(alert) && (
                       <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none">
                         <div className={cn(
                           "absolute top-4 -right-10 text-white text-[9px] font-black py-1 px-12 rotate-45 uppercase shadow-lg font-mono",
@@ -748,7 +759,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                           <MapPin className="w-4 h-4 text-emergency" /> TRACK GPS
                         </a>
                         <div className="flex gap-2">
-                          {alert.status === 'pending' && (
+                          {isActiveAlert(alert) && (
                             <motion.button 
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
@@ -758,7 +769,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                               Dispatch
                             </motion.button>
                           )}
-                          {(alert.status === 'pending' || alert.status === 'responding') && (
+                          {(isActiveAlert(alert) || isRespondedAlert(alert)) && (
                             <motion.button 
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}

@@ -60,61 +60,63 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
   const [filterTime, setFilterTime] = useState<string>('ALL');
 
-  // Filter alerts for this tanod: pending OR specifically assigned/responded by them
-  const dashboardAlerts = alerts.filter(alert => {
-    // 1. Tanod specific constraint
-    const isRelevant = 
-      (alert.status === 'pending' || 
-       alert.assignedTo === profile?.id || 
-       alert.respondedBy === profile?.id);
-    
-    if (!isRelevant) return false;
+  const isActiveAlert = (alert: Alert) => {
+    const status = alert.status?.toLowerCase();
+    return status === 'pending' || status === 'active' || status === 'responding';
+  };
 
-    // 2. Status Filter
-    if (filterStatus === 'ACTIVE') {
-      if (['resolved', 'cancelled'].includes(alert.status)) return false;
-    } else if (filterStatus !== 'ALL') {
-      if (alert.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
-    }
+  const isPendingAlert = (alert: Alert) => {
+    const status = alert.status?.toLowerCase();
+    return status === 'pending';
+  };
 
-    // 3. Type Filter
-    if (filterType !== 'ALL') {
-      const typeLower = filterType.toLowerCase();
-      const alertTypeLower = alert.type.toLowerCase();
-      
-      const typeEnum: Record<string, string[]> = {
-        'medical': ['medical', 'medical emergency'],
-        'fire': ['fire', 'fire alert'],
-        'crime': ['crime', 'criminal activity'],
-        'disaster': ['disaster', 'natural disaster']
-      };
-      
-      const aliases = typeEnum[typeLower] || [typeLower];
-      const isTypeMatch = aliases.some(alias => alertTypeLower.includes(alias));
-      
-      if (!isTypeMatch) return false;
-    }
+   // Filter alerts for this tanod
+   const dashboardAlerts = alerts.filter(alert => {
+     // 1. Status Filter
+     if (filterStatus === 'ACTIVE') {
+       if (['resolved', 'cancelled'].includes(alert.status?.toLowerCase())) return false;
+     } else if (filterStatus !== 'ALL') {
+       if (alert.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
+     }
 
-    // 4. Time Filter
-    if (filterTime !== 'ALL') {
-      const alertDate = new Date(alert.timestamp);
-      const now = new Date();
-      const diffMs = now.getTime() - alertDate.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
+     // 2. Type Filter
+     if (filterType !== 'ALL') {
+       const typeLower = filterType.toLowerCase();
+       const alertTypeLower = alert.type.toLowerCase();
+       
+       const typeEnum: Record<string, string[]> = {
+         'medical': ['medical', 'medical emergency'],
+         'fire': ['fire', 'fire alert'],
+         'crime': ['crime', 'criminal activity'],
+         'disaster': ['disaster', 'natural disaster']
+       };
+       
+       const aliases = typeEnum[typeLower] || [typeLower];
+       const isTypeMatch = aliases.some(alias => alertTypeLower.includes(alias));
+       
+       if (!isTypeMatch) return false;
+     }
 
-      if (filterTime === '1H' && diffHours > 1) return false;
-      if (filterTime === '4H' && diffHours > 4) return false;
-      if (filterTime === '24H' && diffHours > 24) return false;
-    }
+     // 3. Time Filter
+     if (filterTime !== 'ALL') {
+       const alertDate = new Date(alert.timestamp);
+       const now = new Date();
+       const diffMs = now.getTime() - alertDate.getTime();
+       const diffHours = diffMs / (1000 * 60 * 60);
 
-    return true;
-  });
+       if (filterTime === '1H' && diffHours > 1) return false;
+       if (filterTime === '4H' && diffHours > 4) return false;
+       if (filterTime === '24H' && diffHours > 24) return false;
+     }
+     
+     return true;
+   });
 
   useEffect(() => {
     if (!profile || profile.role !== 'tanod') return;
 
     // Handle flashing lights only, sound is global in App.tsx
-    const hasPending = dashboardAlerts.some(a => a.status === 'pending');
+    const hasPending = dashboardAlerts.some(a => isActiveAlert(a));
     if (hasPending || sirenActive) {
       setIsFlashing(true);
     } else {
@@ -517,10 +519,10 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
             </div>
 
             {/* Emergency Dispatch Area */}
-            {dashboardAlerts.filter(a => a.status === 'pending').length > 0 && (
+            {dashboardAlerts.filter(a => isPendingAlert(a)).length > 0 && (
               <div className="space-y-2">
                 <p className="text-[9px] font-black uppercase text-emergency tracking-widest pl-2">Pending Dispatch</p>
-                {dashboardAlerts.filter(a => a.status === 'pending').map(alert => (
+                {dashboardAlerts.filter(a => isPendingAlert(a)).map(alert => (
                   <DispatchAlert 
                     key={alert.id} 
                     incident={{
@@ -612,7 +614,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                     key={alert.id}
                     className={cn(
                       "cursor-pointer glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
-                      alert.status === 'pending' && (
+                      isActiveAlert(alert) && (
                         alert.aiAnalysis && alert.aiAnalysis.severityScore > 7 ? "border-emergency/50 shadow-glow-red bg-emergency/5" :
                         alert.aiAnalysis && alert.aiAnalysis.severityScore >= 5 ? "border-warning/50 shadow-glow-orange bg-warning/5" :
                         "border-emergency/30 shadow-glow-red ring-1 ring-emergency/10 bg-emergency/5"
@@ -622,7 +624,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                   >
                     <div className="scanline opacity-10" />
                     
-                    {alert.status === 'pending' && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
+                    {isActiveAlert(alert) && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
                       <motion.div 
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 0.3 }}
@@ -632,7 +634,7 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                       </motion.div>
                     )}
 
-                    {alert.status === 'pending' && (
+                    {isActiveAlert(alert) && (
                       <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-[100]">
                         <div className={cn(
                           "absolute top-4 -right-10 text-white text-[9px] font-black py-1 px-12 rotate-45 uppercase shadow-lg font-mono",
@@ -710,6 +712,32 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                              </div>
                              VIEW LIVE EVIDENCE
                            </motion.button>
+                           <div className="flex gap-2">
+                             {alert.status === 'responding' && (
+                               <button
+                                 onClick={() => handleUpdateStatus(alert, 'resolved')}
+                                 className="flex-1 py-3 bg-success text-black text-[10px] font-black uppercase rounded-lg hover:bg-success/80 transition-all font-mono"
+                               >
+                                 Resolve
+                               </button>
+                             )}
+                             {isPendingAlert(alert) && (
+                               <div className="flex gap-2 w-full">
+                                <button
+                                  onClick={() => handleUpdateStatus(alert, 'responding')}
+                                  className="flex-[2] py-3 bg-emergency text-white text-[10px] font-black uppercase rounded-lg hover:bg-emergency/80 transition-all font-mono"
+                                >
+                                  Respond
+                                </button>
+                                <button
+                                  onClick={() => handleRejectAlert(alert)}
+                                  className="flex-1 py-3 bg-white/5 text-white text-[10px] font-black uppercase rounded-lg hover:bg-white/10 transition-all font-mono"
+                                >
+                                  Abort
+                                </button>
+                               </div>
+                             )}
+                           </div>
                         </div>
 
                         {alert.customMessage && (

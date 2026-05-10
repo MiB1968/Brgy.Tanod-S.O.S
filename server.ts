@@ -438,6 +438,81 @@ async function startServer() {
         return res.json({ success: true });
       }
 
+      if (collection === 'users') {
+        const result = await pool.query(
+          `UPDATE users SET status = $1, last_active = now() WHERE id = $2`,
+          [data.status, docId]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'residents') {
+        const fields = Object.keys(data);
+        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        await pool.query(
+          `UPDATE residents SET ${setClause} WHERE id = $1`,
+          [docId, ...Object.values(data)]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'patrols') {
+        const fields = Object.keys(data);
+        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        await pool.query(
+          `UPDATE patrols SET ${setClause}, last_ping = now() WHERE tanod_id = $1`,
+          [docId, ...Object.values(data)]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'system_broadcasts' || collection === 'broadcasts') {
+        await pool.query(
+          "UPDATE system_broadcasts SET isActive = $1 WHERE id = $2",
+          [data.isActive, docId]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'witness_invites') {
+        await pool.query(
+          "UPDATE witness_invites SET status = $1 WHERE id = $2",
+          [data.status, docId]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'incidents') {
+        await pool.query(
+          "INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, gps_location, description, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+          [data.alertId, data.tanodId, data.tanodName, data.timestamp, data.type, JSON.stringify(data.gpsLocation), data.description, data.status]
+        );
+        return res.json({ success: true });
+      }
+
+      if (collection === 'alerts') {
+        // Dynamic update query for alerts
+        const fields = Object.keys(data);
+        const values = Object.values(data);
+        
+        // Simple sanitization - ensure fields are allowed
+        const allowedFields = ['status', 'severity_score', 'ai_analysis', 'resolved_at'];
+        const updateFields = fields.filter(f => allowedFields.includes(f));
+        
+        if (updateFields.length > 0) {
+          const setClause = updateFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+          await pool.query(
+            `UPDATE alerts SET ${setClause}, updated_at = now() WHERE id = $1`,
+            [docId, ...updateFields.map(f => data[f])]
+          );
+          
+          const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [docId]);
+          io.emit("alert_update", { type: 'update', alert: result.rows[0] });
+        }
+        
+        return res.json({ success: true });
+      }
+
       res.status(404).json({ error: "Path not mapped" });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

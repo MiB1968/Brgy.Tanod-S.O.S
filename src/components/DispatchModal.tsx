@@ -97,7 +97,7 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-start justify-center p-4 pt-20">
       <div className="bg-[#16191F] border border-[#2D3139] w-full max-w-lg rounded-[40px] overflow-hidden shadow-2xl">
         <div className="p-8 border-b border-[#2D3139] flex justify-between items-center bg-[#1A1D23]">
           <div>
