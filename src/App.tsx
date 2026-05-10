@@ -94,7 +94,6 @@ import { useSOSStore } from './store/useSOSStore';
 
 // Service & Lib imports
 import { analyzeIncident } from './services/aiService';
-import { getQueueSize } from './lib/offlineQueue';
 import { cn } from './lib/utils';
 import { 
   isRuben as checkIsRuben, 
