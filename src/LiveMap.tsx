@@ -154,28 +154,51 @@ function MapController({ patrols, alerts, showP, showS }: any) {
 
   useEffect(() => {
     let alive = true;
-    const inv = () => { if(alive && map && (map as any)._mapPane) try { map.invalidateSize({animate:false}); } catch(e) {} };
-    const ro = new window.ResizeObserver(inv);
+
+    const updateBounds = () => {
+      if (!alive || !map || !(map as any)._mapPane) return;
+      try { map.invalidateSize({ animate: false }); } catch (e) {}
+
+      const pts: [number, number][] = [];
+      if (showP) {
+        patrols.forEach((p: any) => {
+          if (isValidCoord(p.location?.lat, p.location?.lng)) pts.push([p.location.lat, p.location.lng]);
+        });
+      }
+      if (showS) {
+        alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').forEach((a: any) => {
+          if (isValidCoord(a.location?.lat, a.location?.lng)) pts.push([a.location.lat, a.location.lng]);
+        });
+      }
+
+      if (pts.length >= 2) {
+        try {
+          map.fitBounds(L.latLngBounds(pts), { padding: [52, 52], maxZoom: 16 });
+        } catch (e) {
+          console.warn("fitBounds failed", e);
+        }
+      } else if (pts.length === 1) {
+        try {
+          map.setView(pts[0], 16);
+        } catch (e) {
+          console.warn("setView failed", e);
+        }
+      }
+    };
+
+    const ro = new window.ResizeObserver(updateBounds);
     const container = map.getContainer();
     if (container) ro.observe(container);
-    const ts = [10,100,500,1000].map(t=>setTimeout(inv,t));
-    map.whenReady(()=>setTimeout(inv,0));
-    return ()=>{ alive=false; ro.disconnect(); ts.forEach(clearTimeout); };
-  }, [map]);
 
-  useEffect(() => {
-    if (!map || !(map as any)._mapPane) return;
-    const pts: [number, number][] = [];
-    if (showP) patrols.forEach((p:any)=>{ if(isValidCoord(p.location?.lat, p.location?.lng)) pts.push([p.location.lat,p.location.lng]); });
-    if (showS) alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').forEach((a:any) =>{ if(isValidCoord(a.location?.lat, a.location?.lng)) pts.push([a.location.lat,a.location.lng]); });
-    
-    if (pts.length >= 2) {
-      try { 
-        map.fitBounds(L.latLngBounds(pts),{padding:[52,52],maxZoom:16}); 
-      } catch(e) {
-        console.warn("fitBounds failed", e);
-      }
-    }
+    const ts = [10, 100, 500, 1000].map(t => setTimeout(updateBounds, t));
+    map.whenReady(() => setTimeout(updateBounds, 0));
+    updateBounds();
+
+    return () => {
+      alive = false;
+      ro.disconnect();
+      ts.forEach(clearTimeout);
+    };
   }, [map, patrols, alerts, showP, showS]);
 
   return null;
