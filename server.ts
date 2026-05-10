@@ -10,13 +10,14 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 dotenv.config();
 
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
 const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 
 // Database Pool
 const pool = new Pool({
