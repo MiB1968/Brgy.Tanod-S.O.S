@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import socket from './lib/socket';
+import { playSiren } from './lib/audio';
 import * as api from './lib/api';
 import { 
   User, 
@@ -330,9 +331,22 @@ export default function App() {
         status: alert.status as AlertStatus,
         timestamp: alert.created_at || new Date().toISOString()
       };
+
+      // Check if it's a new pending alert we haven't seen yet to prevent spamming sirens on status updates
+      const isNewPending = formattedAlert.status === 'pending' && !useIncidentStore.getState().alerts.some(a => a.id === formattedAlert.id);
+
       addAlert(formattedAlert);
+
       if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
-        toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+        if (isNewPending) {
+          toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+          playSiren();
+          if (navigator.vibrate) {
+            navigator.vibrate([500, 200, 500, 200, 500]);
+          }
+        } else if (formattedAlert.status !== 'pending' && !useIncidentStore.getState().alerts.some(a => a.id === formattedAlert.id)) {
+             toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+        }
       }
       if (profile && profile.role === 'resident' && formattedAlert.residentId === profile.id) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
