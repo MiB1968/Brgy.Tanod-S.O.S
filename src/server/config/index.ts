@@ -20,7 +20,11 @@ export const config = {
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
   },
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project',
+  }
 };
+
 
 if (!process.env.JWT_SECRET && config.nodeEnv === 'production') {
   throw new Error('FATAL: JWT_SECRET environment variable is not set in production.');

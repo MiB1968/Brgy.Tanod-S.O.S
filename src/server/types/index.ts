@@ -26,6 +26,7 @@ export interface LocationUpdate {
 export interface Incident {
   id: string;
   reporterId: string;
+  barangayId?: string;
   type: string;
   description: string;
   latitude: number;
