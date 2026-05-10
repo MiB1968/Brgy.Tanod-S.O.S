@@ -169,7 +169,7 @@ export default function BackgroundServices() {
             type: 'patrol_marker',
             timestamp,
             location: { lat: loc.lat, lng: loc.lng },
-            details: `Patrol marker recorded at ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
+            details: `Patrol marker recorded at ${loc.lat ? loc.lat.toFixed(4) : 'N/A'}, ${loc.lng ? loc.lng.toFixed(4) : 'N/A'}`
           });
         }
       } catch (err) {

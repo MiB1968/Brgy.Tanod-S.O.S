@@ -134,6 +134,7 @@ export default function App() {
   const [globalSirenActive, setGlobalSirenActive] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   const isMasterAdmin = useMemo(() => {
     return checkIsRuben(user?.id, user?.email || undefined);
@@ -186,6 +187,16 @@ export default function App() {
 
   // Initial Load of Data
   useEffect(() => {
+    // Request notification permission on load
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          setNotificationPermission(permission);
+        });
+      }
+    }
+
     async function loadInitialData() {
       if (!user) return;
       try {
@@ -319,6 +330,24 @@ export default function App() {
   useEffect(() => {
     if (!profile) return;
 
+    const showSOSNotification = (alert: Alert) => {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(`🚨 SOS EMERGENCY: ${alert.type}`, {
+          body: `Resident: ${alert.residentName}\nLocation tracked. Tactical units notified.`,
+          icon: '/sos-icon.png',
+          tag: alert.id,
+          requireInteraction: true, // Keep until dismissed for critical alerts
+          silent: false
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          setActiveTab('tracker');
+          notification.close();
+        };
+      }
+    };
+
     socket.on('alert_update', (data: any) => {
       const alert = data.alert;
       const formattedAlert: Alert = {
@@ -333,6 +362,10 @@ export default function App() {
       addAlert(formattedAlert);
       if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
         toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
+        // Trigger browser notification for critical roles
+        if (formattedAlert.status === 'pending') {
+          showSOSNotification(formattedAlert);
+        }
       }
       if (profile && profile.role === 'resident' && formattedAlert.residentId === profile.id) {
         if (typeof navigator !== 'undefined' && navigator.vibrate) {

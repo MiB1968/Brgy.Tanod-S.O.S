@@ -471,14 +471,14 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                 </div>
 
                 <div className="grid grid-cols-2 gap-6 pb-2">
-                   <div className="space-y-2">
-                     <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Latitude Ref</p>
-                     <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLat.toFixed(8)}</div>
-                   </div>
-                   <div className="space-y-2">
-                     <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Longitude Ref</p>
-                     <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLng.toFixed(8)}</div>
-                   </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Latitude Ref</p>
+                      <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLat ? formData.gpsLat.toFixed(8) : 'Pending...'}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Longitude Ref</p>
+                      <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLng ? formData.gpsLng.toFixed(8) : 'Pending...'}</div>
+                    </div>
                 </div>
               </div>
               <div className="flex gap-4 pt-6">

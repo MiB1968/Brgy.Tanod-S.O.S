@@ -459,7 +459,7 @@ export function TanodActivityLogs() {
                                  <div key={idx} className="flex items-center gap-4 text-[9px] font-mono group/point">
                                    <div className="w-2 h-2 rounded-full bg-info/20 border border-info/40 shrink-0 z-10 group-hover/point:bg-info group-hover/point:scale-125 transition-all" />
                                    <span className="text-white/60 w-16 tabular-nums">{new Date(p.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-                                   <span className="text-white/20 tracking-tighter shrink-0">LAT: {p.lat.toFixed(5)} LNG: {p.lng.toFixed(5)}</span>
+                                   <span className="text-white/20 tracking-tighter shrink-0">LAT: {p.lat ? p.lat.toFixed(5) : 'N/A'} LNG: {p.lng ? p.lng.toFixed(5) : 'N/A'}</span>
                                    <div className="flex-1 h-[1px] bg-white/5 mx-2" />
                                    <span className="text-[8px] text-white/10 uppercase italic font-black">Link_OK</span>
                                  </div>

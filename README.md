@@ -4,14 +4,15 @@ A mobile-first emergency response web app for Philippine barangay operations. Th
 
 ## Architecture
 
-This project is a React/TypeScript frontend (Vite) with a Node.js Express backend (`server.ts`).
-It uses Supabase for Postgres and Realtime features, and Firebase for Authentication and Firestore.
+This project is a React/TypeScript frontend (Vite) with an Express backend (`server.ts`).
+It uses Firebase for Authentication and Firestore as the database. The system strictly adheres to the "Backend as Single Source of Truth" mandate, with all communication securely proxied and validated by the backend.
 
 ### Security Best Practices Implemented:
-- Firebase config and API keys (`GEMINI_API_KEY`, `SEMAPHORE_API_KEY`) are kept out of tracking/client-side where possible.
-- SMS dispatch calls are proxied through the backend (`/api/sms`).
-- Input validation on WebSocket and SOS HTTP endpoints is handled via Zod on the server.
-- Supabase Row Level Security (RLS) is enabled (see `SUPABASE_SETUP.sql`).
+- Firebase config and external API keys (`GEMINI_API_KEY`, `SEMAPHORE_API_KEY`) are kept on the server to prevent client-side exposure.
+- All backend routes (`/api/*`) require an API key (`VITE_API_SECRET_KEY`) sent via the `x-api-key` header to prevent unauthorized access.
+- SMS dispatch calls are securely proxied through the backend (`/api/sms`).
+- Input validation on WebSocket and SOS HTTP endpoints is handled securely on the server.
+- Completely eliminated rogue direct client-side database calls.
 
 ## Running the Application
 
@@ -21,7 +22,7 @@ It uses Supabase for Postgres and Realtime features, and Firebase for Authentica
    ```
 
 2. Environment Setup:
-   Copy `.env.example` to `.env` and fill in necessary keys.
+   Copy `.env.example` to `.env` and fill in necessary keys, including `VITE_API_SECRET_KEY` and Firebase credentials.
 
 3. Run Development Server:
    ```sh
@@ -32,4 +33,5 @@ It uses Supabase for Postgres and Realtime features, and Firebase for Authentica
 
 - **GPS/Maps:** `react-leaflet` combined with real-time websocket updates (`/ws/gps`) on the Express backend.
 - **SMS Notifications:** Handled by [Semaphore API](https://semaphore.co), configured in `.env` and proxied via `server.ts`.
-- **AI Triage:** Configured with Gemini 2.5 (`GEMINI_API_KEY`) for summarizing and triaging emergency reports.
+- **AI Triage/Guardian AI:** Configured with Gemini (`GEMINI_API_KEY`) for monitoring, summarizing, and triaging emergency reports.
+- **Backend Analytics:** Dedicated API endpoints for fetching real-time dashboard analytics and statistics.

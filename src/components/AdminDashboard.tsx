@@ -37,7 +37,6 @@ import AdminAnalytics from './Admin/AdminAnalytics';
 import { ManageBroadcasts } from './Admin/ManageBroadcasts';
 import { PoliceLights } from './PoliceLights';
 import { BrgyTanodQR } from './BrgyTanodQR';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import LiveMap from '../LiveMap';
 import { 
@@ -841,7 +840,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                           )}
                           {(t as TanodProfile).lastGpsLocation && (
                             <span className="text-[8px] font-mono text-white/40 uppercase ml-auto">
-                              GPS: {(t as TanodProfile).lastGpsLocation?.lat.toFixed(4)}, {(t as TanodProfile).lastGpsLocation?.lng.toFixed(4)}
+                              GPS: {(t as TanodProfile).lastGpsLocation?.lat ? (t as TanodProfile).lastGpsLocation?.lat.toFixed(4) : 'N/A'}, {(t as TanodProfile).lastGpsLocation?.lng ? (t as TanodProfile).lastGpsLocation?.lng.toFixed(4) : 'N/A'}
                             </span>
                           )}
                           {lastUpdate && !((t as TanodProfile).lastGpsLocation) && (

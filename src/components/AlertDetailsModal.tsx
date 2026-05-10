@@ -280,8 +280,8 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                   <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative">
                      <ReportMap lat={alert.location.lat} lng={alert.location.lng} />
                      <div className="absolute bottom-4 left-4 z-[400] bg-black/80 backdrop-blur border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white/70 shadow-lg">
-                        LAT: {alert.location.lat.toFixed(6)}<br/>
-                        LNG: {alert.location.lng.toFixed(6)}
+                        LAT: {alert.location?.lat ? alert.location.lat.toFixed(6) : 'N/A'}<br/>
+                        LNG: {alert.location?.lng ? alert.location.lng.toFixed(6) : 'N/A'}
                      </div>
                   </div>
                </div>

@@ -90,7 +90,7 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
                       <MapPin className="w-4 h-4 text-white/20" />
                       <div>
                         <p className="text-[8px] font-black text-white/20 uppercase tracking-widest font-mono leading-none mb-1">Coordinates</p>
-                        <p className="text-[11px] font-mono">{report.location.lat.toFixed(4)}, {report.location.lng.toFixed(4)}</p>
+                        <p className="text-[11px] font-mono">{report.location.lat ? report.location.lat.toFixed(4) : 'N/A'}, {report.location.lng ? report.location.lng.toFixed(4) : 'N/A'}</p>
                       </div>
                     </div>
 

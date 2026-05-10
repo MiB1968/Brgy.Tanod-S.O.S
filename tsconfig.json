@@ -25,5 +25,5 @@
     "types": ["vite/client"],
     "noEmit": true
   },
-  "exclude": ["supabase"]
+  "exclude": ["node_modules", "dist"]
 }

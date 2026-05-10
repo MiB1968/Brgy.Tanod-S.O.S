@@ -257,15 +257,21 @@ export default function AdminResidents({ profile }: { profile: any }) {
                     <MapPin className="w-4 h-4 text-[#FF4B4B]" /> REGISTERED LOCATION
                   </h5>
                   <div className="flex justify-between items-center text-sm">
-                    <code className="text-[#FF4B4B]">{selectedResident.gpsLat.toFixed(6)}, {selectedResident.gpsLng.toFixed(6)}</code>
-                    <a 
-                      href={`https://www.google.com/maps?q=${selectedResident.gpsLat},${selectedResident.gpsLng}`} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-white hover:text-[#FF4B4B] flex items-center gap-2 font-bold"
-                    >
-                      OPEN IN GOOGLE MAPS <ExternalLink className="w-4 h-4" />
-                    </a>
+                    {selectedResident.gpsLat !== undefined && selectedResident.gpsLat !== null && selectedResident.gpsLng !== undefined && selectedResident.gpsLng !== null ? (
+                      <>
+                        <code className="text-[#FF4B4B]">{selectedResident.gpsLat.toFixed(6)}, {selectedResident.gpsLng.toFixed(6)}</code>
+                        <a 
+                          href={`https://www.google.com/maps?q=${selectedResident.gpsLat},${selectedResident.gpsLng}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-white hover:text-[#FF4B4B] flex items-center gap-2 font-bold"
+                        >
+                          OPEN IN GOOGLE MAPS <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-[#8E9299] italic">Location not available</span>
+                    )}
                   </div>
                 </div>
               </div>
