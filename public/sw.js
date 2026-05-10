@@ -1,12 +1,24 @@
-// Service Worker unregistration pattern to fix aggressive caching issues
-self.addEventListener('install', (e) => {
+const CACHE_NAME = 'tanod-sos-v1';
+const STATIC_ASSETS = ['/', '/index.html', '/manifest.json', '/logo.svg'];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(keyList.map((key) => caches.delete(key)));
-    }).then(() => self.clients.claim()).then(() => self.registration.unregister())
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.url.includes('/api/')) return; // Never cache API calls
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
 });

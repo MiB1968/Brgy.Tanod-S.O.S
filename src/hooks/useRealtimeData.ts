@@ -27,8 +27,23 @@ export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadca
 
     // Patrol updates
     socket.on('patrol_update', (patrol: any) => {
-      // Map server data to frontend type if needed
-      // This will trigger store updates usually
+      if (!patrol) return;
+      const mapped = {
+        id: patrol.tanod_id,
+        tanodId: patrol.tanod_id,
+        location: patrol.location,
+        isActive: patrol.isActive,
+        lastUpdate: new Date().toISOString(),
+      };
+      setPatrols((prev: any[]) => {
+        const existing = prev.findIndex((p) => p.tanodId === mapped.tanodId);
+        if (existing >= 0) {
+          const updated = [...prev];
+          updated[existing] = { ...updated[existing], ...mapped };
+          return updated;
+        }
+        return [...prev, mapped];
+      });
     });
 
     return () => {
