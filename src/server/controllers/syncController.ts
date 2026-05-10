@@ -15,12 +15,17 @@ export const getSync = async (req: AuthRequest, res: Response) => {
   const id = parts[1];
 
   try {
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isTanod = userRole === 'tanod' || isAdmin;
+
     if (collection === 'system' && id === 'siren') {
       const result = await pool.query("SELECT data FROM system_config WHERE key = 'siren'");
       return res.json(result.rows[0]?.data || { sirenActive: false });
     }
 
     if (collection === 'alerts' || collection === 'active_alerts') {
+      // Residents can only see their own alerts, Tanods/Admins see all
       if (id) {
         const result = await pool.query(
           "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1", 
@@ -28,14 +33,26 @@ export const getSync = async (req: AuthRequest, res: Response) => {
         );
         const alert = result.rows[0];
         if (!alert) return response.error(res, "Alert not found", "NOT_FOUND", 404);
+        
+        if (!isTanod && alert.resident_id !== req.user?.id) {
+          return response.error(res, "Unauthorized access to alert details", "FORBIDDEN", 403);
+        }
+
         return res.json({
           ...alert,
           location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
           timestamp: alert.created_at
         });
       } else {
-        const query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id ORDER BY a.created_at DESC LIMIT 100";
-        const result = await pool.query(query);
+        let query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id ORDER BY a.created_at DESC LIMIT 100";
+        let params: any[] = [];
+
+        if (!isTanod) {
+          query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.resident_id = $1 ORDER BY a.created_at DESC LIMIT 100";
+          params = [req.user?.id];
+        }
+
+        const result = await pool.query(query, params);
         return res.json(result.rows.map(a => ({
           ...a,
           location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
@@ -45,6 +62,7 @@ export const getSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'incidents') {
+      if (!isTanod) return response.error(res, "Unauthorized", "FORBIDDEN", 403);
       const result = await pool.query("SELECT * FROM incidents ORDER BY timestamp DESC LIMIT 100");
       return res.json(result.rows.map(i => ({ id: i.id, ...i })));
     }
@@ -55,9 +73,13 @@ export const getSync = async (req: AuthRequest, res: Response) => {
           return res.json(result.rows);
       }
       if (id) {
+        // Residents can only see their own profile
+        if (!isTanod && id !== req.user?.id) return response.error(res, "Forbidden", "FORBIDDEN", 403);
         const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE id = $1", [id]);
         return res.json(result.rows[0] || null);
       }
+      // Only Admins/Tanods can list residents
+      if (!isTanod) return response.error(res, "Forbidden", "FORBIDDEN", 403);
       const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE role = 'resident'");
       return res.json(result.rows);
     }
@@ -84,11 +106,13 @@ export const getSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'audit_logs') {
+      if (!isAdmin) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
       const result = await pool.query("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
       return res.json(result.rows);
     }
 
     if (collection === 'tanod_activity_logs') {
+      if (!isTanod) return response.error(res, "Tanod/Admin Access Required", "FORBIDDEN", 403);
       const result = await pool.query("SELECT * FROM tanod_activity_logs ORDER BY timestamp DESC LIMIT 100");
       return res.json(result.rows.map(l => ({
         id: l.id,
@@ -121,7 +145,12 @@ export const postSync = async (req: AuthRequest, res: Response) => {
   const docId = id || parts[1];
 
   try {
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isTanod = userRole === 'tanod' || isAdmin;
+
     if (collection === 'system' && docId === 'siren') {
+      if (!isTanod) return response.error(res, "Full clearance required for Siren Control", "FORBIDDEN", 403);
       await pool.query(
         "INSERT INTO system_config (key, data, updated_at) VALUES ('siren', $1, now()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = now()",
         [JSON.stringify(data)]
@@ -131,6 +160,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'patrol_sessions') {
+      if (!isTanod) return response.error(res, "Access Denied", "FORBIDDEN", 403);
       if (options?.merge) {
         const current = await pool.query("SELECT route FROM patrol_sessions WHERE id = $1", [docId]);
         let newRoute = data.route;
@@ -152,6 +182,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'tanod_activity_logs') {
+      if (!isTanod) return response.error(res, "Access Denied", "FORBIDDEN", 403);
       await pool.query(
         "INSERT INTO tanod_activity_logs (tanod_id, tanod_name, type, timestamp, details, location) VALUES ($1, $2, $3, $4, $5, $6)",
         [data.tanodId, data.tanodName, data.type, data.timestamp, data.details, JSON.stringify(data.location || null)]
@@ -160,7 +191,16 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'users') {
+      // User can only update themselves unless they are admin
+      if (!isAdmin && docId !== req.user?.id) return response.error(res, "Forbidden", "FORBIDDEN", 403);
+      
       const fieldMapping: Record<string, string> = { status: 'status', role: 'role', name: 'name', email: 'email' };
+      // Prevent residents from changing their own role/status
+      if (!isAdmin) {
+        delete data.role;
+        delete data.status;
+      }
+
       const safeData: Record<string, any> = {};
       Object.keys(data).forEach(key => { if (fieldMapping[key]) safeData[fieldMapping[key]] = data[key]; });
 
@@ -175,6 +215,9 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'residents') {
+      // Residents can only update themselves unless they are admin/tanod
+      if (!isTanod && docId !== req.user?.id) return response.error(res, "Forbidden", "FORBIDDEN", 403);
+
       const fieldMapping: Record<string, string> = {
         name: 'name', phone: 'phone', address: 'address', status: 'status',
         house_number: 'house_number', household_size: 'household_size',
@@ -182,8 +225,15 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         gps_lat: 'gps_lat', gps_lng: 'gps_lng', is_verified: 'is_verified',
         verification_date: 'verification_date', rejection_reason: 'rejection_reason'
       };
-      // Note: mapping logic in server.ts was more verbose (handling camelCase etc), 
-      // but let's keep it robust by checking both or adapting.
+
+      // Prevent non-admins from verifying or rejecting
+      if (!isTanod) {
+        delete data.status;
+        delete data.is_verified;
+        delete data.verification_date;
+        delete data.rejection_reason;
+      }
+
       const safeData: Record<string, any> = {};
       Object.keys(data).forEach(key => {
          const mapped = fieldMapping[key] || fieldMapping[key.replace(/([A-Z])/g, "_$1").toLowerCase()];
@@ -199,6 +249,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'patrols') {
+      if (!isTanod) return response.error(res, "Access Denied", "FORBIDDEN", 403);
       const isActive = data.isActive ?? data.is_active;
       const location = data.location ? JSON.stringify(data.location) : null;
       const status = data.status;
@@ -223,6 +274,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'system_broadcasts' || collection === 'broadcasts') {
+      if (!isTanod) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
       if (docId) {
         await pool.query("UPDATE system_broadcasts SET isActive = $1 WHERE id = $2", [data.isActive, docId]);
         const result = await pool.query("SELECT * FROM system_broadcasts WHERE id = $1", [docId]);
@@ -238,6 +290,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'incidents') {
+      if (!isTanod) return response.error(res, "Access Denied", "FORBIDDEN", 403);
       await pool.query(
         `INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, location, gps_location, description, persons_involved, actions_taken, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -247,7 +300,17 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'alerts') {
-      const allowedFields = ['status', 'severity_score', 'ai_analysis', 'resolved_at', 'assignedTo', 'assignedToName', 'respondedAt', 'respondedBy', 'respondedByName', 'resolutionNotes', 'responderNotes'];
+      // Permission required to update an alert (Tanod/Admin or Owner for specific fields)
+      const alertCheck = await pool.query("SELECT resident_id FROM alerts WHERE id = $1", [docId]);
+      if (alertCheck.rows.length === 0) return response.error(res, "Alert not found", "NOT_FOUND", 404);
+      
+      const isOwner = alertCheck.rows[0].resident_id === req.user?.id;
+      if (!isTanod && !isOwner) return response.error(res, "Access Denied", "FORBIDDEN", 403);
+
+      const allowedFields = isTanod 
+        ? ['status', 'severity_score', 'ai_analysis', 'resolved_at', 'assignedTo', 'assignedToName', 'respondedAt', 'respondedBy', 'respondedByName', 'resolutionNotes', 'responderNotes']
+        : ['custom_message', 'location', 'type']; // Residents can only update their own SOS details
+
       const updateFields = Object.keys(data).filter(f => allowedFields.includes(f));
       
       if (updateFields.length > 0) {
@@ -279,8 +342,13 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
   const docId = id || parts[1];
 
   try {
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isTanod = userRole === 'tanod' || isAdmin;
+
     const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents'];
     if (deletable.includes(collection) && docId) {
+      if (!isTanod) return response.error(res, "Administrative clearance required for deletion", "FORBIDDEN", 403);
       await pool.query(`DELETE FROM ${collection} WHERE id = $1`, [docId]);
       return res.json({ success: true });
     }

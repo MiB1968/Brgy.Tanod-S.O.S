@@ -49,7 +49,6 @@ export default function DashboardView({
     return (
       <TanodDashboard 
         profile={profile} 
-        onTabChange={onTabChange} 
         deferredPrompt={deferredPrompt} 
         onInstall={onInstall} 
         sirenActive={sirenActive} 

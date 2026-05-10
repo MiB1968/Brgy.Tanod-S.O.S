@@ -1,28 +1,48 @@
 # Security Specification: Brgy. Tanod S.O.S.
 
-## 1. Data Invariants
-- A **User** profile must exist for all authenticated actions.
-- An **Alert** (SOS) cannot be created without a valid resident identity.
-- **Alert** status transitions must be unidirectional (pending -> responding -> resolved/cancelled).
-- **Tanod** locations are only visible to authorized personnel (Admin, Tanod) or a resident who has an active emergency assigned to that unit.
-- **System Broadcasts** can only be initiated by verified Admins.
+## 1. Data Invariants (SQL/CockroachDB)
+- **Identity Integrity**: All writes to `alerts`, `incidents`, and `users` must be tied to the authenticated `req.user.id`.
+- **Alert Sovereignty**: A resident can only update or cancel their own active SOS alerts.
+- **Tanod Authority**: Only users with the `tanod` or `admin` role can respond to alerts or create incident reports.
+- **Admin Supremacy**: Only `admin` or `superadmin` roles can approve new residents or change user roles.
+- **Temporal Strictness**: Audit logs and activity logs use DB-side `now()` for timestamps to prevent forgery.
+- **Relational Consistency**: Foreign keys exist between `alerts` and `users` to prevent orphaned records.
 
-## 2. The "Dirty Dozen" Payloads
+## 2. Hardened Protections
 
-1.  **Identity Spoofing**: Attempt to create a user profile with a different `uid` than the authenticated one.
-2.  **Role Escalation**: Attempt to update own `role` to 'admin'.
-3.  **Ghost Alert**: Create an SOS alert with a `residentId` that doesn't match the sender.
-4.  **Shadow Update**: Update an alert using `affectedKeys()` bypass (if the rule didn't have `hasOnly`).
-5.  **Status Shortcut**: Transition an alert from 'pending' directly to 'resolved' bypassing 'responding' (or other state logic).
-6.  **Junk Data Injection**: Inject a 1MB string into the alert `customMessage`.
-7.  **Resource Poisoning**: Use a document ID containing malicious scripts or excessive length (>128 chars).
-8.  **Unauthorized List Coverage**: Attempt to list all residents as a standard resident.
-9.  **PII Leak**: Attempt to 'get' a resident's private profile details (if split).
-10. **Orphaned Writes**: Create an `incident` report referencing a non-existent `alert`.
-11. **Timestamp Forgery**: Provide a client-side `timestamp` in the future for an alert.
-12. **Anonymous Spam**: Attempt to create alerts while unverified (if email verification is mandated).
+### A. Rate Limiting
+- **Global API**: 1000 requests per 15 mins.
+- **Authentication**: 20 requests per 15 mins (Mitigates Brute-Force).
+- **SOS Creation**: 5 requests per minute (Mitigates SOS Spam).
 
-## 3. Test Runner (Draft)
-A comprehensive test suite in `firestore.rules.test.ts` will verify that all above payloads return `PERMISSION_DENIED`.
+### B. RBAC (Role-Based Access Control)
+Implemented in `syncController.ts` and middleware:
+1. **Resident Tier**: Can only `GET` their own alerts and profiles. Can only `POST` updates to their own profile.
+2. **Tanod Tier**: Can `GET` all alerts, residents, and patrols. Can `POST` updates to any alert (responding/resolving).
+3. **Admin Tier**: Full access to `audit_logs` and user management.
 
-(Detailed test implementation planned for next step)
+### C. CORS Security
+- **Strict Origin**: Production origin is locked to the specific deployed URL.
+- **Credentials Allowed**: Secure cookies or headers allowed only from trusted origins.
+
+## 3. The "Dirty Dozen" Audit Results (SQL Edition)
+
+| Vulnerability | Attack Vector | Mitigation Status |
+| :--- | :--- | :--- |
+| Identity Spoofing | Change `resident_id` in payload | **PATCHED** (Controller forces `req.user.id`) |
+| Role Escalation | Update `role` field in profile | **PATCHED** (Field removed for non-admins) |
+| SOS Spam | Script creating 1000 alerts | **PATCHED** (sosLimiter + Active Check) |
+| Ghost Alerts | Create alert for another user | **PATCHED** (Logic verification in `sosController`) |
+| PII Leak | GET /api/sync?path=residents/ALL | **PATCHED** (RBAC restricts LIST to Tanod/Admin) |
+| Status Shortcut | pending -> resolved bypassing responding | **MONITORED** (Application logic in controllers) |
+| Shadow Update | Inject unknown fields to User | **PATCHED** (Field mapping + Allow-listing) |
+| Junk Data | 10MB message payload | **MITIGATED** (express.json limit + DB field size) |
+| Orphaned Writes | Incident for non-existent alert | **PATCHED** (SQL Foreign Keys) |
+| Timestamp Forgery | Client-side future date | **PATCHED** (DB uses `now()`) |
+| Anonymous Spam | Create alert without login | **PATCHED** (Auth Middleware) |
+| Siren Hijack | Non-admin toggling siren | **PATCHED** (isTanod check in `postSync`) |
+
+## 4. Deployment Readiness
+- Environment variables for `DATABASE_URL`, `JWT_SECRET`, and `CORS_ORIGIN` must be set.
+- `helmet` is active with secure headers.
+- `logo.png` (2.9MB) replaced with lightweight SVG in branding.

@@ -1,958 +1,159 @@
 import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { 
-  IconOnlineTanods, 
-  IconNewIncident,
-  IconActiveSOS,
-  IconRadar
-} from './TacticalIcons';
-import { Alert, User, RegistryStatus, TanodProfile } from '../types';
-import { AlertTriangle, MapPin, Zap, CheckCircle, Shield, Volume2, VolumeX, Info, Filter, FilePlus, X, Globe } from 'lucide-react';
+import { Alert, User, SystemBroadcast, RegistryStatus } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'react-hot-toast';
-import { cn } from '../lib/utils';
-import { PoliceLights } from './PoliceLights';
-import { BrgyTanodQR } from './BrgyTanodQR';
-import AboutModal from './AboutModal';
-import { InstallAppButton } from './InstallAppButton';
-import IncidentForm from './IncidentForm';
-import AnimatedButton from './AnimatedButton';
-import FlameAnimation from './FlameAnimation';
-import { DispatchAlert } from './Admin/DispatchAlert';
-import { WitnessIndicator } from './WitnessIndicator';
-import { AlertDetailsModal } from './AlertDetailsModal';
-import { SOSChat } from './SOSChat';
+import toast from 'react-hot-toast';
+import LiveMap from '../LiveMap';
 
+// Sub-components
+import { TanodPortalHeader } from './Tanod/TanodPortalHeader';
+import { TanodAlertsFeed } from './Tanod/TanodAlertsFeed';
+import { StatusTogglePanel } from './Tanod/StatusTogglePanel';
+import { PoliceLights } from './PoliceLights';
+import AboutModal from './AboutModal';
+import { AlertDetailsModal } from './AlertDetailsModal';
+import IncidentForm from './IncidentForm';
+
+// Stores & Hooks
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
 import { logIncidentAction } from '../services/logService';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
-};
+const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 }
-};
-
-export default function TanodDashboard({ profile, onTabChange, deferredPrompt, onInstall, sirenActive, onToggleSiren }: { profile: User | null, onTabChange: (tab: string) => void, deferredPrompt?: any, onInstall?: () => void, sirenActive: boolean, onToggleSiren: () => void }) {
+export default function TanodDashboard({ 
+  profile, 
+  deferredPrompt, 
+  onInstall, 
+  sirenActive, 
+  onToggleSiren 
+}: { 
+  profile: User | null, 
+  deferredPrompt?: any, 
+  onInstall?: () => void, 
+  sirenActive: boolean, 
+  onToggleSiren: () => void 
+}) {
   const { alerts } = useIncidentStore();
   const { patrols, updateTanodStatus } = useTanodStore();
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
-  const [loadingAlertIds, setLoadingAlertIds] = useState<Set<string>>(new Set());
-  const [processedAlertIds, setProcessedAlertIds] = useState<Set<string>>(new Set());
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState<string>('');
-  const [shiftLog, setShiftLog] = useState<Alert[]>([]);
   const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
 
-  // Filtering State
-  const [filterType, setFilterType] = useState<string>('ALL');
-  const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
-  const [filterTime, setFilterTime] = useState<string>('ALL');
-
-  const isActiveAlert = (alert: Alert) => {
-    const status = alert.status?.toLowerCase();
-    return status === 'pending' || status === 'active' || status === 'responding';
-  };
-
-  const isPendingAlert = (alert: Alert) => {
-    const status = alert.status?.toLowerCase();
-    // Allow responding if it is pending or active, and not yet assigned
-    return (status === 'pending' || status === 'active') && !alert.assignedTo;
-  };
-
-   // Filter alerts for this tanod
-   const dashboardAlerts = alerts.filter(alert => {
-     // 1. Status Filter
-     if (filterStatus === 'ACTIVE') {
-       if (['resolved', 'cancelled'].includes(alert.status?.toLowerCase())) return false;
-     } else if (filterStatus !== 'ALL') {
-       if (alert.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
-     }
-
-     // 2. Type Filter
-     if (filterType !== 'ALL') {
-       const typeLower = filterType.toLowerCase();
-       const alertTypeLower = alert.type.toLowerCase();
-       
-       const typeEnum: Record<string, string[]> = {
-         'medical': ['medical', 'medical emergency'],
-         'fire': ['fire', 'fire alert'],
-         'crime': ['crime', 'criminal activity'],
-         'disaster': ['disaster', 'natural disaster']
-       };
-       
-       const aliases = typeEnum[typeLower] || [typeLower];
-       const isTypeMatch = aliases.some(alias => alertTypeLower.includes(alias));
-       
-       if (!isTypeMatch) return false;
-     }
-
-     // 3. Time Filter
-     if (filterTime !== 'ALL') {
-       const alertDate = new Date(alert.timestamp);
-       const now = new Date();
-       const diffMs = now.getTime() - alertDate.getTime();
-       const diffHours = diffMs / (1000 * 60 * 60);
-
-       if (filterTime === '1H' && diffHours > 1) return false;
-       if (filterTime === '4H' && diffHours > 4) return false;
-       if (filterTime === '24H' && diffHours > 24) return false;
-     }
-     
-     return true;
-   });
-
   useEffect(() => {
-    if (!profile || profile.role !== 'tanod') return;
-
-    // Handle flashing lights only, sound is global in App.tsx
-    const hasPending = dashboardAlerts.some(a => isActiveAlert(a));
-    if (hasPending || sirenActive) {
-      setIsFlashing(true);
-    } else {
-      setIsFlashing(false);
-    }
-  }, [dashboardAlerts, profile, sirenActive]);
-
-  useEffect(() => {
-    if (!profile || profile.role !== 'tanod') return;
-
-    const loadLog = async () => {
-      try {
-        const data = await api.generic.list(`alerts?respondedBy=${profile.id}&status=resolved&orderBy=resolvedAt:desc`);
-        setShiftLog(data);
-      } catch (err) {
-        console.error("Failed to load tanod shift log", err);
-      }
-    };
-
-    loadLog();
-    socket.on('alert_update', (alert) => {
-      if (alert.respondedBy === profile.id || alert.status === 'pending') {
-        loadLog();
-      }
-    });
-
-    return () => {
-      socket.off('alert_update');
-    };
-  }, [profile]);
+    if (!profile) return;
+    const hasActive = alerts.some(a => ['pending', 'active'].includes(a.status?.toLowerCase() || ''));
+    setIsFlashing(hasActive || sirenActive);
+  }, [alerts, profile, sirenActive]);
 
   const handleUpdateStatus = async (alert: Alert, status: Alert['status']) => {
-    setLoadingAlertIds(prev => new Set(prev).add(alert.id));
     try {
-      const updateData: any = { 
-        status, 
-        updatedAt: new Date().toISOString() 
-      };
+      const updateData: any = { status, updatedAt: new Date().toISOString() };
       
       if (status === 'responding') {
-        updateData.respondedBy = profile?.id || 'unknown';
-        updateData.respondedByName = profile?.name || 'Tanod Unit';
+        updateData.respondedBy = profile?.id;
+        updateData.respondedByName = profile?.name;
         updateData.respondedAt = new Date().toISOString();
-        updateData.assignedTo = profile?.id || 'unknown';
-        updateData.assignedToName = profile?.name || 'Tanod Unit';
       }
       
       if (status === 'resolved') {
         updateData.resolvedAt = new Date().toISOString();
-        updateData.resolutionNotes = `Cleared by ${profile?.name || 'Tanod Responder'}`;
+        updateData.resolutionNotes = `Resolved by Responder ${profile?.name}`;
         
         await api.incidents.create({
           alertId: alert.id,
           tanodId: profile?.id || 'unknown',
-          tanodName: profile?.name || 'Unknown Tanod',
+          tanodName: profile?.name || 'Unknown',
           date: new Date().toISOString().split('T')[0],
           time: new Date().toLocaleTimeString(),
-          timestamp: new Date().toISOString(),
-          location: alert.customMessage || 'Location via GPS',
-          gpsLocation: alert.location,
+          location: alert.customMessage || 'GPS Response',
           type: alert.type,
-          description: `Automatically created from a resolved alert.\nCitizen: ${alert.residentName}\nResponse note: ${updateData.resolutionNotes}${alert.responderNotes ? `\nResponder Situation Report: ${alert.responderNotes}` : ''}`,
-          status: 'resolved',
-          respondedAt: alert.respondedAt || updateData.respondedAt || new Date().toISOString(),
-          resolvedAt: updateData.resolvedAt,
-          adminOnDuty: 'Admin Console'
+          description: `Resolved SOS Alert from ${alert.residentName}.\nResolution note: ${updateData.resolutionNotes}`,
+          status: 'resolved'
         });
       }
 
       await api.alerts.update(alert.id, updateData);
-
-      // Log Tanod Activity
-      if (status === 'responding' || status === 'resolved') {
-        const responseTime = status === 'responding' 
-          ? Math.floor((new Date(updateData.respondedAt).getTime() - new Date(alert.timestamp).getTime()) / 1000)
-          : undefined;
-
-        await api.logs.create({
-          tanodId: profile?.id || 'unknown',
-          tanodName: profile?.name || 'Unknown Tanod',
-          type: status === 'responding' ? 'alert_response' : 'status_change',
-          details: status === 'responding' 
-            ? `Responding to ${alert.type} alert from ${alert.residentName}`
-            : `Resolved alert from ${alert.residentName}`,
-          timestamp: new Date().toISOString(),
-          alertId: alert.id,
-          responseTime: responseTime,
-          location: alert.location
-        });
-      }
-
-      if (profile?.id) {
-        try {
-          const userStatus = status === 'resolved' ? 'On-Duty' : status;
-          await api.generic.update(`users/${profile.id}`, { 
-            status: userStatus,
-            activeAlertId: status === 'resolved' ? null : alert.id
-          });
-          
-          if (status === 'responding') {
-            setProcessedAlertIds(prev => new Set(prev).add(alert.id));
-          }
-        } catch(e) {
-          console.error('Failed to update roster status:', e);
-        }
-      }
-
-      await logIncidentAction({ ...alert, ...updateData });
-    } catch (error: any) {
-      console.error("Error updating alert:", error);
-    } finally {
-      setLoadingAlertIds(prev => {
-        const next = new Set(prev);
-        next.delete(alert.id);
-        return next;
-      });
-    }
-  };
-
-  const handleRejectAlert = async (alert: Alert) => {
-    try {
-      const updateData: any = { 
-        status: 'pending', 
-        updatedAt: new Date().toISOString(),
-        assignedTo: null,
-        assignedToName: null,
-        respondedBy: null,
-        respondedByName: null,
-        respondedAt: null
-      };
       
-      await api.alerts.update(alert.id, updateData);
-      
-      // Log the rejection
-      await logIncidentAction({ 
-        ...alert, 
-        ...updateData, 
-        resolutionNotes: `SOS assignment rejected by ${profile?.name || 'anonymous tanod'}` 
-      });
-
-      // Clear tanod active alert if they were assigned
       if (profile?.id) {
+        const isOnline = ['responding'].includes(status.toLowerCase()) || 
+                         (['resolved', 'cancelled'].includes(status.toLowerCase()) && profile.status === 'approved');
+        
         await api.generic.update(`users/${profile.id}`, { 
-          activeAlertId: null,
-          status: 'On-Duty'
+           status: status === 'responding' ? 'Responding' : (profile.status || 'approved'),
+           activeAlertId: status === 'responding' ? alert.id : null
         });
       }
-    } catch (e) {
-      console.error('Failed to reject alert:', e);
-    }
-  };
-
-  const handleSaveResponderNote = async (alertId: string) => {
-    try {
-      await api.alerts.update(alertId, {
-        responderNotes: noteText,
-        updatedAt: new Date().toISOString()
-      });
-      setEditingNoteId(null);
-      setNoteText('');
-    } catch (e) {
-      console.error('Failed to save note:', e);
+      
+      await logIncidentAction({ ...alert, ...updateData });
+      toast.success(`Operational Status: ${status.toUpperCase()}`);
+    } catch (error: any) {
+      toast.error(`Fault: ${error.message}`);
     }
   };
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8"
-    >
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8">
       <PoliceLights active={isFlashing} />
-      <div className="scanline opacity-10 pointer-events-none" />
       
-      <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-6 mb-8 glass-panel p-8 rounded-[48px] border-white/5 skew-card relative overflow-hidden">
-        <div className="absolute inset-0 tactical-bg-glow opacity-30" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
-            <span className="text-[9px] font-mono text-success font-black uppercase tracking-[0.4em]">Unit Identity: Verified</span>
-          </div>
-          <h2 className="text-3xl md:text-5xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-4 outline-text">
-            <IconRadar className="w-10 h-10 text-success animate-pulse" />
-            RESPONDER<span className="text-success">PORTAL</span>
-          </h2>
-          <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em] mt-3 bg-white/5 inline-block px-3 py-1 rounded-full border border-white/5">Tactical Surveillance & Force Deployment Interface</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto relative z-10">
-          <motion.button
-            whileHover={{ scale: 1.02, backgroundColor: 'rgba(239, 68, 68, 0.9)' }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsReportFormOpen(true)}
-            className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-5 rounded-2xl bg-emergency text-white transition-all group shadow-glow-red active:scale-95 border-b-4 border-emergency/30"
-            id="file-report-btn"
-          >
-            <FilePlus className="w-5 h-5 text-white group-hover:rotate-12 transition-transform" />
-            <span className="text-[14px] font-black uppercase tracking-[0.2em] font-mono italic">FILE_INTEL_REPORT</span>
-          </motion.button>
-          <button
-            onClick={() => setIsAboutOpen(true)}
-            className="flex items-center justify-center gap-2 w-full md:w-auto px-6 py-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
-            id="tanod-about-btn"
-          >
-            <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-            <span className="text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.25em] font-mono">MISSION_BRIEF</span>
-          </button>
-        </div>
-      </motion.div>
-
-      <AboutModal 
-        isOpen={isAboutOpen} 
-        onClose={() => setIsAboutOpen(false)} 
-        role={profile?.role} 
+      <TanodPortalHeader 
+        profile={profile} 
+        setIsReportFormOpen={setIsReportFormOpen} 
+        setIsAboutOpen={setIsAboutOpen} 
       />
 
-      <AnimatePresence>
-        {isReportFormOpen && profile && (
-          <IncidentForm 
-            profile={profile} 
-            onClose={() => setIsReportFormOpen(false)} 
-          />
-        )}
-      </AnimatePresence>
-
       {deferredPrompt && (
-        <motion.button
-          variants={itemVariants}
-          onClick={onInstall}
-          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-4 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group"
-        >
-          <span className="text-lg group-hover:scale-125 transition-transform">📲</span>
-          <span>INSTALL TANOD MOBILE APP</span>
+        <motion.button onClick={onInstall} className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-4 transition-all hover:scale-[1.01] uppercase font-mono shadow-glow-info">
+          📲 INSTALL TANOD MOBILE APP
         </motion.button>
       )}
 
-      <motion.div variants={itemVariants}>
-        <div className="glass-panel bg-brand-bg/60 backdrop-blur-3xl border-white/5 rounded-[40px] p-8 text-white shadow-2xl overflow-hidden relative group border-t border-l border-white/10">
-           <div className="absolute top-8 right-8 flex items-center justify-center">
-             <div className="absolute w-12 h-12 bg-success/20 rounded-full animate-pulse blur-2xl shadow-[0_0_15px_rgba(34,197,94,0.4)]" />
-             <span className="relative text-2xl drop-shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse">🟢</span>
-           </div>
-           
-           <div className="relative z-10">
-             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2 font-mono flex items-center gap-2">
-               <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
-               Service Status
-             </p>
+      <StatusTogglePanel 
+        profile={profile} 
+        sirenActive={sirenActive} 
+        onToggleSiren={onToggleSiren} 
+        updateTanodStatus={updateTanodStatus}
+      />
 
-             {profile?.role === 'tanod' && (
-               <div className="mb-4 flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5 w-fit hover:bg-white/10 transition-colors group">
-                 <div className="flex items-center gap-2">
-                   <div className={cn(
-                     "w-2 h-2 rounded-full transition-all",
-                     (profile as TanodProfile).isLocationSharingEnabled !== false 
-                       ? "bg-success shadow-[0_0_10px_#22c55e] animate-pulse" 
-                       : "bg-white/10"
-                   )} />
-                   <div className="flex flex-col">
-                     <span className="text-[10px] font-mono font-black uppercase tracking-widest text-white/40 group-hover:text-white/60">Live GPS Link</span>
-                     <span className="text-[8px] font-mono font-bold uppercase text-white/20 tracking-tighter">
-                       {(profile as TanodProfile).isLocationSharingEnabled !== false ? 'TRANSMITTING' : 'ENCRYPTED_OFFLINE'}
-                     </span>
-                   </div>
-                 </div>
-                 <button
-                   onClick={async () => {
-                     if (!profile || !profile.id) return;
-                     const currentState = (profile as TanodProfile).isLocationSharingEnabled !== false;
-                     try {
-                       await api.generic.update(`users/${profile.id}`, { 
-                         isLocationSharingEnabled: !currentState,
-                         updatedAt: new Date().toISOString()
-                       });
-                       toast.success(!currentState ? 'Intel Link: GPS SHARING ACTIVE' : 'Intel Link: GPS SHARING SUSPENDED', {
-                         icon: !currentState ? '📡' : '🔏',
-                         style: {
-                           borderRadius: '10px',
-                           background: '#14171d',
-                           color: '#fff',
-                           border: '1px solid rgba(255,255,255,0.1)',
-                           fontSize: '12px',
-                           fontWeight: 'bold',
-                           fontFamily: 'monospace'
-                         }
-                       });
-                     } catch (e) {
-                       console.error('Failed to toggle location sharing', e);
-                       toast.error('Tactical Error: Setting Update Failed');
-                     }
-                   }}
-                   className={cn(
-                     "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border font-mono shadow-lg",
-                     (profile as TanodProfile).isLocationSharingEnabled !== false
-                       ? "bg-success/20 text-success border-success/30 hover:bg-success/30 shadow-success/10"
-                       : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
-                   )}
-                 >
-                   {(profile as TanodProfile).isLocationSharingEnabled !== false ? 'ON' : 'OFF'}
-                 </button>
-               </div>
-             )}
-             <div className="flex flex-col">
-               <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">STATUS:</span>
-               <div className="flex items-center gap-1 mt-1">
-                 <select 
-                    value={profile?.status || 'Available'}
-                    onChange={async (e) => {
-                      if (!profile) return;
-                      const newStatus = e.target.value as RegistryStatus;
-                      try {
-                        await api.generic.update(`users/${profile.id}`, { status: newStatus });
-                        
-                        // Sync with patrols table for live monitor
-                        const isOnline = 
-                          newStatus.toLowerCase() === 'on patrol' || 
-                          newStatus.toLowerCase() === 'responding' || 
-                          newStatus.toLowerCase() === 'available';
-
-                        await api.generic.update(`patrols/${profile.id}`, { 
-                          isActive: isOnline,
-                          status: newStatus.toLowerCase().includes('responding') ? 'responding' : (isOnline ? 'patrolling' : 'offline'),
-                          tanodName: profile.name
-                        });
-
-                        updateTanodStatus(profile.id, newStatus);
-                        socket.emit('tanod_update', { id: profile.id });
-                        socket.emit('patrol_update', { tanod_id: profile.id, isActive: isOnline });
-                      } catch(e) {
-                          console.error('Failed to update status', e);
-                      }
-                    }}
-                    className="text-4xl font-black italic tracking-tighter uppercase font-mono text-success leading-none bg-transparent outline-none cursor-pointer hover:text-success/80 transition-colors"
-                 >
-                    <option value="Available">AVAILABLE</option>
-                    <option value="On Patrol">ON PATROL</option>
-                    <option value="Responding">RESPONDING</option>
-                    <option value="Offline">OFFLINE</option>
-                 </select>
-               </div>
-             </div>
-             <div className="mt-8 flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                   <IconOnlineTanods className="w-5 h-5 text-success/60" />
-                 </div>
-                 <div>
-                   <p className="text-[10px] opacity-40 uppercase tracking-widest font-mono font-black border-l border-success/30 pl-2">Designated Officer</p>
-                   <p className="text-sm font-bold uppercase italic tracking-tight font-mono border-l border-success/30 pl-2">{profile?.name}</p>
-                 </div>
-               </div>
-
-               <button 
-                onClick={onToggleSiren}
-                className={cn(
-                  "p-4 rounded-2xl border transition-all flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-widest group shadow-2xl",
-                  sirenActive 
-                    ? "bg-emergency border-white/20 text-white animate-pulse" 
-                    : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20"
-                )}
-               >
-                 {sirenActive ? (
-                   <>
-                    <VolumeX className="w-4 h-4 group-hover:scale-110" /> Stop Siren
-                   </>
-                 ) : (
-                   <>
-                    <Volume2 className="w-4 h-4 group-hover:scale-110" /> Test Siren
-                   </>
-                 )}
-               </button>
-             </div>
-           </div>
-           
-           <Shield className="absolute -bottom-10 -right-10 w-48 h-48 opacity-[0.03] group-hover:rotate-12 transition-transform text-white pointer-events-none" />
-           <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent pointer-events-none" />
-        </div>
+      <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative shadow-2xl">
+        <LiveMap />
       </motion.div>
-      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          {/* Tactical Units Status Bar */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col">
-              <span className="text-[9px] font-black uppercase text-white/30 tracking-widest font-mono">Total Units</span>
-              <span className="text-2xl font-black text-white font-mono mt-1">{patrols.length}</span>
-            </div>
-            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col">
-              <span className="text-[9px] font-black uppercase text-success/60 tracking-widest font-mono">On Patrol</span>
-              <span className="text-2xl font-black text-white font-mono mt-1">
-                {patrols.filter(p => p.isActive && p.status === 'patrolling').length}
-              </span>
-            </div>
-            <div className="glass-panel p-4 rounded-3xl border-white/5 flex flex-col relative overflow-hidden">
-              <span className="text-[9px] font-black uppercase text-emergency/60 tracking-widest font-mono">Responding</span>
-              <span className="text-2xl font-black text-white font-mono mt-1">
-                {patrols.filter(p => p.isActive && p.status === 'responding').length}
-              </span>
-              {patrols.some(p => p.isActive && p.status === 'responding') && (
-                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emergency animate-ping" />
-              )}
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between glass-panel p-4 rounded-3xl">
-              <h3 className="text-lg font-black italic tracking-tighter flex items-center gap-2 uppercase font-mono">
-                <IconNewIncident className="w-5 h-5 text-emergency shadow-glow-red" glow />
-                LIVE INCIDENT FEED
-              </h3>
-              <div className="flex items-center gap-2">
-                 <span className="w-2 h-2 bg-emergency rounded-full animate-pulse shadow-glow-red" />
-                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Real-time Stream</span>
-              </div>
-            </div>
-
-            {/* Emergency Dispatch Area */}
-            {dashboardAlerts.filter(a => isPendingAlert(a)).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[9px] font-black uppercase text-emergency tracking-widest pl-2">Pending Dispatch</p>
-                {dashboardAlerts.filter(a => isPendingAlert(a)).map(alert => (
-                  <DispatchAlert 
-                    key={alert.id} 
-                    incident={{
-                      id: alert.id,
-                      tanodId: alert.assignedTo || 'pending',
-                      tanodName: 'Citizen SOS',
-                      timestamp: alert.timestamp,
-                      location: `${alert.location.lat},${alert.location.lng}`,
-                      type: alert.type,
-                      description: alert.customMessage || 'No description',
-                      status: 'pending'
-                    }}
-                    onDispatch={() => handleUpdateStatus(alert, 'responding')}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Tactical Filter Bar */}
-            <div className="flex flex-wrap items-center gap-3 glass-panel p-3 rounded-[28px] border-white/5 backdrop-blur-md">
-              <div className="flex items-center gap-2 px-3">
-                <Filter className="w-3.5 h-3.5 text-white/30" />
-                <span className="text-[9px] font-black uppercase text-white/20 tracking-widest font-mono">Operational Sigs</span>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <select 
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
-                >
-                  <option value="ACTIVE">ACTIVE_ONLY</option>
-                  <option value="ALL">ALL_STATUS</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="RESPONDING">RESPONDING</option>
-                </select>
-
-                <select 
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
-                >
-                  <option value="ALL">ALL_TYPES</option>
-                  <option value="MEDICAL">MEDICAL</option>
-                  <option value="FIRE">FIRE</option>
-                  <option value="CRIME">CRIME</option>
-                  <option value="DISASTER">DISASTER</option>
-                </select>
-
-                <select 
-                  value={filterTime}
-                  onChange={(e) => setFilterTime(e.target.value)}
-                  className="bg-brand-bg/50 border border-white/5 rounded-xl px-3 py-1.5 text-[9px] font-black text-white/50 font-mono outline-none focus:border-info/30 transition-colors uppercase tracking-wider cursor-pointer hover:bg-brand-bg md:w-auto w-full"
-                >
-                  <option value="ALL">ALL_TIME</option>
-                  <option value="1H">LAST_1H</option>
-                  <option value="4H">LAST_4H</option>
-                  <option value="24H">LAST_24H</option>
-                </select>
-              </div>
-
-              <div className="ml-auto px-4 py-1.5 bg-white/5 rounded-lg border border-white/5 md:block hidden">
-                <span className="text-[9px] font-black text-white/40 uppercase font-mono tracking-tighter">
-                   {dashboardAlerts.length} <span className="text-white/20">TARGETS_FOUND</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <AnimatePresence mode="popLayout">
-              {dashboardAlerts.length === 0 ? (
-                <div className="glass-panel border-white/5 rounded-[40px] p-24 text-center relative overflow-hidden group">
-                  <div className="scanline opacity-5" />
-                  <CheckCircle className="w-16 h-16 text-success mx-auto mb-4 opacity-10 group-hover:opacity-20 transition-opacity" />
-                  <p className="text-white/30 font-black uppercase tracking-[0.3em] text-[10px] font-mono">No matching incidents detected.</p>
-                  <p className="text-white/10 text-[8px] font-mono mt-2 tracking-widest">AWAITING TRANSMISSION...</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <TanodAlertsFeed 
+          alerts={alerts} 
+          profile={profile} 
+          onUpdateStatus={handleUpdateStatus} 
+          onDetails={setSelectedAlertForDetails} 
+        />
+        
+        <div className="lg:col-span-1 space-y-6 md:space-y-8">
+            {/* Units Summary */}
+            <div className="glass-panel p-8 rounded-[40px] border-white/5">
+                <h4 className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em] font-mono mb-6">Force Status Summary</h4>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
+                    <span className="text-[11px] font-bold text-white/60 font-mono">ON_PATROL</span>
+                    <span className="text-xl font-black text-success font-mono">{patrols.filter(p => p.isActive && p.status === 'patrolling').length}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
+                    <span className="text-[11px] font-bold text-white/60 font-mono">RESPONDING</span>
+                    <span className="text-xl font-black text-emergency font-mono">{patrols.filter(p => p.isActive && p.status === 'responding').length}</span>
+                  </div>
                 </div>
-              ) : (
-                dashboardAlerts.map((alert, index) => (
-                  <motion.div
-                    onClick={() => setSelectedAlertForDetails(alert)}
-                    variants={itemVariants}
-                    layout
-                    initial="hidden"
-                    animate="show"
-                    exit="hidden"
-                    transition={{ delay: index * 0.05 }}
-                    key={alert.id}
-                    className={cn(
-                      "cursor-pointer glass-panel border-white/5 rounded-[32px] p-6 relative overflow-hidden transition-all group",
-                      isActiveAlert(alert) && (
-                        alert.aiAnalysis && alert.aiAnalysis.severityScore > 7 ? "border-emergency/50 shadow-glow-red bg-emergency/5" :
-                        alert.aiAnalysis && alert.aiAnalysis.severityScore >= 5 ? "border-warning/50 shadow-glow-orange bg-warning/5" :
-                        "border-emergency/30 shadow-glow-red ring-1 ring-emergency/10 bg-emergency/5"
-                      ),
-                      alert.status === 'responding' && "border-info/30 shadow-lg bg-info/5"
-                    )}
-                  >
-                    <div className="scanline opacity-10" />
-                    
-                    {isActiveAlert(alert) && alert.aiAnalysis && alert.aiAnalysis.severityScore >= 7 && (
-                      <motion.div 
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 0.3 }}
-                        className="absolute -bottom-8 -right-8 pointer-events-none rotate-12 group-hover:opacity-50 transition-opacity"
-                      >
-                        <FlameAnimation size="lg" />
-                      </motion.div>
-                    )}
-
-                    {isActiveAlert(alert) && (
-                      <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-[100]">
-                        <div className={cn(
-                          "absolute top-4 -right-10 text-white text-[9px] font-black py-1 px-12 rotate-45 uppercase shadow-lg font-mono",
-                          alert.aiAnalysis && alert.aiAnalysis.severityScore > 7 ? "bg-emergency" : 
-                          alert.aiAnalysis && alert.aiAnalysis.severityScore >= 5 ? "bg-warning text-black" :
-                          "bg-caution text-black"
-                        )}>
-                          {alert.aiAnalysis && alert.aiAnalysis.severityScore > 7 ? 'CRITICAL' : 
-                           alert.aiAnalysis && alert.aiAnalysis.severityScore >= 5 ? 'HIGH' : 'NORMAL'}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-start gap-4">
-                          <div className={cn(
-                            "w-16 h-16 rounded-[24px] flex items-center justify-center shrink-0 shadow-2xl transition-all group-hover:scale-105",
-                            alert.status === 'pending' ? "bg-emergency text-white sos-glow shadow-glow-red" : "bg-info text-white"
-                          )}>
-                            <AlertTriangle className="w-8 h-8" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-3 mb-1">
-                              <h4 className="font-black text-2xl text-white italic tracking-tighter uppercase font-mono leading-none">{alert.residentName}</h4>
-                              <div className={cn(
-                                "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-sm font-mono border",
-                                alert.status === 'pending' ? "bg-emergency/20 text-emergency border-emergency/30 animate-pulse" : "bg-info/20 text-info border-info/30"
-                              )}>
-                                {alert.status}
-                              </div>
-                            </div>
-                            <p className="text-[10px] text-white/40 font-bold flex items-center gap-2 font-mono uppercase tracking-[0.1em]">
-                              <MapPin className="w-3 h-3 text-emergency" /> TRANSMISSION T+{Math.floor((Date.now() - new Date(alert.timestamp).getTime()) / 60000)}M • {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </p>
-                            {alert.assignedTo === profile?.uid && alert.status === 'pending' && (
-                              <div className="mt-3 px-3 py-2 bg-emergency/10 border border-emergency/30 rounded-xl flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-emergency animate-pulse" />
-                                <div>
-                                  <p className="text-[9px] font-black uppercase text-emergency tracking-tighter font-mono">Designated for SOS</p>
-                                </div>
-                               <WitnessIndicator alertId={alert.id} />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col gap-3">
-                           <div className="bg-brand-bg/80 rounded-2xl p-4 border border-white/5 backdrop-blur-sm">
-                              <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">Incident Protocol</p>
-                              <div className="flex items-center justify-between">
-                                <p className="text-base font-bold text-white uppercase italic tracking-tighter font-mono flex items-center gap-2">
-                                  <span className="text-xl">
-                                    {alert.type === 'medical' && '🏥'}
-                                    {alert.type === 'fire' && '🔥'}
-                                    {alert.type === 'crime' && '🚨'}
-                                    {alert.type === 'flood' && '🌊'}
-                                  </span>
-                                  {alert.type}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ff0000]" />
-                                   <span className="text-[8px] font-black text-emergency uppercase tracking-widest">EVIDENCE_STREAMING</span>
-                                </div>
-                              </div>
-                           </div>
-                           <motion.button 
-                             whileHover={{ scale: 1.02 }}
-                             whileTap={{ scale: 0.98 }}
-                             onClick={() => toast.success(`Secure Evidence Stream path: alerts/${alert.id}/`, { icon: '📺' })}
-                             className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                           >
-                             <div className="w-4 h-4 bg-red-500 rounded-sm flex items-center justify-center">
-                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                             </div>
-                             VIEW LIVE EVIDENCE
-                           </motion.button>
-                           <div className="flex gap-2">
-                             {alert.status === 'responding' && (
-                               <button
-                                 onClick={() => handleUpdateStatus(alert, 'resolved')}
-                                 className="flex-1 py-3 bg-success text-black text-[10px] font-black uppercase rounded-lg hover:bg-success/80 transition-all font-mono"
-                               >
-                                 Resolve
-                               </button>
-                             )}
-                             {isPendingAlert(alert) && (
-                               <div className="flex gap-2 w-full">
-                                <button
-                                  onClick={() => handleUpdateStatus(alert, 'responding')}
-                                  className="flex-[2] py-3 bg-emergency text-white text-[10px] font-black uppercase rounded-lg hover:bg-emergency/80 transition-all font-mono"
-                                >
-                                  Respond
-                                </button>
-                                <button
-                                  onClick={() => handleRejectAlert(alert)}
-                                  className="flex-1 py-3 bg-white/5 text-white text-[10px] font-black uppercase rounded-lg hover:bg-white/10 transition-all font-mono"
-                                >
-                                  Abort
-                                </button>
-                               </div>
-                             )}
-                           </div>
-                        </div>
-
-                        {alert.customMessage && (
-                          <div className="bg-emergency/5 rounded-2xl p-4 border border-white/5 italic text-white/90 text-sm leading-relaxed font-mono shadow-inner">
-                            <span className="text-emergency mr-2 font-black not-italic opacity-50">&gt;&gt;</span>
-                            {alert.customMessage}
-                          </div>
-                        )}
-
-                        {alert.aiAnalysis && (
-                          <div className={cn(
-                            "rounded-2xl p-4 border backdrop-blur-sm",
-                            alert.aiAnalysis.severityScore > 7 ? "bg-emergency/5 border-emergency/20" : 
-                            alert.aiAnalysis.severityScore >= 5 ? "bg-warning/5 border-warning/20" :
-                            "bg-caution/5 border-caution/20"
-                          )}>
-                             <div className="flex justify-between items-center mb-2">
-                                <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] font-mono">Priority Intelligence</p>
-                                <span className={cn(
-                                    "px-2 py-0.5 rounded-[4px] text-[8px] font-black font-mono uppercase tracking-tighter shadow-sm",
-                                    alert.aiAnalysis.severityScore > 7 ? "bg-emergency text-white" : 
-                                    alert.aiAnalysis.severityScore >= 5 ? "bg-warning text-black" :
-                                    "bg-caution text-black"
-                                  )}>
-                                    {alert.aiAnalysis.severityScore > 7 ? 'CRITICAL' : alert.aiAnalysis.severityScore >= 5 ? 'HIGH' : 'NORMAL'}
-                                  </span>
-                             </div>
-                             <p className="text-xs font-bold text-white/90 leading-tight italic font-mono">"{alert.aiAnalysis.summary}"</p>
-                             <div className="flex gap-1 mt-3">
-                                {[...Array(10)].map((_, i) => (
-                                  <div 
-                                    key={i} 
-                                    className={cn(
-                                      "h-1.5 flex-1 rounded-full transition-all",
-                                      i < alert.aiAnalysis!.severityScore 
-                                        ? (alert.aiAnalysis!.severityScore > 7 ? 'bg-emergency' : alert.aiAnalysis!.severityScore >= 5 ? 'bg-warning' : 'bg-caution')
-                                        : 'bg-white/5'
-                                    )} 
-                                  />
-                                ))}
-                             </div>
-                          </div>
-                        )}
-
-                        {/* Responder Notes Section */}
-                        {alert.status === 'responding' && (
-                          <div className="bg-info/5 rounded-2xl p-4 border border-info/20 shadow-inner">
-                            <div className="flex items-center justify-between mb-3">
-                              <p className="text-[9px] font-black text-info/60 uppercase tracking-[0.2em] font-mono flex items-center gap-2">
-                                <Shield className="w-3 h-3" /> Tactical Responder Notes
-                              </p>
-                              {editingNoteId !== alert.id ? (
-                                <button 
-                                  onClick={() => {
-                                    setEditingNoteId(alert.id);
-                                    setNoteText(alert.responderNotes || '');
-                                  }}
-                                  className="text-[8px] font-black text-info hover:text-white transition-colors underline uppercase font-mono"
-                                >
-                                  {alert.responderNotes ? 'Edit Note' : 'Add Note'}
-                                </button>
-                              ) : (
-                                <button 
-                                  onClick={() => setEditingNoteId(null)}
-                                  className="text-[8px] font-black text-white/40 hover:text-white transition-colors uppercase font-mono"
-                                >
-                                  Cancel
-                                </button>
-                              )}
-                            </div>
-
-                            {editingNoteId === alert.id ? (
-                              <div className="space-y-3">
-                                <textarea
-                                  value={noteText}
-                                  onChange={(e) => setNoteText(e.target.value)}
-                                  placeholder="Enter mission updates, casualties, or required reinforcements..."
-                                  className="w-full bg-brand-bg/50 border border-info/30 rounded-xl p-3 text-xs text-white placeholder:text-white/20 font-mono outline-none focus:border-info min-h-[80px]"
-                                />
-                                <button
-                                  onClick={() => handleSaveResponderNote(alert.id)}
-                                  className="w-full py-2 bg-info text-white text-[9px] font-black rounded-lg hover:bg-info/80 transition-all uppercase tracking-widest font-mono"
-                                >
-                                  Update Situation Report
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="text-xs text-white/80 font-mono italic leading-relaxed">
-                                {alert.responderNotes ? (
-                                  <>
-                                    <span className="text-info mr-2 opacity-50 font-black not-italic">&gt;&gt;</span>
-                                    {alert.responderNotes}
-                                  </>
-                                ) : (
-                                  <span className="text-white/20 italic">No situation report entered yet. Intelligence missing.</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Tactical Chat Section */}
-                        {profile && (alert.status === 'responding' || alert.status === 'pending') && (
-                          <div className="mt-4">
-                            <SOSChat alertId={alert.id} currentUser={profile} />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-3 shrink-0 justify-center">
-                        <motion.a 
-                          whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.05)' }}
-                          whileTap={{ scale: 0.98 }}
-                          href={`https://www.google.com/maps?q=${alert.location.lat},${alert.location.lng}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-center gap-3 px-8 py-5 bg-brand-bg border border-white/10 text-white text-[10px] font-black rounded-2xl hover:border-emergency/50 transition-all uppercase tracking-widest font-mono shadow-lg"
-                        >
-                          <MapPin className="w-4 h-4 text-emergency" /> INITIALIZE GPS
-                        </motion.a>
-                        {alert.status === 'pending' && (
-                          <div className="flex gap-2">
-                             <AnimatedButton 
-                                onClick={() => handleUpdateStatus(alert, 'responding')}
-                                isLoading={loadingAlertIds.has(alert.id)}
-                                isSuccess={processedAlertIds.has(alert.id)}
-                                label="ACCEPT SOS"
-                                successLabel="ACCEPTED"
-                                className="flex-1 bg-success shadow-glow-green"
-                              />
-                              <motion.button 
-                                whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleRejectAlert(alert)}
-                                className="py-5 px-6 bg-white/5 border border-white/10 text-white/40 text-[10px] font-black rounded-2xl hover:border-emergency/30 transition-all uppercase tracking-[0.2em] font-mono select-none flex items-center justify-center gap-2"
-                              >
-                                <X className="w-4 h-4" /> REJECT
-                              </motion.button>
-                          </div>
-                        )}
-                        {alert.status === 'responding' && alert.respondedBy === profile?.uid && (
-                          <motion.button 
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => handleUpdateStatus(alert, 'resolved')}
-                            className="flex-1 py-5 px-10 bg-success text-white text-[10px] font-black rounded-2xl transition-all shadow-[0_0_20px_rgba(52,199,89,0.3)] uppercase tracking-[0.2em] font-mono select-none italic"
-                          >
-                            MARK RESOLVED
-                          </motion.button>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </AnimatePresence>
-          </div>
+            </div>
         </div>
+      </div>
 
-        <div className="space-y-6">
-          <div className="glass-panel border-white/5 rounded-[40px] p-8 shadow-command">
-             <div className="flex items-center justify-between mb-8">
-               <h4 className="text-[10px] font-black uppercase text-white tracking-[0.3em] font-mono leading-none">Command Log</h4>
-               <span className="text-[8px] text-white/40 font-mono">Today</span>
-             </div>
-             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
-               {shiftLog.length === 0 ? (
-                 <div className="py-12 flex flex-col items-center justify-center opacity-20">
-                    <CheckCircle className="w-12 h-12 mb-4" />
-                    <p className="text-[10px] text-white font-black uppercase tracking-widest font-mono">No data logged</p>
-                 </div>
-               ) : (
-                 shiftLog.map(log => (
-                   <div onClick={() => setSelectedAlertForDetails(log)} key={log.id} className="cursor-pointer p-4 bg-brand-bg/50 rounded-2xl border border-white/5 flex flex-col gap-2 hover:border-white/10 transition-colors">
-                     <div className="flex justify-between items-start">
-                       <span className="text-xs font-black text-white uppercase italic tracking-tighter font-mono">{log.type}</span>
-                       <span className="text-[9px] font-mono text-white/40">{new Date(log.resolvedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                     </div>
-                     <span className="text-[10px] text-white/60 font-medium uppercase tracking-tight">{log.residentName}</span>
-                   </div>
-                 ))
-               )}
-             </div>
-          </div>
-          
-          <div className="pt-2 mb-8">
-            <BrgyTanodQR />
-          </div>
-
-          <div className="pt-2">
-            <InstallAppButton />
-          </div>
-        </div>
-
-        {selectedAlertForDetails && (
-          <AlertDetailsModal
-            alert={selectedAlertForDetails}
-            onClose={() => setSelectedAlertForDetails(null)}
-          />
-        )}
-      </motion.div>
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} role={profile?.role} />
+      <AnimatePresence>
+        {isReportFormOpen && profile && <IncidentForm profile={profile} onClose={() => setIsReportFormOpen(false)} />}
+      </AnimatePresence>
+      {selectedAlertForDetails && (
+        <AlertDetailsModal alert={selectedAlertForDetails} onClose={() => setSelectedAlertForDetails(null)} />
+      )}
     </motion.div>
   );
 }

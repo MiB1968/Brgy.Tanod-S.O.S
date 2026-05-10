@@ -10,7 +10,19 @@ export interface AIAnalysis {
   instructions: string[];
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is missing. AI Analysis will be disabled.");
+      return null;
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function analyzeIncident(description: string, initialType?: string): Promise<AIAnalysis> {
   const fallback: AIAnalysis = {
@@ -23,7 +35,8 @@ export async function analyzeIncident(description: string, initialType?: string)
     instructions: ["Stay calm", "Wait for responders"]
   };
 
-  if (!navigator.onLine || !process.env.GEMINI_API_KEY) return fallback;
+  const ai = getAI();
+  if (!navigator.onLine || !ai) return fallback;
 
   try {
     const response = await ai.models.generateContent({

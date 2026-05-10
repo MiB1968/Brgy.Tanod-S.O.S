@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 /* ── LOGO SVG COMPONENT ───────────────────────────────────── */
 export function TanodLogo({ size = 200, animated = true, className, useImage = false }: { size?: number, animated?: boolean, className?: string, useImage?: boolean }) {
   const [imgError, setImgError] = React.useState(false);
-  const logoUrl = '/logo.png';
+  const logoUrl = '/logo.svg';
 
   if (useImage && !imgError) {
     return (

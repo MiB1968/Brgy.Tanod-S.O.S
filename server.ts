@@ -24,19 +24,30 @@ async function startServer() {
   // 2. Initialize Sockets
   initSocket(server);
 
-  // 3. Serve Static Files in Production
-  if (config.nodeEnv === 'production') {
+  // 3. Vite development middleware or static production serving
+  if (config.nodeEnv !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      // Avoid intercepting API routes (already handled by app.use above)
       if (!req.path.startsWith('/api/')) {
         res.sendFile(path.join(distPath, 'index.html'));
       }
     });
   }
 
-  // 4. Start Server
+  // 4. Error Handling (Must be after all routes and middleware)
+  const { errorHandler, notFoundHandler } = await import('./src/server/middleware/error');
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  // 5. Start Server
   server.listen(config.port, '0.0.0.0', () => {
     console.log(`
 ==================================================
