@@ -335,8 +335,37 @@ export default function App() {
         toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
       }
       if (profile && profile.role === 'resident' && formattedAlert.residentId === profile.id) {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(200);
+        if (formattedAlert.status === 'responding') {
+          // Synthesize two ascending beeps for reassurance
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const playBeep = (freq: number, startTime: number, duration: number) => {
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, startTime);
+              gain.gain.setValueAtTime(0, startTime);
+              gain.gain.linearRampToValueAtTime(0.5, startTime + 0.05);
+              gain.gain.linearRampToValueAtTime(0, startTime + duration);
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.start(startTime);
+              osc.stop(startTime + duration);
+            };
+
+            playBeep(440, audioCtx.currentTime, 0.2); // A4
+            playBeep(659.25, audioCtx.currentTime + 0.25, 0.3); // E5
+          } catch (e) {
+            console.error('AudioContext error:', e);
+          }
+
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([100, 100, 200]);
+          }
+        } else {
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(200);
+          }
         }
         toast.success(`SOS Update: ${formattedAlert.status}`);
       }
