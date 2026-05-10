@@ -95,6 +95,9 @@ import { useSOSStore } from './store/useSOSStore';
 // Service & Lib imports
 import { analyzeIncident } from './services/aiService';
 import { getQueueSize } from './lib/offlineQueue';
+import { useAppData } from './hooks/useAppData';
+import { useSocketListeners } from './hooks/useSocketListeners';
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { cn, isValidCoord } from './lib/utils';
 import { 
   isRuben as checkIsRuben, 
@@ -157,6 +160,17 @@ export default function App() {
     } as User;
   }, [profile, effectiveRole, user]);
 
+  // Custom hooks for data and real-time listeners
+  useAppData(user, effectiveRole);
+  useSocketListeners(
+    effectiveProfile, 
+    effectiveRole, 
+    setActiveBroadcast, 
+    setGlobalSirenActive, 
+    setIsShaking, 
+    setActiveTab
+  );
+
   const visiblePatrols = useMemo(() => {
     return patrols.filter(p => {
       // Basic coordinates check
@@ -184,42 +198,20 @@ export default function App() {
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
-      const u = JSON.parse(storedUser);
-      setUser(u);
-      setProfile(u);
+      try {
+        const u = JSON.parse(storedUser);
+        setUser(u);
+        setProfile(u);
+      } catch (err) {
+        console.error("Malformed user data in storage", err);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
     }
     setLoading(false);
   }, [setProfile, setLoading]);
 
-  // Initial Load of Data
-  useEffect(() => {
-    // Request notification permission on load
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(permission => {
-          setNotificationPermission(permission);
-        });
-      }
-    }
-
-    async function loadInitialData() {
-      if (!user) return;
-      try {
-        const [alertsData, patrolsData, tanodsData] = await Promise.all([
-          api.alerts.getAll(),
-          api.generic.list('patrols'),
-          api.generic.list('users?role=tanod')
-        ]);
-        setAlerts(alertsData);
-        setPatrols(patrolsData);
-        setTanods(tanodsData);
-      } catch (err) {
-        console.error("Failed to load initial data", err);
-      }
-    }
-    loadInitialData();
-  }, [user, setAlerts, setPatrols]);
+  // Initial Load of Data (Removed - now in useAppData hook)
 
   // SOS Store Subscription
   useEffect(() => {
@@ -229,23 +221,7 @@ export default function App() {
     }
   }, [user?.id, effectiveRole, subscribeToUserAlerts]);
 
-  // Global Siren Sync
-  useEffect(() => {
-    if (!user) return;
-    
-    // Listen for siren via socket
-    socket.on('siren_update', (data: any) => {
-      setGlobalSirenActive(data?.sirenActive || false);
-      if (data?.sirenActive) {
-        setIsShaking(true);
-        setTimeout(() => setIsShaking(false), 2000);
-      }
-    });
-
-    return () => {
-      socket.off('siren_update');
-    };
-  }, [user]);
+  // Global Siren Sync (Removed - now in useSocketListeners hook)
 
   useEffect(() => {
     const handleOnline = () => {
@@ -264,7 +240,7 @@ export default function App() {
     };
   }, [setIsOnline, triggerSync]);
 
-  const toggleGlobalSiren = async () => {
+  const toggleGlobalSiren = useCallback(async () => {
     try {
       const nextState = !globalSirenActive;
       await api.system.updateSiren({
@@ -281,17 +257,20 @@ export default function App() {
       console.error(err);
       toast.error('Siren Control System Failure');
     }
-  };
+  }, [globalSirenActive, profile?.name]);
 
   // Failsafe Loading
+  const loadingFailsafeTriggered = useRef(false);
   useEffect(() => {
+    if (loadingFailsafeTriggered.current) return;
     const timer = setTimeout(() => {
       setLoading(false);
+      loadingFailsafeTriggered.current = true;
     }, 8000);
     return () => clearTimeout(timer);
   }, [setLoading]);
 
-  const handleLogin = async (email?: string, password?: string) => {
+  const handleLogin = useCallback(async (email?: string, password?: string) => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
     
@@ -312,126 +291,32 @@ export default function App() {
     } finally {
       setIsLoggingIn(false);
     }
-  };
+  }, [isLoggingIn, setProfile]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     setProfile(null);
-  };
+  }, [setProfile]);
 
-  const handleInstallApp = async () => {
+  const handleInstallApp = useCallback(async () => {
     if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
         setDeferredPrompt(null);
     }
-  };
+  }, [deferredPrompt]);
 
-  const resetAuthSession = async () => {
+  const resetAuthSession = useCallback(async () => {
     await handleLogout();
-  };
+  }, [handleLogout]);
 
-  // Socket Listeners for Real-time Updates (Replacing Firestore snapshots)
-  useEffect(() => {
-    if (!profile) return;
-
-    const showSOSNotification = (alert: Alert) => {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification(`🚨 SOS EMERGENCY: ${alert.type}`, {
-          body: `Resident: ${alert.residentName}\nLocation tracked. Tactical units notified.`,
-          icon: '/sos-icon.png',
-          tag: alert.id,
-          requireInteraction: true, // Keep until dismissed for critical alerts
-          silent: false
-        });
-
-        notification.onclick = () => {
-          window.focus();
-          setActiveTab('tracker');
-          notification.close();
-        };
-      }
-    };
-
-    socket.on('alert_update', (data: any) => {
-      const alert = data.alert;
-      if (!alert) return;
-      
-      const formattedAlert: Alert = {
-        id: alert.id,
-        residentId: alert.resident_id || alert.residentId,
-        residentName: alert.residentName || 'Resident',
-        type: alert.type as EmergencyType,
-        location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
-        status: alert.status as AlertStatus,
-        timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
-      };
-      addAlert(formattedAlert);
-      if (profile && (profile.role === 'admin' || profile.role === 'tanod')) {
-        toast.error(`NEW SOS ALERT: ${formattedAlert.type}`, { duration: 10000 });
-        // Trigger browser notification for critical roles
-        if (formattedAlert.status === 'pending') {
-          showSOSNotification(formattedAlert);
-        }
-      }
-      if (profile && profile.role === 'resident' && formattedAlert.residentId === profile.id) {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(200);
-        }
-        toast.success(`SOS Update: ${formattedAlert.status}`);
-      }
-    });
-
-    socket.on('patrol_update', (update: any) => {
-       const patrol: PatrolLocation = {
-         id: update.tanodId || update.tanod_id,
-         tanodId: update.tanodId || update.tanod_id,
-         tanodName: update.tanodName || update.tanod_name || 'Active Tanod',
-         location: typeof update.location === 'string' ? JSON.parse(update.location) : update.location,
-         isActive: update.isActive ?? update.is_active,
-         status: (update.isActive ?? update.is_active) ? (update.status || 'patrolling') : 'offline',
-         lastUpdate: new Date().toISOString()
-       };
-       
-       updatePatrol(patrol);
-    });
-
-    socket.on('patrol_location', (data: any) => {
-      updatePatrol({
-        tanodId: data.tanodId,
-        isActive: true,
-        ...data
-      } as PatrolLocation);
-    });
-
-    socket.on('broadcast_update', (broadcast: any) => {
-      if (broadcast.isActive) {
-        setActiveBroadcast(broadcast);
-      } else {
-        setActiveBroadcast(null);
-      }
-    });
-
-    socket.on('tanod_update', (update: any) => {
-      if (update.status) {
-        updateTanodStatus(update.id, update.status);
-      }
-    });
-
-    return () => {
-      socket.off('alert_update');
-      socket.off('patrol_update');
-      socket.off('patrol_location');
-      socket.off('broadcast_update');
-      socket.off('tanod_update');
-    };
-  }, [profile, setAlerts, setPatrols]);
+  // Socket Listeners for Real-time Updates (Removed - now in useSocketListeners hook)
 
   const [isSettingRole, setIsSettingRole] = useState(false);
-  const handleSetRole = async (role: UserRole) => {
+  const handleSetRole = useCallback(async (role: UserRole) => {
     if (!user) return;
     setIsSettingRole(true);
     try {
@@ -447,9 +332,9 @@ export default function App() {
     } finally {
       setIsSettingRole(false);
     }
-  };
+  }, [user, setProfile]);
 
-  const handleDemoLogin = async (role: 'resident' | 'admin') => {
+  const handleDemoLogin = useCallback(async (role: 'resident' | 'admin') => {
     try {
       setLoading(true);
       toast.loading("Initiating anonymous session...", { id: 'demo-login' });
@@ -468,7 +353,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setProfile]);
 
   if (loading) {
     return (
@@ -552,7 +437,12 @@ export default function App() {
             "absolute top-0 left-0 w-full px-4 py-1.5 text-center text-[7px] xs:text-[9px] font-black uppercase tracking-[0.2em] transition-all cursor-pointer pointer-events-auto", 
             isOnline ? "bg-green-500/10 text-green-400 border-b border-green-500/20" : "bg-emergency/20 text-emergency border-b border-emergency/30 backdrop-blur-md animate-pulse"
           )} 
-          onClick={(e) => { e.stopPropagation(); setIsOnline(!isOnline); }}
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            const nextState = !isOnline;
+            setIsOnline(nextState);
+            if (nextState) triggerSync();
+          }}
         >
           <span className="inline-block animate-flicker">
             {isOnline ? "System Online — Neural Sync Active" : "Offline Mode — Operating on Local Storage"}
@@ -631,144 +521,146 @@ export default function App() {
       />
 
       <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 flex flex-col">
-        <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
-          <div className="flex-1 w-full">
-            <div className="flex justify-between items-start w-full transition-all">
-              <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white">
-                {activeTab}
-              </h1>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black tracking-widest text-emergency uppercase mt-1">
-                  {effectiveRole === 'resident' && "Resident view panel"}
-                  {(effectiveRole === 'admin' || effectiveRole === 'superadmin') && "Admin view panel"}
-                  {effectiveRole === 'tanod' && "Tanod view panel"}
-                </span>
-                <span className="text-[8px] font-mono text-white/40 uppercase tracking-[0.2em]">SECURE SYSTEM v2.4.0</span>
+        <GlobalErrorBoundary>
+          <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
+            <div className="flex-1 w-full">
+              <div className="flex justify-between items-start w-full transition-all">
+                <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white">
+                  {activeTab}
+                </h1>
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-black tracking-widest text-emergency uppercase mt-1">
+                    {effectiveRole === 'resident' && "Resident view panel"}
+                    {(effectiveRole === 'admin' || effectiveRole === 'superadmin') && "Admin view panel"}
+                    {effectiveRole === 'tanod' && "Tanod view panel"}
+                  </span>
+                  <span className="text-[8px] font-mono text-white/40 uppercase tracking-[0.2em]">SECURE SYSTEM v2.4.0</span>
+                </div>
               </div>
+              <p className="text-white/40 text-[10px] font-bold tracking-[0.1em] uppercase mt-1 font-mono">
+                Brgy.TANOD 🆘 ALERT — EMERGENCY INTELLIGENCE INFRASTRUCTURE
+              </p>
             </div>
-            <p className="text-white/40 text-[10px] font-bold tracking-[0.1em] uppercase mt-1 font-mono">
-              Brgy.TANOD 🆘 ALERT — EMERGENCY INTELLIGENCE INFRASTRUCTURE
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
-            {(isMasterAdmin || checkIsRuben(user?.id, user?.email || undefined)) && (
-              <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
-                <button 
-                  onClick={() => { setViewOverride(null); setActiveTab('home'); }} 
-                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", !viewOverride ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
-                >
-                  ADMIN
-                </button>
-                <button 
-                  onClick={() => { setViewOverride('tanod'); setActiveTab('home'); }} 
-                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'tanod' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
-                >
-                  TANOD VIEW
-                </button>
-                <button 
-                  onClick={() => { setViewOverride('resident'); setActiveTab('home'); }} 
-                  className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'resident' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
-                >
-                  CLIENT VIEW
-                </button>
-              </div>
-            )}
-            
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={toggleGlobalSiren}
-                className={cn(
-                  "p-3 rounded-2xl border transition-all group relative",
-                  globalSirenActive 
-                    ? "bg-emergency border-white/20 text-white animate-pulse shadow-glow-red" 
-                    : "bg-brand-card border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20"
-                )}
-                title={globalSirenActive ? "Stop Global Emergency Broadcast" : "Activate Global Siren"}
-              >
-                {globalSirenActive ? <VolumeX className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Volume2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
-              </button>
-
-              {(effectiveRole === 'tanod' || effectiveRole === 'admin' || effectiveRole === 'superadmin') && (
-                <button 
-                  onClick={() => setIsIncidentFormOpen(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-emergency rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-xs tracking-widest"
-                >
-                  <Plus className="w-4 h-4 stroke-[3px]" /> NEW INCIDENT
-                </button>
+            <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+              {isMasterAdmin && (
+                <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
+                  <button 
+                    onClick={() => { setViewOverride(null); setActiveTab('home'); }} 
+                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", !viewOverride ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                  >
+                    ADMIN
+                  </button>
+                  <button 
+                    onClick={() => { setViewOverride('tanod'); setActiveTab('home'); }} 
+                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'tanod' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                  >
+                    TANOD VIEW
+                  </button>
+                  <button 
+                    onClick={() => { setViewOverride('resident'); setActiveTab('home'); }} 
+                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'resident' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                  >
+                    CLIENT VIEW
+                  </button>
+                </div>
               )}
               
-              <button className="p-3 bg-brand-card border border-white/10 rounded-2xl hover:bg-brand-card/80 relative transition-all group">
-                <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emergency border-2 border-brand-bg rounded-full animate-ping"></span>}
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleGlobalSiren}
+                  className={cn(
+                    "p-3 rounded-2xl border transition-all group relative",
+                    globalSirenActive 
+                      ? "bg-emergency border-white/20 text-white animate-pulse shadow-glow-red" 
+                      : "bg-brand-card border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20"
+                  )}
+                  title={globalSirenActive ? "Stop Global Emergency Broadcast" : "Activate Global Siren"}
+                >
+                  {globalSirenActive ? <VolumeX className="w-5 h-5 group-hover:scale-110 transition-transform" /> : <Volume2 className="w-5 h-5 group-hover:scale-110 transition-transform" />}
+                </button>
+  
+                {(effectiveRole === 'tanod' || effectiveRole === 'admin' || effectiveRole === 'superadmin') && (
+                  <button 
+                    onClick={() => setIsIncidentFormOpen(true)}
+                    className="flex items-center gap-2 px-6 py-3 bg-emergency rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-xs tracking-widest"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3px]" /> NEW INCIDENT
+                  </button>
+                )}
+                
+                <button className="p-3 bg-brand-card border border-white/10 rounded-2xl hover:bg-brand-card/80 relative transition-all group">
+                  <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emergency border-2 border-brand-bg rounded-full animate-ping"></span>}
+                </button>
+              </div>
             </div>
-          </div>
-        </header>
-
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={activeTab} 
-            initial={{ opacity: 0, x: 20, filter: 'blur(10px)' }} 
-            animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} 
-            exit={{ opacity: 0, x: -20, filter: 'blur(10px)' }} 
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} 
-            className="flex-1"
-          >
-            {activeTab === 'home' && effectiveProfile && (
-              <DashboardView 
-                profile={effectiveProfile} 
-                alerts={alerts} 
-                patrols={patrols} 
-                onTabChange={(tab: any) => setActiveTab(tab as any)} 
-                isOnline={isOnline} 
-                deferredPrompt={deferredPrompt}
-                onInstall={handleInstallApp}
-                sirenActive={globalSirenActive}
-                onToggleSiren={toggleGlobalSiren}
-                visiblePatrols={visiblePatrols}
-                activeBroadcast={activeBroadcast}
-              />
-            )}
-            {activeTab === 'map' && (
-              <div className="h-full min-h-[500px] flex flex-col gap-4">
-                <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold font-mono uppercase">Offline Area Map</h3>
-                    <p className="text-xs text-[#8E9299]">Fallback view for network issues / area intelligence</p>
+          </header>
+  
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={activeTab} 
+              initial={{ opacity: 0, x: 20, filter: 'blur(10px)' }} 
+              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} 
+              exit={{ opacity: 0, x: -20, filter: 'blur(10px)' }} 
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} 
+              className="flex-1"
+            >
+              {activeTab === 'home' && effectiveProfile && (
+                <DashboardView 
+                  profile={effectiveProfile} 
+                  alerts={alerts} 
+                  patrols={patrols} 
+                  onTabChange={(tab: any) => setActiveTab(tab as any)} 
+                  isOnline={isOnline} 
+                  deferredPrompt={deferredPrompt}
+                  onInstall={handleInstallApp}
+                  sirenActive={globalSirenActive}
+                  onToggleSiren={toggleGlobalSiren}
+                  visiblePatrols={visiblePatrols}
+                  activeBroadcast={activeBroadcast}
+                />
+              )}
+              {activeTab === 'map' && (
+                <div className="h-full min-h-[500px] flex flex-col gap-4">
+                  <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-bold font-mono uppercase">Offline Area Map</h3>
+                      <p className="text-xs text-[#8E9299]">Fallback view for network issues / area intelligence</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
+                      <div className="flex items-center gap-2"><span className="text-base">🔴</span> SOS</div>
+                      <div className="flex items-center gap-2"><span className="text-base">🟢</span> PATROL</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
-                    <div className="flex items-center gap-2"><span className="text-base">🔴</span> SOS</div>
-                    <div className="flex items-center gap-2"><span className="text-base">🟢</span> PATROL</div>
-                  </div>
+                  <ActiveMap alerts={alerts} patrols={visiblePatrols} />
                 </div>
-                <ActiveMap alerts={alerts} patrols={visiblePatrols} />
-              </div>
-            )}
-            {activeTab === 'tracker' && (
-              <div className="h-full min-h-[500px] flex flex-col gap-4">
-                <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold font-mono uppercase">Tactical Live GPS</h3>
-                    <p className="text-xs text-[#8E9299]">Real-time Tanod-to-Citizen streaming via WebSockets/Firebase</p>
+              )}
+              {activeTab === 'tracker' && (
+                <div className="h-full min-h-[500px] flex flex-col gap-4">
+                  <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-bold font-mono uppercase">Tactical Live GPS</h3>
+                      <p className="text-xs text-[#8E9299]">Real-time Tanod-to-Citizen streaming via WebSockets/Firebase</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
+                      <div className="flex items-center gap-2"><span className="text-base">🔴</span> RESIDENT SOS</div>
+                      <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
-                    <div className="flex items-center gap-2"><span className="text-base">🔴</span> RESIDENT SOS</div>
-                    <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
-                  </div>
+                  <LiveMap />
                 </div>
-                <LiveMap />
-              </div>
-            )}
-            {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}
-            {activeTab === 'resident-map' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <ResidentTacticalMap />}
-            {activeTab === 'directory' && <DirectoryView />}
-            {activeTab === 'schedule' && effectiveProfile && <ScheduleView profile={effectiveProfile} role={effectiveRole as any} />}
-            {activeTab === 'reports' && <ReportsView />}
-            {activeTab === 'settings' && effectiveProfile && <SettingsView profile={effectiveProfile} role={effectiveRole as any} />}
-            {activeTab === 'roster' && <TanodRosterView />}
-            {activeTab === 'logs' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <TanodActivityLogs />}
-          </motion.div>
-        </AnimatePresence>
+              )}
+              {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}
+              {activeTab === 'resident-map' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <ResidentTacticalMap />}
+              {activeTab === 'directory' && <DirectoryView />}
+              {activeTab === 'schedule' && effectiveProfile && <ScheduleView profile={effectiveProfile} role={effectiveRole as any} />}
+              {activeTab === 'reports' && <ReportsView />}
+              {activeTab === 'settings' && effectiveProfile && <SettingsView profile={effectiveProfile} role={effectiveRole as any} />}
+              {activeTab === 'roster' && <TanodRosterView />}
+              {activeTab === 'logs' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <TanodActivityLogs />}
+            </motion.div>
+          </AnimatePresence>
+        </GlobalErrorBoundary>
 
         {isIncidentFormOpen && effectiveProfile && (
           <IncidentForm profile={effectiveProfile} onClose={() => setIsIncidentFormOpen(false)} />
