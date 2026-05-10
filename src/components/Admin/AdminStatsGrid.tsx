@@ -75,7 +75,10 @@ export function AdminStatsGrid({
       />
       <StatCard 
         label="Online Tanods" 
-        value={onDutyTanods.filter((t: any) => (t.status as string)?.toLowerCase() === 'on-duty' || (t.status as string)?.toLowerCase() === 'responding' || (t.status as string)?.toLowerCase() === 'available').length} 
+        value={onDutyTanods.filter((t: any) => {
+          const s = (t.status as string)?.toLowerCase();
+          return s === 'on-duty' || s === 'on patrol' || s === 'responding' || s === 'available';
+        }).length} 
         icon={IconOnlineTanods}
         color="text-success" 
         bg="bg-success/10" 

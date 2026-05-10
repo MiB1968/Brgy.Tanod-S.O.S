@@ -92,6 +92,7 @@ async function initDb(retries = 3) {
       await client.query(`
         CREATE TABLE IF NOT EXISTS residents (
           id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          name TEXT,
           phone TEXT,
           address TEXT,
           house_number TEXT,
@@ -102,6 +103,7 @@ async function initDb(retries = 3) {
           emergency_contact_phone TEXT,
           gps_lat FLOAT,
           gps_lng FLOAT,
+          status TEXT DEFAULT 'pending',
           is_verified BOOLEAN DEFAULT false,
           verification_date TIMESTAMPTZ
         );
@@ -211,8 +213,11 @@ async function initDb(retries = 3) {
           tanod_name TEXT,
           timestamp TIMESTAMPTZ,
           type TEXT,
+          location TEXT,
           gps_location JSONB,
           description TEXT,
+          persons_involved TEXT,
+          actions_taken TEXT,
           status TEXT
         );
       `);
@@ -314,7 +319,10 @@ async function startServer() {
 
       if (collection === 'alerts' || collection === 'active_alerts') {
         if (id) {
-          const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [id]);
+          const result = await pool.query(
+            "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1", 
+            [id]
+          );
           const alert = result.rows[0];
           if (!alert) return res.status(404).json({ error: "Not found" });
           return res.json({
@@ -323,8 +331,7 @@ async function startServer() {
             timestamp: alert.created_at
           });
         } else {
-          // Simplified implementation for now if searching is complex
-          const query = "SELECT * FROM alerts ORDER BY created_at DESC LIMIT 100";
+          const query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id ORDER BY a.created_at DESC LIMIT 100";
           console.log(`DB_QUERY: ${query}`);
           const result = await pool.query(query);
           return res.json(result.rows.map(a => ({
@@ -375,8 +382,10 @@ async function startServer() {
         })));
       }
 
-      if (collection === 'broadcasts' || collection === 'system_broadcasts') {
-        const query = "SELECT * FROM system_broadcasts WHERE isactive = true ORDER BY timestamp DESC LIMIT 1";
+      if (collection === 'system_broadcasts' || collection === 'broadcasts') {
+        const query = (searchParams && searchParams.includes('isActive=true'))
+          ? "SELECT * FROM system_broadcasts WHERE isactive = true ORDER BY timestamp DESC"
+          : "SELECT * FROM system_broadcasts ORDER BY timestamp DESC LIMIT 100";
         console.log(`DB_QUERY: ${query}`);
         const result = await pool.query(query);
         return res.json(result.rows);
@@ -481,42 +490,144 @@ async function startServer() {
       }
 
       if (collection === 'users') {
-        const result = await pool.query(
-          `UPDATE users SET status = $1, last_active = now() WHERE id = $2`,
-          [data.status, docId]
+        const fieldMapping: Record<string, string> = {
+          status: 'status',
+          role: 'role',
+          name: 'name',
+          email: 'email'
+        };
+
+        const safeData: Record<string, any> = {};
+        Object.keys(data).forEach(key => {
+          if (fieldMapping[key]) {
+            safeData[fieldMapping[key]] = data[key];
+          }
+        });
+
+        const safeFields = Object.keys(safeData);
+        if (safeFields.length === 0) return res.status(400).json({ error: "No valid fields to update" });
+
+        const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        await pool.query(
+          `UPDATE users SET ${setClause}, last_active = now() WHERE id = $1`,
+          [docId, ...safeFields.map(f => safeData[f])]
         );
+        
+        io.emit("tanod_update", { id: docId, ...safeData });
         return res.json({ success: true });
       }
 
       if (collection === 'residents') {
-        const ALLOWED_RESIDENT_FIELDS = ['phone', 'address', 'house_number', 'household_size', 'blood_type', 'medical_conditions', 'emergency_contact_name', 'emergency_contact_phone', 'gps_lat', 'gps_lng', 'is_verified', 'verification_date'];
-        const safeFields = Object.keys(data).filter(f => ALLOWED_RESIDENT_FIELDS.includes(f));
+        const fieldMapping: Record<string, string> = {
+          name: 'name',
+          fullName: 'name',
+          phone: 'phone',
+          mobileNumber: 'phone',
+          address: 'address',
+          status: 'status',
+          house_number: 'house_number',
+          houseNumber: 'house_number',
+          household_size: 'household_size',
+          householdSize: 'household_size',
+          householdCount: 'household_size',
+          blood_type: 'blood_type',
+          bloodType: 'blood_type',
+          medical_conditions: 'medical_conditions',
+          medicalConditions: 'medical_conditions',
+          emergency_contact_name: 'emergency_contact_name',
+          emergencyContactName: 'emergency_contact_name',
+          emergency_contact_phone: 'emergency_contact_phone',
+          emergencyContactPhone: 'emergency_contact_phone',
+          gps_lat: 'gps_lat',
+          gpsLat: 'gps_lat',
+          gps_lng: 'gps_lng',
+          gpsLng: 'gps_lng',
+          is_verified: 'is_verified',
+          isVerified: 'is_verified',
+          verification_date: 'verification_date',
+          verificationDate: 'verification_date',
+          approvedAt: 'verification_date',
+          rejectionReason: 'rejection_reason',
+          rejection_reason: 'rejection_reason'
+        };
+
+        const safeData: Record<string, any> = {};
+        Object.keys(data).forEach(key => {
+          if (fieldMapping[key]) {
+            safeData[fieldMapping[key]] = data[key];
+          }
+        });
+
+        const safeFields = Object.keys(safeData);
         if (safeFields.length === 0) return res.status(400).json({ error: "No valid fields to update" });
         const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
         await pool.query(
           `UPDATE residents SET ${setClause} WHERE id = $1`,
-          [docId, ...safeFields.map(f => data[f])]
+          [docId, ...safeFields.map(f => safeData[f])]
         );
+        io.emit("resident_update", { id: docId, ...safeData });
         return res.json({ success: true });
       }
 
       if (collection === 'patrols') {
-        const ALLOWED_PATROL_FIELDS = ['is_active', 'location'];
-        const safeFields = Object.keys(data).filter(f => ALLOWED_PATROL_FIELDS.includes(f));
+        const fieldMapping: Record<string, string> = {
+          is_active: 'is_active',
+          isActive: 'is_active',
+          location: 'location',
+          status: 'status', // Adding status to mapping
+          tanodName: 'tanod_name',
+          tanod_name: 'tanod_name'
+        };
+
+        const safeData: Record<string, any> = {};
+        Object.keys(data).forEach(key => {
+          if (fieldMapping[key]) {
+            safeData[fieldMapping[key]] = data[key];
+          }
+        });
+
+        const safeFields = Object.keys(safeData);
         if (safeFields.length === 0) return res.status(400).json({ error: "No valid fields to update" });
         const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        
+        // Use UPSERT for patrols since they might not exist yet when a tanod goes online
         await pool.query(
-          `UPDATE patrols SET ${setClause}, last_ping = now() WHERE tanod_id = $1`,
-          [docId, ...safeFields.map(f => data[f])]
+          `INSERT INTO patrols (tanod_id, is_active, location, status, tanod_name, last_ping)
+           VALUES ($1, $2, $3, $4, $5, now())
+           ON CONFLICT (tanod_id) DO UPDATE SET 
+           is_active = EXCLUDED.is_active,
+           location = EXCLUDED.location,
+           status = EXCLUDED.status,
+           tanod_name = EXCLUDED.tanod_name,
+           last_ping = now()`,
+          [
+            docId, 
+            safeData.is_active ?? true, 
+            JSON.stringify(safeData.location || {}), 
+            safeData.status || 'Available', 
+            safeData.tanod_name || 'Active Tanod'
+          ]
         );
+        
+        io.emit("patrol_update", { tanod_id: docId, ...safeData });
         return res.json({ success: true });
       }
 
       if (collection === 'system_broadcasts' || collection === 'broadcasts') {
-        await pool.query(
-          "UPDATE system_broadcasts SET isActive = $1 WHERE id = $2",
-          [data.isActive, docId]
-        );
+        if (docId) {
+          await pool.query(
+            "UPDATE system_broadcasts SET isActive = $1 WHERE id = $2",
+            [data.isActive, docId]
+          );
+          const result = await pool.query("SELECT * FROM system_broadcasts WHERE id = $1", [docId]);
+          io.emit("broadcast_update", result.rows[0]);
+        } else {
+          const result = await pool.query(
+            "INSERT INTO system_broadcasts (adminId, adminName, message, type, isactive, timestamp) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+            [data.adminId, data.adminName, data.message, data.type, data.isActive ?? true, data.timestamp || new Date().toISOString()]
+          );
+          io.emit("broadcast_update", result.rows[0]);
+        }
         return res.json({ success: true });
       }
 
@@ -530,8 +641,21 @@ async function startServer() {
 
       if (collection === 'incidents') {
         await pool.query(
-          "INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, gps_location, description, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [data.alertId, data.tanodId, data.tanodName, data.timestamp, data.type, JSON.stringify(data.gpsLocation), data.description, data.status]
+          `INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, location, gps_location, description, persons_involved, actions_taken, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            data.alertId || null, 
+            data.tanodId, 
+            data.tanodName, 
+            data.timestamp || new Date().toISOString(), 
+            data.type, 
+            data.location, 
+            JSON.stringify(data.gpsLocation || null), 
+            data.description, 
+            data.personsInvolved || null, 
+            data.actionsTaken || null, 
+            data.status || 'pending'
+          ]
         );
         return res.json({ success: true });
       }
@@ -542,7 +666,19 @@ async function startServer() {
         const values = Object.values(data);
         
         // Simple sanitization - ensure fields are allowed
-        const allowedFields = ['status', 'severity_score', 'ai_analysis', 'resolved_at'];
+        const allowedFields = [
+          'status', 
+          'severity_score', 
+          'ai_analysis', 
+          'resolved_at', 
+          'assignedTo', 
+          'assignedToName', 
+          'respondedAt',
+          'respondedBy',
+          'respondedByName',
+          'resolutionNotes',
+          'responderNotes'
+        ];
         const updateFields = fields.filter(f => allowedFields.includes(f));
         
         if (updateFields.length > 0) {
@@ -552,8 +688,19 @@ async function startServer() {
             [docId, ...updateFields.map(f => data[f])]
           );
           
-          const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [docId]);
-          io.emit("alert_update", { type: 'update', alert: result.rows[0] });
+          const result = await pool.query(
+            "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1", 
+            [docId]
+          );
+          const alert = result.rows[0];
+          io.emit("alert_update", { 
+            type: 'update', 
+            alert: {
+              ...alert,
+              location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
+              timestamp: alert.created_at
+            }
+          });
         }
         
         return res.json({ success: true });
@@ -625,7 +772,10 @@ async function startServer() {
       
       if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
       
-      res.json({ success: true, user: result.rows[0] });
+      const updatedUser = result.rows[0];
+      io.emit("tanod_update", { id: updatedUser.id, status: updatedUser.status, role: updatedUser.role });
+      
+      res.json({ success: true, user: updatedUser });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -647,16 +797,18 @@ async function startServer() {
 
       if (role === 'resident' && details) {
         await client.query(
-          `INSERT INTO residents (id, phone, address, house_number, household_size, gps_lat, gps_lng) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          `INSERT INTO residents (id, name, phone, address, house_number, household_size, gps_lat, gps_lng, status) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             userId, 
+            name,
             details.mobileNumber, 
             details.address, 
             details.houseNumber, 
             parseInt(details.householdCount) || 1,
             details.gpsLat,
-            details.gpsLng
+            details.gpsLng,
+            'pending'
           ]
         );
       }
@@ -812,6 +964,15 @@ async function startServer() {
   // Socket Connection
   io.on("connection", (socket) => {
     console.log("SOCKET: Connected", socket.id);
+    
+    // Simple re-emit pattern for real-time collaboration
+    socket.on("tanod_update", (data) => socket.broadcast.emit("tanod_update", data));
+    socket.on("patrol_location", (data) => socket.broadcast.emit("patrol_location", data));
+    socket.on("alert_update", (data) => socket.broadcast.emit("alert_update", data));
+    socket.on("broadcast_update", (data) => socket.broadcast.emit("broadcast_update", data));
+    socket.on("resident_update", (data) => socket.broadcast.emit("resident_update", data));
+    socket.on("shift_update", (data) => socket.broadcast.emit("shift_update", data));
+    
     socket.on("disconnect", () => console.log("SOCKET: Disconnected", socket.id));
   });
 

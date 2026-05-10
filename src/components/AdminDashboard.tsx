@@ -290,7 +290,12 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
         updatedAt: new Date().toISOString()
       });
 
-      const isActuallyOnline = newStatus.toLowerCase() === 'on-duty' || newStatus.toLowerCase() === 'responding';
+      const isActuallyOnline = 
+        newStatus.toLowerCase() === 'on-duty' || 
+        newStatus.toLowerCase() === 'on patrol' || 
+        newStatus.toLowerCase() === 'responding' || 
+        newStatus.toLowerCase() === 'available';
+        
       await api.generic.update(`patrols/${tanodId}`, {
         isActive: isActuallyOnline,
         lastUpdate: new Date().toISOString()
@@ -788,12 +793,12 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                 </div>
               ) : (
                 onDutyTanods.map((t, index) => {
-                  const pMatch = patrols.find(p => p.tanodId === t.uid);
+                  const pMatch = patrols.find(p => p.tanodId === t.id);
                   const isOnline = pMatch?.isActive;
                   const lastUpdate = pMatch?.lastUpdate;
 
                   return (
-                    <div key={t.uid || t.id || index} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
+                    <div key={t.id || index} className="flex items-center gap-5 p-5 bg-brand-bg/40 rounded-[28px] border border-white/5 hover:border-info/40 hover:bg-brand-bg/60 transition-all group relative overflow-hidden">
                       <div className="w-14 h-14 rounded-[20px] bg-brand-card flex items-center justify-center border border-white/5 group-hover:bg-info/10 group-hover:border-info/20 shadow-inner group-hover:shadow-info/10 transition-all relative z-10">
                         <Shield className={cn(
                           "w-7 h-7 transition-colors",
@@ -806,11 +811,13 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                           <p className="text-base font-black text-white/90 leading-tight font-mono uppercase italic tracking-tight truncate">{t.name}</p>
                           <select
                             value={(t as TanodProfile).status || 'Off-Duty'}
-                            onChange={(e) => handleUpdateTanodStatus(t.uid, e.target.value)}
+                            onChange={(e) => handleUpdateTanodStatus(t.id, e.target.value)}
                             className="bg-brand-bg/80 border border-white/10 rounded-lg px-2 py-1 text-[8px] font-black text-white/40 font-mono outline-none focus:border-info/30 transition-all uppercase tracking-wider cursor-pointer hover:bg-brand-bg hover:text-white"
                           >
                             <option value="On-Duty">ST: ON DUTY</option>
+                            <option value="On Patrol">ST: ON PATROL</option>
                             <option value="Responding">ST: RESPONDING</option>
+                            <option value="Available">ST: AVAILABLE</option>
                             <option value="Off-Duty">ST: OFF DUTY</option>
                           </select>
                         </div>
@@ -819,7 +826,7 @@ export default function AdminDashboard({ profile, onTabChange, deferredPrompt, o
                           <input
                             type="text"
                             value={(t as TanodProfile).sector || ''}
-                            onChange={(e) => handleUpdateTanodField(t.uid, 'sector', e.target.value)}
+                            onChange={(e) => handleUpdateTanodField(t.id, 'sector', e.target.value)}
                             className="bg-brand-bg/50 border border-white/10 rounded-lg px-2 py-0.5 text-[8px] font-black text-white font-mono outline-none focus:border-info/30 uppercase tracking-wider"
                             placeholder="Assign Sector"
                           />

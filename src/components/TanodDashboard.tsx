@@ -429,8 +429,21 @@ export default function TanodDashboard({ profile, onTabChange, deferredPrompt, o
                       const newStatus = e.target.value as RegistryStatus;
                       try {
                         await api.generic.update(`users/${profile.id}`, { status: newStatus });
+                        
+                        // Sync with patrols table for live monitor
+                        const isOnline = 
+                          newStatus.toLowerCase() === 'on patrol' || 
+                          newStatus.toLowerCase() === 'responding' || 
+                          newStatus.toLowerCase() === 'available';
+
+                        await api.generic.update(`patrols/${profile.id}`, { 
+                          isActive: isOnline,
+                          status: newStatus.toLowerCase().includes('responding') ? 'responding' : (isOnline ? 'patrolling' : 'offline')
+                        });
+
                         updateTanodStatus(profile.id, newStatus);
                         socket.emit('tanod_update', { id: profile.id });
+                        socket.emit('patrol_update', { tanod_id: profile.id, isActive: isOnline });
                       } catch(e) {
                           console.error('Failed to update status', e);
                       }

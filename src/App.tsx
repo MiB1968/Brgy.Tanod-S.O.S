@@ -113,7 +113,7 @@ export default function App() {
     setIsLoading: setLoading 
   } = useAuthStore();
   const { alerts, setAlerts, addAlert } = useIncidentStore();
-  const { patrols, setPatrols } = useTanodStore();
+  const { patrols, setPatrols, setTanods, updateTanodStatus } = useTanodStore();
   const { 
     isOnline, 
     setIsOnline, 
@@ -200,12 +200,14 @@ export default function App() {
     async function loadInitialData() {
       if (!user) return;
       try {
-        const [alertsData, patrolsData] = await Promise.all([
+        const [alertsData, patrolsData, tanodsData] = await Promise.all([
           api.alerts.getAll(),
-          api.generic.list('patrols')
+          api.generic.list('patrols'),
+          api.generic.list('users?role=tanod')
         ]);
         setAlerts(alertsData);
         setPatrols(patrolsData);
+        setTanods(tanodsData);
       } catch (err) {
         console.error("Failed to load initial data", err);
       }
@@ -386,7 +388,7 @@ export default function App() {
          lastUpdate: new Date().toISOString()
        };
        
-       setPatrols([...patrols.filter(p => p.tanodId !== update.tanod_id), patrol]);
+       setPatrols(prev => [...prev.filter(p => p.tanodId !== update.tanod_id), patrol]);
     });
 
     socket.on('broadcast_update', (broadcast: any) => {
@@ -394,6 +396,12 @@ export default function App() {
         setActiveBroadcast(broadcast);
       } else {
         setActiveBroadcast(null);
+      }
+    });
+
+    socket.on('tanod_update', (update: any) => {
+      if (update.status) {
+        updateTanodStatus(update.id, update.status);
       }
     });
 
