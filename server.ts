@@ -507,6 +507,9 @@ async function startServer() {
   // --- Data Routes ---
   app.get("/api/users/:id", authenticate, async (req: AuthRequest, res: any) => {
     try {
+      if (req.user.id !== req.params.id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
       const result = await pool.query("SELECT id, email, name, role FROM users WHERE id = $1", [req.params.id]);
       if (result.rows.length === 0) return res.status(404).json({ error: "User not found" });
       res.json(result.rows[0]);
