@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area } from 'recharts';
 import { motion } from 'motion/react';
 import { BarChart as ChartIcon, Zap, Shield, Users, Activity } from 'lucide-react';
+import { fetchAPI } from '../../lib/api';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
@@ -12,13 +13,8 @@ export default function AdminAnalytics() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const res = await fetch('/api/analytics/dashboard', {
-          credentials: 'include'
-        });
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
-        }
+        const json = await fetchAPI('/analytics/dashboard');
+        setData(json);
       } catch (err) {
         console.error("Failed to fetch analytics:", err);
       } finally {

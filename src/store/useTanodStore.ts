@@ -8,7 +8,7 @@ interface TanodState {
   patrolSessions: TanodPatrolSession[];
   tanods: TanodProfile[];
   updatePatrol: (patrol: PatrolLocation) => void;
-  setPatrols: (patrols: PatrolLocation[]) => void;
+  setPatrols: (patrols: PatrolLocation[] | ((prev: PatrolLocation[]) => PatrolLocation[])) => void;
   setShifts: (shifts: Shift[]) => void;
   setActivityLogs: (logs: TanodActivityLog[]) => void;
   setPatrolSessions: (sessions: TanodPatrolSession[]) => void;
@@ -27,7 +27,9 @@ export const useTanodStore = create<TanodState>((set) => ({
   updatePatrol: (patrol: PatrolLocation) => set((state) => ({
     patrols: state.patrols.map((p) => p.id === patrol.id ? { ...p, ...patrol } : p)
   })),
-  setPatrols: (patrols) => set({ patrols }),
+  setPatrols: (patrols) => set((state) => ({
+    patrols: typeof patrols === 'function' ? patrols(state.patrols) : patrols
+  })),
   setShifts: (shifts) => set({ shifts }),
   setActivityLogs: (activityLogs) => set({ activityLogs }),
   setPatrolSessions: (patrolSessions) => set({ patrolSessions }),

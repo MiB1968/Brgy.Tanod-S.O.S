@@ -12,7 +12,7 @@ Deno.serve(async () => {
 
     // 1. Fetch current active reports
     const { data: logs, error: fetchError } = await supabase
-      .from('report_logs')
+      .from('audit_logs')
       .select('*');
 
     if (fetchError) throw fetchError;
@@ -39,7 +39,7 @@ Deno.serve(async () => {
 
     // 4. Clear Active Logs
     const { error: deleteError } = await supabase
-      .from('report_logs')
+      .from('audit_logs')
       .delete()
       .neq('id', 'placeholder'); // Delete all
 

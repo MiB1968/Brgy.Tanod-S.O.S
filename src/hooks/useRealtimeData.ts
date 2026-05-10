@@ -6,7 +6,7 @@ import { SystemBroadcast, Alert, PatrolLocation } from '../types';
 
 export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadcast | null) => void, setGlobalSirenActive: (a: boolean) => void) => {
   const { setAlerts, addAlert } = useIncidentStore();
-  const { setPatrols } = useTanodStore();
+  const { setPatrols, updatePatrol } = useTanodStore();
 
   useEffect(() => {
     if (!user) return;
@@ -27,8 +27,11 @@ export const useRealtimeData = (user: any, setActiveBroadcast: (b: SystemBroadca
 
     // Patrol updates
     socket.on('patrol_update', (patrol: any) => {
-      // Map server data to frontend type if needed
-      // This will trigger store updates usually
+      // Assuming 'patrol' maps correctly, update the patrol in the store 
+      // Using updatePatrol if patrol has an ID
+      if (patrol.id) {
+         updatePatrol(patrol);
+      }
     });
 
     return () => {

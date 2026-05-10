@@ -13,7 +13,7 @@ const pool = new pg.Pool({
 
 async function createTestUsers() {
   const tanodPass = await bcrypt.hash('tanodtest', 10);
-  const residentPass = await bcrypt.hash('resedenttest', 10);
+  const residentPass = await bcrypt.hash('residenttest', 10);
 
   const client = await pool.connect();
   try {
@@ -28,11 +28,13 @@ async function createTestUsers() {
     // Create Resident
     await client.query(
       "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (email) DO NOTHING",
-      ['resedenttest@gmail.com', residentPass, 'Resident Test', 'resident', 'pending']
+      ['residenttest@gmail.com', residentPass, 'Resident Test', 'resident', 'pending']
     );
     
     await client.query('COMMIT');
     console.log("Test users created successfully.");
+    console.log("  Tanod   → tanodtest@gmail.com / tanodtest");
+    console.log("  Resident → residenttest@gmail.com / residenttest");
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Error:", err);

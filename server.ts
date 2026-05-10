@@ -20,7 +20,11 @@ dotenv.config();
 const { Pool } = pg;
 const apiKey = process.env.GEMINI_API_KEY?.trim() || null;
 const DATABASE_URL = (process.env.COCKROACH_URL || process.env.DATABASE_URL)?.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret_shhh";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.");
+  process.exit(1);
+}
 
 // Database Pool
 const pool = new Pool({
@@ -129,14 +133,20 @@ async function initDb(retries = 3) {
       `);
 
       // Bootstrap Admin
-      const adminEmail = 'rubenlleg12@gmail.com';
-      const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
-      if (adminResult.rows.length === 0) {
-        const hashedPass = await bcrypt.hash('admin123', 10);
-        await client.query(
-          "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
-          [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
-        );
+      const adminEmail = process.env.ADMIN_BOOTSTRAP_EMAIL;
+      const adminPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+      
+      if (!adminEmail || !adminPassword) {
+        console.warn("WARN: ADMIN_BOOTSTRAP_EMAIL or ADMIN_BOOTSTRAP_PASSWORD not set. Skipping admin bootstrap.");
+      } else {
+        const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+        if (adminResult.rows.length === 0) {
+          const hashedPass = await bcrypt.hash(adminPassword, 10);
+          await client.query(
+            "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+            [adminEmail, hashedPass, 'Admin', 'admin', 'verified']
+          );
+        }
       }
 
       await client.query(`
@@ -153,6 +163,16 @@ async function initDb(retries = 3) {
           message TEXT NOT NULL,
           timestamp TIMESTAMPTZ DEFAULT now(),
           isActive BOOLEAN DEFAULT true
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS witness_invites (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          alert_id UUID REFERENCES alerts(id) ON DELETE CASCADE,
+          invited_by UUID REFERENCES users(id),
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TIMESTAMPTZ DEFAULT now()
         );
       `);
 
@@ -251,22 +271,6 @@ async function startServer() {
   // IMPORTANT: Set trust proxy for rate limiting behind load balancers
   app.set('trust proxy', 1);
 
-  app.get("/api/debug-db", (req, res) => {
-    if (!DATABASE_URL) return res.json({ status: "missing" });
-    try {
-      const url = new URL(DATABASE_URL);
-      res.json({
-        status: "configured",
-        host: url.hostname,
-        port: url.port,
-        protocol: url.protocol,
-        length: DATABASE_URL.length
-      });
-    } catch (e: any) {
-      res.json({ status: "error", message: e.message });
-    }
-  });
-
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: "*" }
@@ -290,7 +294,7 @@ async function startServer() {
   app.use("/api/", limiter);
 
   // --- Sync API (Mock Firestore to Postgres) ---
-  app.get("/api/sync", async (req, res) => {
+  app.get("/api/sync", authenticate, async (req: AuthRequest, res: any) => {
     const { path: fullPath } = req.query;
     if (!fullPath) return res.status(400).json({ error: "Path required" });
 
@@ -485,21 +489,25 @@ async function startServer() {
       }
 
       if (collection === 'residents') {
-        const fields = Object.keys(data);
-        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        const ALLOWED_RESIDENT_FIELDS = ['phone', 'address', 'house_number', 'household_size', 'blood_type', 'medical_conditions', 'emergency_contact_name', 'emergency_contact_phone', 'gps_lat', 'gps_lng', 'is_verified', 'verification_date'];
+        const safeFields = Object.keys(data).filter(f => ALLOWED_RESIDENT_FIELDS.includes(f));
+        if (safeFields.length === 0) return res.status(400).json({ error: "No valid fields to update" });
+        const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
         await pool.query(
           `UPDATE residents SET ${setClause} WHERE id = $1`,
-          [docId, ...Object.values(data)]
+          [docId, ...safeFields.map(f => data[f])]
         );
         return res.json({ success: true });
       }
 
       if (collection === 'patrols') {
-        const fields = Object.keys(data);
-        const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+        const ALLOWED_PATROL_FIELDS = ['is_active', 'location'];
+        const safeFields = Object.keys(data).filter(f => ALLOWED_PATROL_FIELDS.includes(f));
+        if (safeFields.length === 0) return res.status(400).json({ error: "No valid fields to update" });
+        const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
         await pool.query(
           `UPDATE patrols SET ${setClause}, last_ping = now() WHERE tanod_id = $1`,
-          [docId, ...Object.values(data)]
+          [docId, ...safeFields.map(f => data[f])]
         );
         return res.json({ success: true });
       }
@@ -552,6 +560,41 @@ async function startServer() {
       }
 
       res.status(404).json({ error: "Path not mapped" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/sync", authenticate, async (req: AuthRequest, res: any) => {
+    const { path: fullPath, id } = req.body;
+    if (!fullPath) return res.status(400).json({ error: "Path required" });
+
+    const parts = (fullPath as string).split('/');
+    const collection = parts[0];
+    const docId = id || parts[1];
+
+    try {
+      if (collection === 'alerts' && docId) {
+        await pool.query("DELETE FROM alerts WHERE id = $1", [docId]);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'system_broadcasts' && docId) {
+        await pool.query("DELETE FROM system_broadcasts WHERE id = $1", [docId]);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'tanod_activity_logs' && docId) {
+        await pool.query("DELETE FROM tanod_activity_logs WHERE id = $1", [docId]);
+        return res.json({ success: true });
+      }
+
+      if (collection === 'incidents' && docId) {
+        await pool.query("DELETE FROM incidents WHERE id = $1", [docId]);
+        return res.json({ success: true });
+      }
+
+      res.status(404).json({ error: `Delete not supported for: ${fullPath}` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

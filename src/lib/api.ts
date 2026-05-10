@@ -5,7 +5,7 @@
 
 const API_BASE = '/api';
 
-async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
