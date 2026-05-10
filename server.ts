@@ -124,11 +124,16 @@ async function initDb(retries = 3) {
       const adminEmail = 'rubenlleg12@gmail.com';
       const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
       if (adminResult.rows.length === 0) {
-        const hashedPass = await bcrypt.hash('admin123', 10);
-        await client.query(
-          "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
-          [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
-        );
+        const adminPass = process.env.ADMIN_DEFAULT_PASSWORD;
+        if (adminPass) {
+          const hashedPass = await bcrypt.hash(adminPass, 10);
+          await client.query(
+            "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+            [adminEmail, hashedPass, 'Ruben (SuperAdmin)', 'admin', 'verified']
+          );
+        } else {
+          console.warn("DB_INIT: ADMIN_DEFAULT_PASSWORD not set. Admin account creation skipped.");
+        }
       }
 
       await client.query(`
