@@ -4,6 +4,8 @@ import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { analyzeIncident } from '../services/aiService';
 import { queueSOS } from '../lib/offlineQueue';
+import { playSuccessNotification } from '../lib/audio';
+import toast from 'react-hot-toast';
 
 interface SOSState {
   activeAlert: Alert | null;
@@ -62,6 +64,15 @@ export const useSOSStore = create<SOSState>()(
       socket.on('alert_update', ({ alert }: { alert: Alert }) => {
         if (alert.residentId === userId) {
           if (alert.status !== 'resolved' && alert.status !== 'cancelled') {
+            const currentAlert = get().activeAlert;
+            // Check if status transitioned to responding
+            if (currentAlert && currentAlert.status === 'pending' && alert.status === 'responding') {
+               playSuccessNotification();
+               if (navigator.vibrate) {
+                 navigator.vibrate([200, 100, 200, 100, 200]);
+               }
+               toast.success('Help is on the way! A Tanod is responding to your SOS.', { duration: 8000 });
+            }
             set({ activeAlert: alert });
           } else {
             set({ activeAlert: null });

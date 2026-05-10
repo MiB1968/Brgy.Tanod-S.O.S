@@ -235,10 +235,26 @@ export default function BackgroundServices() {
       }
     };
 
+    const handleOnline = () => {
+      useSystemStore.getState().setIsOnline(true);
+      syncQueue(); // Flush immediately on reconnect
+    };
+
+    const handleOffline = () => {
+      useSystemStore.getState().setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const interval = setInterval(syncQueue, 30000);
     if (isOnline) syncQueue();
 
-    return () => clearInterval(interval);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
   }, [isOnline, setQueuedSOSCount, lastSyncTime]);
 
   return null;
