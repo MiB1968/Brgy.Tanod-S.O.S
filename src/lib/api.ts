@@ -25,15 +25,8 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const rawBody = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(rawBody);
-      } catch (e) {
-        errorData = { error: rawBody || 'Unknown API Error' };
-      }
-      console.error('API Error:', { status: response.status, body: errorData });
-      const message = errorData.error?.message || errorData.error || errorData.message || 'API Request failed';
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      const message = error.error?.message || error.error || error.message || 'API Request failed';
       throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
     }
 

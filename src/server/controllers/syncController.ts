@@ -63,20 +63,14 @@ export const getSync = async (req: AuthRequest, res: Response) => {
 
     if (collection === 'incidents') {
       if (!isTanod) return response.error(res, "Unauthorized", "FORBIDDEN", 403);
-      const result = await pool.query(`
-        SELECT i.*, a.resolved_at as resolved_at 
-        FROM incidents i 
-        LEFT JOIN alerts a ON i.alert_id = a.id 
-        ORDER BY i.timestamp DESC LIMIT 100
-      `);
+      const result = await pool.query("SELECT * FROM incidents ORDER BY timestamp DESC LIMIT 100");
       return res.json(result.rows.map(i => ({ 
         id: i.id, 
         ...i,
         tanodName: i.tanod_name,
         citizen: i.citizen_name || 'Citizen',
         date: i.timestamp ? new Date(i.timestamp).toISOString().split('T')[0] : 'Unknown',
-        time: i.timestamp ? new Date(i.timestamp).toLocaleTimeString() : 'Unknown',
-        resolvedAt: i.resolved_at
+        time: i.timestamp ? new Date(i.timestamp).toLocaleTimeString() : 'Unknown'
       })));
     }
 
@@ -370,12 +364,13 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     if (collection === 'incidents') {
       if (!isTanod) return response.error(res, "Access Denied", "FORBIDDEN", 403);
       await pool.query(
-        `INSERT INTO incidents (alert_id, tanod_id, tanod_name, timestamp, type, location, gps_location, description, persons_involved, actions_taken, status, assigned_to, assigned_to_name, responded_by, responded_by_name, responded_at, resolution_notes, responder_notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        `INSERT INTO incidents (alert_id, tanod_id, tanod_name, citizen_name, timestamp, type, location, gps_location, description, persons_involved, actions_taken, status, responded_at, resolved_at, admin_on_duty)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           data.alertId || null, 
           data.tanodId, 
           data.tanodName, 
+          data.citizenName || data.citizen || 'Unknown',
           data.timestamp || new Date().toISOString(), 
           data.type, 
           data.location, 
@@ -384,13 +379,9 @@ export const postSync = async (req: AuthRequest, res: Response) => {
           data.personsInvolved || null, 
           data.actionsTaken || null, 
           data.status || 'pending',
-          data.assignedTo || null,
-          data.assignedToName || null,
-          data.respondedBy || null,
-          data.respondedByName || null,
           data.respondedAt || null,
-          data.resolutionNotes || null,
-          data.responderNotes || null
+          data.resolvedAt || null,
+          data.adminOnDuty || null
         ]
       );
       return res.json({ success: true });

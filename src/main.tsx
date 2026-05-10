@@ -12,6 +12,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+console.log("App starting...");
 createRoot(document.getElementById('root')!).render(
   <GlobalErrorBoundary>
     <App />

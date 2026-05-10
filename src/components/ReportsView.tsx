@@ -132,29 +132,17 @@ export default function ReportsView() {
                 <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em] mb-3 font-mono">Mission Narrative</p>
                 <div className="space-y-3">
                   <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Alerted By:</span> {report.citizen || 'Unknown'}
+                    <span className="text-white/40">Alerted By Cityzen Name:</span> {report.citizen || 'Unknown'}
                   </p>
                   <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Resident Address:</span> {report.location || 'Unknown'}
+                    <span className="text-white/40">Location:</span> {report.location || 'Unknown'}
                   </p>
                   <p className="font-bold text-[13px] text-white/80 font-mono italic">
-                    <span className="text-white/40">Reported Details:</span> "{report.description || 'N/A'}"
+                    <span className="text-white/40">Citizen Reported details:</span> "{report.description}"
                   </p>
-                  <div className="pt-2 border-t border-white/5 mt-2 space-y-1">
-                    <p className="font-bold text-[11px] text-white/60 font-mono italic">
-                      <span className="text-white/40">Alert Time:</span> {report.timestamp ? new Date(report.timestamp).toLocaleString() : 'N/A'}
-                    </p>
-                    <p className="font-bold text-[11px] text-white/60 font-mono italic">
-                      <span className="text-white/40">Accepted Time:</span> {report.respondedAt ? new Date(report.respondedAt).toLocaleString() : 'N/A'}
-                    </p>
-                    <p className="font-bold text-[11px] text-white/60 font-mono italic">
-                      <span className="text-white/40">Resolved Time:</span> {report.resolvedAt ? new Date(report.resolvedAt).toLocaleString() : 'N/A'}
-                    </p>
-                    <p className="font-bold text-[11px] text-success font-mono italic">
-                      <span className="text-white/40">Resolved By:</span> {report.respondedByName || report.tanodName || 'Unknown'}
-                    </p>
-                    <p className="font-bold text-[11px] text-success font-mono italic">
-                      <span className="text-white/40">Admin On Duty:</span> {report.assignedToName || 'N/A'}
+                  <div className="pt-2 border-t border-white/5 mt-2">
+                    <p className="font-bold text-[13px] text-success font-mono italic">
+                      <span className="text-white/40">Note Cleared by:</span> {report.tanodName || 'Unknown'}
                     </p>
                   </div>
                 </div>
@@ -175,13 +163,13 @@ export default function ReportsView() {
                   <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 font-mono">Time Index</p>
                   <p className="text-xs font-black text-white uppercase font-mono italic tracking-tight">{report.date} • {report.time}</p>
                 </div>
-                {report.timestamp && report.resolvedAt && (
+                {report.respondedAt && report.resolvedAt && (
                   <div className="col-span-2 p-6 bg-info/5 border border-info/20 rounded-3xl flex flex-col gap-4">
                      <div className="flex justify-between items-center">
-                       <p className="text-[9px] font-black text-info uppercase tracking-[0.3em] font-mono">Total Duration (Alerted - Resolved)</p>
+                       <p className="text-[9px] font-black text-info uppercase tracking-[0.3em] font-mono">Response Duration</p>
                        <p className="text-base font-black text-white uppercase font-mono italic">
                          {(() => {
-                           const start = new Date(report.timestamp).getTime();
+                           const start = new Date(report.respondedAt).getTime();
                            const end = new Date(report.resolvedAt).getTime();
                            const mins = Math.round((end - start) / 60000);
                            if (mins < 1) return '< 1M';
@@ -193,8 +181,8 @@ export default function ReportsView() {
                        </p>
                      </div>
                      <div className="flex justify-between items-center text-[9px] text-info/50 font-black uppercase tracking-widest font-mono">
-                       <span>ALERTED: {new Date(report.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                       <span>RESOLVED: {new Date(report.resolvedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                       <span>IN: {new Date(report.respondedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                       <span>OUT: {new Date(report.resolvedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                      </div>
                   </div>
                 )}

@@ -17,7 +17,7 @@ export default defineConfig(({mode}) => {
     },
     resolve: {
       alias: [
-        { find: '@', replacement: path.resolve(__dirname, 'src') },
+        { find: '@', replacement: path.resolve(__dirname, './') },
       ],
     },
     server: {
@@ -26,7 +26,6 @@ export default defineConfig(({mode}) => {
       hmr: process.env.DISABLE_HMR !== 'true',
     },
     optimizeDeps: {
-      exclude: ['server'],
     },
     
   };

@@ -2,10 +2,10 @@ import * as http from 'http';
 import path from 'path';
 import express from 'express';
 import { fileURLToPath } from 'url';
-import app from './server/app';
-import { initDb } from './server/services/dbService';
-import { initSocket } from './server/sockets/index';
-import { config } from './server/config/index';
+import app from './src/server/app';
+import { initDb } from './src/server/services/dbService';
+import { initSocket } from './src/server/sockets/index';
+import { config } from './src/server/config/index';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,7 +43,7 @@ async function startServer() {
   }
 
   // 4. Error Handling (Must be after all routes and middleware)
-  const { errorHandler, notFoundHandler } = await import('./server/middleware/error');
+  const { errorHandler, notFoundHandler } = await import('./src/server/middleware/error');
   app.use(notFoundHandler);
   app.use(errorHandler);
 
