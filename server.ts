@@ -85,9 +85,19 @@ async function initDb(retries = 3) {
           role TEXT NOT NULL DEFAULT 'resident',
           status TEXT NOT NULL DEFAULT 'pending',
           created_at TIMESTAMPTZ DEFAULT now(),
-          last_active TIMESTAMPTZ DEFAULT now()
+          last_active TIMESTAMPTZ DEFAULT now(),
+          active_alert_id TEXT
         );
       `);
+
+      // Modify existing table
+      try {
+        await client.query(`ALTER TABLE users ADD COLUMN active_alert_id TEXT;`);
+      } catch (err: any) {
+        if (!err.message.includes('already exists')) {
+          console.warn("DB_INIT: " + err.message);
+        }
+      }
       
       await client.query(`
         CREATE TABLE IF NOT EXISTS residents (
@@ -119,9 +129,26 @@ async function initDb(retries = 3) {
           ai_analysis JSONB,
           created_at TIMESTAMPTZ DEFAULT now(),
           updated_at TIMESTAMPTZ DEFAULT now(),
-          resolved_at TIMESTAMPTZ
+          resolved_at TIMESTAMPTZ,
+          assigned_to TEXT,
+          assigned_to_name TEXT,
+          responded_by TEXT,
+          responded_by_name TEXT,
+          responded_at TIMESTAMPTZ
         );
       `);
+
+      try {
+        await client.query(`ALTER TABLE alerts ADD COLUMN assigned_to TEXT;`);
+        await client.query(`ALTER TABLE alerts ADD COLUMN assigned_to_name TEXT;`);
+        await client.query(`ALTER TABLE alerts ADD COLUMN responded_by TEXT;`);
+        await client.query(`ALTER TABLE alerts ADD COLUMN responded_by_name TEXT;`);
+        await client.query(`ALTER TABLE alerts ADD COLUMN responded_at TIMESTAMPTZ;`);
+      } catch (err: any) {
+        if (!err.message.includes('already exists')) {
+          console.warn("DB_INIT: " + err.message);
+        }
+      }
 
       await client.query(`
         CREATE TABLE IF NOT EXISTS patrols (
@@ -314,7 +341,7 @@ async function startServer() {
 
       if (collection === 'alerts' || collection === 'active_alerts') {
         if (id) {
-          const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [id]);
+          const result = await pool.query("SELECT *, assigned_to as \"assignedTo\", assigned_to_name as \"assignedToName\", responded_by as \"respondedBy\", responded_by_name as \"respondedByName\", responded_at as \"respondedAt\" FROM alerts WHERE id = $1", [id]);
           const alert = result.rows[0];
           if (!alert) return res.status(404).json({ error: "Not found" });
           return res.json({
@@ -324,7 +351,7 @@ async function startServer() {
           });
         } else {
           // Simplified implementation for now if searching is complex
-          const query = "SELECT * FROM alerts ORDER BY created_at DESC LIMIT 100";
+          const query = "SELECT *, assigned_to as \"assignedTo\", assigned_to_name as \"assignedToName\", responded_by as \"respondedBy\", responded_by_name as \"respondedByName\", responded_at as \"respondedAt\" FROM alerts ORDER BY created_at DESC LIMIT 100";
           console.log(`DB_QUERY: ${query}`);
           const result = await pool.query(query);
           return res.json(result.rows.map(a => ({
@@ -538,22 +565,47 @@ async function startServer() {
 
       if (collection === 'alerts') {
         // Dynamic update query for alerts
-        const fields = Object.keys(data);
-        const values = Object.values(data);
+        const allowedFieldsMap: Record<string, string> = {
+          'status': 'status',
+          'severity_score': 'severity_score',
+          'ai_analysis': 'ai_analysis',
+          'resolved_at': 'resolved_at',
+          'assignedTo': 'assigned_to',
+          'assignedToName': 'assigned_to_name',
+          'respondedBy': 'responded_by',
+          'respondedByName': 'responded_by_name',
+          'respondedAt': 'responded_at'
+        };
+
+        const updateFields = [];
+        const values = [docId];
+        let index = 2;
         
-        // Simple sanitization - ensure fields are allowed
-        const allowedFields = ['status', 'severity_score', 'ai_analysis', 'resolved_at'];
-        const updateFields = fields.filter(f => allowedFields.includes(f));
+        for (const [key, value] of Object.entries(data)) {
+          if (allowedFieldsMap[key]) {
+            updateFields.push(`${allowedFieldsMap[key]} = $${index++}`);
+            values.push(value);
+          }
+        }
         
         if (updateFields.length > 0) {
-          const setClause = updateFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
           await pool.query(
-            `UPDATE alerts SET ${setClause}, updated_at = now() WHERE id = $1`,
-            [docId, ...updateFields.map(f => data[f])]
+            `UPDATE alerts SET ${updateFields.join(', ')}, updated_at = now() WHERE id = $1`,
+            values
           );
           
           const result = await pool.query("SELECT * FROM alerts WHERE id = $1", [docId]);
-          io.emit("alert_update", { type: 'update', alert: result.rows[0] });
+          const alert = result.rows[0];
+          // Map snake_case to camelCase for the frontend
+          const formattedAlert = {
+            ...alert,
+            assignedTo: alert.assigned_to,
+            assignedToName: alert.assigned_to_name,
+            respondedBy: alert.responded_by,
+            respondedByName: alert.responded_by_name,
+            respondedAt: alert.responded_at
+          };
+          io.emit("alert_update", { type: 'update', alert: formattedAlert });
         }
         
         return res.json({ success: true });
@@ -714,7 +766,7 @@ async function startServer() {
 
   app.get("/api/alerts/active", authenticate, async (req: AuthRequest, res: any) => {
     try {
-      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      const result = await pool.query("SELECT *, assigned_to as \"assignedTo\", assigned_to_name as \"assignedToName\", responded_by as \"respondedBy\", responded_by_name as \"respondedByName\", responded_at as \"respondedAt\" FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
       res.json(result.rows);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -740,7 +792,7 @@ async function startServer() {
 
   app.get("/api/sos/active", authenticate, async (req: AuthRequest, res: any) => {
     try {
-      const result = await pool.query("SELECT * FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
+      const result = await pool.query("SELECT *, assigned_to as \"assignedTo\", assigned_to_name as \"assignedToName\", responded_by as \"respondedBy\", responded_by_name as \"respondedByName\", responded_at as \"respondedAt\" FROM alerts WHERE status != 'resolved' ORDER BY created_at DESC");
       res.json(result.rows);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
