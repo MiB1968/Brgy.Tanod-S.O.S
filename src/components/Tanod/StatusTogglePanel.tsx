@@ -6,6 +6,8 @@ import { cn } from '../../lib/utils';
 import * as api from '../../lib/api';
 import socket from '../../lib/socket';
 import toast from 'react-hot-toast';
+import { TacticalCard } from '../Tactical/TacticalCard';
+import { TacticalButton } from '../Tactical/TacticalButton';
 
 interface StatusTogglePanelProps {
   profile: User | null;
@@ -51,82 +53,81 @@ export function StatusTogglePanel({ profile, sirenActive, onToggleSiren, updateT
   };
 
   return (
-    <div className="glass-panel bg-brand-bg/60 backdrop-blur-3xl border-white/5 rounded-[40px] p-8 text-white shadow-2xl overflow-hidden relative group border-t border-l border-white/10 mb-8">
+    <TacticalCard className="mb-8">
        <div className="absolute top-8 right-8 flex items-center justify-center">
-         <div className="absolute w-12 h-12 bg-success/20 rounded-full animate-pulse blur-2xl shadow-[0_0_15px_rgba(34,197,94,0.4)]" />
-         <span className="relative text-2xl drop-shadow-[0_0_8px_rgba(34,197,94,0.8)] animate-pulse">🟢</span>
+         <div className="absolute w-12 h-12 bg-tactical-cyan/20 rounded-full animate-pulse blur-2xl shadow-[0_0_15px_var(--color-tactical-cyan)]" />
+         <span className="relative text-2xl drop-shadow-[0_0_8px_var(--color-tactical-cyan)] animate-pulse">🟢</span>
        </div>
        
        <div className="relative z-10">
-         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mb-2 font-mono flex items-center gap-2">
-           <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" />
+         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-tactical-cyan/60 mb-2 font-mono flex items-center gap-2">
+           <span className="w-1.5 h-1.5 rounded-full bg-tactical-cyan animate-ping" />
            Service Status
          </p>
 
-         <div className="mb-4 flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5 w-fit hover:bg-white/10 transition-colors group">
+         <div className="mb-4 flex items-center justify-between bg-tactical-dark p-4 rounded-2xl border border-tactical-cyan/30 w-fit gap-6">
            <div className="flex items-center gap-2">
              <div className={cn(
                "w-2 h-2 rounded-full transition-all",
-               isLocationEnabled ? "bg-success shadow-[0_0_10px_#22c55e] animate-pulse" : "bg-white/10"
+               isLocationEnabled ? "bg-tactical-cyan shadow-[0_0_10px_var(--color-tactical-cyan)] animate-pulse" : "bg-white/10"
              )} />
              <div className="flex flex-col">
-               <span className="text-[10px] font-mono font-black uppercase tracking-widest text-white/40 group-hover:text-white/60">Live GPS Link</span>
-               <span className="text-[8px] font-mono font-bold uppercase text-white/20 tracking-tighter">
+               <span className="text-[10px] font-mono font-black uppercase tracking-widest text-white/60">Live GPS Link</span>
+               <span className="text-[8px] font-mono font-bold uppercase text-tactical-cyan/60 tracking-tighter">
                  {isLocationEnabled ? 'TRANSMITTING' : 'ENCRYPTED_OFFLINE'}
                </span>
              </div>
            </div>
-           <button
+           
+           <TacticalButton
+             label={isLocationEnabled ? 'ON' : 'OFF'}
              onClick={toggleLocation}
              className={cn(
-               "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border font-mono shadow-lg",
-               isLocationEnabled ? "bg-success/20 text-success border-success/30 hover:bg-success/30" : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+               "px-4 py-1 rounded-lg text-[9px]",
+               isLocationEnabled ? "bg-tactical-cyan/20 border-tactical-cyan" : ""
              )}
-           >
-             {isLocationEnabled ? 'ON' : 'OFF'}
-           </button>
+           />
          </div>
 
          <div className="flex flex-col">
-           <span className="text-4xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">STATUS:</span>
+           <span className="text-4xl font-black italic tracking-tighter uppercase font-display text-white leading-none">STATUS:</span>
            <div className="flex items-center gap-1 mt-1">
              <select 
                 value={profile?.status || 'Available'}
                 onChange={(e) => handleStatusChange(e.target.value as RegistryStatus)}
-                className="text-4xl font-black italic tracking-tighter uppercase font-mono text-success leading-none bg-transparent outline-none cursor-pointer hover:text-success/80 transition-colors"
+                className="text-4xl font-black italic tracking-tighter uppercase font-display text-tactical-cyan leading-none bg-transparent outline-none cursor-pointer hover:text-tactical-cyan/80 transition-colors"
              >
-                <option value="Available">AVAILABLE</option>
-                <option value="On Patrol">ON PATROL</option>
-                <option value="Responding">RESPONDING</option>
-                <option value="Offline">OFFLINE</option>
+                <option value="Available" className="bg-tactical-dark">AVAILABLE</option>
+                <option value="On Patrol" className="bg-tactical-dark">ON PATROL</option>
+                <option value="Responding" className="bg-tactical-dark">RESPONDING</option>
+                <option value="Offline" className="bg-tactical-dark">OFFLINE</option>
              </select>
            </div>
          </div>
 
          <div className="mt-8 flex items-center justify-between">
            <div className="flex items-center gap-3">
-             <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-               <IconOnlineTanods className="w-5 h-5 text-success/60" />
+             <div className="w-10 h-10 rounded-full bg-tactical-dark border border-tactical-cyan/30 flex items-center justify-center">
+               <IconOnlineTanods className="w-5 h-5 text-tactical-cyan/60" />
              </div>
              <div>
-               <p className="text-[10px] opacity-40 uppercase tracking-widest font-mono font-black border-l border-success/30 pl-2">Designated Officer</p>
-               <p className="text-sm font-bold uppercase italic tracking-tight font-mono border-l border-success/30 pl-2">{profile?.name}</p>
+               <p className="text-[10px] opacity-60 uppercase tracking-widest font-mono font-black border-l border-tactical-cyan/30 pl-2">Designated Officer</p>
+               <p className="text-sm font-bold uppercase italic tracking-tight font-display border-l border-tactical-cyan/30 pl-2 text-white">{profile?.name}</p>
              </div>
            </div>
 
-           <button 
+           <TacticalButton 
             onClick={onToggleSiren}
-            className={cn(
-              "p-4 rounded-2xl border transition-all flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-widest group shadow-2xl",
-              sirenActive ? "bg-emergency border-white/20 text-white animate-pulse" : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
-            )}
+            label={sirenActive ? 'Stop Siren' : 'Test Siren'}
+            danger={sirenActive}
+            className={cn("p-4", sirenActive ? "animate-pulse" : "")}
            >
              {sirenActive ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-             {sirenActive ? 'Stop Siren' : 'Test Siren'}
-           </button>
+           </TacticalButton>
          </div>
        </div>
-       <Shield className="absolute -bottom-10 -right-10 w-48 h-48 opacity-[0.03] text-white pointer-events-none" />
-    </div>
+       <Shield className="absolute -bottom-10 -right-10 w-48 h-48 opacity-[0.05] text-tactical-cyan pointer-events-none" />
+    </TacticalCard>
   );
 }
+

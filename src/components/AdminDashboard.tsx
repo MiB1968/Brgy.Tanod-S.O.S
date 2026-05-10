@@ -222,7 +222,7 @@ export default function AdminDashboard({
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8"
+      className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8 bg-tactical-dark"
     >
       <PoliceLights active={isFlashing} />
       
@@ -232,14 +232,14 @@ export default function AdminDashboard({
       />
 
       {activeBroadcast && (
-        <motion.div variants={itemVariants} className="glass-panel border-emergency/30 bg-emergency/10 rounded-[40px] p-8 border-l-4 border-l-emergency shadow-glow-red overflow-hidden relative">
+        <motion.div variants={itemVariants} className="tactical-panel border-tactical-red/30 bg-tactical-red/10 rounded-[40px] p-8 border-l-4 border-l-tactical-red shadow-[0_0_20px_var(--color-tactical-red)] overflow-hidden relative">
           <div className="flex items-center gap-6">
-            <div className="p-4 rounded-2xl bg-emergency text-white animate-pulse">
+            <div className="p-4 rounded-2xl bg-tactical-red text-white animate-pulse">
                <span className="text-2xl font-black">!</span>
             </div>
             <div className="flex-1">
-               <h4 className="text-[10px] font-black uppercase text-emergency tracking-widest font-mono">ACTIVE SYSTEM SOS BROADCAST</h4>
-               <p className="text-xl font-black italic tracking-tighter uppercase text-white font-mono mt-1">"{activeBroadcast.message}"</p>
+               <h4 className="text-[10px] font-black uppercase text-tactical-red tracking-widest font-mono">ACTIVE SYSTEM SOS BROADCAST</h4>
+               <p className="text-xl font-black italic tracking-tighter uppercase text-white font-display mt-1">"{activeBroadcast.message}"</p>
                <p className="text-[10px] font-bold text-white/40 mt-1 uppercase">INITIATED BY ADMIN: {activeBroadcast.adminName}</p>
             </div>
           </div>
@@ -250,7 +250,7 @@ export default function AdminDashboard({
         <motion.button
           variants={itemVariants}
           onClick={onInstall}
-          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(59,130,246,0.2)] group relative overflow-hidden"
+          className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-tactical-cyan/10 text-tactical-cyan font-black border border-tactical-cyan/30 hover:bg-tactical-cyan/20 mb-8 transition-all hover:scale-[1.01] active:scale-95 uppercase tracking-[0.2em] font-mono shadow-[0_0_20px_rgba(0,240,255,0.2)] group relative overflow-hidden"
         >
           <span>📲 INSTALL TANOD TACTICAL MOBILE</span>
         </motion.button>
@@ -272,7 +272,7 @@ export default function AdminDashboard({
         onUpdateStatus={handleUpdateTanodStatus} 
       />
 
-      <motion.div variants={itemVariants} className="w-full h-[600px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative shadow-2xl">
+      <motion.div variants={itemVariants} className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">
         <LiveMap />
       </motion.div>
 

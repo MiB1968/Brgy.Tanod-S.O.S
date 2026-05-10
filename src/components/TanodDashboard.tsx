@@ -10,6 +10,7 @@ import LiveMap from '../LiveMap';
 import { TanodPortalHeader } from './Tanod/TanodPortalHeader';
 import { TanodAlertsFeed } from './Tanod/TanodAlertsFeed';
 import { StatusTogglePanel } from './Tanod/StatusTogglePanel';
+import { TacticalCard } from './Tactical/TacticalCard';
 import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import { AlertDetailsModal } from './AlertDetailsModal';
@@ -97,7 +98,7 @@ export default function TanodDashboard({
   };
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8">
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8 bg-tactical-dark">
       <PoliceLights active={isFlashing} />
       
       <TanodPortalHeader 
@@ -107,7 +108,7 @@ export default function TanodDashboard({
       />
 
       {deferredPrompt && (
-        <motion.button onClick={onInstall} className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-info/10 text-info font-black border border-info/30 hover:bg-info/20 mb-4 transition-all hover:scale-[1.01] uppercase font-mono shadow-glow-info">
+        <motion.button onClick={onInstall} className="w-full flex items-center justify-center gap-3 px-6 py-5 rounded-[32px] bg-tactical-cyan/10 text-tactical-cyan font-black border border-tactical-cyan/30 hover:bg-tactical-cyan/20 mb-4 transition-all hover:scale-[1.01] uppercase font-mono shadow-[0_0_15px_var(--color-tactical-cyan)]">
           📲 INSTALL TANOD MOBILE APP
         </motion.button>
       )}
@@ -119,7 +120,7 @@ export default function TanodDashboard({
         updateTanodStatus={updateTanodStatus}
       />
 
-      <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative shadow-2xl">
+      <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">
         <LiveMap />
       </motion.div>
 
@@ -133,19 +134,18 @@ export default function TanodDashboard({
         
         <div className="lg:col-span-1 space-y-6 md:space-y-8">
             {/* Units Summary */}
-            <div className="glass-panel p-8 rounded-[40px] border-white/5">
-                <h4 className="text-[10px] font-black uppercase text-white/40 tracking-[0.3em] font-mono mb-6">Force Status Summary</h4>
+            <TacticalCard title="Force Status Summary">
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
+                  <div className="flex justify-between items-center p-4 bg-tactical-dark rounded-2xl border border-tactical-cyan/20">
                     <span className="text-[11px] font-bold text-white/60 font-mono">ON_PATROL</span>
-                    <span className="text-xl font-black text-success font-mono">{patrols.filter(p => p.isActive && p.status === 'patrolling').length}</span>
+                    <span className="text-xl font-black text-tactical-cyan font-mono">{patrols.filter(p => p.isActive && p.status === 'patrolling').length}</span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl">
+                  <div className="flex justify-between items-center p-4 bg-tactical-dark rounded-2xl border border-tactical-cyan/20">
                     <span className="text-[11px] font-bold text-white/60 font-mono">RESPONDING</span>
-                    <span className="text-xl font-black text-emergency font-mono">{patrols.filter(p => p.isActive && p.status === 'responding').length}</span>
+                    <span className="text-xl font-black text-tactical-red font-mono">{patrols.filter(p => p.isActive && p.status === 'responding').length}</span>
                   </div>
                 </div>
-            </div>
+            </TacticalCard>
         </div>
       </div>
 

@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node dist/server.mjs",
-    "build": "rimraf dist && NODE_ENV=production vite build && npx esbuild server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.mjs --external:vite --packages=external",
+    "start": "node dist/server.js",
+    "build": "npx rimraf dist && npx vite build && npx esbuild server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.js --external:vite --packages=external",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

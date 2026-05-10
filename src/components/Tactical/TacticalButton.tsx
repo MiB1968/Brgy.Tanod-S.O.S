@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 interface TacticalButtonProps {
   label: string;
   danger?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
   className?: string;
   children?: ReactNode;
 }
