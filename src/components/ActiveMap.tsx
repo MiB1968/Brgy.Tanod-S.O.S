@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { downloadRegion, OCCIDENTAL_MINDORO_BOUNDS } from '../lib/mapDownloader';
 import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
@@ -193,6 +193,14 @@ export default function ActiveMap({
   const [mapCenter, setMapCenter] = useState<[number, number]>(propCenter || [13.2236, 120.5960]); // Mamburao, Occidental Mindoro
   const [zoom, setZoom] = useState(15);
 
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location.lat, a.location.lng));
+  }, [alerts]);
+
+  const filteredPatrols = useMemo(() => {
+    return patrols.filter(p => p.isActive && isValidCoord(p.location.lat, p.location.lng));
+  }, [patrols]);
+
   useEffect(() => {
     const hasDownloaded = localStorage.getItem('map_downloaded');
     if (hasDownloaded) {
@@ -303,7 +311,7 @@ export default function ActiveMap({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(15,17,21,0.6)_100%)]"></div>
         </div>
         
-        {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location.lat, a.location.lng)).map(alert => (
+        {filteredAlerts.map(alert => (
           <React.Fragment key={alert.id}>
             {showHeatmap && alert.aiAnalysis && alert.aiAnalysis.severityScore > 6 && (
               <Circle 
@@ -377,7 +385,7 @@ export default function ActiveMap({
           </React.Fragment>
         ))}
 
-        {patrols.filter(p => p.isActive && isValidCoord(p.location.lat, p.location.lng)).map(patrol => (
+        {filteredPatrols.map(patrol => (
           <React.Fragment key={patrol.id}>
             <Marker 
               position={[patrol.location.lat, patrol.location.lng]} 
