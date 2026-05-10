@@ -249,7 +249,7 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
 }
 
 import { downloadRegion, Bounds } from "./lib/mapDownloader";
-import { Download, HardDrive, ShieldCheck } from "lucide-react";
+import { Download, HardDrive } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 function MapDownloadControl() {
