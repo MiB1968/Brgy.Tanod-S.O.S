@@ -1,6 +1,5 @@
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { AuditLogEntry } from '../types/auditLog';
 import { Alert } from '../types';
 
@@ -22,23 +21,21 @@ export const logIncidentAction = async (alert: Alert, actionNotes?: string) => {
     await api.generic.create('audit_logs', entry);
     socket.emit('audit_log_new', entry);
 
-    // 2. Save to Supabase (Sync for Daily Audit Log system)
-    if (isSupabaseConfigured) {
-      try {
-        await supabase.from('report_logs').upsert([{
-          id: alert.id,
-          incident_id: alert.id,
-          type: alert.type,
-          status: alert.status,
-          tanod_assigned: entry.tanod_assigned,
-          location_lat: alert.location.lat,
-          location_lng: alert.location.lng,
-          lat: alert.location.lat,
-          lng: alert.location.lng
-        }]);
-      } catch (supErr) {
-        console.error('Supabase Audit Log sync failed:', supErr);
-      }
+    // 2. Save to Central Server DB (Sync for Daily Audit Log system)
+    try {
+      await api.generic.update(`report_logs/${alert.id}`, {
+        id: alert.id,
+        incident_id: alert.id,
+        type: alert.type,
+        status: alert.status,
+        tanod_assigned: entry.tanod_assigned,
+        location_lat: alert.location.lat,
+        location_lng: alert.location.lng,
+        lat: alert.location.lat,
+        lng: alert.location.lng
+      });
+    } catch (dbErr) {
+      console.error('Report Log sync failed:', dbErr);
     }
   } catch (error) {
     console.error('Failed to log incident action:', error);

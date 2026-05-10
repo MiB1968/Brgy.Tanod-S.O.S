@@ -7,8 +7,11 @@ const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('token');
+  const apiKey = import.meta.env.VITE_API_SECRET_KEY || 'dev-secret-key';
+
   const headers = {
     'Content-Type': 'application/json',
+    'x-api-key': apiKey,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
