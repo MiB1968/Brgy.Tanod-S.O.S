@@ -4,12 +4,16 @@ export interface AuditLogEntry {
   type: 'Medical' | 'Fire' | 'Crime' | 'Other';
   status: 'Sent' | 'Received' | 'Dispatched' | 'Resolved';
   citizen_id?: string;
+  citizen_name?: string;
   tanod_assigned?: string;
   location_lat: number;
   location_lng: number;
   created_at: string;
-  resolved_at?: string;
+  alert_resolved_at?: string;
   notes?: string;
+  severity_score?: number;
+  ai_analysis?: any;
+  description?: string;
 }
 
 export interface AuditLogArchive {

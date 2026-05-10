@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { AuditLogArchive } from '../../types/auditLog';
-import { mockArchives } from '../../data/mock/auditLogArchives';
+import { AuditLogArchive, AuditLogEntry } from '../../types/auditLog';
 import { User } from '../../types';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { generic } from '../../lib/api';
 
 export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,20 +15,39 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
   const fetchArchives = async () => {
     setIsLoading(true);
     try {
-      if (!isSupabaseConfigured) {
-        throw new Error('Supabase not configured');
-      }
-      const { data, error } = await supabase
-        .from('audit_log_archives')
-        .select('*')
-        .order('archived_at', { ascending: false });
+      const data: AuditLogEntry[] = await generic.list('audit_logs');
       
-      if (error) throw error;
-      setArchives(data || []);
+      // Group by date (session_date)
+      const grouped: Record<string, AuditLogEntry[]> = {};
+      data.forEach(log => {
+        const dateStr = new Date(log.created_at).toISOString().split('T')[0];
+        if (!grouped[dateStr]) grouped[dateStr] = [];
+        grouped[dateStr].push(log);
+      });
+
+      const archivesList: AuditLogArchive[] = Object.keys(grouped).map(dateStr => {
+        const entries = grouped[dateStr];
+        const resolvedCount = entries.filter(e => e.status.toLowerCase() === 'resolved').length;
+        return {
+          id: `arch-${dateStr}`,
+          session_date: dateStr,
+          archived_at: new Date().toISOString(),
+          archived_by: 'system',
+          log_count: entries.length,
+          log_entries: entries,
+          total_incidents: entries.length,
+          resolved_count: resolvedCount,
+          unresolved_count: entries.length - resolvedCount,
+        };
+      });
+
+      // Sort by date descending
+      archivesList.sort((a, b) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime());
+
+      setArchives(archivesList);
     } catch (err) {
-      console.error('Failed to fetch archives from Supabase:', err);
-      // Fallback to mock for development if Supabase fails
-      setArchives(mockArchives);
+      console.error('Failed to fetch archives:', err);
+      setArchives([]);
     } finally {
       setIsLoading(false);
     }
@@ -176,8 +194,47 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
                         : 'bg-red-500/20 text-red-400'
                     }`}>{entry.status}</span>
                   </div>
-                  <p className="text-white/50">Tanod: {entry.tanod_assigned ?? 'Unassigned'}</p>
-                  <p className="text-white/30">{new Date(entry.created_at).toLocaleString()}</p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-white/70 font-medium">Resident: <span className="text-white">{entry.citizen_name ?? 'Unknown'}</span></p>
+                    <p className="text-white/70">Tanod: <span className="text-white">{entry.tanod_assigned ?? 'Unassigned'}</span></p>
+                    {entry.severity_score && (
+                      <p className="text-white/70">Severity:
+                        <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          entry.severity_score >= 8 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                          entry.severity_score >= 5 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          'bg-green-500/20 text-green-400 border border-green-500/30'
+                        }`}>{entry.severity_score}/10</span>
+                      </p>
+                    )}
+                    <p className="text-white/40">{new Date(entry.created_at).toLocaleString()}</p>
+                  </div>
+
+                  {(entry.notes || entry.ai_analysis || entry.description) && (
+                    <div className="mt-3 p-2 bg-[#1A2235] border border-white/5 rounded font-mono text-[11px] space-y-2">
+                      {entry.ai_analysis && (
+                        <div>
+                          <p className="text-amber-500/70 mb-0.5 font-bold">» AI Analysis:</p>
+                          <p className="text-amber-100/70 whitespace-pre-wrap">{
+                            typeof entry.ai_analysis === 'string'
+                              ? entry.ai_analysis
+                              : JSON.stringify(entry.ai_analysis, null, 2)
+                          }</p>
+                        </div>
+                      )}
+                      {!entry.ai_analysis && entry.description && (
+                        <div>
+                          <p className="text-white/40 mb-0.5 font-bold">» Description:</p>
+                          <p className="text-white/70 whitespace-pre-wrap">{entry.description}</p>
+                        </div>
+                      )}
+                      {entry.notes && (
+                        <div>
+                          <p className="text-blue-400/70 mb-0.5 font-bold">» Resolution Notes:</p>
+                          <p className="text-blue-100/70 whitespace-pre-wrap">{entry.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
