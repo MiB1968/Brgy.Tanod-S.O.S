@@ -3,8 +3,8 @@ import React, { useEffect, useState } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { Alert } from '../types';
-import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Shield, MapPin, CheckCircle } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Shield, MapPin, CheckCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { AlertDetailsModal } from './AlertDetailsModal';
 
