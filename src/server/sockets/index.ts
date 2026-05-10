@@ -3,6 +3,21 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index';
 
+interface LocationEntry {
+  user_id: string;
+  role: string;
+  lat: number;
+  lng: number;
+  name?: string;
+  timestamp?: string;
+}
+
+const activeLocations: Record<string, LocationEntry> = {};
+
+export function getActiveLocations(): LocationEntry[] {
+  return Object.values(activeLocations);
+}
+
 let io: Server;
 
 export function initSocket(server: HttpServer) {
@@ -32,8 +47,20 @@ export function initSocket(server: HttpServer) {
 
     if (user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'tanod') {
       socket.join('responders');
-      // Add status tracking if needed
     }
+
+    // Location Tracking
+    socket.on('location_update', (data: LocationEntry) => {
+      if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
+      
+      activeLocations[data.user_id] = {
+        ...data,
+        timestamp: new Date().toISOString()
+      };
+
+      // Broadcast location map to responders only, reducing global bandwidth
+      io.to('responders').emit('location_map', activeLocations);
+    });
 
     // Heartbeat
     socket.on('ping', () => {
@@ -42,6 +69,7 @@ export function initSocket(server: HttpServer) {
 
     socket.on('disconnect', (reason) => {
       console.log(`Socket disconnected: ${socketId} (Reason: ${reason})`);
+      // Optional: We can leave location stale or remove it. For now, leave it to keep last known location.
     });
   });
 

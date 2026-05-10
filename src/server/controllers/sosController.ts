@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
+import { haversineDistance } from '../utils/geo';
 
 export const createAlert = async (req: AuthRequest, res: Response) => {
   const { type, location, description, severity } = req.body;
@@ -114,4 +115,40 @@ export const getActiveAlerts = async (req: AuthRequest, res: Response) => {
   } catch (err: any) {
     return response.error(res, err.message);
   }
+};
+
+export const findNearest = async (req: AuthRequest, res: Response) => {
+  const { lat, lng } = req.body ?? {};
+
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return response.error(res, "lat and lng must be numbers", "BAD_REQUEST", 400);
+  }
+
+  const activeLocations = socketService.getActiveLocations();
+  
+  let nearest: any = null;
+  let minDistance = Infinity;
+
+  for (const loc of activeLocations) {
+    if (loc.role !== "tanod") continue;
+    if (typeof loc.lat !== "number" || typeof loc.lng !== "number") continue;
+
+    const d = haversineDistance({ lat, lng }, loc);
+    if (d < minDistance) {
+      minDistance = d;
+      nearest = loc;
+    }
+  }
+
+  if (nearest) {
+    nearest = { ...nearest, distance_metres: Math.round(minDistance) };
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      nearest_tanod: nearest,
+      active_tanods: activeLocations.filter(l => l.role === "tanod").length
+    }
+  });
 };

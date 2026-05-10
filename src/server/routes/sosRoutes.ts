@@ -7,5 +7,6 @@ const router = Router();
 router.post('/alert', authenticate, sosController.createAlert);
 router.post('/alert/:id/cancel', authenticate, sosController.cancelAlert);
 router.get('/active', authenticate, sosController.getActiveAlerts);
+router.post('/nearest', authenticate, sosController.findNearest);
 
 export default router;

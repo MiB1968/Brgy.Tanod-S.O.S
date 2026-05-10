@@ -3,8 +3,17 @@ import { authenticate, authorize } from '../middleware/auth';
 import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
+import { rateLimit } from 'express-rate-limit';
 
 const router = Router();
+
+const smsLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, 
+  limit: 10,
+  message: { success: false, error: { code: 'TOO_MANY_REQUESTS', message: 'Too many SMS requests. Please wait a moment.' } },
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
 
 router.post('/siren', authenticate, authorize(['admin', 'superadmin', 'tanod']), async (req, res) => {
   const { sirenActive } = req.body;
@@ -47,6 +56,45 @@ router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), asy
     response.success(res, updatedUser);
   } catch (err: any) {
     response.error(res, err.message);
+  }
+});
+
+router.post('/sms', authenticate, smsLimiter, async (req, res) => {
+  const { to, message } = req.body ?? {};
+
+  if (!to || !message) {
+    return response.error(res, "to and message are required", "BAD_REQUEST", 400);
+  }
+
+  const apiKey = process.env.SEMAPHORE_API_KEY;
+
+  if (!apiKey) {
+    console.log("[SMS Simulation]", { to, message });
+    return res.json({ success: true, simulated: true });
+  }
+
+  try {
+    const fetchResponse = await fetch(
+      "https://api.semaphore.co/api/v4/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ apikey: apiKey, number: to, message }),
+      }
+    );
+
+    if (!fetchResponse.ok) {
+        const detail = await fetchResponse.text();
+        return res.status(502).json({ success: false, error: { code: 'BAD_GATEWAY', message: "Semaphore API error", detail } });
+    }
+
+    const data = await fetchResponse.json();
+    return res.json({ success: true, data });
+  } catch (err: any) {
+    console.error("[SMS] Fetch failed:", err);
+    return res.status(502).json({ success: false, error: { code: 'BAD_GATEWAY', message: "Could not reach Semaphore API" } });
   }
 });
 
