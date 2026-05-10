@@ -5,7 +5,7 @@ import L from 'leaflet';
 import { toast } from 'react-hot-toast';
 import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, isValidCoord } from '../lib/utils';
+import { cn, isValidCoord, formatMobileNumber, formatIdNumber } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
 import { TanodLogo, BackgroundPattern } from './Branding';
 
@@ -376,11 +376,11 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">ID Reference Number</label>
-                  <input placeholder="XXXX-XXXX-XXXX" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                  <input placeholder="XXXX-XXXX-XXXX" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: formatIdNumber(e.target.value)})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Primary Mobile Terminal</label>
-                  <input required placeholder="09XX-XXX-XXXX" value={formData.mobileNumber} onChange={e => setFormData({...formData, mobileNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                  <input required placeholder="09XX-XXX-XXXX" value={formData.mobileNumber} onChange={e => setFormData({...formData, mobileNumber: formatMobileNumber(e.target.value)})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Emergency Alert Email</label>
