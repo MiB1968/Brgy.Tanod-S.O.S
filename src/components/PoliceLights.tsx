@@ -27,12 +27,12 @@ export function PoliceLights({ active }: { active: boolean }) {
           
           {/* Screen Vignette Flash with Rings */}
           <motion.div 
-            className="absolute inset-0 border-[40px] border-red-600/20"
+            className="absolute inset-0 border-[10px] sm:border-[40px] border-red-600/20"
             animate={{ opacity: [0, 1, 0, 0, 0], scale: [1, 1.02, 1] }}
             transition={{ duration: 0.8, repeat: Infinity }}
           />
           <motion.div 
-            className="absolute inset-0 border-[40px] border-blue-600/20"
+            className="absolute inset-0 border-[10px] sm:border-[40px] border-blue-600/20"
             animate={{ opacity: [0, 0, 0, 1, 0], scale: [1, 1.02, 1] }}
             transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
           />

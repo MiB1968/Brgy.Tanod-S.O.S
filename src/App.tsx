@@ -521,47 +521,50 @@ export default function App() {
         handleInstallApp={handleInstallApp}
       />
 
-      <main className="flex-1 h-full overflow-y-auto p-4 md:p-8 flex flex-col">
+      <main className="flex-1 h-full overflow-y-auto p-3 sm:p-5 md:p-8 flex flex-col relative">
         <GlobalErrorBoundary>
-          <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-8 shrink-0 relative z-10 w-full glass-panel p-4 md:p-6 rounded-[32px] shadow-command">
+          <header className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4 mb-6 sm:mb-8 shrink-0 relative z-10 w-full glass-panel p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] shadow-command border-white/5">
             <div className="flex-1 w-full">
               <div className="flex justify-between items-start w-full transition-all">
-                <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white">
-                  {activeTab}
-                </h1>
+                <div className="flex flex-col">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-black italic tracking-tighter uppercase font-mono text-white leading-none">
+                    {activeTab}
+                  </h1>
+                  <span className="text-[7px] sm:text-[8px] font-mono text-white/30 uppercase tracking-[0.2em] mt-1">SECURE_SURVEILLANCE_v2.4.0</span>
+                </div>
                 <div className="flex flex-col items-end">
-                  <span className="text-[10px] font-black tracking-widest text-emergency uppercase mt-1">
-                    {effectiveRole === 'resident' && "Resident view panel"}
-                    {(effectiveRole === 'admin' || effectiveRole === 'superadmin') && "Admin view panel"}
-                    {effectiveRole === 'tanod' && "Tanod view panel"}
-                  </span>
-                  <span className="text-[8px] font-mono text-white/40 uppercase tracking-[0.2em]">SECURE SYSTEM v2.4.0</span>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emergency/10 border border-emergency/20">
+                    <span className="w-1 h-1 rounded-full bg-emergency animate-ping" />
+                    <span className="text-[8px] sm:text-[10px] font-black tracking-widest text-emergency uppercase leading-none">
+                      {effectiveRole === 'resident' && "RESIDENT_NODE"}
+                      {(effectiveRole === 'admin' || effectiveRole === 'superadmin') && "ADMIN_COMMAND"}
+                      {effectiveRole === 'tanod' && "RESPONDER_UNIT"}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <p className="text-white/40 text-[10px] font-bold tracking-[0.1em] uppercase mt-1 font-mono">
-                Brgy.TANOD 🆘 ALERT — EMERGENCY INTELLIGENCE INFRASTRUCTURE
-              </p>
+              <div className="h-px w-full bg-gradient-to-r from-white/10 via-transparent to-transparent mt-3" />
             </div>
-            <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
               {isMasterAdmin && (
-                <div className="flex bg-brand-bg/50 border border-white/10 rounded-2xl overflow-hidden p-1">
+                <div className="flex bg-brand-bg/50 border border-white/10 rounded-xl sm:rounded-2xl overflow-hidden p-0.5 sm:p-1">
                   <button 
                     onClick={() => { setViewOverride(null); setActiveTab('home'); }} 
-                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", !viewOverride ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                    className={cn("px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black tracking-widest transition-all", !viewOverride ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
                   >
-                    ADMIN
+                    ADM
                   </button>
                   <button 
                     onClick={() => { setViewOverride('tanod'); setActiveTab('home'); }} 
-                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'tanod' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                    className={cn("px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black tracking-widest transition-all", viewOverride === 'tanod' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
                   >
-                    TANOD VIEW
+                    TND
                   </button>
                   <button 
                     onClick={() => { setViewOverride('resident'); setActiveTab('home'); }} 
-                    className={cn("px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all", viewOverride === 'resident' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
+                    className={cn("px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[8px] sm:text-[10px] font-black tracking-widest transition-all", viewOverride === 'resident' ? "bg-emergency text-white shadow-glow-red" : "text-white/40 hover:text-white")}
                   >
-                    CLIENT VIEW
+                    RES
                   </button>
                 </div>
               )}
@@ -570,7 +573,7 @@ export default function App() {
                 <button 
                   onClick={toggleGlobalSiren}
                   className={cn(
-                    "p-3 rounded-2xl border transition-all group relative",
+                    "p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border transition-all group relative",
                     globalSirenActive 
                       ? "bg-emergency border-white/20 text-white animate-pulse shadow-glow-red" 
                       : "bg-brand-card border-white/10 text-white/40 hover:bg-white/10 hover:border-white/20"
@@ -583,13 +586,13 @@ export default function App() {
                 {(effectiveRole === 'tanod' || effectiveRole === 'admin' || effectiveRole === 'superadmin') && (
                   <button 
                     onClick={() => setIsIncidentFormOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-emergency rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-xs tracking-widest"
+                    className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-emergency rounded-xl sm:rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-glow-red font-black text-[10px] sm:text-xs tracking-widest"
                   >
-                    <Plus className="w-4 h-4 stroke-[3px]" /> NEW INCIDENT
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3px]" /> <span>NEW_INCIDENT</span>
                   </button>
                 )}
                 
-                <button className="p-3 bg-brand-card border border-white/10 rounded-2xl hover:bg-brand-card/80 relative transition-all group">
+                <button className="p-2.5 sm:p-3 bg-brand-card border border-white/10 rounded-xl sm:rounded-2xl hover:bg-brand-card/80 relative transition-all group">
                   <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
                   {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled').length > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-emergency border-2 border-brand-bg rounded-full animate-ping"></span>}
                 </button>

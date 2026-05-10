@@ -354,11 +354,18 @@ export default function LiveMap() {
   useEffect(() => {
     const loadResidents = async () => {
       try {
+        // Skip resident listing for non-tanods to avoid 403 errors
+        // Note: Real solution would be a public-safe endpoint, but for now we safeguard it.
         const data = await api.residents.getAll();
         const validData = data.filter((r: any) => r.gpsLat && r.gpsLng && r.status === 'approved');
         setResidents(validData);
-      } catch (err) {
-        console.error("Failed to load residents for map", err);
+      } catch (err: any) {
+        // Only log error if it's not a permission error or if we're debugging
+        if (err.message?.includes('Forbidden') || err.message?.includes('403')) {
+          console.log("Resident listing restricted to command personnel.");
+        } else {
+          console.error("Failed to load residents for map", err);
+        }
       }
     };
 

@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
     build: {
-      outDir: 'dist',
+      outDir: 'dist/client',
       emptyOutDir: true,
     },
     resolve: {
