@@ -12,6 +12,7 @@ import {
   Info, 
   Shield 
 } from 'lucide-react';
+import { Howl } from 'howler';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import TacticalCard from './TacticalCard';
@@ -65,6 +66,11 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
   const [sosSuccess, setSosSuccess] = useState(false);
   const [manualLocation, setManualLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [gpsLocation, setGpsLocation] = useState<{ lat: number, lng: number, accuracy?: number } | null>(null);
+
+  const sosConfirmationSound = useRef(new Howl({
+    src: ['https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3'], // Confirmation sound
+    volume: 0.7,
+  }));
 
   useEffect(() => {
     if (profile?.id) {
@@ -196,6 +202,8 @@ export default function ResidentDashboard({ profile, patrols, visiblePatrols, is
       
       const alertId = await createSOS(type, description, location);
       activeAlertIdRef.current = alertId;
+
+      sosConfirmationSound.current.play();
 
       setSosSuccess(true);
       setTimeout(() => {

@@ -6,14 +6,15 @@
 const API_BASE = '/api';
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    credentials: 'include',
     headers,
   });
 
@@ -68,8 +69,8 @@ export const residents = {
     method: 'POST',
     body: JSON.stringify({ path: `residents/${id}`, data }),
   }),
-  updateRole: (id: string, role: string) => fetchAPI(`/users/${id}/role`, {
-    method: 'PUT',
+  updateRole: (id: string, role: string) => fetchAPI(`/users/${id}`, {
+    method: 'PATCH',
     body: JSON.stringify({ role }),
   }),
 };

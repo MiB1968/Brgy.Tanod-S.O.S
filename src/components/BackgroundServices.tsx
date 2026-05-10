@@ -45,7 +45,7 @@ export default function BackgroundServices() {
           setPatrolSessions(sessionsData);
         }
       } catch (err) {
-        console.error("Background initial load failed", err);
+        console.error("Background initial load failed. Error details:", err);
       }
     };
 

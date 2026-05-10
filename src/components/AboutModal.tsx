@@ -27,7 +27,8 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
           setDevAvatar(snap.avatarUrl);
         }
       } catch (e) {
-        console.error("Failed to load dev avatar:", e);
+        // Silently fail if system/developer is not available, as it's not critical
+        console.warn("Developer info not available, skipping.");
       }
     }
     if (isOpen) loadDevData();

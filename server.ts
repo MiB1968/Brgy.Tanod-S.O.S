@@ -3,6 +3,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import * as http from "http";
 import path from "path";
+import { fileURLToPath } from 'url';
 import { z } from "zod";
 import pg from "pg";
 import { Server } from "socket.io";
@@ -10,6 +11,9 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -31,11 +35,15 @@ interface AuthRequest extends express.Request {
 // --- Auth Middleware ---
 function authenticate(req: AuthRequest, res: any, next: any) {
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Auth required" });
+  if (!token) {
+    console.log("AUTHENTICATE: No token found. Cookies:", req.cookies);
+    return res.status(401).json({ error: "Auth required" });
+  }
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (err) {
+    console.error("AUTHENTICATE: Invalid token:", err);
     res.status(401).json({ error: "Invalid token" });
   }
 }
