@@ -2,10 +2,11 @@ import React, { useEffect, useState } from "react";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import { cn, isValidCoord } from "./lib/utils";
-import { startGPS } from "./gpsSystem";
+import { startGPSTracking } from "./services/gpsService";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
 import { useIncidentStore } from "./store/useIncidentStore";
 import { useTanodStore } from "./store/useTanodStore";
+import { useAuthStore } from "./store/useAuthStore";
 import * as api from "./lib/api";
 import socket from "./lib/socket";
 
@@ -340,6 +341,7 @@ function MapDownloadControl() {
 export default function LiveMap() {
   const { alerts }  = useIncidentStore();
   const { patrols } = useTanodStore();
+  const { profile } = useAuthStore();
   const [showPatrols, setShowPatrols] = useState(true);
   const [showSOS,     setShowSOS]     = useState(true);
   const [showRoutes,  setShowRoutes]  = useState(true);
@@ -351,6 +353,13 @@ export default function LiveMap() {
 
   const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
+
+  useEffect(() => {
+    if (profile?.id && profile?.role) {
+      const stopTracking = startGPSTracking(profile.id, profile.role as 'resident' | 'tanod' | 'admin', () => {});
+      return () => stopTracking();
+    }
+  }, [profile]);
 
   useEffect(() => {
     const loadResidents = async () => {
