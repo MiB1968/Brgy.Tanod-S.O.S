@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { User, PatrolLocation } from '../types';
+import { User } from '../types';
 import { useTanodStore } from '../store/useTanodStore';
 import { Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
