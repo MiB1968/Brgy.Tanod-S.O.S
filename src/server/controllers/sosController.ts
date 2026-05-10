@@ -5,6 +5,8 @@ import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 import { haversineDistance } from '../utils/geo';
 
+import { analyzeIncident } from '../services/aiService';
+
 export const createAlert = async (req: AuthRequest, res: Response) => {
   const { type, location, description, severity } = req.body;
   const userId = req.user?.id;
@@ -14,6 +16,16 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
   }
 
   try {
+    // AI Triage
+    let aiTriageData = null;
+    let finalSeverity = severity || 3;
+    
+    if (description) {
+      const analysis = await analyzeIncident(description, type);
+      aiTriageData = analysis;
+      finalSeverity = analysis.severityScore;
+    }
+
     // Check for existing active alert from same user to prevent spam
     const activeCheck = await pool.query(
       "SELECT id FROM alerts WHERE resident_id = $1 AND (status = 'pending' OR status = 'active' OR status = 'responding') LIMIT 1",
@@ -26,9 +38,9 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
 
     const result = await pool.query(
       `INSERT INTO alerts (
-        resident_id, type, location, description, status, severity_score, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, 'pending', $5, now(), now()) RETURNING *`,
-      [userId, type, JSON.stringify(location), description || '', severity || 3]
+        resident_id, type, location, description, status, severity_score, ai_analysis, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, now(), now()) RETURNING *`,
+      [userId, aiTriageData?.incidentType || type, JSON.stringify(location), description || '', finalSeverity, aiTriageData ? JSON.stringify(aiTriageData) : null]
     );
 
     const alert = result.rows[0];

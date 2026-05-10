@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { Alert, EmergencyType } from '../types';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { analyzeIncident } from '../services/aiService';
 import { queueSOS } from '../lib/offlineQueue';
 
 interface SOSState {
@@ -25,9 +24,6 @@ export const useSOSStore = create<SOSState>()(
       const storedUser = localStorage.getItem('user');
       const user = storedUser ? JSON.parse(storedUser) : null;
 
-      // Perform AI Analysis
-      const aiAnalysis = await analyzeIncident(description, type);
-
       const alertData: any = {
         residentId: user?.id || 'anonymous',
         residentName: user?.name || 'Unknown Resident',
@@ -35,8 +31,7 @@ export const useSOSStore = create<SOSState>()(
         location,
         status: 'pending',
         timestamp: new Date().toISOString(),
-        description,
-        aiAnalysis
+        description
       };
 
       try {

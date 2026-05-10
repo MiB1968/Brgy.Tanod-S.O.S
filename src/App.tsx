@@ -94,7 +94,6 @@ import { useSystemStore } from './store/useSystemStore';
 import { useSOSStore } from './store/useSOSStore';
 
 // Service & Lib imports
-import { analyzeIncident } from './services/aiService';
 import { getQueueSize } from './lib/offlineQueue';
 import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';

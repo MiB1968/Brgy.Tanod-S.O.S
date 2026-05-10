@@ -28,7 +28,6 @@ export function initSocket(server: HttpServer) {
   io.use((socket, next) => {
     const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
     if (!token) {
-      // Allow unauthenticated for now if needed, but better to enforce
       return next(); 
     }
     try {
@@ -47,19 +46,23 @@ export function initSocket(server: HttpServer) {
 
     if (user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'tanod') {
       socket.join('responders');
+      // Send initial full map to newly connected responder
+      socket.emit('location_map', activeLocations);
     }
 
     // Location Tracking
     socket.on('location_update', (data: LocationEntry) => {
       if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
       
-      activeLocations[data.user_id] = {
+      const newEntry = {
         ...data,
         timestamp: new Date().toISOString()
       };
+      
+      activeLocations[data.user_id] = newEntry;
 
-      // Broadcast location map to responders only, reducing global bandwidth
-      io.to('responders').emit('location_map', activeLocations);
+      // Broadcast DELTA location map to responders only
+      io.to('responders').emit('location_update_delta', newEntry);
     });
 
     // Heartbeat
@@ -69,9 +72,26 @@ export function initSocket(server: HttpServer) {
 
     socket.on('disconnect', (reason) => {
       console.log(`Socket disconnected: ${socketId} (Reason: ${reason})`);
-      // Optional: We can leave location stale or remove it. For now, leave it to keep last known location.
     });
   });
+
+  // Stale Location Expiry Task (runs every 1 minute)
+  setInterval(() => {
+    const now = Date.now();
+    const expiryMs = 5 * 60 * 1000; // 5 minutes
+
+    Object.keys(activeLocations).forEach((userId) => {
+      const loc = activeLocations[userId];
+      if (loc.timestamp) {
+        const timeDiff = now - new Date(loc.timestamp).getTime();
+        if (timeDiff > expiryMs) {
+          delete activeLocations[userId];
+          // Broadcast delta indicating removal
+          if (io) io.to('responders').emit('location_remove_delta', { user_id: userId });
+        }
+      }
+    });
+  }, 60000);
 
   return io;
 }

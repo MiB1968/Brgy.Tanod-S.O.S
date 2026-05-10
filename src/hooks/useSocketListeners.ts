@@ -79,6 +79,36 @@ export function useSocketListeners(
     socket.on('alert_new', handleAlert);
     socket.on('alert_update', handleAlert);
 
+    socket.on('location_map', (activeLocations: any) => {
+      const patrolsToSet: PatrolLocation[] = Object.values(activeLocations).map((loc: any) => ({
+        id: loc.user_id,
+        tanodId: loc.user_id,
+        tanodName: loc.name || 'Active Responder',
+        location: { lat: loc.lat, lng: loc.lng },
+        isActive: true,
+        status: 'patrolling',
+        lastUpdate: loc.timestamp || new Date().toISOString()
+      }));
+      useTanodStore.getState().setPatrols(patrolsToSet);
+    });
+
+    socket.on('location_update_delta', (loc: any) => {
+      updatePatrol({
+        id: loc.user_id,
+        tanodId: loc.user_id,
+        tanodName: loc.name || 'Active Responder',
+        location: { lat: loc.lat, lng: loc.lng },
+        isActive: true,
+        status: 'patrolling',
+        lastUpdate: loc.timestamp || new Date().toISOString()
+      });
+    });
+
+    socket.on('location_remove_delta', (data: { user_id: string }) => {
+      // Mark patrol as inactive or remove it from list
+      useTanodStore.getState().setPatrols((prev) => prev.filter(p => p.tanodId !== data.user_id));
+    });
+
     socket.on('patrol_update', (update: any) => {
        const patrol: PatrolLocation = {
          id: update.tanodId || update.tanod_id,
@@ -130,6 +160,9 @@ export function useSocketListeners(
     return () => {
       socket.off('alert_new', handleAlert);
       socket.off('alert_update', handleAlert);
+      socket.off('location_map');
+      socket.off('location_update_delta');
+      socket.off('location_remove_delta');
       socket.off('patrol_update');
       socket.off('patrol_location');
       socket.off('broadcast_update');
