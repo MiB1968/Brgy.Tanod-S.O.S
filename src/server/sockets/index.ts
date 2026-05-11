@@ -7,16 +7,43 @@ import { VoicePermissionLevel } from '../services/voiceAssistantService.types';
 import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
 import { setupIncidentHandlers } from './handlers/incident.handler';
 import { config } from '../config/index';
+import { normalizeRole, isTanodOrAbove, isAdminOrAbove } from '../utils/roleUtils';
 
 let io: Server;
 
 export { getActiveLocations };
 
+// ---------------------------------------------------------------------------
+// Per-socket voice command rate limiter
+// Prevents DoS via the 10MB maxHttpBufferSize socket buffer + rapid voice events.
+// Each connected socket gets its own independent limiter instance.
+// ---------------------------------------------------------------------------
+const VOICE_RATE_LIMIT = 10;    // max voice commands
+const VOICE_RATE_WINDOW = 60000; // per 60-second rolling window
+
+function createVoiceRateLimiter(): () => boolean {
+  const timestamps: number[] = [];
+  return function isAllowed(): boolean {
+    const now = Date.now();
+    const cutoff = now - VOICE_RATE_WINDOW;
+    // Evict expired entries from the front of the array
+    while (timestamps.length > 0 && timestamps[0] < cutoff) {
+      timestamps.shift();
+    }
+    if (timestamps.length >= VOICE_RATE_LIMIT) return false;
+    timestamps.push(now);
+    return true;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Socket.IO server init
+// ---------------------------------------------------------------------------
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
-    pingTimeout: 180000,      // 180 seconds - be extremely patient with mobile/proxy latency
-    pingInterval: 25000,     // 25 seconds
-    transports: ['polling', 'websocket'], // Polling first for reliable handshake
+    pingTimeout: 180000,
+    pingInterval: 25000,
+    transports: ['polling', 'websocket'],
     allowEIO3: true,
     connectTimeout: 60000,
     maxHttpBufferSize: 1e7, // 10MB for voice packets
@@ -24,30 +51,33 @@ export function initSocket(server: HttpServer): Server {
     cors: {
       origin: config.corsOrigin,
       credentials: true,
-      methods: ["GET", "POST"]
-    }
+      methods: ['GET', 'POST'],
+    },
   });
 
-  // Global Socket Authentication
+  // Global socket authentication
   io.use((socket, next) => {
     console.log(`[Socket] New connection attempt: ${socket.id} from ${socket.handshake.address}`);
     socketAuthMiddleware(socket, next);
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
-    const { id, role, barangayId } = socket.data.user;
+    const { id, role: rawRole, barangayId } = socket.data.user;
+
+    // Normalize once at connection time — all checks below use this value
+    const role = normalizeRole(rawRole);
 
     console.log(`[Socket] Connected → ${role} ${id} | Barangay: ${barangayId}`);
 
-    // Universal User Room
+    // Universal user room (for targeted notifications)
     socket.join(`user_${id}`);
 
-    // Role-based room joining
-    if (role === 'TANOD' || role === 'ADMIN' || role === 'CAPTAIN' || (role as string) === 'admin' || (role as string) === 'superadmin' || (role as string) === 'tanod') {
+    // Role-based room assignment
+    if (isTanodOrAbove(role)) {
       socket.join('responders');
       socket.join(`barangay_${barangayId}`);
-      if (role === 'ADMIN' || (role as string) === 'admin' || role === 'CAPTAIN') {
-         socket.join(`admin_${id}`);
+      if (isAdminOrAbove(role)) {
+        socket.join(`admin_${id}`);
       }
     } else {
       socket.join(`citizen_${id}`);
@@ -58,47 +88,64 @@ export function initSocket(server: HttpServer): Server {
     setupLocationHandlers(io, socket);
     setupIncidentHandlers(io, socket);
 
-    // Helper to map socket role string to VoicePermissionLevel
-    const getPermissionLevel = (roleStr: string): VoicePermissionLevel => {
-      const r = roleStr.toUpperCase();
-      if (r === 'ADMIN' || r === 'CAPTAIN') return VoicePermissionLevel.ADMIN;
-      if (r === 'TANOD') return VoicePermissionLevel.TANOD;
-      if (r === 'CITIZEN') return VoicePermissionLevel.RESIDENT;
+    // Map normalized role to VoicePermissionLevel
+    const getPermissionLevel = (r: string): VoicePermissionLevel => {
+      const normalized = normalizeRole(r);
+      if (normalized === 'admin' || normalized === 'captain' || normalized === 'superadmin') {
+        return VoicePermissionLevel.ADMIN;
+      }
+      if (normalized === 'tanod') return VoicePermissionLevel.TANOD;
       return VoicePermissionLevel.RESIDENT;
     };
 
-    // Voice Assistant Events
+    // Create a dedicated rate limiter for this socket connection
+    const voiceAllowed = createVoiceRateLimiter();
+
+    // Voice command handler
     socket.on('voice-command', async (data) => {
+      if (!voiceAllowed()) {
+        socket.emit('voice-error', {
+          message: 'Too many voice commands. Please wait before trying again.',
+          code: 'RATE_LIMITED',
+        });
+        return;
+      }
       try {
         await voiceAssistantService.processVoiceInput(
-          id, 
-          { transcript: data.transcript, language: 'fil' }, 
-          getPermissionLevel(role as string)
+          id,
+          { transcript: data.transcript, language: 'fil' },
+          getPermissionLevel(role)
         );
-        // Response already emitted inside service
       } catch (error: any) {
-        socket.emit('voice-error', { 
+        socket.emit('voice-error', {
           message: error.message,
-          code: error.code || 'VOICE_PERMISSION_ERROR'
+          code: error.code || 'VOICE_PERMISSION_ERROR',
         });
       }
     });
 
+    // Confirm-action handler (also voice-gated)
     socket.on('confirm-action', async (data) => {
+      if (!voiceAllowed()) {
+        socket.emit('voice-error', {
+          message: 'Too many voice commands. Please wait before trying again.',
+          code: 'RATE_LIMITED',
+        });
+        return;
+      }
       try {
-        // socket.io buffers arrive directly as Node Buffers
         const audioBuffer = data.voiceSample ? Buffer.from(data.voiceSample) : undefined;
         await voiceAssistantService.executeConfirmedAction(
-          id, 
-          data.action, 
-          getPermissionLevel(role as string), 
+          id,
+          data.action,
+          getPermissionLevel(role),
           audioBuffer
         );
       } catch (e: any) {
         console.error(e);
-        socket.emit('voice-error', { 
-           message: e.message,
-           code: e.code || 'ACTION_FAILED'
+        socket.emit('voice-error', {
+          message: e.message,
+          code: e.code || 'ACTION_FAILED',
         });
       }
     });
@@ -108,7 +155,6 @@ export function initSocket(server: HttpServer): Server {
 
     socket.on('disconnect', (reason) => {
       console.log(`[Socket] Disconnected → ${role} ${id} | Reason: ${reason}`);
-      // Cleanup can be handled in individual handlers
     });
   });
 
@@ -128,7 +174,6 @@ export function emitToAll(event: string, data: any) {
   if (io) io.emit(event, data);
 }
 
-// Helper emitters
 export function emitToResponders(event: string, data: any) {
   io?.to('responders').emit(event, data);
 }

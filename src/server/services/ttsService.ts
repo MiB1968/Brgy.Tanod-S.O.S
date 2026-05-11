@@ -106,11 +106,13 @@ class TTSService {
 
   private isQuotaError(error: any): boolean {
     const msg = error.message?.toLowerCase() || '';
+    const status = error.status || error.statusCode || error.response?.status || error.response?.statusCode;
     return msg.includes('quota') || 
            msg.includes('credit') || 
-           error.status === 402 || 
-           error.status === 429 || 
-           error.status === 401 || 
+           msg.includes('unauthorized') ||
+           status === 402 || 
+           status === 429 || 
+           status === 401 || 
            error.code === 'insufficient_funds';
   }
 
