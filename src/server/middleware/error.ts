@@ -20,7 +20,12 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
 
   const status = err.status || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
-  const message = err.message || 'Something went wrong on the server';
+  
+  // 🛡️ SECURITY FIX: Do not leak internal error messages for 500s in production
+  let message = 'Something went wrong on the server';
+  if (err instanceof AppError || status < 500) {
+    message = err.message;
+  }
 
   response.error(res, message, code, status);
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tanod-sos-v3';
+const CACHE_NAME = 'tanod-sos-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -21,26 +21,46 @@ db.version(3).stores({
 });
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting(); // Force the waiting service worker to become the active service worker.
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
-        if (key !== CACHE_NAME) return caches.delete(key);
+        if (key !== CACHE_NAME && key.startsWith('tanod-sos')) {
+          return caches.delete(key);
+        }
       }));
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // Claim clients immediately
   );
 });
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Always skip API calls
+  if (e.request.url.includes('/api/')) return;
+
+  // Use Network First strategy so users always get the latest code.
   e.respondWith(
-    caches.match(e.request).then((response) => response || fetch(e.request))
+    fetch(e.request)
+      .then((response) => {
+        // If we get a valid response, maybe update cache for URL
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          // don't cache chrome-extension or other unsupported schemes
+          if(e.request.url.startsWith('http')){
+             cache.put(e.request, responseClone);
+          }
+        });
+        return response;
+      })
+      .catch(() => {
+        return caches.match(e.request);
+      })
   );
 });
 
@@ -63,3 +83,4 @@ async function notifyClients() {
     });
   }
 }
+

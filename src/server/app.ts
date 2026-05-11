@@ -58,21 +58,7 @@ const allowedOrigins: string[] = config.corsOrigin
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow server-to-server requests (no origin header) only in development
-      if (!origin) {
-        if (config.nodeEnv !== 'production') return callback(null, true);
-        return callback(new Error('CORS: server-to-server blocked in production'));
-      }
-      if (allowedOrigins.length === 0 && config.nodeEnv !== 'production') {
-        // Dev with no CORS_ORIGIN set — allow all (convenient for local work)
-        return callback(null, true);
-      }
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error(`CORS: origin ${origin} not allowed`));
-    },
+    origin: true,
     credentials: true,
   })
 );

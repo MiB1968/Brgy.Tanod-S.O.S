@@ -42,6 +42,7 @@ function createVoiceRateLimiter(): () => boolean {
 // ---------------------------------------------------------------------------
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
+    path: '/socket.io/',
     pingTimeout: 180000,
     pingInterval: 25000,
     transports: ['polling', 'websocket'],
@@ -50,7 +51,7 @@ export function initSocket(server: HttpServer): Server {
     maxHttpBufferSize: 1e7, // 10MB for voice packets
     cookie: false,
     cors: {
-      origin: config.corsOrigin,
+      origin: true,
       credentials: true,
       methods: ['GET', 'POST'],
     },
