@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { AuthenticatedSocket } from '../../types';
+import { z } from 'zod';
 
 interface LocationEntry {
   user_id: string;
@@ -16,6 +17,11 @@ export function getActiveLocations(): LocationEntry[] {
   return Object.values(activeLocations);
 }
 
+const locationUpdateSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+
 export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
   const user = socket.data.user;
 
@@ -23,18 +29,27 @@ export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
     socket.emit('location_map', activeLocations);
   }
 
-  socket.on('location_update', (data: LocationEntry) => {
-    if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
-    
-    const newEntry = {
-      ...data,
-      timestamp: new Date().toISOString()
-    };
-    
-    activeLocations[data.user_id] = newEntry;
+  socket.on('location_update', (rawData: unknown) => {
+    try {
+      const data = locationUpdateSchema.parse(rawData);
+      
+      const newEntry: LocationEntry = {
+        // Enforce identity via socket session, prevent spoofing
+        user_id: user.id,
+        role: user.role,
+        name: user.name,
+        lat: data.lat,
+        lng: data.lng,
+        timestamp: new Date().toISOString()
+      };
+      
+      activeLocations[user.id] = newEntry;
 
-    // Broadcast DELTA location map to responders only
-    io.to('responders').emit('location_update_delta', newEntry);
+      // Broadcast DELTA location map to responders only
+      io.to('responders').emit('location_update_delta', newEntry);
+    } catch (e) {
+      console.warn(`[Socket] location_update rejected for ${user.id} due to invalid payload`);
+    }
   });
 }
 
@@ -53,5 +68,6 @@ export function startLocationExpiryTask(io: Server) {
         }
       }
     });
-  }, 60000);
+  }, 60000); // 1 minute checks
 }
+

@@ -33,7 +33,8 @@ export const useSOSStore = create<SOSState>()(
         status: 'pending',
         timestamp: new Date().toISOString(),
         description,
-        photos
+        photos,
+        clientUuid: crypto.randomUUID()
       };
 
       try {

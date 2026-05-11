@@ -14,8 +14,8 @@ export class AppError extends Error {
 }
 
 
-export function errorHandler(err: AppError, req: Request, res: Response, next: NextFunction) {
-  console.error(`[ERROR] ${new Date().toISOString()} - ${err.message}`);
+export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
+  console.error(`[ERROR] ${new Date().toISOString()} - ${err.message || err}`);
   if (err.stack) console.error(err.stack);
 
   const status = err.status || 500;

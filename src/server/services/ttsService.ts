@@ -110,6 +110,7 @@ class TTSService {
            msg.includes('credit') || 
            error.status === 402 || 
            error.status === 429 || 
+           error.status === 401 || 
            error.code === 'insufficient_funds';
   }
 
@@ -173,14 +174,14 @@ class TTSService {
   private async fallbackTTS(text: string): Promise<Buffer> {
     // Basic Google TTS implementation as ultimate failover
     try {
-        const { default: googleTTS } = await import('google-tts-api');
+        const googleTTS = await import('google-tts-api');
         const results = await googleTTS.getAllAudioBase64(text, {
           lang: 'en',
           slow: false,
           host: 'https://translate.google.com',
         });
         
-        const buffers = results.map(r => Buffer.from(r.base64, 'base64'));
+        const buffers = results.map((r: any) => Buffer.from(r.base64, 'base64'));
         return Buffer.concat(buffers);
     } catch (err) {
         console.error("Fallback TTS failed:", err);
