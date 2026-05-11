@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { Alert, User, SystemBroadcast } from '../types';
+import { Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import LiveMap from '../LiveMap';
@@ -17,7 +18,8 @@ import AdminAnalytics from './Admin/AdminAnalytics';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import { SOSBroadcastPanel } from './Admin/SOSBroadcastPanel';
-import { JarvisVoice } from './Admin/JarvisVoice';
+import { GuardianVoiceAssistant } from './ai/GuardianVoiceAssistant';
+import { GuardianGreeting } from './ai/GuardianGreeting';
 import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import DispatchModal from './DispatchModal';
@@ -83,12 +85,6 @@ export default function AdminDashboard({
 
   const activeAlertsCount = alerts.filter(a => !isResolvedAlert(a)).length;
   const pendingAlertsCount = alerts.filter(a => isActiveAlert(a)).length;
-
-  useEffect(() => {
-    if (profile) {
-      performGreeting(profile.role, profile.name);
-    }
-  }, []);
 
   useEffect(() => {
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
@@ -267,7 +263,11 @@ export default function AdminDashboard({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         <SOSBroadcastPanel profile={profile} />
-        <JarvisVoice />
+        <div className="bg-slate-900/50 rounded-3xl p-6 border border-white/5 flex flex-col justify-center items-center text-center">
+          <Shield className="text-blue-500/50 mb-3" size={32} />
+          <h4 className="text-xs font-mono text-slate-500 uppercase tracking-widest">Guardian AI Intelligence</h4>
+          <p className="text-[10px] text-slate-600 mt-1">Automatic Tactical Analysis Active</p>
+        </div>
       </div>
 
       <AdminStatsGrid 

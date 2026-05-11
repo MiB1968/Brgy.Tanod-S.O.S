@@ -99,6 +99,8 @@ import { getQueueSize } from './lib/offlineQueue';
 import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
+import { GuardianGreeting } from './components/ai/GuardianGreeting';
 import { PWAStatus } from './components/PWAStatus';
 
 // Rest of App...
@@ -689,6 +691,15 @@ export default function App() {
           profile={effectiveProfile} 
           alerts={alerts} 
         />
+        
+        {/* System Guardian Voice AI Intelligence */}
+        {(effectiveRole === 'admin' || effectiveRole === 'superadmin' || effectiveRole === 'tanod') && (
+          <>
+            <GuardianGreeting />
+            <GuardianVoiceAssistant />
+          </>
+        )}
+
         <SOSAlertSiren userRole={effectiveRole} />
         <BackgroundServices />
       </main>

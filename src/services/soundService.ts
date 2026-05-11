@@ -14,12 +14,16 @@ class SoundService {
     // These are high-quality, professional assets from public/mixkit sources
     this.sounds = {
       intro_epic: new Howl({
-        src: ['https://assets.mixkit.co/active_storage/sfx/2645/2645-preview.mp3'], // Technological hum/whoosh
+        src: ['https://assets.mixkit.co/active_storage/sfx/2645/2645-preview.mp3'], // Tactical hum/whoosh
         volume: 0.6
       }),
       intro_super: new Howl({
         src: ['https://assets.mixkit.co/active_storage/sfx/2048/2048-preview.mp3'], // Deep cinematic hit
         volume: 0.8
+      }),
+      system_online: new Howl({
+        src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'], // Digital startup
+        volume: 0.5
       }),
       sos_alert: new Howl({
         src: ['https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3'], // High priority ping
