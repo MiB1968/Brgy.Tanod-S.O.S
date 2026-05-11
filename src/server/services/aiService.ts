@@ -1,14 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-
 import { config } from '../config/index';
+import {
+  routeToModel,
+  shouldUpgradeModel,
+  AI_MODELS,
+  type AITier,
+  type ModelConfig,
+} from '../config/aiModels';
 
 const getApiKey = () => config.guardianAiKey || process.env.GEMINI_API_KEY || "";
-
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 // =============================================================================
-// Schema Definition (Single Source of Truth)
+// Schema
 // =============================================================================
 const AIAnalysisSchema = z.object({
   incidentType: z.enum(["MEDICAL", "FIRE", "CRIME", "DISTURBANCE", "NATURAL_DISASTER", "OTHER"]),
@@ -24,16 +29,16 @@ const AIAnalysisSchema = z.object({
 export type AIAnalysis = z.infer<typeof AIAnalysisSchema>;
 
 // =============================================================================
-// Logger (use your existing logger or winston/pino)
+// Logger
 // =============================================================================
 const log = {
-  info: (msg: string, meta?: any) => console.info(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
+  info:  (msg: string, meta?: any) => console.info(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
   error: (msg: string, meta?: any) => console.error(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
-  warn: (msg: string, meta?: any) => console.warn(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
+  warn:  (msg: string, meta?: any) => console.warn(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
 };
 
 // =============================================================================
-// Fallback Analysis (Safe default when AI fails)
+// Fallback
 // =============================================================================
 function createFallbackAnalysis(description: string, initialType?: string): AIAnalysis {
   return {
@@ -42,193 +47,181 @@ function createFallbackAnalysis(description: string, initialType?: string): AIAn
     urgency: "HIGH",
     summary: description.length > 100 ? description.substring(0, 97) + "..." : description,
     recommendedResponders: ["Tanod Team"],
-    riskFactors: ["AI analysis unavailable"],
+    riskFactors: ["AI analysis unavailable — manual assessment required"],
     estimatedResponseTimeMins: 15,
     actionRecommendations: [
       "Dispatch nearest available Tanod immediately",
       "Maintain communication with reporter",
-      "Prepare for possible escalation"
+      "Prepare for possible escalation",
     ],
   };
 }
 
 // =============================================================================
-// Main Function
+// Core: call one model with timeout
+// =============================================================================
+async function callModel(
+  modelConfig: ModelConfig,
+  prompt: string,
+  requestId: string
+): Promise<AIAnalysis> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Model timeout after ${modelConfig.timeoutMs}ms`)), modelConfig.timeoutMs)
+  );
+
+  const callPromise = (async () => {
+    const result = await ai.models.generateContent({
+      model: modelConfig.name,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: modelConfig.maxOutputTokens,
+        temperature: 0.2,
+      },
+    });
+
+    const raw = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return AIAnalysisSchema.parse(parsed);
+  })();
+
+  return Promise.race([callPromise, timeoutPromise]);
+}
+
+// =============================================================================
+// Main export — with automatic routing + upgrade on underestimate
 // =============================================================================
 export async function analyzeIncident(
   description: string,
   initialType?: string,
   nearestTanodDistanceKm?: number,
-  incidentId?: string   // Important for audit trail
-): Promise<AIAnalysis> {
-  
-  const startTime = Date.now();
-  const requestId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  incidentId?: string
+): Promise<AIAnalysis & { _modelUsed: string; _tier: AITier }> {
 
-  log.info("Incident analysis started", { 
-    requestId, 
-    incidentId, 
-    initialType, 
-    nearestTanodDistanceKm 
-  });
+  const requestId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const startTime = Date.now();
 
   if (!description?.trim()) {
     log.warn("Empty description received", { requestId, incidentId });
-    return createFallbackAnalysis("No description provided", initialType);
+    return { ...createFallbackAnalysis("No description provided", initialType), _modelUsed: 'none', _tier: 'flash' };
   }
 
-  // Sanitize input
-  const cleanDescription = description.trim().slice(0, 1500); // Prevent abuse
+  // Sanitize
+  const sanitized = description
+    .replace(/<[^>]*>/g, '')
+    .replace(/[^\w\s.,!?;:()\-'"]/g, '')
+    .substring(0, 1000)
+    .trim();
 
-  if (!getApiKey() || getApiKey() === "missing-key" || getApiKey() === "YOUR_GEMINI_API_KEY") {
-    if (requestId.endsWith('0')) { // Rate-limit log spam
-      log.warn("Gemini API Key misconfigured or missing. Using fallback analysis.");
-    }
-    return createFallbackAnalysis(cleanDescription, initialType);
-  }
+  const prompt = buildPrompt(sanitized, initialType, nearestTanodDistanceKm);
+
+  // === Step 1: Route to initial model ===
+  const initialModel = routeToModel({
+    incidentType: initialType?.toUpperCase(),
+    descriptionLength: sanitized.length,
+  });
+
+  log.info("Routing decision", {
+    requestId,
+    incidentId,
+    selectedTier: initialModel.tier,
+    selectedModel: initialModel.name,
+    reason: `type=${initialType}, descLen=${sanitized.length}`,
+  });
+
+  let result: AIAnalysis;
+  let usedModel = initialModel;
 
   try {
-    const prompt = `You are **Guardian AI**, an expert emergency response coordinator for a Philippine Barangay. 
-You are calm, decisive, accurate, and operationally focused. Your job is to analyze SOS reports and give immediate, actionable guidance to Tanods and the Command Center.
+    result = await callModel(initialModel, prompt, requestId);
 
-**Context:**
-- This is a local barangay setting in the Philippines.
-- Common serious incidents include pananaksak (stabbing), domestic violence, floods, typhoons, fires, medical emergencies (especially elderly/children), and community disturbances.
-- Tanods typically respond on foot or motorcycle. Average speed: 20 km/h in residential areas.
+    // === Step 2: Check if result severity is higher than we expected ===
+    const upgrade = shouldUpgradeModel(initialModel.tier, result.severityScore, result.urgency);
 
-**Rules:**
-- Be decisive. Avoid "OTHER" unless truly impossible to classify.
-- Use "NATURAL_DISASTER" for floods, typhoons, landslides, etc.
-- Prioritize human life. Domestic violence, crimes with weapons, fires, and medical distress involving vulnerable persons are HIGH or CRITICAL.
-- Calculate estimatedResponseTimeMins realistically using the provided distance. Assume 20 km/h average speed + 3 minutes preparation time. Round to nearest integer. Minimum 5 minutes.
+    if (upgrade) {
+      log.warn("Upgrading model — initial result indicates higher severity than routed tier", {
+        requestId,
+        incidentId,
+        from: initialModel.tier,
+        to: upgrade.tier,
+        severityScore: result.severityScore,
+        urgency: result.urgency,
+      });
 
-**Output must be valid JSON matching this exact schema:**
-{
-  "incidentType": "MEDICAL" | "FIRE" | "CRIME" | "DISTURBANCE" | "NATURAL_DISASTER" | "OTHER",
-  "severityScore": number,          // 1-10 (10 = life-threatening)
-  "urgency": "LOW" | "NORMAL" | "HIGH" | "CRITICAL",
-  "summary": string,                // 1-2 sentence clear summary
-  "recommendedResponders": string[], // e.g. ["Tanod Team Alpha", "BFP", "Medical Responder"]
-  "riskFactors": string[],          // e.g. ["Suspected weapon", "Possible domestic issue", "Flooding area"]
-  "estimatedResponseTimeMins": number,
-  "actionRecommendations": string[]  // Clear, numbered-style actionable items for Tanods + Command Center
-}
-
-**Examples:**
-
-Input: "My husband is beating me again. Please send help fast. Zone 3"
-Output: {
-  "incidentType": "CRIME",
-  "severityScore": 9,
-  "urgency": "CRITICAL",
-  "summary": "Ongoing domestic violence incident in Zone 3.",
-  "recommendedResponders": ["Tanod Team", "Barangay Health Worker", "PNP if needed"],
-  "riskFactors": ["Suspect may be violent", "Possible ongoing physical assault"],
-  "estimatedResponseTimeMins": 8,
-  "actionRecommendations": [
-    "Approach with caution - possible violent suspect",
-    "Prioritize victim safety and extraction",
-    "Request backup before entry",
-    "Prepare medical assistance for victim"
-  ]
-}
-
-Input: "Baha na naman dito sa kalsada, malakas ang ulan. Hindi na makadaan ang sasakyan."
-Output: {
-  "incidentType": "NATURAL_DISASTER",
-  "severityScore": 6,
-  "urgency": "HIGH",
-  "summary": "Flooding reported on main road due to heavy rain.",
-  "recommendedResponders": ["Tanod Team", "Barangay Engineering"],
-  "riskFactors": ["Impassable road", "Risk of stranded vehicles"],
-  "estimatedResponseTimeMins": 12,
-  "actionRecommendations": [
-    "Assess flood depth and affected households",
-    "Set up warning signs and road closure",
-    "Coordinate with MDRRMO if worsening"
-  ]
-}
-
-**Now analyze this incident:**
-
-Initial reported type: \${initialType || 'Unknown'}
-Nearest Tanod distance: \${nearestTanodDistanceKm ? nearestTanodDistanceKm.toFixed(2) + ' km' : 'unknown'}
-Description: \${cleanDescription}
-
-Respond with **only** the valid JSON object. No explanations, no markdown, no extra text.`;
-
-    const timeoutMs = 8000; // 8 seconds max
-
-    const resultPromise = ai.models.generateContent({ 
-      model: config.geminiModel,
-      contents: prompt,
-      config: { 
-        responseMimeType: "application/json",
-        temperature: 0.1,
-        topP: 0.85,
-      },
-    });
-    
-    const result: any = await Promise.race([
-      resultPromise,
-      new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("AI analysis timeout")), timeoutMs)
-      )
-    ]);
-
-    const rawText = result.text;
-
-    if (!rawText || rawText.trim() === "") {
-      throw new Error("Empty response from Gemini");
-    }
-
-    // Robust JSON parsing with fallback strategies
-    let parsedData: any;
-    try {
-      parsedData = JSON.parse(rawText);
-    } catch (parseError) {
-      // Attempt to extract JSON object from markdown/code blocks
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw parseError;
+      try {
+        const upgradedResult = await callModel(upgrade, prompt, requestId);
+        result = upgradedResult;
+        usedModel = upgrade;
+      } catch (upgradeErr: any) {
+        log.warn("Upgrade model call failed, keeping initial result", {
+          requestId,
+          error: upgradeErr.message,
+        });
+        // Keep the original result — don't fall back to dummy
       }
     }
 
-    // Validate against schema
-    const validated = AIAnalysisSchema.parse(parsedData);
-
-    const duration = Date.now() - startTime;
-    
-    log.info("AI analysis completed successfully", {
+    log.info("Analysis complete", {
       requestId,
       incidentId,
-      incidentType: validated.incidentType,
-      urgency: validated.urgency,
-      severityScore: validated.severityScore,
-      responseTimeMs: duration,
-      estimatedResponseTimeMins: validated.estimatedResponseTimeMins
+      model: usedModel.name,
+      tier: usedModel.tier,
+      severity: result.severityScore,
+      urgency: result.urgency,
+      durationMs: Date.now() - startTime,
     });
 
-    return validated;
+    return { ...result, _modelUsed: usedModel.name, _tier: usedModel.tier };
 
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    const isAuthError = error?.message?.includes('API_KEY_INVALID') || error?.message?.includes('400') || error?.status === 400;
-    
-    if (isAuthError) {
-      log.warn("Gemini Auth Error: Invalid API Key detected. Please verify GEMINI_API_KEY.");
-    } else {
-      log.error("AI analysis failed", {
-        requestId,
-        incidentId,
-        error: error.message || "Unknown error",
-        durationMs: duration
-      });
+  } catch (err: any) {
+    log.error("AI analysis failed", {
+      requestId,
+      incidentId,
+      model: usedModel.name,
+      error: err.message,
+      durationMs: Date.now() - startTime,
+    });
+
+    // === Step 3: If chosen model failed, try flash as last resort ===
+    if (initialModel.tier !== 'flash') {
+      log.warn("Primary model failed, falling back to flash", { requestId });
+      try {
+        const flashResult = await callModel(AI_MODELS.flash, prompt, requestId);
+        return { ...flashResult, _modelUsed: AI_MODELS.flash.name, _tier: 'flash' };
+      } catch {
+        // Flash also failed — use static fallback
+      }
     }
 
-    return createFallbackAnalysis(cleanDescription, initialType);
+    return { ...createFallbackAnalysis(sanitized, initialType), _modelUsed: 'fallback', _tier: 'flash' };
   }
 }
 
+// =============================================================================
+// Prompt builder (separated for clarity)
+// =============================================================================
+function buildPrompt(
+  description: string,
+  initialType?: string,
+  nearestTanodDistanceKm?: number
+): string {
+  return `You are an emergency triage AI for a Philippine barangay (Brgy. Tanod S.O.S. System).
+Analyze this incident report and respond with ONLY a valid JSON object — no markdown, no explanation.
+
+Incident Description: "${description}"
+${initialType ? `Initial Type: ${initialType}` : ''}
+${nearestTanodDistanceKm !== undefined ? `Nearest Tanod Distance: ${nearestTanodDistanceKm.toFixed(2)} km` : ''}
+
+Required JSON format:
+{
+  "incidentType": "MEDICAL" | "FIRE" | "CRIME" | "DISTURBANCE" | "NATURAL_DISASTER" | "OTHER",
+  "severityScore": 1-10,
+  "urgency": "LOW" | "NORMAL" | "HIGH" | "CRITICAL",
+  "summary": "max 280 chars",
+  "recommendedResponders": ["string"],
+  "riskFactors": ["string"],
+  "estimatedResponseTimeMins": 1-60,
+  "actionRecommendations": ["string"]
+}`;
+}

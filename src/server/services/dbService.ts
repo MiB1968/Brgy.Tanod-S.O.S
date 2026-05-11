@@ -85,11 +85,14 @@ export async function initDb(retries = 3) {
         );
       `);
 
-      // Bootstrap Admin & Demo Users
+      // Bootstrap Admin
       const { email: adminEmail, password: adminPassword } = config.adminBootstrap;
       
-      const adminBootEmail = adminEmail || 'admin@demo.com';
-      const adminBootPass = adminPassword || 'demo';
+      if (!adminEmail || !adminPassword) {
+        throw new Error('ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD must be set in .env before starting the server.');
+      }
+      const adminBootEmail = adminEmail;
+      const adminBootPass = adminPassword;
 
       const adminResult = await client.query("SELECT * FROM users WHERE email = $1", [adminBootEmail]);
       if (adminResult.rows.length === 0) {
@@ -99,26 +102,6 @@ export async function initDb(retries = 3) {
           [adminBootEmail, hashedPass, 'Super Admin', 'admin', 'verified']
         );
         console.log(`Successfully bootstrapped admin: ${adminBootEmail}`);
-      }
-
-      // Bootstrap Demo Resident and Tanod
-      const demoUsers = [
-        { email: 'resident@demo.com', name: 'Demo Resident', role: 'resident' },
-        { email: 'tanod@demo.com', name: 'Demo Tanod', role: 'tanod' }
-      ];
-
-      for (const u of demoUsers) {
-        const res = await client.query("SELECT * FROM users WHERE email = $1", [u.email]);
-        if (res.rows.length === 0) {
-          const hashed = await bcrypt.hash('demo', 10);
-          const insertRes = await client.query(
-            "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            [u.email, hashed, u.name, u.role, 'verified']
-          );
-          if (u.role === 'tanod') {
-             await client.query("INSERT INTO patrols (tanod_id, tanod_name, is_active, status) VALUES ($1, $2, false, 'offline')", [insertRes.rows[0].id, u.name]);
-          }
-        }
       }
 
       await client.query(`

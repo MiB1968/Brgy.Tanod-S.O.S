@@ -13,8 +13,8 @@ async function startServer() {
     initDatabase();
     await initDb();
   } catch (err) {
-    console.error("CRITICAL: Database initialization failed.", err);
-    // Continue for now, but in real production you might want to exit
+    console.error("CRITICAL: Database initialization failed. Server cannot start safely.", err);
+    process.exit(1);
   }
 
   const server = http.createServer(app);

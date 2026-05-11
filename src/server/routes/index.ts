@@ -6,6 +6,7 @@ import syncRoutes from "./syncRoutes";
 import systemRoutes from "./systemRoutes";
 import voiceRoutes from "./voiceRoutes";
 import aiRoutes from "./aiRoutes";
+import adminRoutes from "./adminRoutes";
 
 export const setupRoutes = (app: Express): void => {
   // Health check
@@ -29,6 +30,7 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/system", systemRoutes);
   app.use("/api/voice", voiceRoutes);
   app.use("/api/ai", aiRoutes);
+  app.use("/api/admin", adminRoutes);
 
   // 404 catch-all for unmatched API routes
   app.use("/api/*", (req, res) => {

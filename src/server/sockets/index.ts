@@ -51,7 +51,17 @@ export function initSocket(server: HttpServer): Server {
     maxHttpBufferSize: 1e7, // 10MB for voice packets
     cookie: false,
     cors: {
-      origin: true,
+      origin: (origin, callback) => {
+        const allowedOrigins = config.corsOrigin ? config.corsOrigin.split(',').map(o => o.trim()) : [];
+        const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
+        const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
+
+        if (!origin || isStudioPreview || isDevFallback || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        console.warn(`[Socket CORS] Origin rejected: ${origin}`);
+        return callback(null, false);  // ← null, not new Error()
+      },
       credentials: true,
       methods: ['GET', 'POST'],
     },

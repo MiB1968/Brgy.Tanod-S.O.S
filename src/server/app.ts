@@ -18,7 +18,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // unsafe-inline needed for Vite dev HMR
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: [
@@ -58,7 +58,16 @@ const allowedOrigins: string[] = config.corsOrigin
 
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
+      const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
+
+      if (!origin || isStudioPreview || isDevFallback || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.warn(`[CORS] Origin rejected: ${origin}`);
+      return callback(null, false);  // ← null, not new Error()
+    },
     credentials: true,
   })
 );
