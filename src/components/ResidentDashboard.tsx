@@ -158,7 +158,7 @@ export default function ResidentDashboard({
                         }
                       }
                     }}
-                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-emergency/20 hover:text-emergency hover:border-emergency/30 transition-all active:scale-95 whitespace-nowrap"
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-emergency/20 hover:text-emergency hover:border-emergency/30 transition-all active:scale-95 whitespace-nowrap relative z-50 cursor-pointer"
                   >
                     Abort SOS
                   </button>

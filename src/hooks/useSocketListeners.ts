@@ -54,15 +54,16 @@ export function useSocketListeners(
         residentName: alert.residentName || 'Resident',
         type: alert.type as EmergencyType,
         location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
-        status: alert.status as AlertStatus,
+        status: (alert.status as string).toLowerCase() as AlertStatus,
         timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
       };
       
       addAlert(formattedAlert);
       
       if (profile.role === 'admin' || profile.role === 'tanod' || effectiveRole === 'superadmin') {
-        const isNew = !data.alert; // If data is the alert itself, it's alert_new
-        if (isNew || formattedAlert.status === 'pending') {
+        // Either it's a new alert or status is pending/PENDING
+        // We can just check the lowercase status.
+        if (formattedAlert.status.toLowerCase() === 'pending') {
           toast.error(`🚨 SOS EMERGENCY: ${formattedAlert.type}`, { duration: 10000, id: `sos-${formattedAlert.id}` });
           showSOSNotification(formattedAlert);
         }

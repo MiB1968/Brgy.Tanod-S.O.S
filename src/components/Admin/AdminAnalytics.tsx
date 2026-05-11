@@ -9,14 +9,18 @@ const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 export default function AdminAnalytics() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         const json = await fetchAPI('/analytics/dashboard');
-        setData(json);
-      } catch (err) {
+        const payload = json.data || json; // gracefully handle both forms
+        setData(payload);
+        setError(null);
+      } catch (err: any) {
         console.error("Failed to fetch analytics:", err);
+        setError(err.message || 'Failed to fetch analytics');
       } finally {
         setLoading(false);
       }
@@ -26,6 +30,15 @@ export default function AdminAnalytics() {
     const interval = setInterval(fetchAnalytics, 30000); // Pulse every 30s
     return () => clearInterval(interval);
   }, []);
+
+  if (error) {
+    return (
+      <div className="glass-panel p-12 rounded-[40px] border-white/5 flex flex-col items-center justify-center">
+        <Activity className="w-12 h-12 text-emergency opacity-20 mb-4" />
+        <p className="text-sm font-black uppercase text-emergency tracking-tighter font-mono">{error}</p>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (

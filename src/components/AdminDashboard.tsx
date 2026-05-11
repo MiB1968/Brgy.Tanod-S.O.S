@@ -17,6 +17,7 @@ import AdminAnalytics from './Admin/AdminAnalytics';
 import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import { SOSBroadcastPanel } from './Admin/SOSBroadcastPanel';
+import { JarvisVoice } from './Admin/JarvisVoice';
 import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import DispatchModal from './DispatchModal';
@@ -256,7 +257,10 @@ export default function AdminDashboard({
         </motion.button>
       )}
 
-      <SOSBroadcastPanel profile={profile} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        <SOSBroadcastPanel profile={profile} />
+        <JarvisVoice />
+      </div>
 
       <AdminStatsGrid 
         residentsCount={residentsCount}

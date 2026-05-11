@@ -4,6 +4,8 @@ import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 import { rateLimit } from 'express-rate-limit';
+import { jarvisVoiceService } from '../services/elevenLabsService';
+import { Readable } from 'stream';
 
 const router = Router();
 
@@ -95,6 +97,27 @@ router.post('/sms', authenticate, smsLimiter, async (req, res) => {
   } catch (err: any) {
     console.error("[SMS] Fetch failed:", err);
     return res.status(502).json({ success: false, error: { code: 'BAD_GATEWAY', message: "Could not reach Semaphore API" } });
+  }
+});
+
+router.post('/tts', authenticate, authorize(['admin', 'superadmin', 'captain']), async (req, res) => {
+  const { text } = req.body;
+  if (!text) {
+    return response.error(res, "Text is required", "BAD_REQUEST", 400);
+  }
+
+  try {
+    const stream = await jarvisVoiceService.generateAudioStream(text);
+    if (!stream) {
+      return response.error(res, "Failed to generate TTS", "TTS_FAILED", 500);
+    }
+    
+    // Convert to readable stream and pipe to response
+    res.setHeader('Content-Type', 'audio/mpeg');
+    Readable.from(stream).pipe(res);
+  } catch (err: any) {
+    console.error('TTS Error:', err);
+    response.error(res, err.message, "TTS_ERROR", 500);
   }
 });
 

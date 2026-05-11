@@ -1,18 +1,16 @@
 import * as http from 'http';
 import path from 'path';
 import express from 'express';
-import { fileURLToPath } from 'url';
 import app from './src/server/app';
 import { initDb } from './src/server/services/dbService';
+import { initDatabase } from './src/server/db/index';
 import { initSocket } from './src/server/sockets/index';
 import { config } from './src/server/config/index';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 async function startServer() {
   // 1. Initialize Database
   try {
+    initDatabase();
     await initDb();
   } catch (err) {
     console.error("CRITICAL: Database initialization failed.", err);

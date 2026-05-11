@@ -7,7 +7,9 @@ const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: config.databaseUrl,
-  ssl: config.databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false }
+  ssl: config.databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
+  connectionTimeoutMillis: 5000,
+  query_timeout: 10000,
 });
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);
@@ -31,20 +33,23 @@ export const initDatabase = (): admin.firestore.Firestore => {
       // For production: use service account credentials
       // credential: admin.credential.cert({...})
     });
-    
+    console.log('[DB] Firebase app initialized successfully');
+  }
+
+  if (!db) {
     db = admin.firestore();
     db.settings({
       ignoreUndefinedProperties: true,
     });
-
     console.log('[DB] Firebase Firestore initialized successfully');
   }
+  
   return db;
 };
 
 export const getDb = (): admin.firestore.Firestore => {
   if (!db) {
-    throw new Error('Database not initialized. Call initDatabase() in your server entry point.');
+    db = initDatabase();
   }
   return db;
 };

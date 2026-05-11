@@ -46,7 +46,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       "fixed inset-y-0 left-0 w-72 glass-panel border-r border-white/5 flex flex-col shrink-0 z-[100] transition-transform duration-500 ease-out md:relative md:translate-x-0 md:w-64 lg:w-72 shadow-command",
       isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
     )}>
-      <div className="absolute top-0 left-0 w-full h-full bg-brand-bg/20 -z-10" />
+      <div className="absolute top-0 left-0 w-full h-full bg-brand-bg/40 backdrop-blur-2xl -z-10" />
       <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emergency/5 blur-[100px] rounded-full" />
       
       <div className="p-6 pt-10 sm:pt-12 overflow-hidden flex flex-col items-center sm:items-start">

@@ -1,46 +1,100 @@
-import { BaseRepository } from './BaseRepository';
+import { pool } from '../index';
 import { Incident } from '../../types';
+import { AppError } from '../../middleware/error';
 
-export class IncidentRepository extends BaseRepository<Incident> {
-  constructor() {
-    super('incidents');
+export class IncidentRepository {
+  async create(data: any): Promise<Incident> {
+    try {
+      const location = JSON.stringify({ lat: data.latitude, lng: data.longitude });
+      const aiAnalysis = data.aiAnalysis ? JSON.stringify(data.aiAnalysis) : null;
+      // Note: barangayId, photos, and voiceClip are ignored or properly handled depending on your DB schema.
+      // Since 'alerts' is the SOS table, we map reporterId -> resident_id.
+      const result = await pool.query(
+        `INSERT INTO alerts (resident_id, type, description, location, status, ai_analysis, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, now(), now()) RETURNING *`,
+        [data.reporterId, data.type, data.description || '', location, data.status ? data.status.toLowerCase() : 'pending', aiAnalysis]
+      );
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        reporterId: row.resident_id,
+        barangayId: data.barangayId, // not in DB schema, keep in-memory
+        type: row.type,
+        status: row.status,
+        description: row.description,
+        location: row.location,
+        latitude: row.location?.lat,
+        longitude: row.location?.lng,
+        aiAnalysis: row.ai_analysis,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      } as Incident;
+    } catch (err) {
+      console.error("[IncidentRepository] Create error:", err);
+      throw new AppError('Failed to create record', 500, 'DB_CREATE_ERROR');
+    }
   }
 
   async findActiveByBarangay(barangayId: string, limit = 30): Promise<Incident[]> {
-    const snapshot = await this.getCollection()
-      .where('barangayId', '==', barangayId)
-      .where('status', 'in', ['PENDING', 'DISPATCHED', 'RESPONDING'])
-      .orderBy('createdAt', 'desc')
-      .limit(limit)
-      .get();
-
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    const result = await pool.query(`
+      SELECT * FROM alerts 
+      WHERE status IN ('pending', 'active', 'responding') 
+      ORDER BY created_at DESC 
+      LIMIT $1`, [limit]
+    );
+    return result.rows.map(row => ({
+      id: row.id,
+      reporterId: row.resident_id,
+      barangayId: barangayId,
+      type: row.type,
+      status: row.status,
+      description: row.description,
+      location: row.location,
+      latitude: row.location?.lat,
+      longitude: row.location?.lng,
+      aiAnalysis: row.ai_analysis,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     } as Incident));
   }
 
   async findByReporter(reporterId: string, limit = 10): Promise<Incident[]> {
-    const snapshot = await this.getCollection()
-      .where('reporterId', '==', reporterId)
-      .orderBy('createdAt', 'desc')
-      .limit(limit)
-      .get();
-
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    const result = await pool.query(
+      `SELECT * FROM alerts WHERE resident_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [reporterId, limit]
+    );
+    return result.rows.map(row => ({
+      id: row.id,
+      reporterId: row.resident_id,
+      type: row.type,
+      status: row.status,
+      description: row.description,
+      location: row.location,
+      latitude: row.location?.lat,
+      longitude: row.location?.lng,
+      aiAnalysis: row.ai_analysis,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     } as Incident));
   }
 
   async findByStatus(status: string, barangayId?: string) {
-    let query = this.getCollection().where('status', '==', status);
-
-    if (barangayId) {
-      query = query.where('barangayId', '==', barangayId);
-    }
-
-    const snapshot = await query.orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident));
+    const result = await pool.query(`
+      SELECT * FROM alerts WHERE status = $1 ORDER BY created_at DESC
+    `, [status]);
+    return result.rows.map(row => ({
+      id: row.id,
+      reporterId: row.resident_id,
+      type: row.type,
+      status: row.status,
+      description: row.description,
+      location: row.location,
+      latitude: row.location?.lat,
+      longitude: row.location?.lng,
+      aiAnalysis: row.ai_analysis,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    } as Incident));
   }
 }
+

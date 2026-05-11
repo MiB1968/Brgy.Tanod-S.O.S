@@ -16,7 +16,10 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
         (SELECT COUNT(*) FROM users WHERE role = 'resident' AND status = 'approved') as verified_residents,
         (SELECT COUNT(*) FROM users WHERE role = 'tanod') as total_tanods,
         (SELECT COUNT(*) FROM alerts WHERE status IN ('pending', 'active', 'responding')) as active_alerts
-    `);
+    `).catch(err => {
+      console.error("Analytics Overview Query Error:", err);
+      return { rows: [{ verified_residents: 0, total_tanods: 0, active_alerts: 0 }] };
+    });
 
     // 2. Alerts by type
     const byTypePromise = pool.query(`
@@ -24,7 +27,10 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       FROM alerts 
       GROUP BY type 
       ORDER BY count DESC
-    `);
+    `).catch(err => {
+      console.error("Analytics ByType Query Error:", err);
+      return { rows: [] };
+    });
 
     // 3. Alerts history (last 7 days)
     const historyPromise = pool.query(`
@@ -35,7 +41,10 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       WHERE created_at >= NOW() - INTERVAL '7 days'
       GROUP BY day 
       ORDER BY day ASC
-    `);
+    `).catch(err => {
+      console.error("Analytics History Query Error:", err);
+      return { rows: [] };
+    });
 
     const [overviewRes, byTypeRes, historyRes] = await Promise.all([
       overviewPromise,
@@ -43,17 +52,18 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       historyPromise
     ]);
 
-    res.json({
+    return response.success(res, {
       overview: {
-        verified_residents: parseInt(overviewRes.rows[0].verified_residents),
-        total_tanods: parseInt(overviewRes.rows[0].total_tanods),
-        active_alerts: parseInt(overviewRes.rows[0].active_alerts)
+        verified_residents: parseInt(overviewRes.rows[0]?.verified_residents || 0),
+        total_tanods: parseInt(overviewRes.rows[0]?.total_tanods || 0),
+        active_alerts: parseInt(overviewRes.rows[0]?.active_alerts || 0)
       },
       alertsByType: byTypeRes.rows,
       alertsHistory: historyRes.rows
     });
 
   } catch (err: any) {
-    response.error(res, err.message);
+    console.error("Analytics Dashboard Error:", err);
+    return response.error(res, err.message);
   }
 };

@@ -25,13 +25,38 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      const message = error.error?.message || error.error || error.message || 'API Request failed';
-      throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+      console.error(`API request to ${endpoint} failed with status ${response.status}: ${response.statusText}`);
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+        const message = error.error?.message || error.error || error.message || 'API Request failed';
+        throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+      } else {
+        const text = await response.text();
+        throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}...`);
+      }
     }
 
-    return response.json();
+    const contentType = response.headers.get('content-type');
+    
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return null;
+    }
+
+    // Try to parse as JSON if it looks like JSON or check the header
+    if ((contentType && contentType.includes('application/json')) || !contentType) {
+      try {
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+      } catch (e) {
+        throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
+      }
+    } else {
+      throw new Error(`Expected JSON response, but got content-type: ${contentType}`);
+    }
   } catch (err: any) {
+    console.error(`API request to ${endpoint} failed:`, err);
     if (err.name === 'AbortError') {
       throw new Error('Request timed out. Please check your connection.');
     }

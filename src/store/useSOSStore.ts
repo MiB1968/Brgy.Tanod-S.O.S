@@ -77,6 +77,7 @@ export const useSOSStore = create<SOSState>()(
         const normalizedAlert: Alert = {
           ...rawAlert,
           id: rawAlert.id,
+          status: (rawAlert.status || '').toLowerCase() as any,
           residentId: rawAlert.resident_id || rawAlert.residentId,
           residentName: rawAlert.residentName || 'Resident',
           location: typeof rawAlert.location === 'string' ? JSON.parse(rawAlert.location) : rawAlert.location,

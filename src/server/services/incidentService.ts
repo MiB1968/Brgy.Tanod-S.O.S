@@ -1,13 +1,16 @@
 // src/server/services/incidentService.ts
+import { IncidentRepository } from '../db/repositories';
 import { analyzeIncident } from './aiService';
 import { AppError } from '../middleware/error';
 import { getIO } from '../sockets';
 import { SOCKET_EVENTS } from '../constants';
-import { LocationUpdate } from '../types';
 import { pool } from '../db/index';
+import { LocationUpdate } from '../types';
 
-// In-memory cache for duplicate prevention (can be replaced with Redis later)
-const recentSOS = new Map<string, number>(); // userId → timestamp
+const incidentRepository = new IncidentRepository();
+
+// In-memory cache for duplicate prevention
+const recentSOS = new Map<string, number>();
 
 export const incidentService = {
   async createSOS(data: {
@@ -22,22 +25,12 @@ export const incidentService = {
   }) {
     const { reporterId, barangayId, description, latitude, longitude } = data;
 
-    // === Duplicate SOS Protection ===
+    // Duplicate protection
     const lastSOS = recentSOS.get(reporterId);
-    if (lastSOS && Date.now() - lastSOS < 60_000) { // 60 seconds
+    if (lastSOS && Date.now() - lastSOS < 60_000) {
       throw new AppError("You already sent an SOS recently. Please wait.", 429, "RATE_LIMITED");
     }
     recentSOS.set(reporterId, Date.now());
-    
-    // Check for existing active alert from same user
-    const activeCheck = await pool.query(
-      "SELECT id FROM alerts WHERE resident_id = $1 AND status IN ('pending', 'active', 'responding') LIMIT 1",
-      [reporterId]
-    );
-
-    if (activeCheck.rows.length > 0) {
-      throw new AppError("You already have an active SOS alert. Please use the chat to provide updates.", 409, "CONFLICT");
-    }
 
     // Calculate nearest Tanod distance
     let nearestTanodDistanceKm = 1.2; // default
@@ -50,7 +43,7 @@ export const incidentService = {
       console.warn("[SOS] Could not calculate nearest responder distance", e);
     }
 
-    // Guardian AI Analysis
+    // AI Analysis
     const aiAnalysis = await analyzeIncident(
       description,
       data.initialType,
@@ -58,43 +51,50 @@ export const incidentService = {
       `inc_${Date.now()}`
     );
 
-    const finalSeverity = aiAnalysis.severityScore || 3;
-    const result = await pool.query(
-      `INSERT INTO alerts (
-        resident_id, type, location, description, status, severity_score, ai_analysis, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, now(), now()) RETURNING *`,
-      [
-        reporterId, 
-        aiAnalysis.incidentType || data.initialType || 'OTHER', 
-        JSON.stringify({ lat: latitude, lng: longitude }), 
-        description || '', 
-        finalSeverity, 
-        JSON.stringify(aiAnalysis)
-      ]
-    );
-
-    const alert = result.rows[0];
-
-    const incident = {
-      id: alert.id,
+    const incidentData = {
       reporterId,
       barangayId,
-      description,
+      type: aiAnalysis.incidentType || data.initialType || 'OTHER',
+      description: description || '',
       latitude,
       longitude,
       status: 'PENDING' as const,
       aiAnalysis,
       photos: data.photos || [],
       voiceClip: data.voiceClip,
-      createdAt: alert.created_at,
-      updatedAt: alert.updated_at,
     };
+
+    const incident = await incidentRepository.create(incidentData);
+
+    // Fetch the resident name for realtime emission
+    let residentName = 'Resident';
+    try {
+      const userRes = await pool.query("SELECT name FROM users WHERE id = $1", [reporterId]);
+      if (userRes.rows.length > 0) {
+        residentName = userRes.rows[0].name;
+      }
+    } catch (e) {
+      console.warn("Could not fetch resident name for realtime broadcast", e);
+    }
 
     // Real-time broadcast
     if (getIO()) {
-      getIO().to('responders').emit(SOCKET_EVENTS.NEW_INCIDENT, incident);
+      const formattedAlert = {
+        id: incident.id,
+        resident_id: incident.reporterId,
+        residentName: residentName,
+        type: incident.type,
+        status: incident.status,
+        description: incident.description,
+        location: incident.location,
+        aiAnalysis: incident.aiAnalysis,
+        created_at: incident.createdAt || new Date().toISOString()
+      };
+      getIO().to('responders').emit('alert_new', { alert: formattedAlert });
+      getIO().to(`incident_${incident.id}`).emit('alert_new', { alert: formattedAlert });
+      getIO().to(`user_${incident.reporterId}`).emit('alert_new', { alert: formattedAlert });
       if (barangayId && barangayId !== 'default') {
-        getIO().to(`barangay_${barangayId}`).emit(SOCKET_EVENTS.NEW_INCIDENT, incident);
+        getIO().to(`barangay_${barangayId}`).emit('alert_new', { alert: formattedAlert });
       }
     }
 
@@ -132,15 +132,16 @@ export const incidentService = {
     };
 
     if (getIO()) {
-      getIO().to(`incident_${incidentId}`).emit(SOCKET_EVENTS.INCIDENT_UPDATED, { alert: updated });
-      getIO().to('responders').emit(SOCKET_EVENTS.INCIDENT_UPDATED, { alert: updated });
+      getIO().to(`incident_${incidentId}`).emit('alert_update', { type: 'update', alert: updated });
+      getIO().to('responders').emit('alert_update', { type: 'update', alert: updated });
+      getIO().to(`user_${alert.resident_id}`).emit('alert_update', { type: 'update', alert: updated });
     }
     
     return updated;
   },
 
-  async getActiveIncidents(barangayId?: string, userRole?: string) {
-    return this.getActiveAlerts();
+  async getActiveIncidents(barangayId?: string) {
+    return await incidentRepository.findActiveByBarangay(barangayId || 'default');
   },
 
   async getActiveAlerts() {
