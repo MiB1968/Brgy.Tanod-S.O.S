@@ -1,0 +1,3 @@
+## 2024-05-11 - React-Leaflet Marker Recreation Bottleneck
+**Learning:** Calling `L.divIcon` inside the React render cycle creates a new icon reference on every render. This forces React-Leaflet to constantly destroy and recreate the underlying DOM elements for every single marker, causing severe garbage collection and DOM thrashing, especially noticeable during real-time map updates via websockets.
+**Action:** Always pre-instantiate static `L.divIcon` objects outside the component body. Use `useMemo` for derived arrays (like filtered markers) to prevent double-filtering and to maintain reference stability for map markers.
