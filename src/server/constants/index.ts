@@ -36,6 +36,10 @@ export const SOCKET_EVENTS = {
   // SOS
   SOS_ALERT: "sos_alert",
 
+  // Voice Assistant
+  VOICE_RESPONSE: "VOICE_RESPONSE",
+  JARVIS_ACTION_EXECUTED: "JARVIS_ACTION_EXECUTED",
+
   // General
   JOIN_INCIDENT_ROOM: "join_incident_room",
   LEAVE_INCIDENT_ROOM: "leave_incident_room",

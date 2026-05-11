@@ -2,6 +2,8 @@ import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../types';
 import { socketAuthMiddleware } from '../middleware/socketAuth';
+import { voiceAssistantService } from '../services/voiceAssistantService';
+import { VoicePermissionLevel } from '../services/voiceAssistantService.types';
 import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
 import { setupIncidentHandlers } from './handlers/incident.handler';
 import { config } from '../config/index';
@@ -56,11 +58,23 @@ export function initSocket(server: HttpServer): Server {
     setupLocationHandlers(io, socket);
     setupIncidentHandlers(io, socket);
 
+    // Helper to map socket role string to VoicePermissionLevel
+    const getPermissionLevel = (roleStr: string): VoicePermissionLevel => {
+      const r = roleStr.toUpperCase();
+      if (r === 'ADMIN' || r === 'CAPTAIN') return VoicePermissionLevel.ADMIN;
+      if (r === 'TANOD') return VoicePermissionLevel.TANOD;
+      if (r === 'CITIZEN') return VoicePermissionLevel.RESIDENT;
+      return VoicePermissionLevel.RESIDENT;
+    };
+
     // Voice Assistant Events
     socket.on('voice-command', async (data) => {
       try {
-        const { voiceAssistantService } = await import('../services/voiceAssistantService');
-        await voiceAssistantService.processVoiceInput(id, data.transcript, role as string);
+        await voiceAssistantService.processVoiceInput(
+          id, 
+          { transcript: data.transcript, language: 'fil' }, 
+          getPermissionLevel(role as string)
+        );
         // Response already emitted inside service
       } catch (error: any) {
         socket.emit('voice-error', { 
@@ -72,10 +86,14 @@ export function initSocket(server: HttpServer): Server {
 
     socket.on('confirm-action', async (data) => {
       try {
-        const { voiceAssistantService } = await import('../services/voiceAssistantService');
         // socket.io buffers arrive directly as Node Buffers
         const audioBuffer = data.voiceSample ? Buffer.from(data.voiceSample) : undefined;
-        await voiceAssistantService.executeConfirmedAction(id, data.action, role as string, audioBuffer);
+        await voiceAssistantService.executeConfirmedAction(
+          id, 
+          data.action, 
+          getPermissionLevel(role as string), 
+          audioBuffer
+        );
       } catch (e: any) {
         console.error(e);
         socket.emit('voice-error', { 

@@ -4,8 +4,7 @@ import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 import { rateLimit } from 'express-rate-limit';
-import { jarvisVoiceService } from '../services/elevenLabsService';
-import { Readable } from 'stream';
+import { ttsService } from '../services/ttsService';
 
 const router = Router();
 
@@ -101,20 +100,19 @@ router.post('/sms', authenticate, smsLimiter, async (req, res) => {
 });
 
 router.post('/tts', authenticate, authorize(['admin', 'superadmin', 'captain']), async (req, res) => {
-  const { text } = req.body;
+  const { text, options } = req.body;
   if (!text) {
     return response.error(res, "Text is required", "BAD_REQUEST", 400);
   }
 
   try {
-    const stream = await jarvisVoiceService.generateAudioStream(text);
-    if (!stream) {
+    const buffer = await ttsService.generateSpeech({ text, ...options });
+    if (!buffer) {
       return response.error(res, "Failed to generate TTS", "TTS_FAILED", 500);
     }
     
-    // Convert to readable stream and pipe to response
     res.setHeader('Content-Type', 'audio/mpeg');
-    Readable.from(stream).pipe(res);
+    res.send(buffer);
   } catch (err: any) {
     console.error('TTS Error:', err);
     response.error(res, err.message, "TTS_ERROR", 500);
