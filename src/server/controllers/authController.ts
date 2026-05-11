@@ -38,7 +38,7 @@ export const register = async (req: Request, res: Response) => {
     await client.query('COMMIT');
     
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
-    res.cookie('token', token, { httpOnly: true, secure: config.nodeEnv === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('token', token, { httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
     
     return response.success(res, { user, token }, "Registration successful", 201);
   } catch (err: any) {
@@ -61,7 +61,7 @@ export const login = async (req: Request, res: Response) => {
     await logAction(user.id, 'USER_LOGIN', 'users', user.id);
     
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, config.jwtSecret, { expiresIn: '7d' });
-    res.cookie('token', token, { httpOnly: true, secure: config.nodeEnv === 'production', maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('token', token, { httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'none', maxAge: 7 * 24 * 60 * 60 * 1000 });
     
     const { password: _, ...userWithoutPass } = user;
     return response.success(res, { user: userWithoutPass, token }, "Login successful");
@@ -71,7 +71,7 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const logout = (req: Request, res: Response) => {
-  res.clearCookie('token');
+  res.clearCookie('token', { httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'none' });
   return response.success(res, null, "Logged out successfully");
 };
 

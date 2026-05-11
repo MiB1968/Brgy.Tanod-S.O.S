@@ -88,7 +88,7 @@ export class AnomalyDetectionService {
           avgCommandLength: 45,
           commonActions: ['check incidents', 'dispatch', 'status update'],
           activeHours: [7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-          typicalIncidentTypes: ['crime', 'medical', 'fire']
+          typicalIncidentTypes: ['CRIME', 'MEDICAL', 'FIRE']
         },
         currentSession: {
           commandCount: 0,

@@ -1,8 +1,8 @@
 import { rateLimit } from 'express-rate-limit';
 
 export const globalLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  limit: 2000, // Increased limit for heavy synchronization
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 1000, // API standard limitation
   standardHeaders: 'draft-8',
   legacyHeaders: false,
 });

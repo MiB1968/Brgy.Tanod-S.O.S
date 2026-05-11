@@ -72,7 +72,7 @@ export default function ResidentDashboard({
 
   const handleShout = useCallback(() => {
     toast.error('SHOUT DETECTED: AUTO-INITIATING SOS', { duration: 5000, icon: '🔊' });
-    handleSOS('other', 'Auto-SOS: High-decibel sound detected.');
+    handleSOS('OTHER', 'Auto-SOS: High-decibel sound detected.');
   }, []);
 
   const { startListening, stopListening } = useShoutDetection(handleShout);
@@ -93,7 +93,7 @@ export default function ResidentDashboard({
     if (!activeAlert && isRecording) stopRecording();
   }, [activeAlert, isRecording, stopRecording]);
 
-  const handleSOS = async (type: EmergencyType = 'other', description: string) => {
+  const handleSOS = async (type: EmergencyType = 'OTHER', description: string) => {
     if (activeAlert || isSending) return;
     
     try {

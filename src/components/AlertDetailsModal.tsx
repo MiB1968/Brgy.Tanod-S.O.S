@@ -45,10 +45,10 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   };
 
   const TYPE_COLORS: Record<string, string> = {
-    medical: 'text-[#00D4FF]',
-    fire: 'text-[#FF8C00]',
-    crime: 'text-[#FF4B4B]',
-    flood: 'text-[#A78BFA]'
+    MEDICAL: 'text-[#00D4FF]',
+    FIRE: 'text-[#FF8C00]',
+    CRIME: 'text-[#FF4B4B]',
+    FLOOD: 'text-[#A78BFA]'
   };
 
   return (

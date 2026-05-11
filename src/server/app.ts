@@ -17,7 +17,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
   frameguard: false,
 }));
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
+app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

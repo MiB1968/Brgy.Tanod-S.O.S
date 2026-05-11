@@ -8,8 +8,8 @@ export class ReportRepository {
         COUNT(*) as total_incidents,
         COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved,
         COUNT(CASE WHEN status = 'in-progress' THEN 1 END) as in_progress,
-        COUNT(CASE WHEN type = 'crime' THEN 1 END) as crime_count,
-        COUNT(CASE WHEN type = 'medical' THEN 1 END) as medical_count
+        COUNT(CASE WHEN type = 'CRIME' THEN 1 END) as crime_count,
+        COUNT(CASE WHEN type = 'MEDICAL' THEN 1 END) as medical_count
       FROM incidents
       WHERE created_at BETWEEN $1 AND $2
     `, [startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), endDate || new Date()]);
