@@ -16,9 +16,11 @@ export function initSocket(server: HttpServer): Server {
       origin: config.corsOrigin,
       credentials: true,
     },
-    pingTimeout: 60000,      // 60 seconds
-    pingInterval: 25000,     // 25 seconds
-    transports: ['websocket', 'polling'],
+    pingTimeout: 120000,      // 120 seconds
+    pingInterval: 30000,     // 30 seconds
+    transports: ['polling', 'websocket'], // Consistent with client
+    allowEIO3: true,
+    connectTimeout: 45000
   });
 
   // Global Socket Authentication

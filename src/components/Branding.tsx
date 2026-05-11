@@ -19,6 +19,16 @@ export function TanodLogo({ size = 200, animated = true, className, useImage = f
     );
   }
 
+  const grid = React.useMemo(() => (
+    <g clipPath="url(#shieldShape)" opacity="0.15">
+      {[...Array(15)].map((_, r) => (
+        [...Array(15)].map((_, c) => (
+          <path key={`${r}-${c}`} d={`M${c * 36 + (r % 2 ? 18 : 0)} ${r * 32} l18 0 l9 15 l-9 15 l-18 0 l-9 -15 z`} fill="none" stroke="#ef4444" strokeWidth="0.5" />
+        ))
+      ))}
+    </g>
+  ), []);
+
   return (
     <svg width={size} height={size} viewBox="0 0 400 460" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <defs>
@@ -54,13 +64,7 @@ export function TanodLogo({ size = 200, animated = true, className, useImage = f
       <path d="M200 10 L380 60 L380 280 C380 380 200 450 200 450 C200 450 20 380 20 280 L20 60 L200 10Z" fill="url(#logoBackground)" stroke="url(#shieldBorder)" strokeWidth="8" />
 
       {/* Tactical Hex Grid */}
-      <g clipPath="url(#shieldShape)" opacity="0.15">
-        {[...Array(15)].map((_, r) => (
-          [...Array(15)].map((_, c) => (
-            <path key={`${r}-${c}`} d={`M${c * 36 + (r % 2 ? 18 : 0)} ${r * 32} l18 0 l9 15 l-9 15 l-18 0 l-9 -15 z`} fill="none" stroke="#ef4444" strokeWidth="0.5" />
-          ))
-        ))}
-      </g>
+      {grid}
 
       {/* Philippine Sun & Stars (High Detail) */}
       <g transform="translate(200, 95)" opacity="0.9">
@@ -162,6 +166,7 @@ export function TanodWordmark({ width, className, size = 'md' }: { width?: numbe
 export function BackgroundPattern() {
   const HEX_SIZE = 28;
   const cols = 30, rows = 22;
+  
   const hexPoints = (cx: number, cy: number, r: number) => {
     return [...Array(6)].map((_, i) => {
       const a = (Math.PI / 180) * (60 * i - 30);
@@ -169,16 +174,22 @@ export function BackgroundPattern() {
     }).join(" ");
   };
 
-  const hexagons = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = col * HEX_SIZE * 1.73 + (row % 2 === 0 ? 0 : HEX_SIZE * 0.866);
-      const y = row * HEX_SIZE * 1.5;
-      const distFromCenter = Math.hypot(x - 760, y - 430) / 600;
-      const opacity = Math.max(0.01, 0.07 - distFromCenter * 0.06);
-      hexagons.push({ x, y, opacity, id: `${row}-${col}` });
+  const hexagons = React.useMemo(() => {
+    const hexs = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = col * HEX_SIZE * 1.73 + (row % 2 === 0 ? 0 : HEX_SIZE * 0.866);
+        const y = row * HEX_SIZE * 1.5;
+        const distFromCenter = Math.hypot(x - 760, y - 430) / 600;
+        const opacity = Math.max(0.01, 0.07 - distFromCenter * 0.06);
+        hexs.push({ x, y, opacity, id: `${row}-${col}`, points: hexPoints(x, y, HEX_SIZE * 0.9) });
+      }
     }
-  }
+    return hexs;
+  }, []);
+
+  const horizontalLines = React.useMemo(() => [...Array(43)].map((_, i) => i * 20), []);
+  const verticalLines = React.useMemo(() => [...Array(77)].map((_, i) => i * 20), []);
 
   return (
     <svg width="100%" height="100%" viewBox="0 0 1520 860"
@@ -208,29 +219,35 @@ export function BackgroundPattern() {
       <rect width="1520" height="860" fill="url(#bgGlowBottomRight)" />
 
       {/* Hex grid */}
-      {hexagons.map(h => (
-        <polygon key={h.id}
-          points={hexPoints(h.x, h.y, HEX_SIZE * 0.9)}
-          fill="none"
-          stroke="#ef4444"
-          strokeWidth="0.5"
-          opacity={h.opacity}
-        />
-      ))}
+      <g>
+        {hexagons.map(h => (
+          <polygon key={h.id}
+            points={h.points}
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth="0.5"
+            opacity={h.opacity}
+          />
+        ))}
+      </g>
 
       {/* Horizontal scan lines */}
-      {[...Array(43)].map((_, i) => (
-        <line key={`h${i}`}
-          x1="0" y1={i * 20} x2="1520" y2={i * 20}
-          stroke="#3b82f6" strokeWidth="0.3" opacity="0.025" />
-      ))}
+      <g>
+        {horizontalLines.map((y, i) => (
+          <line key={`h${i}`}
+            x1="0" y1={y} x2="1520" y2={y}
+            stroke="#3b82f6" strokeWidth="0.3" opacity="0.025" />
+        ))}
+      </g>
 
       {/* Vertical scan lines */}
-      {[...Array(77)].map((_, i) => (
-        <line key={`v${i}`}
-          x1={i * 20} y1="0" x2={i * 20} y2="860"
-          stroke="#3b82f6" strokeWidth="0.3" opacity="0.018" />
-      ))}
+      <g>
+        {verticalLines.map((x, i) => (
+          <line key={`v${i}`}
+            x1={x} y1="0" x2={x} y2="860"
+            stroke="#3b82f6" strokeWidth="0.3" opacity="0.018" />
+        ))}
+      </g>
 
       {/* Radar rings */}
       {[120, 220, 320, 440, 580].map((r, i) => (

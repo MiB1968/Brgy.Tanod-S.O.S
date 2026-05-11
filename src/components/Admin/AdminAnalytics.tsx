@@ -10,46 +10,71 @@ export default function AdminAnalytics() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const fetchAnalytics = async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const json = await fetchAPI('/analytics/dashboard');
+      const payload = json.data || json; // gracefully handle both forms
+      setData(payload);
+      setError(null);
+    } catch (err: any) {
+      console.error("Failed to fetch analytics:", err);
+      // Only set error state if we don't have data already
+      if (!data) {
+        setError(err.message || 'Failed to fetch analytics');
+      } else {
+        toast.error('Sync failed: Tactical link unstable', { id: 'sync-fail' });
+      }
+    } finally {
+      setLoading(false);
+      setIsRetrying(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const json = await fetchAPI('/analytics/dashboard');
-        const payload = json.data || json; // gracefully handle both forms
-        setData(payload);
-        setError(null);
-      } catch (err: any) {
-        console.error("Failed to fetch analytics:", err);
-        setError(err.message || 'Failed to fetch analytics');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAnalytics();
-    const interval = setInterval(fetchAnalytics, 30000); // Pulse every 30s
+    const interval = setInterval(() => fetchAnalytics(true), 30000); // Pulse every 30s
     return () => clearInterval(interval);
   }, []);
 
-  if (error) {
+  const handleRetry = () => {
+    setIsRetrying(true);
+    fetchAnalytics();
+  };
+
+  if (error && !data) {
     return (
-      <div className="glass-panel p-12 rounded-[40px] border-white/5 flex flex-col items-center justify-center">
-        <Activity className="w-12 h-12 text-emergency opacity-20 mb-4" />
-        <p className="text-sm font-black uppercase text-emergency tracking-tighter font-mono">{error}</p>
+      <div className="glass-panel p-12 rounded-[40px] border-white/5 flex flex-col items-center justify-center text-center">
+        <div className="relative mb-6">
+          <Activity className="w-12 h-12 text-emergency opacity-20" />
+          <div className="absolute inset-0 border-2 border-emergency/20 rounded-full animate-ping" />
+        </div>
+        <p className="text-sm font-black uppercase text-emergency tracking-widest font-mono mb-6">{error}</p>
+        <button 
+          onClick={handleRetry}
+          disabled={isRetrying}
+          className="flex items-center gap-2 px-8 py-3 bg-emergency text-white font-black italic rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-[10px]"
+        >
+          {isRetrying ? 'RECONNECTING...' : 'FORCE RE-SYNC'}
+        </button>
       </div>
     );
   }
 
-  if (loading || !data) {
+  if (loading && !data) {
     return (
       <div className="glass-panel p-12 rounded-[40px] border-white/5 flex flex-col items-center justify-center animate-pulse">
         <Activity className="w-12 h-12 text-info opacity-20 mb-4" />
-        <p className="text-[10px] font-black uppercase text-white/20 tracking-tighter font-mono">Syncing tactical intel...</p>
+        <p className="text-[10px] font-black uppercase text-white/20 tracking-[0.2em] font-mono">Syncing tactical intel...</p>
       </div>
     );
   }
 
-  const { overview, alertsByType, alertsHistory } = data;
+  const overview = data?.overview || { verified_residents: 0, total_tanods: 0, active_alerts: 0 };
+  const alertsByType = data?.alertsByType || [];
+  const alertsHistory = data?.alertsHistory || [];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">

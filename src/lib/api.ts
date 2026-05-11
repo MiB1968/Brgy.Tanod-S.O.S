@@ -25,16 +25,29 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`API request to ${endpoint} failed with status ${response.status}: ${response.statusText}`);
+      const status = response.status;
+      const statusText = response.statusText;
+      console.error(`API request to ${endpoint} failed with status ${status}: ${statusText}`);
+      
+      let errorMessage = `Server error (${status}): ${statusText}`;
+      
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-        const message = error.error?.message || error.error || error.message || 'API Request failed';
-        throw new Error(typeof message === 'string' ? message : JSON.stringify(message));
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorData.error || errorData.message || errorMessage;
+        } catch (e) {
+          // Fallback to status text
+        }
       } else {
-        const text = await response.text();
-        throw new Error(`Server error (${response.status}): ${text.substring(0, 100)}...`);
+        try {
+          const text = await response.text();
+          if (text) errorMessage = `${errorMessage} - ${text.substring(0, 100)}`;
+        } catch (e) {
+          // Ignore
+        }
       }
+      throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
     }
 
     const contentType = response.headers.get('content-type');

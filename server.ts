@@ -31,12 +31,32 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist/client');
+    const distPath = path.resolve(process.cwd(), 'dist/client');
+    console.log(`[Production] Serving static files from: ${distPath}`);
+    
+    // Safety check: verify dist/client exists
+    import('fs').then(fs => {
+      if (!fs.existsSync(distPath)) {
+        console.error(`ERROR: Static assets directory not found at ${distPath}. Build might have failed.`);
+      } else {
+        console.log(`[Production] Verified: dist/client exists at ${distPath}`);
+      }
+    });
+
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api/')) {
-        res.sendFile(path.join(distPath, 'index.html'));
+      // Don't intercept API calls
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ success: false, error: 'API endpoint not found' });
       }
+      
+      const indexPath = path.join(distPath, 'index.html');
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error(`Error sending index.html: ${err.message}`);
+          res.status(500).send("Application shell not found. Please ensure 'npm run build' completed successfully.");
+        }
+      });
     });
   }
 

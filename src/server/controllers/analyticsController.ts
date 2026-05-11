@@ -54,12 +54,12 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
 
     return response.success(res, {
       overview: {
-        verified_residents: parseInt(overviewRes.rows[0]?.verified_residents || 0),
-        total_tanods: parseInt(overviewRes.rows[0]?.total_tanods || 0),
-        active_alerts: parseInt(overviewRes.rows[0]?.active_alerts || 0)
+        verified_residents: parseInt(overviewRes.rows[0]?.verified_residents || '0'),
+        total_tanods: parseInt(overviewRes.rows[0]?.total_tanods || '0'),
+        active_alerts: parseInt(overviewRes.rows[0]?.active_alerts || '0')
       },
-      alertsByType: byTypeRes.rows,
-      alertsHistory: historyRes.rows
+      alertsByType: byTypeRes.rows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') })),
+      alertsHistory: historyRes.rows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') }))
     });
 
   } catch (err: any) {

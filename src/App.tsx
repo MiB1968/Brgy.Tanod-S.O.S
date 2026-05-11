@@ -172,9 +172,9 @@ export default function App() {
   );
 
   const visiblePatrols = useMemo(() => {
-    return patrols.filter(p => {
-      // Basic coordinates check
-      if (!p.location || !isValidCoord(p.location.lat, p.location.lng)) return false;
+    return (patrols || []).filter(p => {
+      // Basic coordinates check - ensure p.location is an object
+      if (!p || !p.location || typeof p.location !== 'object' || !isValidCoord(p.location.lat, p.location.lng)) return false;
 
       if (['admin', 'superadmin', 'tanod'].includes(effectiveRole)) {
         // For staff, show all who are marked active OR have pinged recently
@@ -357,65 +357,73 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center">
-        <BackgroundPattern />
-        <div className="relative mb-12">
-           <div className="absolute inset-0 bg-emergency/20 blur-[100px] rounded-full animate-pulse" />
-           <TanodLogo size={120} animated={true} className="relative z-10 filter drop-shadow-[0_0_30px_rgba(239,68,68,0.4)]" />
-        </div>
-        <div className="space-y-4 relative z-10">
-          <h2 className="text-2xl font-black italic tracking-tighter text-white font-mono uppercase leading-none">Initializing Link</h2>
-          <div className="flex gap-1 justify-center">
-            <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-2 h-2 bg-emergency rounded-full" />
-            <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-emergency rounded-full" />
-            <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-emergency rounded-full" />
+      <GlobalErrorBoundary>
+        <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center">
+          <BackgroundPattern />
+          <div className="relative mb-12">
+             <div className="absolute inset-0 bg-emergency/20 blur-[100px] rounded-full animate-pulse" />
+             <TanodLogo size={120} animated={true} className="relative z-10 filter drop-shadow-[0_0_30px_rgba(239,68,68,0.4)]" />
           </div>
-          <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] font-mono mt-4">Establishing Secure Command Connection</p>
+          <div className="space-y-4 relative z-10">
+            <h2 className="text-2xl font-black italic tracking-tighter text-white font-mono uppercase leading-none">Initializing Link</h2>
+            <div className="flex gap-1 justify-center">
+              <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-2 h-2 bg-emergency rounded-full" />
+              <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-emergency rounded-full" />
+              <motion.div animate={{ opacity: [0.2, 1, 0.2] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-emergency rounded-full" />
+            </div>
+            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em] font-mono mt-4">Establishing Secure Command Connection</p>
+          </div>
         </div>
-      </div>
+      </GlobalErrorBoundary>
     );
   }
 
   // Handle Registration
   if (isRegistering) return (
-    <RegistrationForm 
-      onCancel={() => setIsRegistering(false)} 
-      onComplete={async (data: any) => {
-        try {
-          const res = await api.auth.register(data);
-          localStorage.setItem('token', res.token);
-          localStorage.setItem('user', JSON.stringify(res.user));
-          setUser(res.user);
-          setProfile(res.user);
-          setIsRegistering(false);
-        } catch (err: any) {
-          toast.error(err.message);
-        }
-      }} 
-    />
+    <GlobalErrorBoundary>
+      <RegistrationForm 
+        onCancel={() => setIsRegistering(false)} 
+        onComplete={async (data: any) => {
+          try {
+            const res = await api.auth.register(data);
+            localStorage.setItem('token', res.token);
+            localStorage.setItem('user', JSON.stringify(res.user));
+            setUser(res.user);
+            setProfile(res.user);
+            setIsRegistering(false);
+          } catch (err: any) {
+            toast.error(err.message);
+          }
+        }} 
+      />
+    </GlobalErrorBoundary>
   );
 
   if (!user) return (
-    <LoginView 
-      onLogin={handleLogin} 
-      onRegister={() => setIsRegistering(true)} 
-      isLoggingIn={isLoggingIn} 
-      onDemoLogin={() => handleDemoLogin('resident')}
-      onDemoAdminLogin={() => handleDemoLogin('admin')}
-      deferredPrompt={deferredPrompt}
-      onInstall={handleInstallApp}
-      onResetSession={resetAuthSession}
-    />
+    <GlobalErrorBoundary>
+      <LoginView 
+        onLogin={handleLogin} 
+        onRegister={() => setIsRegistering(true)} 
+        isLoggingIn={isLoggingIn} 
+        onDemoLogin={() => handleDemoLogin('resident')}
+        onDemoAdminLogin={() => handleDemoLogin('admin')}
+        deferredPrompt={deferredPrompt}
+        onInstall={handleInstallApp}
+        onResetSession={resetAuthSession}
+      />
+    </GlobalErrorBoundary>
   );
 
   if (user && !profile && !residentProfile) return (
-    <RoleSelection 
-      onSelect={handleSetRole} 
-      onRegister={() => setIsRegistering(true)} 
-      isSettingRole={isSettingRole}
-      deferredPrompt={deferredPrompt}
-      onInstall={handleInstallApp}
-    />
+    <GlobalErrorBoundary>
+      <RoleSelection 
+        onSelect={handleSetRole} 
+        onRegister={() => setIsRegistering(true)} 
+        isSettingRole={isSettingRole}
+        deferredPrompt={deferredPrompt}
+        onInstall={handleInstallApp}
+      />
+    </GlobalErrorBoundary>
   );
 
   if (effectiveRole === 'resident' && profile && !viewOverride) {
@@ -430,7 +438,8 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-brand-bg text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
+    <GlobalErrorBoundary>
+      <div className="min-h-screen bg-brand-bg text-white font-sans flex flex-col md:flex-row h-screen overflow-hidden relative">
       <div className="fixed top-0 left-0 w-full z-[101] pointer-events-none h-8 overflow-hidden">
         <div 
           className={cn(
@@ -679,6 +688,7 @@ export default function App() {
         <BackgroundServices />
       </main>
     </div>
+    </GlobalErrorBoundary>
   );
 }
 
