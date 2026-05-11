@@ -17,11 +17,7 @@ const socket = io({
   // Explicitly set path to avoid any ambiguity
   path: '/socket.io/',
   secure: true,
-  withCredentials: true,
-  // Add pings to keep connection alive through aggressive proxies
-  extraHeaders: {
-    "X-Client-Retry": "true"
-  }
+  withCredentials: true
 });
 
 // Refresh token on every reconnection attempt

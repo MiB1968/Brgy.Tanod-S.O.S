@@ -142,6 +142,15 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       return res.json(result.rows);
     }
 
+    if (collection === 'audit_log_archives') {
+      if (!isAdmin) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
+      const result = await pool.query("SELECT * FROM audit_log_archives ORDER BY archived_at DESC LIMIT 50");
+      return res.json(result.rows.map(row => ({
+         ...row,
+         log_entries: typeof row.log_entries === 'string' ? JSON.parse(row.log_entries) : (row.log_entries || [])
+      })));
+    }
+
     if (collection === 'tanod_activity_logs') {
       if (!isTanod) return response.error(res, "Tanod/Admin Access Required", "FORBIDDEN", 403);
       const result = await pool.query("SELECT * FROM tanod_activity_logs ORDER BY timestamp DESC LIMIT 100");
@@ -541,6 +550,16 @@ export const postSync = async (req: AuthRequest, res: Response) => {
       return res.json({ success: true });
     }
 
+    if (collection === 'audit_log_archives') {
+      if (!isAdmin) return response.error(res, "Access Denied", "FORBIDDEN", 403);
+      await pool.query(
+        `INSERT INTO audit_log_archives (session_date, archived_at, archived_by, log_count, total_incidents, resolved_count, unresolved_count, log_entries, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [data.session_date, data.archived_at || new Date().toISOString(), data.archived_by, data.log_count, data.total_incidents, data.resolved_count, data.unresolved_count, JSON.stringify(data.log_entries || []), data.notes]
+      );
+      return res.json({ success: true });
+    }
+
     response.error(res, "Path not mapped", "NOT_FOUND", 404);
   } catch (err: any) {
     response.error(res, err.message);
@@ -560,7 +579,7 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
-    const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents'];
+    const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents', 'audit_log_archives'];
     if (deletable.includes(collection) && docId) {
       if (!isTanod) return response.error(res, "Administrative clearance required for deletion", "FORBIDDEN", 403);
       await pool.query(`DELETE FROM ${collection} WHERE id = $1`, [docId]);

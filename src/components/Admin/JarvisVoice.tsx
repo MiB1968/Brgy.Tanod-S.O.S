@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Power, Settings } from 'lucide-react';
 import socket from '../../lib/socket';
 import { useAuthStore } from '../../store/useAuthStore';
+import { safeStorage } from '../../lib/safeStorage';
 import { JarvisSettingsPanel, VoiceSettings, defaultSettings } from './JarvisSettingsPanel';
 import VoiceBiometricModal from './VoiceBiometricModal';
 
@@ -14,7 +15,7 @@ export function JarvisVoice() {
   const [status, setStatus] = useState("Standby");
   const [showSettings, setShowSettings] = useState(false);
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
-    const saved = localStorage.getItem('jarvis-settings');
+    const saved = safeStorage.getItem('jarvis-settings');
     return saved ? JSON.parse(saved) : defaultSettings;
   });
   const [proposedActions, setProposedActions] = useState<any[]>([]);
@@ -144,7 +145,7 @@ export function JarvisVoice() {
 
     try {
       // Try to get audio from backend server via TTS API
-      const token = localStorage.getItem('token');
+      const token = safeStorage.getItem('token');
       const response = await fetch('/api/system/tts', {
         method: 'POST',
         headers: {
@@ -328,7 +329,7 @@ export function JarvisVoice() {
         onClose={() => setShowSettings(false)}
         initialSettings={voiceSettings}
         onSave={(newSettings) => {
-          localStorage.setItem('jarvis-settings', JSON.stringify(newSettings));
+          safeStorage.setItem('jarvis-settings', JSON.stringify(newSettings));
           setVoiceSettings(newSettings);
         }}
       />

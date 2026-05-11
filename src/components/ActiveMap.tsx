@@ -7,6 +7,7 @@ import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
+import { safeStorage } from '../lib/safeStorage';
 
 // Fix for default marker icons in Leaflet with React
 const DefaultIcon = L.icon({
@@ -194,13 +195,13 @@ export default function ActiveMap({
   const [zoom, setZoom] = useState(15);
 
   useEffect(() => {
-    const hasDownloaded = localStorage.getItem('map_downloaded');
+    const hasDownloaded = safeStorage.getItem('map_downloaded');
     if (hasDownloaded) {
       setIsDownloaded(true);
     } else {
       // Auto download in background
       handleDownload().then(() => {
-        localStorage.setItem('map_downloaded', 'true');
+        safeStorage.setItem('map_downloaded', 'true');
       });
     }
   }, []);
@@ -212,7 +213,7 @@ export default function ActiveMap({
         setProgress({ current, total });
       });
       setIsDownloaded(true);
-      localStorage.setItem('map_downloaded', 'true');
+      safeStorage.setItem('map_downloaded', 'true');
     } catch (err) {
       console.error(err);
     } finally {

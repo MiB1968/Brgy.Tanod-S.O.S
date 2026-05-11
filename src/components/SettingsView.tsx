@@ -14,6 +14,7 @@ import { cn } from '../lib/utils';
 import { toast } from 'react-hot-toast';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
+import { safeStorage } from '../lib/safeStorage';
 
 export default function SettingsView({ profile, role }: { profile: User | null, role: UserRole }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -144,10 +145,17 @@ export default function SettingsView({ profile, role }: { profile: User | null, 
                 <p className="text-white/20 text-[10px] font-black uppercase tracking-widest font-mono mt-1">Audit log download (.JSON)</p>
              </button>
              
-             <button 
+              <button 
                onClick={() => {
                 if(confirm('PURGE LOCAL TERMINAL DATA? THIS CANNOT BE UNDONE.')) {
-                  localStorage.clear();
+                  try {
+                    localStorage.clear();
+                  } catch (e) {
+                    console.warn("localStorage restricted");
+                  }
+                  safeStorage.removeItem('token');
+                  safeStorage.removeItem('user');
+                  safeStorage.removeItem('jarvis-settings');
                   window.location.reload();
                 }
                }}

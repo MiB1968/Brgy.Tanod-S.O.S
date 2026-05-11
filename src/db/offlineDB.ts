@@ -53,4 +53,26 @@ export class SOSDatabase extends Dexie {
   }
 }
 
-export const db = new SOSDatabase();
+// Fallback mock database for incognito / restricted environments
+class MockSOSDatabase {
+  outbox = {
+    add: async () => 1,
+    where: () => ({ anyOf: () => ({ toArray: async () => [] }) }),
+    update: async () => 1,
+    delete: async () => 1
+  };
+  synced = {
+    add: async () => 1
+  };
+  transaction = async (mode: any, tables: any, cb: any) => await cb();
+}
+
+let safeDb: any;
+try {
+  safeDb = new SOSDatabase();
+} catch (err) {
+  console.warn("IndexedDB restricted (likely Incognito mode). Offline features disabled.");
+  safeDb = new MockSOSDatabase();
+}
+
+export const db = safeDb as SOSDatabase;

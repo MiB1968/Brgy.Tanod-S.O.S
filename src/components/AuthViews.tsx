@@ -50,7 +50,7 @@ export function LoginView({
     }
   };
 
-  const isSecure = !!localStorage.getItem('token');
+  const isSecure = !!safeStorage.getItem('token');
 
   return (
     <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-center p-6 text-center relative overflow-hidden font-sans">

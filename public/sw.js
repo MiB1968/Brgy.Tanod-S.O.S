@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tanod-sos-v4';
+const CACHE_NAME = 'tanod-sos-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -41,8 +41,8 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  // Always skip API calls
-  if (e.request.url.includes('/api/')) return;
+  // Always skip API calls and Socket.IO requests
+  if (e.request.url.includes('/api/') || e.request.url.includes('/socket.io/')) return;
 
   // Use Network First strategy so users always get the latest code.
   e.respondWith(

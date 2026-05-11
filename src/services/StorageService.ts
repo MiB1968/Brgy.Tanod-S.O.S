@@ -1,3 +1,5 @@
+import { safeStorage } from '../lib/safeStorage';
+
 export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: number) => {
   const formData = new FormData();
   formData.append('file', chunk);
@@ -7,7 +9,7 @@ export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: numb
   const response = await fetch('/api/storage/upload', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`
+      'Authorization': `Bearer ${safeStorage.getItem('token')}`
     },
     body: formData
   });

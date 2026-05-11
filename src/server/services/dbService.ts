@@ -195,6 +195,21 @@ export async function initDb(retries = 3) {
       `);
 
       await client.query(`
+        CREATE TABLE IF NOT EXISTS audit_log_archives (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          session_date TEXT NOT NULL,
+          archived_at TIMESTAMPTZ DEFAULT now(),
+          archived_by TEXT,
+          log_count INT DEFAULT 0,
+          total_incidents INT DEFAULT 0,
+          resolved_count INT DEFAULT 0,
+          unresolved_count INT DEFAULT 0,
+          log_entries JSONB DEFAULT '[]',
+          notes TEXT
+        );
+      `);
+
+      await client.query(`
         CREATE TABLE IF NOT EXISTS tanod_activity_logs (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           tanod_id UUID REFERENCES users(id),
