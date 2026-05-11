@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import { cn, isValidCoord } from "./lib/utils";
@@ -110,15 +110,16 @@ function getSev(type: string): SevConfig {
 }
 
 // ─── Icon factories ───────────────────────────────────────────────────────────
-const makeOfficerIcon = () => L.divIcon({
+const OFFICER_ICON = L.divIcon({
   className: "",
   html: `<div class="officer-wrap"><div class="officer-ring"></div><div class="officer-dot">👮</div></div>`,
   iconSize: [36, 36], iconAnchor: [18, 18],
 });
 
-const makeSosIcon = (type: string) => {
-  const s = getSev(type);
-  return L.divIcon({
+const SOS_ICONS: Record<string, L.DivIcon> = {};
+Object.keys(SEV).forEach(key => {
+  const s = SEV[key];
+  SOS_ICONS[key] = L.divIcon({
     className: "",
     html: `<div class="sos-wrap" style="--sc:${s.color};--sb:${s.bg};--sg:${s.glow}">
              <div class="sos-ring-1"></div><div class="sos-ring-2"></div>
@@ -126,6 +127,14 @@ const makeSosIcon = (type: string) => {
            </div>`,
     iconSize: [42, 42], iconAnchor: [21, 21],
   });
+});
+
+const getSosIcon = (type: string) => {
+  const t = (type || "").toLowerCase();
+  if (t.includes("fire"))                                           return SOS_ICONS.fire;
+  if (t.includes("medical")||t.includes("health")||t.includes("ambulance")) return SOS_ICONS.medical;
+  if (t.includes("crime")||t.includes("theft")||t.includes("assault")||t.includes("robbery")) return SOS_ICONS.crime;
+  return SOS_ICONS.sos;
 };
 
 const YouHereIcon = L.divIcon({
@@ -134,7 +143,7 @@ const YouHereIcon = L.divIcon({
   iconSize: [20, 20], iconAnchor: [10, 10],
 });
 
-const makeResidentIcon = () => L.divIcon({
+const RESIDENT_ICON = L.divIcon({
   className: "",
   html: `<div style="width:24px;height:24px;border-radius:50%;background:#0A0C10;border:2px solid #A78BFA;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(167,139,250,0.4);"><div style="width:8px;height:8px;border-radius:50%;background:#A78BFA;"></div></div>`,
   iconSize: [24, 24], iconAnchor: [12, 12],
@@ -348,8 +357,21 @@ export default function LiveMap() {
   
   const [residents, setResidents] = useState<any[]>([]);
 
-  const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
-  const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
+  // Memoize filtered arrays to avoid recalculating on every render
+  const filteredPatrols = useMemo(() =>
+    patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)),
+  [patrols]);
+
+  const filteredSOS = useMemo(() =>
+    alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)),
+  [alerts]);
+
+  const filteredResidents = useMemo(() =>
+    residents.filter(r => isValidCoord(r.gpsLat, r.gpsLng)),
+  [residents]);
+
+  const activePatrols = filteredPatrols.length;
+  const activeSOS     = filteredSOS.length;
 
   useEffect(() => {
     const loadResidents = async () => {
@@ -527,8 +549,8 @@ export default function LiveMap() {
         )}
 
         {/* Verified Residents */}
-        {showResidents && residents.filter(r => isValidCoord(r.gpsLat, r.gpsLng)).map((r) => (
-          <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
+        {showResidents && filteredResidents.map((r) => (
+          <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={RESIDENT_ICON} zIndexOffset={50}>
             <Popup>
               <div className="pp">
                 <p className="pp-lbl" style={{ color:"#A78BFA80" }}>Verified Resident</p>
@@ -543,8 +565,8 @@ export default function LiveMap() {
         ))}
 
         {/* Active patrols */}
-        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => (
-          <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={makeOfficerIcon()} zIndexOffset={100}>
+        {showPatrols && filteredPatrols.map((p) => (
+          <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={OFFICER_ICON} zIndexOffset={100}>
             <Popup>
               <div className="pp">
                 <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
@@ -559,10 +581,10 @@ export default function LiveMap() {
         ))}
 
         {/* SOS alerts */}
-        {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)).map((a) => {
+        {showSOS && filteredSOS.map((a) => {
           const s = getSev(a.type);
           return (
-            <Marker key={a.id} position={[a.location.lat, a.location.lng]} icon={makeSosIcon(a.type)} zIndexOffset={200}>
+            <Marker key={a.id} position={[a.location.lat, a.location.lng]} icon={getSosIcon(a.type)} zIndexOffset={200}>
               <Popup>
                 <div className="pp">
                   <p className="pp-lbl" style={{ color:`${s.color}80` }}>Emergency Alert</p>
