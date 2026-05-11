@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Zap, Radio, Signal } from 'lucide-react';
+import { Zap, Radio, Signal, Shield } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { EmergencyType } from '../../types';
 import { toast } from 'react-hot-toast';
@@ -56,20 +56,62 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
             <motion.button
               whileHover={{ scale: isSending ? 1 : 1.05 }}
               whileTap={{ scale: isSending ? 1 : 0.95 }}
-              onClick={() => onInitiateSOS('other', '')}
+              onClick={() => onInitiateSOS('OTHER', 'General Emergency SOS')}
               disabled={isSending}
               className={cn(
-                "relative z-10 w-52 h-52 md:w-64 md:h-64 rounded-full flex flex-col items-center justify-center transition-all duration-500 border-[8px] backdrop-blur-xl shadow-[0_0_60px_rgba(255,59,92,0.4)]",
+                "relative z-10 w-44 h-44 md:w-56 md:h-56 rounded-full flex flex-col items-center justify-center transition-all duration-500 border-[8px] backdrop-blur-xl shadow-[0_0_60px_rgba(255,59,92,0.4)]",
                 isSending ? "bg-emergency/20 border-emergency animate-pulse" : "bg-gradient-to-tr from-tactical-dark via-emergency/20 to-tactical-cyan/20 border-tactical-red/50 hover:border-tactical-cyan/80 active:border-white"
               )}
             >
               <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,59,92,0.2),transparent)] opacity-50" />
-              <Zap className={cn("w-16 h-16 md:w-24 md:h-24 text-white mb-2 filter drop-shadow-lg", isSending && "animate-bounce")} />
+              <Zap className={cn("w-12 h-12 md:w-20 md:h-20 text-white mb-1 filter drop-shadow-lg", isSending && "animate-bounce")} />
               <div className="flex flex-col items-center">
-                <span className="text-4xl md:text-5xl font-black italic tracking-tighter text-white font-display leading-none drop-shadow-md">S.O.S.</span>
-                <span className="text-[10px] md:text-[12px] font-black tracking-[0.4em] text-white/70 mt-3 font-mono uppercase bg-black/40 px-4 py-1 rounded-full border border-white/10">INITIATE</span>
+                <span className="text-3xl md:text-4xl font-black italic tracking-tighter text-white font-display leading-none drop-shadow-md">S.O.S.</span>
+                <span className="text-[8px] md:text-[10px] font-black tracking-[0.4em] text-white/70 mt-2 font-mono uppercase bg-black/40 px-3 py-0.5 rounded-full border border-white/10">GENERAL</span>
               </div>
             </motion.button>
+        </div>
+
+        {/* Specialized SOS Buttons */}
+        <div className="grid grid-cols-3 gap-4 mt-8">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onInitiateSOS('MEDICAL', 'Medical Emergency reported.')}
+            disabled={isSending}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-600/10 border border-blue-500/30 hover:bg-blue-600/20 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/40">
+              <span className="text-white font-black text-xl">+</span>
+            </div>
+            <span className="text-[10px] font-black text-blue-400 tracking-widest uppercase">Medical</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onInitiateSOS('FIRE', 'Fire Emergency reported.')}
+            disabled={isSending}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-orange-600/10 border border-orange-500/30 hover:bg-orange-600/20 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full bg-orange-600 flex items-center justify-center shadow-lg group-hover:shadow-orange-500/40">
+              <Zap className="text-white w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-orange-400 tracking-widest uppercase">Fire</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onInitiateSOS('CRIME', 'Criminal activity/Crime emergency reported.')}
+            disabled={isSending}
+            className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-red-600/10 border border-red-500/30 hover:bg-red-600/20 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:shadow-red-500/40">
+              <Shield className="text-white w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-red-400 tracking-widest uppercase">Crime</span>
+          </motion.button>
         </div>
 
         {/* Footer Bar */}

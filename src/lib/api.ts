@@ -7,7 +7,7 @@ import { safeStorage } from './safeStorage';
 
 const API_BASE = '/api';
 
-export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
+export async function fetchAPI(endpoint: string, options: RequestInit = {}, retries = 2) {
   const token = safeStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
@@ -15,8 +15,9 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
+  const timeout = endpoint.includes('analytics') || endpoint.includes('sync') ? 60000 : 30000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -27,6 +28,13 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      // If it's a 5xx error or rate limit, we might want to retry
+      if ((response.status >= 500 || response.status === 429) && retries > 0) {
+        console.warn(`API ${endpoint} failed with ${response.status}. Retrying... (${retries} left)`);
+        await new Promise(res => setTimeout(res, 1000 * (3 - retries))); // Exponential-ish backoff
+        return fetchAPI(endpoint, options, retries - 1);
+      }
+
       const status = response.status;
       const statusText = response.statusText;
       console.error(`API request to ${endpoint} failed with status ${status}: ${statusText}`);
@@ -41,25 +49,16 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
         } catch (e) {
           // Fallback to status text
         }
-      } else {
-        try {
-          const text = await response.text();
-          if (text) errorMessage = `${errorMessage} - ${text.substring(0, 100)}`;
-        } catch (e) {
-          // Ignore
-        }
       }
       throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
     }
 
     const contentType = response.headers.get('content-type');
     
-    // Handle 204 No Content
     if (response.status === 204) {
       return null;
     }
 
-    // Try to parse as JSON if it looks like JSON or check the header
     if ((contentType && contentType.includes('application/json')) || !contentType) {
       try {
         const text = await response.text();
@@ -71,10 +70,24 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       throw new Error(`Expected JSON response, but got content-type: ${contentType}`);
     }
   } catch (err: any) {
-    console.error(`API request to ${endpoint} failed:`, err);
+    clearTimeout(timeoutId);
+    
     if (err.name === 'AbortError') {
+      if (retries > 0) {
+        console.warn(`API ${endpoint} timed out. Retrying... (${retries} left)`);
+        return fetchAPI(endpoint, options, retries - 1);
+      }
       throw new Error('Request timed out. Please check your connection.');
     }
+
+    // Network errors (Failed to fetch)
+    if (err.message === 'Failed to fetch' && retries > 0) {
+      console.warn(`API ${endpoint} network error. Retrying... (${retries} left)`);
+      await new Promise(res => setTimeout(res, 2000));
+      return fetchAPI(endpoint, options, retries - 1);
+    }
+
+    console.error(`API request to ${endpoint} failed:`, err);
     throw err;
   }
 }

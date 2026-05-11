@@ -106,7 +106,9 @@ export default function AdminDashboard({
         setRecentIncidents(incidentsData);
         
         const tanodsData = await api.generic.list('users?role=tanod');
-        setOnDutyTanods(tanodsData);
+        // Deduplicate tanods by ID to prevent key errors
+        const uniqueTanods = Array.from(new Map(tanodsData.map((t: any) => [t.id, t])).values()) as User[];
+        setOnDutyTanods(uniqueTanods);
       } catch (err) {
         console.error("Failed to load admin dashboard data", err);
       }

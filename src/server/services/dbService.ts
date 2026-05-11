@@ -23,6 +23,9 @@ export async function initDb(retries = 3) {
           created_at TIMESTAMPTZ DEFAULT now(),
           last_active TIMESTAMPTZ DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+        CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       `);
       
       await client.query(`
@@ -66,6 +69,9 @@ export async function initDb(retries = 3) {
           updated_at TIMESTAMPTZ DEFAULT now(),
           resolved_at TIMESTAMPTZ
         );
+        CREATE INDEX IF NOT EXISTS idx_alerts_resident_id ON alerts(resident_id);
+        CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
+        CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
       `);
 
       await client.query(`
@@ -94,6 +100,19 @@ export async function initDb(retries = 3) {
           );
         }
       }
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS alert_messages (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          alert_id UUID REFERENCES alerts(id) ON DELETE CASCADE,
+          sender_id UUID REFERENCES users(id),
+          sender_name TEXT,
+          message TEXT NOT NULL,
+          type TEXT DEFAULT 'text',
+          timestamp TIMESTAMPTZ DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_alert_messages_alert_id ON alert_messages(alert_id);
+      `);
 
       await client.query(`
         CREATE TABLE IF NOT EXISTS system_config (

@@ -8,7 +8,9 @@ import { getIO } from '../sockets';
 import { SOCKET_EVENTS } from '../constants';
 import { anomalyDetectionService } from './anomalyDetectionService';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+import { config } from '../config/index';
+
+const genAI = new GoogleGenerativeAI(config.geminiApiKey!);
 const auditLogRepository = new AuditLogRepository();
 const incidentRepository = new IncidentRepository();
 const tanodLocationRepository = new TanodLocationRepository();
@@ -145,7 +147,7 @@ export class SecureVoiceAssistantService {
     session.availableTanods = await tanodLocationRepository.getActiveTanods();
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       systemInstruction: this.buildHardenedSystemPrompt(session, language),
     });
 

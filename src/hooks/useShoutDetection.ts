@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 
 // Simplified shout/loudness detection using Web Audio API
 export const useShoutDetection = (onShout: () => void, threshold = -20) => {
@@ -40,8 +41,11 @@ export const useShoutDetection = (onShout: () => void, threshold = -20) => {
       };
       
       checkVolume();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Shout detection error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        toast.error("Emergency detection requires microphone permissions.", { icon: '🚨' });
+      }
     }
   }, [onShout]);
 

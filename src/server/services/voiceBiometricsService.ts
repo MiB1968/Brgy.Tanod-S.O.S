@@ -1,8 +1,11 @@
 import { ElevenLabsClient } from 'elevenlabs';
 import { AppError } from '../middleware/error';
 import { AuditLogRepository } from '../db/repositories/AuditLogRepository';
+import { config } from '../config/index';
 
-const elevenLabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY || 'dummy_key' });
+const elevenLabs = new ElevenLabsClient({ 
+  apiKey: config.elevenLabs.apiKeys[0] || 'dummy_key' 
+});
 const auditLogRepository = new AuditLogRepository();
 
 export class VoiceBiometricsService {

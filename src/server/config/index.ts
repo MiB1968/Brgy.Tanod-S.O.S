@@ -11,11 +11,31 @@ export const config = {
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, ''),
   geminiApiKey: process.env.GEMINI_API_KEY?.trim() || null,
+  guardianAiKey: (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,
+  geminiModel: process.env.GEMINI_MODEL || "gemini-1.5-flash", // Stable standard, allow override
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
   },
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  elevenLabs: {
+    apiKeys: (process.env.ELEVENLABS_API_KEYS || process.env.ELEVENLABS_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean),
+    voiceId: (() => {
+      const vid = (process.env.JARVIS_VOICE_ID || 'llN1Ei50DSCIEuoOIaH7').trim();
+      // Handle the case where the user pasted the entire Jamie voice URL
+      if (vid.includes('voiceId=')) {
+        const parts = vid.split('voiceId=');
+        if (parts[1]) return parts[1].split('&')[0];
+      }
+      if (vid.includes('/')) {
+        return vid.split('/').pop() || vid;
+      }
+      return vid;
+    })(),
+  },
+  fishAudio: {
+    apiKeys: (process.env.FISHAUDIO_API_KEYS || process.env.FISHAUDIO_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean),
+  },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project',
   }

@@ -31,7 +31,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(process.cwd(), 'dist/client');
+    const distPath = path.resolve(process.cwd(), 'dist');
     const indexPath = path.join(distPath, 'index.html');
     
     console.log(`[Production] Environment detected.`);
@@ -50,7 +50,7 @@ async function startServer() {
 
     app.get('*', (req, res) => {
       // Don't intercept API calls
-      if (req.path.startsWith('/api/')) {
+      if (req.path.startsWith('/api')) {
         return res.status(404).json({ success: false, error: 'API endpoint not found' });
       }
       

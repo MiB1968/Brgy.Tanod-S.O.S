@@ -5,8 +5,10 @@ import socket from '../../lib/socket';
 import { SystemBroadcast } from '../../types';
 import { motion } from 'motion/react';
 import { Megaphone, Plus, X, Globe } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export function ManageBroadcasts() {
+  const { profile } = useAuthStore();
   const [broadcasts, setBroadcasts] = useState<SystemBroadcast[]>([]);
   const [message, setMessage] = useState('');
   const [type, setType] = useState<SystemBroadcast['type']>('other');
@@ -34,8 +36,8 @@ export function ManageBroadcasts() {
     if (!message) return;
     try {
       await api.generic.create('broadcasts', {
-        adminId: 'current-admin-id', // ideally passed from props
-        adminName: 'Admin',
+        adminId: profile?.id || '00000000-0000-0000-0000-000000000000',
+        adminName: profile?.name || 'Admin',
         message,
         type,
         isActive: true,

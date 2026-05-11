@@ -24,7 +24,16 @@ export function useSocketListeners(
   const { updatePatrol, updateTanodStatus } = useTanodStore();
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile) {
+      if (socket.connected) socket.disconnect();
+      return;
+    }
+
+    // Explicitly connect when profile is available
+    if (!socket.connected) {
+      console.log('[Socket] Initiating authenticated connection...');
+      socket.connect();
+    }
 
     const showSOSNotification = (alert: Alert) => {
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -170,6 +179,9 @@ export function useSocketListeners(
       socket.off('tanod_update');
       socket.off('resident_update');
       socket.off('siren_update');
+      
+      console.log('[Socket] Cleaning up listeners and disconnecting...');
+      socket.disconnect();
     };
   }, [profile, effectiveRole, addAlert, updatePatrol, updateTanodStatus, setActiveBroadcast, setGlobalSirenActive, setIsShaking, setActiveTab]);
 }

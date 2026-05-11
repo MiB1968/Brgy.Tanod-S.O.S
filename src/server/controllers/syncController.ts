@@ -13,18 +13,33 @@ export const getSync = async (req: AuthRequest, res: Response) => {
   const parts = basePath.split('/');
   const collection = parts[0];
   const id = parts[1];
+  const subCollection = parts[2];
 
   try {
     const userRole = req.user?.role;
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
-    if (collection === 'system' && id === 'siren') {
-      const result = await pool.query("SELECT data FROM system_config WHERE key = 'siren'");
-      return res.json(result.rows[0]?.data || { sirenActive: false });
+    if (collection === 'system') {
+      if (id === 'siren') {
+        const result = await pool.query("SELECT data FROM system_config WHERE key = 'siren'");
+        return res.json(result.rows[0]?.data || { sirenActive: false });
+      }
+      if (id === 'developer') {
+        const result = await pool.query("SELECT data FROM system_config WHERE key = 'developer'");
+        return res.json(result.rows[0]?.data || { name: 'Ruben Llego O.', avatarUrl: null });
+      }
     }
 
     if (collection === 'alerts' || collection === 'active_alerts') {
+      if (id && subCollection === 'messages') {
+        const result = await pool.query(
+          "SELECT * FROM alert_messages WHERE alert_id = $1 ORDER BY timestamp ASC",
+          [id]
+        );
+        return res.json(result.rows);
+      }
+      
       // Residents can only see their own alerts, Tanods/Admins see all
       if (id) {
         const result = await pool.query(
@@ -214,20 +229,23 @@ export const postSync = async (req: AuthRequest, res: Response) => {
   const parts = (fullPath as string).split('/');
   const collection = parts[0];
   const docId = id || parts[1];
+  const subCollection = parts[2];
 
   try {
     const userRole = req.user?.role;
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
-    if (collection === 'system' && docId === 'siren') {
-      if (!isTanod) return response.error(res, "Full clearance required for Siren Control", "FORBIDDEN", 403);
-      await pool.query(
-        "INSERT INTO system_config (key, data, updated_at) VALUES ('siren', $1, now()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = now()",
-        [JSON.stringify(data)]
-      );
-      socketService.emitToAll("siren_update", data);
-      return res.json({ success: true });
+    if (collection === 'system') {
+      if (docId === 'siren' || docId === 'developer') {
+        if (!isTanod) return response.error(res, `Full clearance required for ${docId === 'siren' ? 'Siren' : 'Developer'} Control`, "FORBIDDEN", 403);
+        await pool.query(
+          "INSERT INTO system_config (key, data, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO UPDATE SET data = $2, updated_at = now()",
+          [docId, JSON.stringify(data)]
+        );
+        if (docId === 'siren') socketService.emitToAll("siren_update", data);
+        return res.json({ success: true });
+      }
     }
 
     if (collection === 'patrol_sessions') {
@@ -408,6 +426,15 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'alerts') {
+      if (subCollection === 'messages') {
+        const result = await pool.query(
+          "INSERT INTO alert_messages (alert_id, sender_id, sender_name, message, type, timestamp) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+          [docId, req.user?.id, data.senderName || 'User', data.message, data.type || 'text', data.timestamp || new Date().toISOString()]
+        );
+        socketService.emitToRoom(`incident_${docId}`, "new_message", result.rows[0]);
+        return res.json({ success: true, id: result.rows[0].id });
+      }
+
       // Permission required to update an alert (Tanod/Admin or Owner for specific fields)
       const alertCheck = await pool.query("SELECT resident_id FROM alerts WHERE id = $1", [docId]);
       if (alertCheck.rows.length === 0) return response.error(res, "Alert not found", "NOT_FOUND", 404);

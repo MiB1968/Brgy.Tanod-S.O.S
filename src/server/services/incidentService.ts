@@ -40,8 +40,8 @@ export const incidentService = {
 
     // 2. User-Radius/Time Protection
     const lastSOS = recentSOS.get(reporterId);
-    if (lastSOS && Date.now() - lastSOS < 10_000) { // Reduced to 10s for genuine emergency retries
-      throw new AppError("System busy. Please wait 10 seconds before another transmission.", 429, "RATE_LIMITED");
+    if (lastSOS && Date.now() - lastSOS < 5_000) { // Reduced to 5s for genuine emergency retries
+      throw new AppError("System busy. Please wait 5 seconds before another transmission.", 429, "RATE_LIMITED");
     }
     recentSOS.set(reporterId, Date.now());
 
@@ -64,10 +64,16 @@ export const incidentService = {
       `inc_${Date.now()}`
     );
 
+    // Prioritize explicitly selected types if they are high-level categories
+    const userTypes = ['FIRE', 'MEDICAL', 'CRIME', 'NATURAL_DISASTER'];
+    const finalType = (data.initialType && userTypes.includes(data.initialType.toUpperCase()))
+      ? data.initialType.toUpperCase()
+      : (aiAnalysis.incidentType || data.initialType || 'OTHER');
+
     const incidentData = {
       reporterId,
       barangayId,
-      type: aiAnalysis.incidentType || data.initialType || 'OTHER',
+      type: finalType,
       description: description || '',
       latitude,
       longitude,

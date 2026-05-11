@@ -60,7 +60,16 @@ export const useTanodStore = create<TanodState>((set) => ({
   updateTanodStatus: (tanodId, status) => set((state) => ({
     tanods: state.tanods.map((t) => t.id === tanodId ? { ...t, status } : t)
   })),
-  addActivityLog: (log) => set((state) => ({ 
-    activityLogs: [log, ...state.activityLogs].slice(0, 100) 
-  })),
+  addActivityLog: (log) => set((state) => {
+    const logId = log.id || `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newLog = { ...log, id: logId };
+    
+    // De-duplicate if the log already exists by ID
+    const exists = state.activityLogs.some(l => l.id === logId);
+    if (exists) return state;
+    
+    return { 
+      activityLogs: [newLog, ...state.activityLogs].slice(0, 500) 
+    };
+  }),
 }));

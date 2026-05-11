@@ -9,6 +9,7 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
     socket.handshake.headers.authorization?.split(" ")[1];
 
   if (!token) {
+    console.warn(`[SocketAuth] Missing token for socket ${socket.id}`);
     return next(new Error("Authentication required"));
   }
 
@@ -26,9 +27,10 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
       }
     };
 
+    console.log(`[SocketAuth] Authenticated user ${decoded.id} (${decoded.role}) for socket ${socket.id}`);
     next();
-  } catch (err) {
-    console.warn("[SocketAuth] Invalid token");
-    next(new Error("Invalid token"));
+  } catch (err: any) {
+    console.warn(`[SocketAuth] Authentication failed for socket ${socket.id}: ${err.message}`);
+    next(new Error("Authentication error"));
   }
 };

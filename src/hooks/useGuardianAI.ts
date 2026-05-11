@@ -74,40 +74,114 @@ export function useGuardianAI() {
     }
   }, [pendingSOS, activeTanods, profile]);
 
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    
+    const isOwner = profile?.name?.toUpperCase().includes('RUBEN LLEGO') || profile?.email === 'rubenlleg12@gmail.com';
+    
+    setState(s => ({ ...s, isProcessing: true }));
+    try {
+      const response = await guardianAI.processCommand(text, {
+        pendingSOS,
+        activeTanods,
+        isSuperAdmin: isOwner
+      });
+
+      setState(s => ({ ...s, lastTranscript: text }));
+      
+      voiceService.speak(response.reply, () => {
+        setState(s => ({ ...s, isSpeaking: false }));
+      });
+      
+      setState(s => ({ 
+        ...s, 
+        isAwake: true, 
+        isSpeaking: true, 
+        isProcessing: false,
+        action: response.action 
+      }));
+    } catch (err) {
+      console.error('[Guardian AI] Chat Error:', err);
+      setState(s => ({ ...s, isProcessing: false }));
+      toast.error("Guardian AI communication link failure.");
+    }
+  }, [pendingSOS, activeTanods, profile]);
+
   const toggleListening = useCallback(() => {
     if (state.isListening) {
+      if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
       voiceService.stopListening();
       setState(s => ({ ...s, isListening: false }));
     } else {
       soundService.play('voice_beep');
       setState(s => ({ ...s, isListening: true }));
+
+      // Safety timeout: stop listening after 25 seconds of silence or inactivity
+      if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
+      transcriberTimeout.current = setTimeout(() => {
+        if (state.isListening) {
+          voiceService.stopListening();
+          setState(s => ({ ...s, isListening: false }));
+          toast("Voice mode suspended for battery safety.", { icon: '🔋' });
+        }
+      }, 25000);
+
       voiceService.startListening(
         (text, isFinal) => {
           if (isFinal) {
             processText(text);
+            // Reset timeout on activity
+            if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
+            transcriberTimeout.current = setTimeout(() => {
+              voiceService.stopListening();
+              setState(s => ({ ...s, isListening: false }));
+            }, 15000);
           }
         },
         (err) => {
-          setState(s => ({ ...s, isListening: false, error: err.message }));
-          toast.error("Voice synthesis interrupted. Retrying...");
+          setState(s => ({ ...s, isListening: false, error: err.error }));
+          
+          if (err.error === 'not-allowed') {
+            toast.error("Microphone access denied. Please enable it in your browser settings to use Guardian AI.", {
+              duration: 5000,
+              icon: '🎙️'
+            });
+          } else if (err.error !== 'aborted') {
+            toast.error("Guardian AI connectivity interrupted. Switching to manual.");
+          }
         }
       );
     }
   }, [state.isListening, processText]);
 
-  // Proactive suggestions
+  // Proactive suggestions for Admin (e.g. status)
   useEffect(() => {
     if (state.isAwake && !state.isSpeaking && !state.isListening) {
-      const suggestion = guardianAI.getProactiveSuggestion({ pendingSOS, activeTanods });
-      if (suggestion && Math.random() > 0.8) { // Only occasionally suggest
-        voiceService.speak(suggestion);
-      }
+      const timer = setTimeout(() => {
+        const suggestion = guardianAI.getProactiveSuggestion({ pendingSOS, activeTanods });
+        if (suggestion) {
+          setState(s => ({ ...s, isSpeaking: true }));
+          voiceService.speak(suggestion, () => {
+            setState(s => ({ ...s, isSpeaking: false }));
+          });
+        }
+      }, 5000); // Wait 5s before suggesting anything proactively
+      
+      return () => clearTimeout(timer);
     }
-  }, [pendingSOS, activeTanods, state.isAwake]);
+  }, [pendingSOS, activeTanods, state.isAwake, state.isListening, state.isSpeaking]);
+
+  useEffect(() => {
+    return () => {
+      if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
+      voiceService.stopListening();
+    };
+  }, []);
 
   return {
     ...state,
     toggleListening,
-    performGreeting
+    performGreeting,
+    sendMessage
   };
 }

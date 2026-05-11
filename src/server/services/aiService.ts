@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 
-const getApiKey = () => process.env.GEMINI_API_KEY || "";
+import { config } from '../config/index';
+
+const getApiKey = () => config.guardianAiKey || "";
 
 const genAI = new GoogleGenerativeAI(getApiKey());
 
@@ -78,14 +80,16 @@ export async function analyzeIncident(
   // Sanitize input
   const cleanDescription = description.trim().slice(0, 1500); // Prevent abuse
 
-  if (!getApiKey() || getApiKey() === "missing-key") {
-    log.warn("No Gemini API Key found. Using fallback.");
+  if (!getApiKey() || getApiKey() === "missing-key" || getApiKey() === "YOUR_GEMINI_API_KEY") {
+    if (requestId.endsWith('0')) { // Rate-limit log spam
+      log.warn("Gemini API Key misconfigured or missing. Using fallback analysis.");
+    }
     return createFallbackAnalysis(cleanDescription, initialType);
   }
 
   try {
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: config.geminiModel,
       generationConfig: { 
         responseMimeType: "application/json",
         temperature: 0.1,
@@ -213,17 +217,19 @@ Respond with **only** the valid JSON object. No explanations, no markdown, no ex
 
   } catch (error: any) {
     const duration = Date.now() - startTime;
+    const isAuthError = error?.message?.includes('API_KEY_INVALID') || error?.message?.includes('400') || error?.status === 400;
     
-    log.error("AI analysis failed", {
-      requestId,
-      incidentId,
-      error: error.message || "Unknown error",
-      stack: error.stack,
-      durationMs: duration,
-      descriptionLength: cleanDescription.length,
-    });
+    if (isAuthError) {
+      log.warn("Gemini Auth Error: Invalid API Key detected. Please verify GEMINI_API_KEY.");
+    } else {
+      log.error("AI analysis failed", {
+        requestId,
+        incidentId,
+        error: error.message || "Unknown error",
+        durationMs: duration
+      });
+    }
 
-    // Return safe fallback instead of crashing the SOS flow
     return createFallbackAnalysis(cleanDescription, initialType);
   }
 }

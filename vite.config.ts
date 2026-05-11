@@ -12,7 +12,8 @@ export default defineConfig(({mode}) => {
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
     build: {
-      outDir: 'dist/client',
+      outDir: 'dist',
+      assetsDir: 'assets',
       emptyOutDir: true,
     },
     resolve: {

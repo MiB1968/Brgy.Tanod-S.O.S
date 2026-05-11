@@ -4,6 +4,7 @@ import sosRoutes from "./sosRoutes";
 import analyticsRoutes from "./analyticsRoutes";
 import syncRoutes from "./syncRoutes";
 import systemRoutes from "./systemRoutes";
+import voiceRoutes from "./voiceRoutes";
 
 export const setupRoutes = (app: Express): void => {
   // Health check
@@ -26,6 +27,7 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/analytics", analyticsRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/system", systemRoutes);
+  app.use("/api/voice", voiceRoutes);
 
   // 404 handler for API routes
   app.use("/api/*", (req, res) => {

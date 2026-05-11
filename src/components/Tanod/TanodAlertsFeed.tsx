@@ -30,6 +30,10 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
   const isResolvedAlert = (alert: Alert) => ['resolved', 'cancelled'].includes(alert.status?.toLowerCase() || '');
 
   const filteredAlerts = alerts.filter(alert => {
+    // If pending alerts are shown in the Critical section, exclude them from the main list 
+    // to avoid duplicate key errors in React.
+    if (alert.status === 'pending') return false;
+
     if (filterStatus === 'ACTIVE') {
       if (isResolvedAlert(alert)) return false;
     } else if (filterStatus !== 'ALL') {

@@ -12,19 +12,25 @@ export { getActiveLocations };
 
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
+    pingTimeout: 180000,      // 180 seconds - be extremely patient with mobile/proxy latency
+    pingInterval: 25000,     // 25 seconds
+    transports: ['polling', 'websocket'], // Polling first for reliable handshake
+    allowEIO3: true,
+    connectTimeout: 60000,
+    maxHttpBufferSize: 1e7, // 10MB for voice packets
+    cookie: false,
     cors: {
       origin: config.corsOrigin,
       credentials: true,
-    },
-    pingTimeout: 120000,      // 120 seconds
-    pingInterval: 30000,     // 30 seconds
-    transports: ['polling', 'websocket'], // Consistent with client
-    allowEIO3: true,
-    connectTimeout: 45000
+      methods: ["GET", "POST"]
+    }
   });
 
   // Global Socket Authentication
-  io.use(socketAuthMiddleware as any);
+  io.use((socket, next) => {
+    console.log(`[Socket] New connection attempt: ${socket.id} from ${socket.handshake.address}`);
+    socketAuthMiddleware(socket, next);
+  });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
     const { id, role, barangayId } = socket.data.user;
@@ -111,4 +117,8 @@ export function emitToResponders(event: string, data: any) {
 
 export function emitToBarangay(barangayId: string, event: string, data: any) {
   io?.to(`barangay_${barangayId}`).emit(event, data);
+}
+
+export function emitToRoom(room: string, event: string, data: any) {
+  io?.to(room).emit(event, data);
 }
