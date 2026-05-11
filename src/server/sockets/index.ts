@@ -6,6 +6,7 @@ import { voiceAssistantService } from '../services/voiceAssistantService';
 import { VoicePermissionLevel } from '../services/voiceAssistantService.types';
 import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
 import { setupIncidentHandlers } from './handlers/incident.handler';
+import { setupJarvisHandler } from './handlers/jarvis.handler';
 import { config } from '../config/index';
 import { normalizeRole, isTanodOrAbove, isAdminOrAbove } from '../utils/roleUtils';
 
@@ -87,6 +88,7 @@ export function initSocket(server: HttpServer): Server {
     // Register feature handlers
     setupLocationHandlers(io, socket);
     setupIncidentHandlers(io, socket);
+    setupJarvisHandler(io, socket);
 
     // Map normalized role to VoicePermissionLevel
     const getPermissionLevel = (r: string): VoicePermissionLevel => {

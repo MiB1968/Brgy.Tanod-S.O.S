@@ -31,60 +31,42 @@ export function useGuardianAI() {
     const hour = new Date().getHours();
     const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     
-    // Check for Ruben Llego (Owner)
-    const isOwner = name.toUpperCase().includes('RUBEN LLEGO') || profile?.email === 'rubenlleg12@gmail.com';
-
-    if (isOwner) {
-      soundService.play('intro_super');
-      setTimeout(() => {
-        voiceService.speak(`Welcome back, System Owner and Creator, Ruben Llego. Full system access granted. Guardian AI is at your command.`);
-        toast.success("SUPER ADMIN AUTHENTICATED: Full Tactical Oversight Active", { duration: 5000 });
-        setState(s => ({ ...s, isAwake: true }));
-      }, 1000);
-      return;
-    }
-
     // Standard Admin/Tanod Greeting
-    if (['ADMIN', 'CAPTAIN', 'TANOD'].includes(role.toUpperCase())) {
+    if (['ADMIN', 'SUPERADMIN', 'CAPTAIN', 'TANOD'].includes(role.toUpperCase())) {
       soundService.play('intro_epic');
       setTimeout(() => {
-        voiceService.speak(`${timeGreeting}, Commissioner ${name}. System online and ready for coordination.`);
+        voiceService.speak(`${timeGreeting}, Commander ${name}. System online and ready for coordination.`);
         setState(s => ({ ...s, isAwake: true }));
       }, 800);
     }
-  }, [profile]);
+  }, []);
 
   const processText = useCallback(async (text: string) => {
-    const isOwner = profile?.name?.toUpperCase().includes('RUBEN LLEGO') || profile?.email === 'rubenlleg12@gmail.com';
+    const isSuperAdmin = profile?.role === 'superadmin';
     
     const result = await guardianAI.processCommand(text, {
       pendingSOS,
       activeTanods,
-      isSuperAdmin: isOwner
+      isSuperAdmin
     });
 
     setState(s => ({ ...s, isSpeaking: true }));
     voiceService.speak(result.reply, () => {
       setState(s => ({ ...s, isSpeaking: false }));
     });
-
-    if (result.action === 'UNLOCK_SUPER_ADMIN') {
-      // Custom logic for unlocking if needed
-      toast.success("Super User Privileges Synchronized");
-    }
   }, [pendingSOS, activeTanods, profile]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return;
     
-    const isOwner = profile?.name?.toUpperCase().includes('RUBEN LLEGO') || profile?.email === 'rubenlleg12@gmail.com';
+    const isSuperAdmin = profile?.role === 'superadmin';
     
     setState(s => ({ ...s, isProcessing: true }));
     try {
       const response = await guardianAI.processCommand(text, {
         pendingSOS,
         activeTanods,
-        isSuperAdmin: isOwner
+        isSuperAdmin
       });
 
       setState(s => ({ ...s, lastTranscript: text }));
@@ -158,7 +140,8 @@ export function useGuardianAI() {
   useEffect(() => {
     if (state.isAwake && !state.isSpeaking && !state.isListening) {
       const timer = setTimeout(() => {
-        const suggestion = guardianAI.getProactiveSuggestion({ pendingSOS, activeTanods });
+        const isSuperAdmin = profile?.role === 'superadmin';
+        const suggestion = guardianAI.getProactiveSuggestion({ pendingSOS, activeTanods, isSuperAdmin });
         if (suggestion) {
           setState(s => ({ ...s, isSpeaking: true }));
           voiceService.speak(suggestion, () => {
@@ -169,7 +152,7 @@ export function useGuardianAI() {
       
       return () => clearTimeout(timer);
     }
-  }, [pendingSOS, activeTanods, state.isAwake, state.isListening, state.isSpeaking]);
+  }, [pendingSOS, activeTanods, profile, state.isAwake, state.isListening, state.isSpeaking]);
 
   useEffect(() => {
     return () => {

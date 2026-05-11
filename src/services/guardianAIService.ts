@@ -1,77 +1,112 @@
+// src/services/guardianAIService.ts
+// CLIENT-SIDE — tactical command processing, no privilege escalation.
 
 import { voiceService } from './voiceService';
 import { soundService } from './soundService';
-import { toast } from 'react-hot-toast';
+
+export interface GuardianContext {
+  pendingSOS: number;
+  activeTanods: number;
+  isSuperAdmin: boolean;
+}
+
+export interface GuardianResponse {
+  reply: string;
+  action?: 'SUMMARIZE' | 'SUGGEST_DISPATCH' | 'STATUS_REPORT' | 'HELP';
+}
 
 /**
- * Tactical Guardian intelligence Layer
+ * GuardianAIService
+ *
+ * Tactical voice command interpreter for the admin dashboard.
+ * Handles local command shortcuts (status, summarize, help).
+ * Complex AI reasoning is delegated to the server via socket.
+ *
+ * SECURITY: No secret phrases. No privilege escalation via voice.
+ * Super admin access is granted only through the login system.
  */
 class GuardianAIService {
-  private secretPhrase = "I AM THE CREATOR RUBEN LLEGO ACTIVATE FULL POWER";
-
   /**
-   * Processes tactical voice commands
+   * Processes tactical voice commands locally.
+   * Returns a structured response for the UI to act on.
    */
-  public async processCommand(text: string, context: { 
-    pendingSOS: number, 
-    activeTanods: number,
-    isSuperAdmin: boolean 
-  }): Promise<{ reply: string; action?: string }> {
-    const command = text.toUpperCase().replace(/[.,!]/g, '');
-    console.log('[Guardian AI] Tactical Command Input:', command);
+  public async processCommand(
+    text: string,
+    context: GuardianContext
+  ): Promise<GuardianResponse> {
+    const command = text.toUpperCase().replace(/[.,!?]/g, '').trim();
 
-    // 1. REFINED SECRET PHASE RECOGNITION (RUBEN LLEGO PROTOCOL)
-    const rubenMatch = command.includes("RUBEN") || command.includes("REUBEN") || command.includes("ROUBEN");
-    const llegoMatch = command.includes("LLEGO") || command.includes("LEGO") || command.includes("LEGOO");
-    const creatorMatch = command.includes("CREATOR") || command.includes("OWNER") || command.includes("CREATED");
-    const powerMatch = command.includes("POWER") || command.includes("FULL POWER") || command.includes("ACTIVATE");
-    
-    if (command.includes(this.secretPhrase) || (rubenMatch && llegoMatch && (creatorMatch || powerMatch))) {
-      soundService.play('intro_super');
-      return { 
-        reply: "Welcome back, System Owner and Creator, Ruben Llego. Full system access granted. Guardian AI at your command.",
-        action: 'UNLOCK_SUPER_ADMIN'
-      };
-    }
+    // ── Status Summary ─────────────────────────────────────────────────
+    if (command.includes('SUMMARIZE') || command.includes('STATUS') || command.includes('ULAT')) {
+      let reply = 'System status: ';
 
-    // 2. Dashboard Intelligence
-    if (command.includes("SUMMARIZE") || command.includes("STATUS")) {
-      let reply = `System status: normal. `;
       if (context.pendingSOS > 0) {
-        reply += `There are ${context.pendingSOS} pending SOS reports requiring your attention. `;
+        reply += `${context.pendingSOS} pending SOS ${context.pendingSOS === 1 ? 'report' : 'reports'} require attention. `;
       } else {
-        reply += `All zones are clear. `;
+        reply += 'All zones clear. ';
       }
-      reply += `${context.activeTanods} Tanod personnel are currently on active patrol.`;
-      return { reply };
+
+      reply += `${context.activeTanods} Tanod ${context.activeTanods === 1 ? 'officer' : 'officers'} currently on patrol.`;
+
+      return { reply, action: 'STATUS_REPORT' };
     }
 
-    if (command.includes("HELP") || command.includes("WHAT CAN YOU DO")) {
-      return { 
-        reply: "I can summarize incident reports, provide system status, and help you dispatch personnel. Just ask me to summarize or check status." 
+    // ── Dispatch Suggestion ────────────────────────────────────────────
+    if (
+      command.includes('DISPATCH') ||
+      command.includes('IPADALA') ||
+      command.includes('SEND')
+    ) {
+      if (context.activeTanods === 0) {
+        return {
+          reply: 'Warning: No Tanods are currently on patrol. Please activate personnel before dispatching.',
+          action: 'SUGGEST_DISPATCH',
+        };
+      }
+      return {
+        reply: `Ready to dispatch. ${context.activeTanods} Tanod ${context.activeTanods === 1 ? 'officer is' : 'officers are'} available. Please confirm the target location in the dashboard.`,
+        action: 'SUGGEST_DISPATCH',
       };
     }
 
-    // 3. Proactive Suggestions (Triggered if silence or specific keyword)
-    if (command.includes("SUGGEST") || command.includes("WHAT SHOULD I DO")) {
+    // ── Suggestion ────────────────────────────────────────────────────
+    if (command.includes('SUGGEST') || command.includes('WHAT SHOULD') || command.includes('ANO') ) {
       if (context.pendingSOS > 0) {
-        return { reply: `I suggest reviewing the ${context.pendingSOS} pending alerts in the dashboard. Shall I prioritize them for you?` };
+        return {
+          reply: `I suggest reviewing the ${context.pendingSOS} pending ${context.pendingSOS === 1 ? 'alert' : 'alerts'} in the dashboard. Would you like to dispatch the nearest available Tanod?`,
+          action: 'SUGGEST_DISPATCH',
+        };
       }
-      return { reply: "The community is currently quiet. Good time to review patrol logs or update broadcast settings." };
+      return {
+        reply: 'The community is currently quiet. Good time to review patrol logs or check tonight\'s schedule.',
+        action: 'SUMMARIZE',
+      };
     }
 
-    return { reply: "Acknowledged. Standing by for further tactical instructions." };
+    // ── Help ──────────────────────────────────────────────────────────
+    if (command.includes('HELP') || command.includes('TULONG') || command.includes('WHAT CAN')) {
+      return {
+        reply: 'I can give you a situation summary, suggest dispatch actions, or report system status. Just say "status", "summarize", "dispatch", or "suggest".',
+        action: 'HELP',
+      };
+    }
+
+    // ── Default ───────────────────────────────────────────────────────
+    return {
+      reply: 'Acknowledged. Standing by for tactical instructions. Say "help" for available commands.',
+    };
   }
 
   /**
-   * Proactive suggestion logic based on system state
+   * Proactive alerts based on system state.
+   * Called periodically by the dashboard.
    */
-  public getProactiveSuggestion(context: { pendingSOS: number, activeTanods: number }): string | null {
+  public getProactiveSuggestion(context: GuardianContext): string | null {
     if (context.pendingSOS > 5) {
-      return "Alert: High volume of incoming SOS reports. Suggest activating emergency broadcast.";
+      return 'Alert: High volume of incoming SOS reports. Consider activating emergency broadcast.';
     }
     if (context.activeTanods === 0 && context.pendingSOS > 0) {
-      return "System Notice: Pending incidents found but no Tanods are on patrol. Suggest immediate dispatch.";
+      return 'Notice: Pending incidents found but no Tanods are on patrol. Immediate dispatch recommended.';
     }
     return null;
   }

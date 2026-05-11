@@ -37,38 +37,33 @@ class VoiceService {
   public async speak(text: string, onEnd?: () => void) {
     // Try ElevenLabs via backend first
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        const response = await fetch('/api/voice/tts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ text })
-        });
+      const response = await fetch('/api/voice/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text })
+      });
 
-        if (response.ok) {
-          const audioBlob = await response.blob();
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            if (onEnd) onEnd();
-          };
+      if (response.ok) {
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          if (onEnd) onEnd();
+        };
 
-          audio.onerror = (e) => {
-            console.error('[ElevenLabs] Audio playback error:', e);
-            this.fallbackSpeak(text, onEnd);
-          };
+        audio.onerror = (e) => {
+          console.error('[ElevenLabs] Audio playback error:', e);
+          this.fallbackSpeak(text, onEnd);
+        };
 
-          await audio.play();
-          console.log('[Guardian AI] Speaking (ElevenLabs):', text);
-          return;
-        } else {
-          console.warn('[ElevenLabs] Backend failed or not configured, using fallback.');
-        }
+        await audio.play();
+        console.log('[Guardian AI] Speaking (ElevenLabs):', text);
+        return;
+      } else {
+        console.warn('[ElevenLabs] Backend failed or not configured, using fallback.');
       }
     } catch (err) {
       console.error('[ElevenLabs] Fetch failed:', err);
