@@ -44,7 +44,7 @@
 }
 
 @layer utilities {
-  .tactical-panel {
+  .tactical-panel, .glass-panel {
     background: rgba(8, 15, 30, 0.78);
     backdrop-filter: blur(18px);
     border: 1px solid rgba(0, 170, 255, 0.25);
