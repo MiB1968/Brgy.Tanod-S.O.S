@@ -4,8 +4,20 @@ import { config } from "../config/index";
 import { AuthenticatedSocket, UserPayload } from "../types";
 
 export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void) => {
+  // Parse cookies from headers
+  const cookieHeader = socket.handshake.headers.cookie || '';
+  const cookies: Record<string, string> = {};
+  if (cookieHeader) {
+    cookieHeader.split(';').forEach(c => {
+      const [key, val] = c.trim().split('=');
+      cookies[key] = val;
+    });
+  }
+  const cookieToken = cookies['token'];
+
   const token = 
     socket.handshake.auth.token || 
+    cookieToken ||
     socket.handshake.headers.authorization?.split(" ")[1];
 
   if (!token) {

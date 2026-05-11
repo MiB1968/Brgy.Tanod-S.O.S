@@ -1,11 +1,11 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
 import { config } from '../config/index';
 
-const getApiKey = () => config.guardianAiKey || "";
+const getApiKey = () => config.guardianAiKey || process.env.GEMINI_API_KEY || "";
 
-const genAI = new GoogleGenerativeAI(getApiKey());
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 // =============================================================================
 // Schema Definition (Single Source of Truth)
@@ -88,15 +88,6 @@ export async function analyzeIncident(
   }
 
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: config.geminiModel,
-      generationConfig: { 
-        responseMimeType: "application/json",
-        temperature: 0.1,
-        topP: 0.85,
-      },
-    });
-
     const prompt = `You are **Guardian AI**, an expert emergency response coordinator for a Philippine Barangay. 
 You are calm, decisive, accurate, and operationally focused. Your job is to analyze SOS reports and give immediate, actionable guidance to Tanods and the Command Center.
 
@@ -160,15 +151,23 @@ Output: {
 
 **Now analyze this incident:**
 
-Initial reported type: ${initialType || 'Unknown'}
-Nearest Tanod distance: ${nearestTanodDistanceKm ? nearestTanodDistanceKm.toFixed(2) + ' km' : 'unknown'}
-Description: ${cleanDescription}
+Initial reported type: \${initialType || 'Unknown'}
+Nearest Tanod distance: \${nearestTanodDistanceKm ? nearestTanodDistanceKm.toFixed(2) + ' km' : 'unknown'}
+Description: \${cleanDescription}
 
 Respond with **only** the valid JSON object. No explanations, no markdown, no extra text.`;
 
-    // Add timeout protection
     const timeoutMs = 8000; // 8 seconds max
-    const resultPromise = model.generateContent(prompt);
+
+    const resultPromise = ai.models.generateContent({ 
+      model: config.geminiModel,
+      contents: prompt,
+      config: { 
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        topP: 0.85,
+      },
+    });
     
     const result: any = await Promise.race([
       resultPromise,
@@ -177,8 +176,7 @@ Respond with **only** the valid JSON object. No explanations, no markdown, no ex
       )
     ]);
 
-    const response = await result.response;
-    const rawText = response.text();
+    const rawText = result.text;
 
     if (!rawText || rawText.trim() === "") {
       throw new Error("Empty response from Gemini");

@@ -1,47 +1,74 @@
 import dotenv from 'dotenv';
-import path from 'path';
-
 dotenv.config();
 
+// ── Hard-fail on missing critical secrets in production ──────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const REQUIRED = ['JWT_SECRET', 'DATABASE_URL', 'CORS_ORIGIN'];
+  const missing = REQUIRED.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    console.error(
+      `\n[FATAL] Missing required environment variables: ${missing.join(', ')}\n` +
+      'The server cannot start safely without these values set.\n' +
+      'Set them in your .env file or hosting dashboard and restart.\n'
+    );
+    process.exit(1);
+  }
+}
+
 export const config = {
-  port: 3000,
+  // Port now reads from environment — required for cloud hosts (Railway, Render, etc.)
+  port: Number(process.env.PORT) || 3000,
+
   nodeEnv: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET || 'emergency_broadcast_secret_unsafe',
+
+  // NO unsafe fallback. Dev gets a long random string; prod fails above if unset.
+  jwtSecret:
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV !== 'production'
+      ? 'DEV_ONLY_jwt_secret_change_before_deploy_32chars'
+      : ''),
+
   databaseUrl: (process.env.COCKROACH_URL || process.env.DATABASE_URL || '')
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, ''),
+
   geminiApiKey: process.env.GEMINI_API_KEY?.trim() || null,
-  guardianAiKey: (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,
-  geminiModel: process.env.GEMINI_MODEL || "gemini-1.5-flash", // Stable standard, allow override
+  guardianAiKey:
+    (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
   },
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+
+  // Default is now EMPTY STRING, not '*'. Forces explicit configuration.
+  corsOrigin: process.env.CORS_ORIGIN || '',
+
   elevenLabs: {
-    apiKeys: (process.env.ELEVENLABS_API_KEYS || process.env.ELEVENLABS_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean),
+    apiKeys: (process.env.ELEVENLABS_API_KEYS || process.env.ELEVENLABS_API_KEY || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
     voiceId: (() => {
       const vid = (process.env.JARVIS_VOICE_ID || 'llN1Ei50DSCIEuoOIaH7').trim();
-      // Handle the case where the user pasted the entire Jamie voice URL
       if (vid.includes('voiceId=')) {
         const parts = vid.split('voiceId=');
         if (parts[1]) return parts[1].split('&')[0];
       }
-      if (vid.includes('/')) {
-        return vid.split('/').pop() || vid;
-      }
+      if (vid.includes('/')) return vid.split('/').pop() || vid;
       return vid;
     })(),
   },
+
   fishAudio: {
-    apiKeys: (process.env.FISHAUDIO_API_KEYS || process.env.FISHAUDIO_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean),
+    apiKeys: (process.env.FISHAUDIO_API_KEYS || process.env.FISHAUDIO_API_KEY || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
   },
+
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project',
-  }
+  },
 };
-
-
-if (!process.env.JWT_SECRET && config.nodeEnv === 'production') {
-  console.error('CRITICAL WARNING: JWT_SECRET environment variable is not set in production. Using fallback secret. THIS IS INSECURE!');
-}

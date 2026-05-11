@@ -23,6 +23,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // send cookies for cross-origin authentication
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

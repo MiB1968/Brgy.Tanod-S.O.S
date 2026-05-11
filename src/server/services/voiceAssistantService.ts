@@ -1,5 +1,5 @@
 // src/server/services/voiceAssistantService.ts
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { AuditLogRepository } from '../db/repositories/AuditLogRepository';
 import { IncidentRepository } from '../db/repositories/IncidentRepository';
 import { TanodLocationRepository } from '../db/repositories/TanodLocationRepository';
@@ -20,7 +20,7 @@ import {
   VoiceResponseTone
 } from './voiceAssistantService.types';
 
-const genAI = new GoogleGenerativeAI(config.geminiApiKey!);
+const ai = new GoogleGenAI({ apiKey: config.geminiApiKey || process.env.GEMINI_API_KEY || '' });
 
 export class SecureVoiceAssistantService {
   private sessions = new Map<string, VoiceSession>();
@@ -126,13 +126,15 @@ export class SecureVoiceAssistantService {
     const context = await this.getLiveContext();
 
     // Generate response
-    const model = genAI.getGenerativeModel({
+    const result = await ai.models.generateContent({
       model: "gemini-1.5-flash", // or gemini-2.5-flash for better performance
-      systemInstruction: this.buildOptimizedSystemPrompt(context, effectiveRole),
+      contents: transcript,
+      config: {
+        systemInstruction: this.buildOptimizedSystemPrompt(context, effectiveRole)
+      }
     });
 
-    const result = await model.generateContent(transcript);
-    let replyText = result.response.text();
+    let replyText = result.text || "";
 
     replyText = this.sanitizeAIResponse(replyText);
     const proposedActions = this.extractProposedActions(replyText);
