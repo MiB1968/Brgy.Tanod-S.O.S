@@ -5,7 +5,18 @@ import { incidentService } from '../services/incidentService';
 import { AppError } from '../middleware/error';
 
 export const createSOS = async (req: AuthRequest, res: Response) => {
-  const { description, latitude, longitude, initialType, photos, voiceClip, type, location, severity } = req.body;
+  const { 
+    description, 
+    latitude, 
+    longitude, 
+    initialType, 
+    photos, 
+    voiceClip, 
+    type, 
+    location, 
+    severity,
+    clientUuid // Added for deduplication
+  } = req.body;
   const user = req.user!;
 
   const lat = latitude ?? location?.lat;
@@ -25,6 +36,7 @@ export const createSOS = async (req: AuthRequest, res: Response) => {
       initialType: initialType || type,
       photos,
       voiceClip,
+      clientUuid
     });
 
     return res.status(201).json(

@@ -1,9 +1,10 @@
 import io from 'socket.io-client';
+import { safeStorage } from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
 const socket = io({
   auth: {
-    token: localStorage.getItem('token')
+    token: safeStorage.getItem('token')
   },
   reconnection: true,
   reconnectionAttempts: Infinity, 
@@ -17,7 +18,7 @@ const socket = io({
 // Refresh token on every reconnection attempt
 socket.on('reconnect_attempt', () => {
   socket.auth = {
-    token: localStorage.getItem('token')
+    token: safeStorage.getItem('token')
   };
 });
 
@@ -37,7 +38,7 @@ socket.on('disconnect', (reason) => {
 socket.on('connect_error', (err) => {
   console.error('[Socket] Connection Error:', err.message);
   if (err.message === 'Authentication error') {
-    const freshToken = localStorage.getItem('token');
+    const freshToken = safeStorage.getItem('token');
     if (freshToken) {
       socket.auth = { token: freshToken };
       socket.connect();

@@ -26,6 +26,7 @@ import { AlertDetailsModal } from './AlertDetailsModal';
 // Stores & hooks
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
+import { useGuardianAI } from '../hooks/useGuardianAI';
 import { logIncidentAction } from '../services/logService';
 
 const containerVariants = {
@@ -60,6 +61,7 @@ export default function AdminDashboard({
 }) {
   const { alerts } = useIncidentStore();
   const { patrols, tanods } = useTanodStore();
+  const { performGreeting } = useGuardianAI();
   const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
@@ -81,6 +83,12 @@ export default function AdminDashboard({
 
   const activeAlertsCount = alerts.filter(a => !isResolvedAlert(a)).length;
   const pendingAlertsCount = alerts.filter(a => isActiveAlert(a)).length;
+
+  useEffect(() => {
+    if (profile) {
+      performGreeting(profile.role, profile.name);
+    }
+  }, []);
 
   useEffect(() => {
     if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;

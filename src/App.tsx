@@ -92,12 +92,16 @@ import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
 import { useSystemStore } from './store/useSystemStore';
 import { useSOSStore } from './store/useSOSStore';
+import { safeStorage } from './lib/safeStorage';
 
 // Service & Lib imports
 import { getQueueSize } from './lib/offlineQueue';
 import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+import { PWAStatus } from './components/PWAStatus';
+
+// Rest of App...
 import { cn, isValidCoord } from './lib/utils';
 import { 
   isRuben as checkIsRuben, 
@@ -195,8 +199,8 @@ export default function App() {
 
   // Authentication persistence
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const token = safeStorage.getItem('token');
+    const storedUser = safeStorage.getItem('user');
     if (token && storedUser) {
       try {
         const u = JSON.parse(storedUser);
@@ -204,8 +208,8 @@ export default function App() {
         setProfile(u);
       } catch (err) {
         console.error("Malformed user data in storage", err);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        safeStorage.removeItem('user');
+        safeStorage.removeItem('token');
       }
     }
     setLoading(false);
@@ -277,8 +281,8 @@ export default function App() {
     try {
       if (email && password) {
         const res = await api.auth.login({ email, password });
-        localStorage.setItem('token', res.token);
-        localStorage.setItem('user', JSON.stringify(res.user));
+        safeStorage.setItem('token', res.token);
+        safeStorage.setItem('user', JSON.stringify(res.user));
         setUser(res.user);
         setProfile(res.user);
         toast.success(`Unit Authenticated`, { icon: '🔑' });
@@ -294,8 +298,8 @@ export default function App() {
   }, [isLoggingIn, setProfile]);
 
   const handleLogout = useCallback(async () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    safeStorage.removeItem('token');
+    safeStorage.removeItem('user');
     setUser(null);
     setProfile(null);
   }, [setProfile]);
@@ -325,7 +329,7 @@ export default function App() {
        // Re-fetch profile
        const updated = await api.auth.getProfile(user.id);
        setProfile(updated);
-       localStorage.setItem('user', JSON.stringify(updated));
+       safeStorage.setItem('user', JSON.stringify(updated));
     } catch (err: any) {
       console.error("Role assignment failure:", err);
       toast.error(`System Error: ${err.message}`);
@@ -342,8 +346,8 @@ export default function App() {
         email: role === 'admin' ? 'admin@demo.com' : 'resident@demo.com', 
         password: 'demo' 
       });
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
+      safeStorage.setItem('token', res.token);
+      safeStorage.setItem('user', JSON.stringify(res.user));
       setUser(res.user);
       setProfile(res.user);
       toast.success("Guest Session Active", { id: 'demo-login' });
@@ -386,8 +390,8 @@ export default function App() {
         onComplete={async (data: any) => {
           try {
             const res = await api.auth.register(data);
-            localStorage.setItem('token', res.token);
-            localStorage.setItem('user', JSON.stringify(res.user));
+            safeStorage.setItem('token', res.token);
+            safeStorage.setItem('user', JSON.stringify(res.user));
             setUser(res.user);
             setProfile(res.user);
             setIsRegistering(false);
@@ -459,6 +463,7 @@ export default function App() {
         </div>
       </div>
       <Toaster />
+      <PWAStatus />
 
       <BroadcastOverlay 
         activeBroadcast={activeBroadcast}

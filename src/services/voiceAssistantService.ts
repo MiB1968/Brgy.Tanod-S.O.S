@@ -13,9 +13,34 @@ class VoiceAssistantService {
   private onMessageCb: ((msg: LiveServerMessage) => void) | null = null;
   private onStateChangeCb: ((connected: boolean) => void) | null = null;
   private onToolCallCb: ((functionCalls: any[]) => Promise<any[]>) | null = null;
+  private synth: SpeechSynthesis | null = null;
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    if (typeof window !== 'undefined') {
+      this.synth = window.speechSynthesis;
+    }
+  }
+
+  /**
+   * Professional Text-to-Speech Fallback (Jarvis Vocalizer)
+   */
+  public speak(text: string, voiceName: 'Zephyr' | 'Nova' = 'Zephyr') {
+    if (!this.synth) return;
+    this.synth.cancel(); // Interrupt previous speech
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = this.synth.getVoices();
+    
+    // Attempt to find a high-quality voice
+    const preferred = voices.find(v => v.name.includes('Google') || v.name.includes('Premium'));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.pitch = 0.9; // Lower pitch for Jarvis-style depth
+    utterance.rate = 1.0;
+    utterance.volume = 1.0;
+
+    this.synth.speak(utterance);
   }
 
   public setCallbacks(

@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { Alert, EmergencyType } from '../types';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { queueSOS } from '../lib/offlineQueue';
+import { offlineService } from '../services/offlineService';
+import { safeStorage } from '../lib/safeStorage';
 
 interface SOSState {
   activeAlert: Alert | null;
   isSending: boolean;
   setActiveAlert: (alert: Alert | null) => void;
-  createSOS: (type: EmergencyType, description: string, location: { lat: number, lng: number }) => Promise<string | null>;
+  createSOS: (type: EmergencyType, description: string, location: { lat: number, lng: number }, photos?: string[]) => Promise<string | null>;
   cancelSOS: (id: string) => Promise<void>;
   subscribeToUserAlerts: (userId: string) => () => void;
 }
@@ -19,9 +20,9 @@ export const useSOSStore = create<SOSState>()(
     isSending: false,
     setActiveAlert: (alert) => set({ activeAlert: alert }),
     
-    createSOS: async (type, description, location) => {
+    createSOS: async (type, description, location, photos = []) => {
       set({ isSending: true });
-      const storedUser = localStorage.getItem('user');
+      const storedUser = safeStorage.getItem('user');
       const user = storedUser ? JSON.parse(storedUser) : null;
 
       const alertData: any = {
@@ -31,28 +32,52 @@ export const useSOSStore = create<SOSState>()(
         location,
         status: 'pending',
         timestamp: new Date().toISOString(),
-        description
+        description,
+        photos
       };
 
       try {
         let finalAlertId;
+        // If we are online, try to send to API
         if (navigator.onLine) {
-          const res = await api.alerts.create(alertData);
-          finalAlertId = res.id;
+          try {
+            const res = await api.alerts.create(alertData);
+            finalAlertId = res.id;
+            set({ activeAlert: { ...alertData, id: finalAlertId } });
+            return finalAlertId;
+          } catch (apiError) {
+            console.warn("[SOS] API call failed, falling back to outbox queue", apiError);
+            throw apiError;
+          }
         } else {
-          finalAlertId = crypto.randomUUID();
-          await queueSOS({ ...alertData, id: finalAlertId });
+          // Explicitly offline
+          throw new Error('OFFLINE_MODE');
         }
-        
-        // Optimistic update
-        set({ activeAlert: { ...alertData, id: finalAlertId } });
-        return finalAlertId;
       } catch (error) {
-        console.error("SOS creation error:", error);
-        const alertId = crypto.randomUUID();
-        await queueSOS({ ...alertData, id: alertId });
-        set({ activeAlert: { ...alertData, id: alertId } });
-        return alertId;
+        console.warn("[SOS] Queuing report due to connection failure");
+        const tempId = crypto.randomUUID();
+        
+        // Add to professional outbox
+        const photoBlobs = await Promise.all(
+          photos.map(async (p) => {
+            const res = await fetch(p);
+            return await res.blob();
+          })
+        );
+
+        await offlineService.queueSOS({
+          type,
+          description,
+          location,
+          timestamp: alertData.timestamp,
+          userId: user?.id || 'anonymous',
+          userName: user?.name || 'Resident',
+          photos: photoBlobs
+        });
+
+        // Optimistic update for UI tracking
+        set({ activeAlert: { ...alertData, id: tempId, isOfflineQueued: true } });
+        return tempId;
       } finally {
         set({ isSending: false });
       }

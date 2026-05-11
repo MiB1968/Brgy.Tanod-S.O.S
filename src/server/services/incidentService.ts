@@ -11,6 +11,7 @@ const incidentRepository = new IncidentRepository();
 
 // In-memory cache for duplicate prevention
 const recentSOS = new Map<string, number>();
+const processedUuids = new Set<string>(); // Added for clientUuid deduplication
 
 export const incidentService = {
   async createSOS(data: {
@@ -22,13 +23,25 @@ export const incidentService = {
     initialType?: string;
     photos?: string[];
     voiceClip?: string;
+    clientUuid?: string; // Added
   }) {
-    const { reporterId, barangayId, description, latitude, longitude } = data;
+    const { reporterId, barangayId, description, latitude, longitude, clientUuid } = data;
 
-    // Duplicate protection
+    // 1. Client-Side UUID Deduplication (Highly effective for offline-sync retry)
+    if (clientUuid) {
+      if (processedUuids.has(clientUuid)) {
+        console.log(`[SOS] Duplicate report ignored: ${clientUuid}`);
+        throw new AppError("Duplicate report already processed", 200, "DUPLICATE");
+      }
+      processedUuids.add(clientUuid);
+      // Clean up old UUIDs after 1 hour
+      setTimeout(() => processedUuids.delete(clientUuid), 3600_000);
+    }
+
+    // 2. User-Radius/Time Protection
     const lastSOS = recentSOS.get(reporterId);
-    if (lastSOS && Date.now() - lastSOS < 60_000) {
-      throw new AppError("You already sent an SOS recently. Please wait.", 429, "RATE_LIMITED");
+    if (lastSOS && Date.now() - lastSOS < 10_000) { // Reduced to 10s for genuine emergency retries
+      throw new AppError("System busy. Please wait 10 seconds before another transmission.", 429, "RATE_LIMITED");
     }
     recentSOS.set(reporterId, Date.now());
 

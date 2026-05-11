@@ -3,10 +3,12 @@
  * Replaces Firebase SDK with standard HTTP/WebSocket patterns
  */
 
+import { safeStorage } from './safeStorage';
+
 const API_BASE = '/api';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('token');
+  const token = safeStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),

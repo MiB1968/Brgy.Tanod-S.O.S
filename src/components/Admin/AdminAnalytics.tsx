@@ -3,6 +3,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pi
 import { motion } from 'motion/react';
 import { BarChart as ChartIcon, Zap, Shield, Users, Activity } from 'lucide-react';
 import { fetchAPI } from '../../lib/api';
+import { toast } from 'react-hot-toast';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 

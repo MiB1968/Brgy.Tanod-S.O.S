@@ -32,29 +32,39 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(process.cwd(), 'dist/client');
-    console.log(`[Production] Serving static files from: ${distPath}`);
+    const indexPath = path.join(distPath, 'index.html');
     
-    // Safety check: verify dist/client exists
-    import('fs').then(fs => {
-      if (!fs.existsSync(distPath)) {
-        console.error(`ERROR: Static assets directory not found at ${distPath}. Build might have failed.`);
-      } else {
-        console.log(`[Production] Verified: dist/client exists at ${distPath}`);
+    console.log(`[Production] Environment detected.`);
+    console.log(`[Production] System Root: ${process.cwd()}`);
+    console.log(`[Production] Target Asset Directory: ${distPath}`);
+    
+    // Static assets first
+    app.use(express.static(distPath, {
+      index: false, // Don't automatically serve index.html from here, we will handle it via *
+      setHeaders: (res, path) => {
+        if (path.endsWith('.js') || path.endsWith('.css')) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000');
+        }
       }
-    });
+    }));
 
-    app.use(express.static(distPath));
     app.get('*', (req, res) => {
       // Don't intercept API calls
       if (req.path.startsWith('/api/')) {
         return res.status(404).json({ success: false, error: 'API endpoint not found' });
       }
       
-      const indexPath = path.join(distPath, 'index.html');
+      console.log(`[Production] Serving fallback shell for: ${req.path}`);
       res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error(`Error sending index.html: ${err.message}`);
-          res.status(500).send("Application shell not found. Please ensure 'npm run build' completed successfully.");
+          console.error(`[Production] FAILED to serve index.html from ${indexPath}: ${err.message}`);
+          res.status(500).send(`
+            <div style="font-family: monospace; padding: 20px; background: #000; color: #f00;">
+              <h1>SYSTEM BOOT ERROR</h1>
+              <p>Application shell not found at: ${indexPath}</p>
+              <p>Please ensure 'npm run build' has completed and 'dist/client' is populated.</p>
+            </div>
+          `);
         }
       });
     });
