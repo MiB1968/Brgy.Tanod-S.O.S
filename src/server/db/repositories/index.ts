@@ -6,3 +6,7 @@ export { AuditLogRepository } from './AuditLogRepository';
 export { PatrolRepository } from './PatrolRepository';
 export { NotificationRepository } from './NotificationRepository';
 export { ReportRepository } from './ReportRepository';
+export { ShiftRepository } from './ShiftRepository';
+export { AuthRepository } from './AuthRepository';
+export { BarangayRepository } from './BarangayRepository';
+export { BaseRepository } from './BaseRepository';

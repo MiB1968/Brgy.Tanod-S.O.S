@@ -28,7 +28,7 @@ import { AlertDetailsModal } from './AlertDetailsModal';
 // Stores & hooks
 import { useIncidentStore } from '../store/useIncidentStore';
 import { useTanodStore } from '../store/useTanodStore';
-import { useGuardianAI } from '../hooks/useGuardianAI';
+import { useGuardian } from '../hooks/useGuardian';
 import { logIncidentAction } from '../services/logService';
 
 const containerVariants = {
@@ -63,7 +63,7 @@ export default function AdminDashboard({
 }) {
   const { alerts } = useIncidentStore();
   const { patrols, tanods } = useTanodStore();
-  const { performGreeting } = useGuardianAI();
+  const { performGreeting } = useGuardian();
   const [isFlashing, setIsFlashing] = useState(false);
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);

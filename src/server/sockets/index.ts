@@ -7,6 +7,7 @@ import { VoicePermissionLevel } from '../services/voiceAssistantService.types';
 import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
 import { setupIncidentHandlers } from './handlers/incident.handler';
 import { setupJarvisHandler } from './handlers/jarvis.handler';
+import { setupGuardianHandler } from './handlers/guardian.handler';
 import { config } from '../config/index';
 import { normalizeRole, isTanodOrAbove, isAdminOrAbove } from '../utils/roleUtils';
 
@@ -15,26 +16,26 @@ let io: Server;
 export { getActiveLocations };
 
 // ---------------------------------------------------------------------------
-// Per-socket voice command rate limiter
-// Prevents DoS via the 10MB maxHttpBufferSize socket buffer + rapid voice events.
-// Each connected socket gets its own independent limiter instance.
+// Global voice command rate limiter
+// Keyed by userId to prevent bypass via socket reconnection.
 // ---------------------------------------------------------------------------
 const VOICE_RATE_LIMIT = 10;    // max voice commands
 const VOICE_RATE_WINDOW = 60000; // per 60-second rolling window
+const voiceRateLimits = new Map<string, number[]>();
 
-function createVoiceRateLimiter(): () => boolean {
-  const timestamps: number[] = [];
-  return function isAllowed(): boolean {
-    const now = Date.now();
-    const cutoff = now - VOICE_RATE_WINDOW;
-    // Evict expired entries from the front of the array
-    while (timestamps.length > 0 && timestamps[0] < cutoff) {
-      timestamps.shift();
-    }
-    if (timestamps.length >= VOICE_RATE_LIMIT) return false;
-    timestamps.push(now);
-    return true;
-  };
+function isVoiceAllowed(userId: string): boolean {
+  const now = Date.now();
+  const cutoff = now - VOICE_RATE_WINDOW;
+  let timestamps = voiceRateLimits.get(userId) || [];
+  
+  // Evict expired entries
+  timestamps = timestamps.filter(ts => ts > cutoff);
+  
+  if (timestamps.length >= VOICE_RATE_LIMIT) return false;
+  
+  timestamps.push(now);
+  voiceRateLimits.set(userId, timestamps);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +103,7 @@ export function initSocket(server: HttpServer): Server {
     setupLocationHandlers(io, socket);
     setupIncidentHandlers(io, socket);
     setupJarvisHandler(io, socket);
+    setupGuardianHandler(io, socket);
 
     // Map normalized role to VoicePermissionLevel
     const getPermissionLevel = (r: string): VoicePermissionLevel => {
@@ -112,9 +114,6 @@ export function initSocket(server: HttpServer): Server {
       if (normalized === 'tanod') return VoicePermissionLevel.TANOD;
       return VoicePermissionLevel.RESIDENT;
     };
-
-    // Create a dedicated rate limiter for this socket connection
-    const voiceAllowed = createVoiceRateLimiter();
 
     // Voice command handler
     socket.on('voice-command', async (data) => {
@@ -135,7 +134,7 @@ export function initSocket(server: HttpServer): Server {
         return;
       }
 
-      if (!voiceAllowed()) {
+      if (!isVoiceAllowed(id)) {
         socket.emit('voice-error', {
           message: 'Too many voice commands. Please wait before trying again.',
           code: 'RATE_LIMITED',
@@ -162,7 +161,7 @@ export function initSocket(server: HttpServer): Server {
 
     // Confirm-action handler (also voice-gated)
     socket.on('confirm-action', async (data) => {
-      if (!voiceAllowed()) {
+      if (!isVoiceAllowed(id)) {
         socket.emit('voice-error', {
           message: 'Too many voice commands. Please wait before trying again.',
           code: 'RATE_LIMITED',

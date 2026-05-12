@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useGuardianAI } from '../../hooks/useGuardianAI';
+import { useGuardian } from '../../hooks/useGuardian';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface GuardianGreetingProps {
@@ -8,7 +8,7 @@ interface GuardianGreetingProps {
 }
 
 export const GuardianGreeting: React.FC<GuardianGreetingProps> = ({ delay = 1000 }) => {
-  const { performGreeting } = useGuardianAI();
+  const { performGreeting } = useGuardian();
   const { profile } = useAuthStore();
 
   useEffect(() => {

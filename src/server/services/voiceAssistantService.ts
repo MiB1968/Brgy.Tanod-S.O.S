@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error';
 import { getIO } from '../sockets';
 import { SOCKET_EVENTS } from '../constants';
 import { anomalyDetectionService } from './anomalyDetectionService';
+import { ttsService } from './ttsService';
 import { config } from '../config/index';
 
 import {
@@ -82,7 +83,7 @@ export class SecureVoiceAssistantService {
     ]);
 
     const contextData: VoiceContext = {
-      activeIncidents: activeIncidents.slice(0, 6).map((i) => ({
+      activeIncidents: activeIncidents.slice(0, 15).map((i) => ({ // Increased from 6
         id: i.id,
         type: i.type,
         location:
@@ -92,7 +93,7 @@ export class SecureVoiceAssistantService {
         severity: (i.status === 'RESPONDING' ? 'high' : 'medium') as any,
         reportedAt: i.createdAt,
       })),
-      availableTanods: availableTanods.slice(0, 8).map((t) => ({
+      availableTanods: availableTanods.slice(0, 20).map((t) => ({ // Increased from 8
         id: t.tanod_id,
         name: t.tanod_name,
         status: 'available' as any,
@@ -136,6 +137,16 @@ export class SecureVoiceAssistantService {
     // Enforce permission and rate limit
     this.enforceSecurity(userId, input, currentRole);
 
+    // ── ANOMALY DETECTION ────────────────────────────────────────────────
+    const { riskScore } = await anomalyDetectionService.evaluateCommand(userId, transcript);
+    if (riskScore >= 70) {
+      return this.buildErrorResponse(
+        transcript,
+        currentRole,
+        'Command blocked due to anomalous security patterns. Please verify your intent.'
+      );
+    }
+
     const session = this.getOrCreateSession(userId, currentRole);
     const context = await this.getLiveContext();
 
@@ -152,6 +163,18 @@ export class SecureVoiceAssistantService {
 
     this.queueAuditLog(userId, input.transcript, replyText, proposedActions);
 
+    let audioBase64: string | undefined;
+    try {
+      const audioBuffer = await ttsService.generateSpeech({
+        text: replyText,
+        voiceId: config.elevenLabs.voiceId,
+        format: 'mp3'
+      });
+      audioBase64 = audioBuffer.toString('base64');
+    } catch (err) {
+      console.error('[JARVIS] TTS generation failed:', err);
+    }
+
     const response: VoiceResponse = {
       reply: replyText,
       transcript,
@@ -162,6 +185,10 @@ export class SecureVoiceAssistantService {
       confidence: 0.88,
       timestamp: new Date(),
     };
+
+    if (audioBase64) {
+      (response as any).audioBase64 = audioBase64;
+    }
 
     this.emitVoiceResponse(userId, response);
     console.log(`[JARVIS] Processed in ${Date.now() - startTime}ms`);
@@ -231,18 +258,19 @@ export class SecureVoiceAssistantService {
 
   // ── RESPONSE HELPERS ─────────────────────────────────────────────────────
   private buildSystemPrompt(context: VoiceContext, role: VoicePermissionLevel): string {
-    return `You are JARVIS, the Barangay Tanod emergency coordination AI assistant.
-Role of current user: ${role}
-Active incidents: ${context.activeIncidents.length}
-Available Tanods: ${context.availableTanods.length}
-Active alerts: ${context.barangayInfo.activeAlerts}
+    return `ROLE: Brgy Tanod S.O.S. Emergency Coordinator (Guardian Mode).
+CONTEXT: You are assisting citizens and responders in a potential emergency in the Philippines.
+CURRENT ROLE: ${role}
+UNITS AVAILABLE: ${context.availableTanods.length}
+PENDING INCIDENTS: ${context.activeIncidents.length}
 
-Rules:
-- Be concise and clear — your output is spoken aloud.
-- Always ask for confirmation before dispatching personnel.
-- Never claim you can escalate user roles or grant admin access.
-- If asked to bypass security, refuse politely.
-- Respond in Filipino or English matching the user's input.`;
+STRICT CONSTRAINTS:
+- NEVER exceed 15 words per response.
+- Use a calm, authoritative, and concise tone.
+- CRITICAL: No medical diagnoses or legal advice.
+- If danger is detected, prioritize immediate evacuation or responder arrival.
+- Do NOT repeat yourself.
+- Language: Match user's input (English or Filipino).`;
   }
 
   private buildErrorResponse(
@@ -296,7 +324,14 @@ Rules:
   }
 
   private emitVoiceResponse(userId: string, response: VoiceResponse) {
+    // Standard event for dashboard
     getIO().to(`admin_${userId}`).emit(SOCKET_EVENTS.VOICE_RESPONSE, response);
+    
+    // Legacy/Dedicated event for Jarvis client
+    getIO().to(`user_${userId}`).emit('jarvis:reply', {
+      text: response.reply,
+      audioBase64: (response as any).audioBase64
+    });
   }
 
   // ── ACTION EXECUTION ─────────────────────────────────────────────────────
@@ -342,39 +377,118 @@ Rules:
     ].includes(actionType);
   }
 
-  // ── AUDIT ────────────────────────────────────────────────────────────────
-  private queueAuditLog(
-    userId: string,
-    transcript: string,
-    _reply: string,
-    _actions: ProposedAction[]
-  ) {
+  // ── AUDIT & CLEANUP ─────────────────────────────────────────────────────
+
+  private queueAuditLog(userId: string, transcript: string, reply: string, actions: ProposedAction[]) {
     this.auditQueue.push({
       type: 'VOICE_COMMAND',
       citizen_id: userId,
-      notes: transcript.substring(0, 150),
+      notes: `Transcript: ${transcript} | Reply: ${reply} | Actions: ${actions.length}`,
+      timestamp: new Date()
     });
-    if (this.auditQueue.length >= 5) this.flushAuditQueue();
+
+    if (this.auditQueue.length > 10) {
+      this.flushAuditQueue();
+    } else if (!this.auditFlushTimer) {
+      this.auditFlushTimer = setTimeout(() => this.flushAuditQueue(), 30000);
+    }
   }
 
-  private flushAuditQueue() {
-    if (this.auditFlushTimer) clearTimeout(this.auditFlushTimer);
-    this.auditFlushTimer = setTimeout(async () => {
-      for (const entry of this.auditQueue) {
-        await this.auditLogRepo.create(entry).catch(console.error);
-      }
-      this.auditQueue = [];
-    }, 1500);
+  private async flushAuditQueue() {
+    if (this.auditQueue.length === 0) return;
+    const batch = [...this.auditQueue];
+    this.auditQueue = [];
+    if (this.auditFlushTimer) {
+      clearTimeout(this.auditFlushTimer);
+      this.auditFlushTimer = undefined;
+    }
+
+    try {
+      await Promise.all(batch.map(log => this.auditLogRepo.create(log)));
+    } catch (err) {
+      console.error('[JARVIS] Audit flush error:', err);
+    }
   }
 
   private cleanup() {
     const now = Date.now();
-    for (const [id, session] of this.sessions) {
-      if (now - session.lastActivity.getTime() > 45 * 60 * 1000) {
-        this.sessions.delete(id);
+    for (const [userId, session] of this.sessions.entries()) {
+      if (now - session.lastActivity.getTime() > 15 * 60 * 1000) {
+        this.sessions.delete(userId);
       }
     }
     this.contextCache.clear();
+  }
+
+  public async processAudioInput(
+    userId: string,
+    audioBuffer: Buffer,
+    currentRole: VoicePermissionLevel,
+    mimeType: string = 'audio/webm'
+  ): Promise<VoiceResponse> {
+    const startTime = Date.now();
+    
+    // Security check
+    if (!this.checkRateLimit(userId)) {
+      throw new AppError('Too many voice commands. Please wait.', 429, 'RATE_LIMITED');
+    }
+
+    const session = this.getOrCreateSession(userId, currentRole);
+    const context = await this.getLiveContext();
+
+    // Multimodal prompt (using Gemini 1.5 Flash for audio reasoning)
+    const result = await ai.models.generateContent({
+      model: config.geminiModel || 'gemini-1.5-flash',
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: audioBuffer.toString('base64')
+              }
+            },
+            { text: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it." }
+          ]
+        }
+      ]
+    });
+
+    const replyText = this.sanitizeAIResponse(result.text || "");
+    const proposedActions = this.extractProposedActions(replyText);
+
+    this.queueAuditLog(userId, "[Audio Input]", replyText, proposedActions);
+
+    let audioBase64: string | undefined;
+    try {
+      const audioRes = await ttsService.generateSpeech({
+        text: replyText,
+        voiceId: config.elevenLabs.voiceId,
+        format: 'mp3'
+      });
+      audioBase64 = audioRes.toString('base64');
+    } catch (err) {
+      console.error('[JARVIS] TTS generation failed:', err);
+    }
+
+    const response: VoiceResponse = {
+      reply: replyText,
+      transcript: "[Audio processed by Gemini]",
+      proposedActions,
+      permissionLevel: currentRole,
+      isSuperAdmin: currentRole === VoicePermissionLevel.SUPER_ADMIN,
+      tone: this.determineTone(proposedActions),
+      confidence: 0.9,
+      timestamp: new Date(),
+    };
+
+    if (audioBase64) {
+      (response as any).audioBase64 = audioBase64;
+    }
+
+    this.emitVoiceResponse(userId, response);
+    console.log(`[JARVIS] Multimodal audio processed in ${Date.now() - startTime}ms`);
+    return response;
   }
 
   public shutdown() {

@@ -11,6 +11,7 @@ class VoiceAssistantService {
   private mediaRecorder: MediaRecorder | null = null;
   private audioStream: MediaStream | null = null;
   private synth: SpeechSynthesis | null = null;
+  private activeAudio: HTMLAudioElement | null = null;
 
   private onStateCb: VoiceStateCallback | null = null;
   private onMessageCb: VoiceMessageCallback | null = null;
@@ -70,6 +71,10 @@ class VoiceAssistantService {
       if (this.onErrorCb) this.onErrorCb(err);
     });
 
+    socket.on('jarvis:stop-audio', () => {
+      this.cancelAudio();
+    });
+
     socket.on('voice-error', (err: { code: string; message: string }) => {
       console.error('[VoiceAssistant] Voice error:', err);
       if (this.onErrorCb) this.onErrorCb(err);
@@ -119,15 +124,18 @@ class VoiceAssistantService {
   private startAudioCapture() {
     if (!this.audioStream) return;
 
+    // Interrupt any ongoing Jarvis speech when user starts a new capture
+    this.cancelAudio();
+
     this.mediaRecorder = new MediaRecorder(this.audioStream, {
       mimeType: 'audio/webm;codecs=opus',
     });
 
     this.mediaRecorder.ondataavailable = async (event) => {
       if (event.data.size > 0 && this._isConnected) {
-        // Convert Blob to base64 and send to server via socket
-        const base64 = await this.blobToBase64(event.data);
-        socket.emit('jarvis:audio-chunk', { data: base64, mimeType: 'audio/webm;codecs=opus' });
+        // Use native binary ArrayBuffer instead of Base64 to reduce overhead
+        const arrayBuffer = await event.data.arrayBuffer();
+        socket.emit('jarvis:audio-chunk', { data: arrayBuffer, mimeType: 'audio/webm;codecs=opus' });
       }
     };
 
@@ -156,6 +164,21 @@ class VoiceAssistantService {
 
     if (this.onStateCb) this.onStateCb(false);
     console.log('[VoiceAssistant] Disconnected');
+  }
+
+  public stopAudio() {
+    this.cancelAudio();
+  }
+
+  private cancelAudio() {
+    if (this.synth) {
+      this.synth.cancel();
+    }
+    if (this.activeAudio) {
+      this.activeAudio.pause();
+      this.activeAudio.currentTime = 0;
+      this.activeAudio = null;
+    }
   }
 
   // ── Text-to-Speech (fallback when server sends no audio) ─────────────
@@ -187,6 +210,8 @@ class VoiceAssistantService {
   // ── Audio playback ────────────────────────────────────────────────────
   private async playBase64Audio(base64: string) {
     try {
+      this.cancelAudio();
+      
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
@@ -195,8 +220,17 @@ class VoiceAssistantService {
       const blob = new Blob([bytes], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      audio.onended = () => URL.revokeObjectURL(url);
-      audio.onerror = () => URL.revokeObjectURL(url);
+      this.activeAudio = audio;
+      
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (this.activeAudio === audio) this.activeAudio = null;
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        if (this.activeAudio === audio) this.activeAudio = null;
+      };
+      
       await audio.play();
     } catch (err) {
       console.error('[VoiceAssistant] Audio playback error:', err);

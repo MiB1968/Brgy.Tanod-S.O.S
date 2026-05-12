@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth';
 import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
+import { ShiftRepository } from '../db/repositories/ShiftRepository';
 import { z } from 'zod';
 
 const auditLogArchiveSchema = z.object({
@@ -227,19 +228,8 @@ export const getSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'shifts') {
-      const result = await pool.query("SELECT * FROM shifts ORDER BY created_at DESC LIMIT 100");
-      return res.json(result.rows.map(s => ({
-        id: s.id,
-        tanodId: s.tanod_id,
-        tanodName: s.tanod_name,
-        startTime: s.start_time,
-        endTime: s.end_time,
-        sector: s.sector,
-        status: s.status,
-        tanodResponse: s.tanod_response,
-        notes: s.notes,
-        createdAt: s.created_at
-      })));
+      const results = await ShiftRepository.getAll();
+      return res.json(results);
     }
 
     response.error(res, `Path not mapped: ${fullPathStr}`, "NOT_IMPLEMENTED", 404);
@@ -438,20 +428,11 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     if (collection === 'shifts') {
       if (!isAdmin) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
       if (docId) {
-        const allowedFields = ['status', 'tanod_response', 'notes', 'start_time', 'end_time', 'sector'];
-        const updateFields = Object.keys(data).filter(f => allowedFields.includes(f));
-        if (updateFields.length > 0) {
-          const setClause = updateFields.map((f, i) => `${f === 'tanodId' ? 'tanod_id' : (f === 'startTime' ? 'start_time' : (f === 'endTime' ? 'end_time' : f))} = $${i + 2}`).join(', ');
-          // Note: mapping camelCase to snake_case if needed
-          const values = updateFields.map(f => data[f]);
-          await pool.query(`UPDATE shifts SET ${setClause} WHERE id = $1`, [docId, ...values]);
-        }
+        await ShiftRepository.update(docId, data);
       } else {
-        await pool.query(
-          "INSERT INTO shifts (tanod_id, tanod_name, start_time, end_time, sector, status, tanod_response, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [data.tanodId, data.tanodName, data.startTime, data.endTime, data.sector, data.status || 'scheduled', data.tanodResponse || 'pending', data.notes || null]
-        );
+        await ShiftRepository.create(data);
       }
+      socketService.emitToAll("shift_update", { id: docId || 'new', data });
       return res.json({ success: true });
     }
 
@@ -628,10 +609,16 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
-    const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents', 'audit_log_archives'];
+    const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents', 'audit_log_archives', 'shifts'];
     if (deletable.includes(collection) && docId) {
       if (!isTanod) return response.error(res, "Administrative clearance required for deletion", "FORBIDDEN", 403);
-      await pool.query(`DELETE FROM ${collection} WHERE id = $1`, [docId]);
+      
+      if (collection === 'shifts') {
+        await ShiftRepository.delete(docId);
+        socketService.emitToAll("shift_update", { id: docId, deleted: true });
+      } else {
+        await pool.query(`DELETE FROM ${collection} WHERE id = $1`, [docId]);
+      }
       return res.json({ success: true });
     }
     response.error(res, `Delete not supported for: ${fullPath}`, "BAD_REQUEST", 400);

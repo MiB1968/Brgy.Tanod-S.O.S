@@ -2,6 +2,8 @@ import { Server } from 'socket.io';
 import { config } from '../../config/index';
 import { isTanodOrAbove, normalizeRole } from '../../utils/roleUtils';
 import { AuthenticatedSocket } from '../../types';
+import { voiceAssistantService } from '../../services/voiceAssistantService';
+import { VoicePermissionLevel } from '../../services/voiceAssistantService.types';
 
 const activeSessions = new Map<string, any>();
 
@@ -52,7 +54,7 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
   });
 
   // ── Receive audio chunks ─────────────────────────────────────────────
-  socket.on('jarvis:audio-chunk', async (data: { data: string; mimeType: string }) => {
+  socket.on('jarvis:audio-chunk', async (data: { data: Buffer; mimeType: string }) => {
     const session = activeSessions.get(socket.id);
     if (!session) {
       socket.emit('jarvis:error', {
@@ -63,10 +65,15 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
     }
 
     try {
-      const audioBuffer = Buffer.from(data.data, 'base64');
+      // In Socket.IO, binary data arrives as a Buffer in Node.js
+      const audioChunk = data.data;
+
+      if (!Buffer.isBuffer(audioChunk)) {
+         throw new Error('Expected binary buffer for audio chunk');
+      }
 
       // Hard cap — prevent buffer flooding
-      session.totalBufferSize = (session.totalBufferSize || 0) + audioBuffer.length;
+      session.totalBufferSize = (session.totalBufferSize || 0) + audioChunk.length;
       if (session.totalBufferSize > MAX_AUDIO_BUFFER_BYTES) {
         session.audioBuffer = [];
         session.totalBufferSize = 0;
@@ -77,12 +84,12 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
         return;
       }
 
-      session.audioBuffer.push(audioBuffer);
+      session.audioBuffer.push(audioChunk);
 
       // Process when ~2 seconds of audio accumulated
       if (session.totalBufferSize > 32_000) {
         await processAudioBuffer(socket, session, userId, role);
-        session.totalBufferSize = 0;
+        // Note: processAudioBuffer clears the buffer
       }
     } catch (err) {
       console.error('[JARVIS] Audio chunk error:', err);
@@ -124,16 +131,33 @@ async function processAudioBuffer(
   userId: string,
   role: string
 ) {
+  const audioChunks = session.audioBuffer;
   session.audioBuffer = [];
   session.totalBufferSize = 0;
 
-  // Full Gemini Live audio streaming is not yet implemented.
-  // Audio chunks are acknowledged but not processed.
-  // Text-based voice commands flow through the 'voice-command' socket event.
-  // To implement: replace this function body with a Gemini Live WebSocket call.
-  socket.emit('jarvis:audio-received', {
-    message: 'Audio received. Use voice-command event for text-based commands.',
-  });
+  try {
+    const combinedBuffer = Buffer.concat(audioChunks);
+    
+    // Map string role to VoicePermissionLevel enum
+    const permissionLevel = role as VoicePermissionLevel;
 
-  console.log(`[JARVIS] Audio buffer cleared for ${userId} — Gemini Live not yet wired.`);
+    const response = await voiceAssistantService.processAudioInput(
+      userId,
+      combinedBuffer,
+      permissionLevel
+    );
+
+    // Emit confirmation or feedback
+    socket.emit('jarvis:audio-received', {
+      message: 'Audio processed.',
+      reply: response.reply
+    });
+
+  } catch (err: any) {
+    console.error('[JARVIS] Audio processing failed:', err);
+    socket.emit('jarvis:error', {
+      code: 'AUDIO_PROCESS_FAILED',
+      message: err.message || 'Failed to process voice command.'
+    });
+  }
 }

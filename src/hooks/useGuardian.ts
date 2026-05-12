@@ -1,0 +1,195 @@
+// src/hooks/useGuardian.ts
+import { useCallback, useRef, useEffect } from 'react';
+import { useGuardianStore } from '../store/useGuardianStore';
+import { voiceService } from '../services/voiceService';
+import { soundService } from '../services/soundService';
+import { useAuthStore } from '../store/useAuthStore';
+import socket from '../lib/socket';
+import { toast } from 'react-hot-toast';
+
+export function useGuardian() {
+  const { 
+    status, 
+    transcript, 
+    setStatus, 
+    setTranscript, 
+    setLastResponse, 
+    setEmergency, 
+    setError, 
+    reset 
+  } = useGuardianStore();
+  
+  const { profile } = useAuthStore();
+  const recognitionRef = useRef<any>(null);
+  const offlineQueue = useRef<string[]>([]);
+  const synth = window.speechSynthesis;
+
+  // Listen for monitoring events (for responders)
+  useEffect(() => {
+    const handleMonitor = (data: any) => {
+      if (['ADMIN', 'SUPERADMIN', 'CAPTAIN', 'TANOD'].includes(profile?.role?.toUpperCase() || '')) {
+        toast(`Guardian: ${data.userName} - ${data.transcript}`, { 
+          icon: '🎧',
+          id: `monitor-${data.userId}`,
+          duration: data.isFinal ? 3000 : 1000
+        });
+      }
+    };
+
+    socket.on('guardian:monitor_transcript', handleMonitor);
+    return () => {
+      socket.off('guardian:monitor_transcript', handleMonitor);
+    };
+  }, [profile]);
+
+  // Sync offline queue when coming back online
+  useEffect(() => {
+    const handleOnline = () => {
+      if (offlineQueue.current.length > 0) {
+        console.log(`[Guardian] Syncing ${offlineQueue.current.length} offline commands`);
+        offlineQueue.current.forEach(text => {
+          socket.emit('voice-command', { transcript: text, isOfflineSync: true });
+        });
+        offlineQueue.current = [];
+        toast.success("Guardian synced offline records");
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  const speak = useCallback(async (text: string) => {
+    setStatus('RESPONDING');
+    setLastResponse(text);
+    await voiceService.speak(text);
+    // If we're not listening again, go back to IDLE
+    setStatus('IDLE');
+  }, [setStatus, setLastResponse]);
+
+  const handleDeterministicCommand = useCallback((text: string): boolean => {
+    const input = text.toLowerCase();
+
+    // 1. FIRE / SUNOG
+    if (/fire|sunog|apoy/i.test(input)) {
+        soundService.play('alert_emergency');
+        setEmergency(true);
+        speak("Fire emergency detected. Alerting BFP and local responders immediately. Please evacuate.");
+        socket.emit('guardian:priority_spike', { type: 'FIRE', level: 'CRITICAL', transcript: text });
+        return true;
+    }
+
+    // 2. SOS / SAKLOLO
+    if (/sos|help|tulong|saklolo|emergency/i.test(input)) {
+        soundService.play('sos_alarm');
+        setEmergency(true);
+        speak("SOS acknowledged. Coordinating immediate response. Stay calm.");
+        socket.emit('guardian:priority_spike', { type: 'SOS', level: 'HIGH', transcript: text });
+        return true;
+    }
+
+    // 3. STOP / QUIET
+    if (/stop|hinto|tigil|quiet|shut up/i.test(input)) {
+        synth.cancel();
+        setStatus('IDLE');
+        return true;
+    }
+
+    return false;
+  }, [setStatus, setEmergency, speak, synth]);
+
+  const startListening = useCallback(async () => {
+    if (recognitionRef.current) return;
+
+    // Mobile Battery Management
+    if ('getBattery' in navigator) {
+      try {
+        const battery: any = await (navigator as any).getBattery();
+        if (battery.level < 0.1 && !battery.charging) {
+          toast.error("Low battery. Voice Guardian disabled to save power.", { id: 'battery-low' });
+          return;
+        }
+      } catch (e) {}
+    }
+
+    soundService.play('voice_beep');
+    setStatus('LISTENING');
+    setError(null);
+
+    recognitionRef.current = voiceService.startListening(
+      async (text, isFinal) => {
+        setTranscript(text);
+        
+        // Realtime streaming to dispatchers
+        socket.emit('guardian:live_transcript', { transcript: text, isFinal });
+
+        if (isFinal) {
+          setStatus('PROCESSING');
+          
+          // 1. Zero-Latency Regex Router
+          const handled = handleDeterministicCommand(text);
+          if (handled) return;
+
+          // 2. Probabilistic AI Router (Server-side Gemini)
+          try {
+            if (!navigator.onLine) {
+              offlineQueue.current.push(text);
+              setStatus('OFFLINE');
+              speak("Signal weak. Command queued for automatic sync.");
+              return;
+            }
+
+            // Emitting to socket instead of standard fetch for realtime audit capability
+            socket.emit('voice-command', { transcript: text }, (response: any) => {
+              if (response?.success && response.data) {
+                speak(response.data.reply);
+              } else {
+                throw new Error(response?.error?.message || 'AI processing failure');
+              }
+            });
+          } catch (err: any) {
+            console.error('[Guardian] AI Router Error:', err);
+            setStatus('OFFLINE');
+            speak("Connection unstable. Emergency protocols remain active.");
+          }
+        }
+      },
+      (err) => {
+        console.error('[Guardian] Recognition Error:', err);
+        setStatus('ERROR');
+        setError(err.message || 'Microphone error');
+        recognitionRef.current = null;
+      }
+    );
+  }, [setStatus, setTranscript, setError, handleDeterministicCommand, speak]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      voiceService.stopListening(recognitionRef.current);
+      recognitionRef.current = null;
+      setStatus('IDLE');
+    }
+  }, [setStatus]);
+
+  const performGreeting = useCallback((role: string, name: string) => {
+    const hour = new Date().getHours();
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    
+    if (['ADMIN', 'SUPERADMIN', 'CAPTAIN', 'TANOD'].includes(role.toUpperCase())) {
+      soundService.play('intro_epic');
+      setTimeout(() => {
+        speak(`${timeGreeting}, Commander ${name}. System online and ready for coordination.`);
+      }, 1000);
+    }
+  }, [speak]);
+
+  return {
+    status,
+    transcript,
+    isListening: status === 'LISTENING',
+    startListening,
+    stopListening,
+    performGreeting,
+    reset,
+    speak
+  };
+}
