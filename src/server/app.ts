@@ -46,8 +46,8 @@ app.use(
       },
     },
 
-    // X-Frame-Options: DENY — prevents clickjacking
-    frameguard: { action: 'deny' },
+    // X-Frame-Options: SAMEORIGIN — allows iframe embedding within AI Studio
+    frameguard: { action: 'sameorigin' },
 
     // All other helmet defaults remain ON (HSTS, noSniff, etc.)
     crossOriginEmbedderPolicy: false, // keep off; needed for Leaflet tile blobs

@@ -100,7 +100,6 @@ import { getQueueSize } from './lib/offlineQueue';
 import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
-import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
 import GuardianVoiceTacticalAssistant from './components/GuardianVoiceTacticalAssistant';
 import { GuardianGreeting } from './components/ai/GuardianGreeting';
 import { PWAStatus } from './components/PWAStatus';
@@ -700,7 +699,6 @@ export default function App() {
         {(effectiveRole === 'admin' || effectiveRole === 'superadmin' || effectiveRole === 'tanod') && (
           <>
             <GuardianGreeting />
-            <GuardianVoiceAssistant />
             <GuardianVoiceTacticalAssistant 
                 isOpen={isTacticalVoiceOpen}
                 onClose={() => setIsTacticalVoiceOpen(false)}

@@ -3,9 +3,7 @@ import * as safeStorage from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
 const socket = io({
-  auth: {
-    token: safeStorage.getItem('token')
-  },
+  // No explicit token here, handled by cookie handshake
   reconnection: true,
   reconnectionAttempts: 20, // Increase attempts for mobile resilience
   reconnectionDelay: 1000,
