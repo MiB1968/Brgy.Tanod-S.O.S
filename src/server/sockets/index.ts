@@ -57,14 +57,15 @@ export function initSocket(server: HttpServer): Server {
         const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
 
         // Include origin === 'null' to support browser iframes with sandbox attribute where Origin is literally "null"
-        if (!origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
+        // Allow broadly in development to help debug socket/CORS issues
+        if (config.nodeEnv !== 'production' || !origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
           return callback(null, true);
         }
-        console.warn(`[Socket CORS] Origin rejected: ${origin}`);
+        console.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
         return callback(null, false);
       },
       credentials: true,
-      methods: ['GET', 'POST'],
+      methods: ['GET', 'POST', 'OPTIONS'],
     },
   });
 

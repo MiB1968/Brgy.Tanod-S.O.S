@@ -120,10 +120,14 @@ class TTSService {
       pitch: '+0Hz',
     });
     
+    console.log(`[EdgeTTS] Got readable stream: ${!!readable}, type: ${typeof readable}`);
+    
     const chunks: Buffer[] = [];
     for await (const chunk of readable) {
+      console.log(`[EdgeTTS] Received chunk of size ${chunk.length}`);
       chunks.push(chunk as Buffer);
     }
+    console.log(`[EdgeTTS] Stream finished, total chunks: ${chunks.length}, total size: ${chunks.reduce((acc, c) => acc + c.length, 0)}`);
     return Buffer.concat(chunks);
   }
 

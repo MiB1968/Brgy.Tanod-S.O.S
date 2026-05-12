@@ -4,8 +4,9 @@ import { config } from "../config/index";
 import { AuthenticatedSocket, UserPayload } from "../types";
 
 export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void) => {
-  // Parse cookies from headers
   const cookieHeader = socket.handshake.headers.cookie || '';
+  console.log(`[SocketAuth] Headers: ${JSON.stringify(socket.handshake.headers)}`);
+  
   const cookies: Record<string, string> = {};
   if (cookieHeader) {
     cookieHeader.split(';').forEach(c => {
@@ -14,6 +15,7 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
     });
   }
   const cookieToken = cookies['token'];
+  console.log(`[SocketAuth] Found cookie 'token': ${!!cookieToken}`);
 
   let token = 
     socket.handshake.auth.token || 
@@ -26,7 +28,7 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
   }
 
   if (!token) {
-    console.warn(`[SocketAuth] Missing token for socket ${socket.id}`);
+    console.warn(`[SocketAuth] Missing token for socket ${socket.id}. Cookie header present: ${!!cookieHeader}, Handshake Auth token: ${!!socket.handshake.auth.token}`);
     return next(new Error("Authentication required"));
   }
 
