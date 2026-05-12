@@ -107,11 +107,13 @@ router.post('/tts', authenticate, authorize(['admin', 'superadmin', 'captain']),
 
   try {
     const buffer = await ttsService.generateSpeech({ text, ...options });
-    if (!buffer) {
-      return response.error(res, "Failed to generate TTS", "TTS_FAILED", 500);
+    if (!buffer || buffer.length === 0) {
+      return response.error(res, "Failed to generate TTS (empty buffer)", "TTS_FAILED", 500);
     }
     
+    console.log(`[TTS] Serving buffer of size: ${buffer.length} bytes`);
     res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', buffer.length);
     res.send(buffer);
   } catch (err: any) {
     console.error('TTS Error:', err);

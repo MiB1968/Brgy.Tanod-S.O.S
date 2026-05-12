@@ -70,7 +70,7 @@ async function startServer() {
             <div style="font-family: monospace; padding: 20px; background: #000; color: #f00;">
               <h1>SYSTEM BOOT ERROR</h1>
               <p>Application shell not found at: ${indexPath}</p>
-              <p>Please ensure 'npm run build' has completed and 'dist/client' is populated.</p>
+              <p>Please ensure 'npm run build' has completed and 'dist' is populated.</p>
             </div>
           `);
         }
