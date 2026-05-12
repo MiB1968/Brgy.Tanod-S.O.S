@@ -21,6 +21,11 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
+    if (endpoint.includes('/undefined')) {
+      console.error(`Attempted to fetch API endpoint with undefined ID: ${endpoint}`);
+      throw new Error(`Invalid API endpoint (contains undefined): ${endpoint}`);
+    }
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,

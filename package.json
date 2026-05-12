@@ -7,10 +7,15 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node dist/server.js",
-    "build": "rimraf dist && vite build && esbuild server.ts --bundle --platform=node --outfile=dist/server.js --format=esm --packages=external",
+    "build:client": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vite build",
+    "build:server": "esbuild server.ts --bundle --platform=node --outfile=dist/server.js --format=esm --packages=external",
+    "build": "rimraf dist && npm run build:client && npm run build:server",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit",
+    "typecheck:client": "tsc -p tsconfig.client.json --noEmit",
+    "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
+    "lint": "npm run typecheck:client && npm run typecheck:server",
+    "check": "npm run lint && npm test && npm run build",
     "test": "vitest run"
   },
   "dependencies": {
@@ -72,6 +77,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.0",
     "rimraf": "^6.1.3",

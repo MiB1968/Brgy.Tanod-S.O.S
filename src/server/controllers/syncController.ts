@@ -28,6 +28,10 @@ export const getSync = async (req: AuthRequest, res: Response) => {
   const id = parts[1];
   const subCollection = parts[2];
 
+  if (id === 'undefined' || id === 'null') {
+    return response.error(res, "Invalid ID parameter", "BAD_REQUEST", 400);
+  }
+
   try {
     const userRole = req.user?.role;
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
@@ -252,6 +256,10 @@ export const postSync = async (req: AuthRequest, res: Response) => {
   const collection = parts[0];
   const docId = id || parts[1];
   const subCollection = parts[2];
+
+  if (docId === 'undefined' || docId === 'null') {
+    return response.error(res, "Invalid ID parameter", "BAD_REQUEST", 400);
+  }
 
   try {
     const userRole = req.user?.role;
@@ -610,6 +618,10 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
   const parts = (fullPath as string).split('/');
   const collection = parts[0];
   const docId = id || parts[1];
+
+  if (docId === 'undefined' || docId === 'null') {
+    return response.error(res, "Invalid ID parameter", "BAD_REQUEST", 400);
+  }
 
   try {
     const userRole = req.user?.role;

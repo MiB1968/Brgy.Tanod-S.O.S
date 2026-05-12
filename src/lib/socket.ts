@@ -2,14 +2,15 @@ import io from 'socket.io-client';
 import * as safeStorage from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
+const token = safeStorage.getItem('token');
 const socket = io({
-  // No explicit token here, handled by cookie handshake
+  auth: { token }, // Explicit token for initial connection
   reconnection: true,
   reconnectionAttempts: 20, // Increase attempts for mobile resilience
   reconnectionDelay: 1000,
   reconnectionDelayMax: 10000,
   timeout: 60000, 
-  transports: ['polling', 'websocket'], // Polling first for stable handshake
+  transports: ['polling', 'websocket'], // Polling first for stable handshake in iframes
   autoConnect: false,
   rememberUpgrade: false, // Don't remember a failed or unstable websocket upgrade
   // Explicitly set path to avoid any ambiguity
