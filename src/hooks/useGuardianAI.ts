@@ -20,6 +20,7 @@ export function useGuardianAI() {
   });
 
   const transcriberTimeout = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const pendingSOS = alerts.filter(a => a.status === 'pending').length;
   const activeTanods = patrols.length;
@@ -51,9 +52,8 @@ export function useGuardianAI() {
     });
 
     setState(s => ({ ...s, isSpeaking: true }));
-    voiceService.speak(result.reply, () => {
-      setState(s => ({ ...s, isSpeaking: false }));
-    });
+    await voiceService.speak(result.reply);
+    setState(s => ({ ...s, isSpeaking: false }));
   }, [pendingSOS, activeTanods, profile]);
 
   const sendMessage = useCallback(async (text: string) => {
@@ -69,19 +69,12 @@ export function useGuardianAI() {
         isSuperAdmin
       });
 
-      setState(s => ({ ...s, lastTranscript: text }));
+      setState(s => ({ ...s, lastTranscript: text, isProcessing: false, isAwake: true, action: response.action }));
       
-      voiceService.speak(response.reply, () => {
-        setState(s => ({ ...s, isSpeaking: false }));
-      });
+      setState(s => ({ ...s, isSpeaking: true }));
+      await voiceService.speak(response.reply);
+      setState(s => ({ ...s, isSpeaking: false }));
       
-      setState(s => ({ 
-        ...s, 
-        isAwake: true, 
-        isSpeaking: true, 
-        isProcessing: false,
-        action: response.action 
-      }));
     } catch (err) {
       console.error('[Guardian AI] Chat Error:', err);
       setState(s => ({ ...s, isProcessing: false }));
@@ -92,7 +85,7 @@ export function useGuardianAI() {
   const toggleListening = useCallback(() => {
     if (state.isListening) {
       if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
-      voiceService.stopListening();
+      if (recognitionRef.current) voiceService.stopListening(recognitionRef.current);
       setState(s => ({ ...s, isListening: false }));
     } else {
       soundService.play('voice_beep');
@@ -102,20 +95,20 @@ export function useGuardianAI() {
       if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
       transcriberTimeout.current = setTimeout(() => {
         if (state.isListening) {
-          voiceService.stopListening();
+          if (recognitionRef.current) voiceService.stopListening(recognitionRef.current);
           setState(s => ({ ...s, isListening: false }));
           toast("Voice mode suspended for battery safety.", { icon: '🔋' });
         }
       }, 25000);
 
-      voiceService.startListening(
+      recognitionRef.current = voiceService.startListening(
         (text, isFinal) => {
           if (isFinal) {
             processText(text);
             // Reset timeout on activity
             if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
             transcriberTimeout.current = setTimeout(() => {
-              voiceService.stopListening();
+              if (recognitionRef.current) voiceService.stopListening(recognitionRef.current);
               setState(s => ({ ...s, isListening: false }));
             }, 15000);
           }
@@ -139,14 +132,13 @@ export function useGuardianAI() {
   // Proactive suggestions for Admin (e.g. status)
   useEffect(() => {
     if (state.isAwake && !state.isSpeaking && !state.isListening) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         const isSuperAdmin = profile?.role === 'superadmin';
         const suggestion = guardianAI.getProactiveSuggestion({ pendingSOS, activeTanods, isSuperAdmin });
         if (suggestion) {
           setState(s => ({ ...s, isSpeaking: true }));
-          voiceService.speak(suggestion, () => {
-            setState(s => ({ ...s, isSpeaking: false }));
-          });
+          await voiceService.speak(suggestion);
+          setState(s => ({ ...s, isSpeaking: false }));
         }
       }, 5000); // Wait 5s before suggesting anything proactively
       
@@ -157,7 +149,7 @@ export function useGuardianAI() {
   useEffect(() => {
     return () => {
       if (transcriberTimeout.current) clearTimeout(transcriberTimeout.current);
-      voiceService.stopListening();
+      if (recognitionRef.current) voiceService.stopListening(recognitionRef.current);
     };
   }, []);
 

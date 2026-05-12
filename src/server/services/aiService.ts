@@ -80,7 +80,7 @@ async function callModel(
       },
     });
 
-    const raw = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
     return AIAnalysisSchema.parse(parsed);

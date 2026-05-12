@@ -86,7 +86,7 @@ class VoiceService {
   }
 
   startListening(onResult: (text: string, isFinal: boolean) => void, onError?: (err: any) => void) {
-    const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
       onError?.({ message: 'Speech recognition not supported' });
       return null;

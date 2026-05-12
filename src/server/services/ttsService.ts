@@ -114,8 +114,8 @@ class TTSService {
     
     console.log(`[EdgeTTS] Using Voice ID: ${voice}`);
     const communicator = new EdgeTTS();
-    const readable = await communicator.toStream(options.text, {
-      voice: voice,
+    // @ts-ignore
+    const readable = await communicator.synthesizeStream(options.text, voice, {
       rate: '+0%',
       pitch: '+0Hz',
     });
@@ -191,7 +191,7 @@ class TTSService {
     try {
         const googleTTS = await import('google-tts-api');
         const results = await googleTTS.getAllAudioBase64(text, {
-          lang: 'fil',
+          lang: 'tl',
           slow: false,
           host: 'https://translate.google.com',
         });

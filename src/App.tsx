@@ -59,7 +59,8 @@ import {
   Globe,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Mic
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AdminDashboard from './components/AdminDashboard';

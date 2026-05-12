@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Power, Settings } from 'lucide-react';
 import socket from '../../lib/socket';
 import { useAuthStore } from '../../store/useAuthStore';
-import { safeStorage } from '../../lib/safeStorage';
+import * as safeStorage from '../../lib/safeStorage';
 import { JarvisSettingsPanel, VoiceSettings, defaultSettings } from './JarvisSettingsPanel';
 import VoiceBiometricModal from './VoiceBiometricModal';
 
