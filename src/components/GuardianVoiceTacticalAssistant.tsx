@@ -14,7 +14,7 @@ const FilipinoVoices = [
   { id: 'fil-PH-AngeloNeural', label: 'Angelo (Male)' },
 ];
 
-const GuardianVoiceAssistant: React.FC<GuardianVoiceAssistantProps> = ({
+const GuardianVoiceTacticalAssistant: React.FC<GuardianVoiceAssistantProps> = ({
   isOpen, onClose, onSOS, onCommand,
 }) => {
   const [isListening, setIsListening] = useState(false);
@@ -177,4 +177,4 @@ const GuardianVoiceAssistant: React.FC<GuardianVoiceAssistantProps> = ({
   );
 };
 
-export default GuardianVoiceAssistant;
+export default GuardianVoiceTacticalAssistant;

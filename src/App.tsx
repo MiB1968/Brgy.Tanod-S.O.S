@@ -100,6 +100,7 @@ import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
+import GuardianVoiceTacticalAssistant from './components/GuardianVoiceTacticalAssistant';
 import { GuardianGreeting } from './components/ai/GuardianGreeting';
 import { PWAStatus } from './components/PWAStatus';
 
@@ -143,6 +144,7 @@ export default function App() {
   const [globalSirenActive, setGlobalSirenActive] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [activeBroadcast, setActiveBroadcast] = useState<SystemBroadcast | null>(null);
+  const [isTacticalVoiceOpen, setIsTacticalVoiceOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   const isMasterAdmin = useMemo(() => {
@@ -698,6 +700,17 @@ export default function App() {
           <>
             <GuardianGreeting />
             <GuardianVoiceAssistant />
+            <GuardianVoiceTacticalAssistant 
+                isOpen={isTacticalVoiceOpen}
+                onClose={() => setIsTacticalVoiceOpen(false)}
+            />
+            {/* Tactical Voice FAB */}
+            <button
+                onClick={() => setIsTacticalVoiceOpen(true)}
+                className="fixed bottom-24 right-6 z-[90] p-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-lg shadow-cyan-900/50 transition-all active:scale-95"
+            >
+                <Mic size={28} />
+            </button>
           </>
         )}
 
