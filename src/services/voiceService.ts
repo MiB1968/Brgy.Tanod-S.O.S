@@ -23,10 +23,10 @@ class VoiceService {
       this.recognition = new SpeechRecognition();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      this.recognition.lang = 'en-US';
+      this.recognition.lang = 'fil-PH';
       
       // Mobile optimization: handle low-end devices by allowing both Tagalog and English loosely if needed
-      // But for now sticking to en-US as requested
+      // But for now sticking to fil-PH as requested
     }
   }
 
@@ -80,12 +80,12 @@ class VoiceService {
       this.synth.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'fil-PH';
       const voices = this.synth.getVoices();
       
-      // Choose a professional sounding voice
-      const preferred = ['Google US English', 'Microsoft David', 'en-US-Standard-C'];
-      const voice = voices.find(v => preferred.some(p => v.name.includes(p))) || 
-                    voices.find(v => v.name.includes('Premium')) || 
+      // Choose a professional sounding voice, preferring Filipino
+      const preferred = ['Google Filipino', 'Microsoft Filipino', 'fil-PH', 'fil'];
+      const voice = voices.find(v => preferred.some(p => v.name.includes(p) || v.lang.includes(p))) || 
                     voices[0];
       
       if (voice) utterance.voice = voice;
