@@ -1,172 +1,121 @@
-
 /**
  * Professional Voice Intelligence Service
  * Handles Speech Recognition (STT) and Synthesis (TTS)
  */
+import edgeTTS from '@andresaya/edge-tts';
+
+export interface VoiceOptions {
+  voice?: string;
+  rate?: string;
+  pitch?: string;
+  volume?: string;
+}
+
 class VoiceService {
-  private recognition: any = null;
-  private synth: SpeechSynthesis | null = null;
-  private isListening = false;
-  private retryCount = 0;
-  private maxRetries = 3;
+  private static instance: VoiceService;
+  public defaultVoice = 'fil-PH-BlessicaNeural';
 
-  constructor() {
-    if (typeof window !== 'undefined') {
-      this.synth = window.speechSynthesis;
-      this.setupRecognition();
+  private isSpeaking = false;
+
+  private constructor() {}
+
+  public static getInstance(): VoiceService {
+    if (!VoiceService.instance) {
+      VoiceService.instance = new VoiceService();
     }
+    return VoiceService.instance;
   }
 
-  private setupRecognition() {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'fil-PH';
-      
-      // Mobile optimization: handle low-end devices by allowing both Tagalog and English loosely if needed
-      // But for now sticking to fil-PH as requested
-    }
-  }
+  async speak(text: string, options: VoiceOptions = {}): Promise<void> {
+    if (this.isSpeaking) return;
+    this.isSpeaking = true;
 
-  /**
-   * Jarvis-style Vocalizer (TTS)
-   * Prioritizes ElevenLabs via backend, fallbacks to browser TTS
-   */
-  public async speak(text: string, onEnd?: () => void) {
-    // Try ElevenLabs via backend first
     try {
       const response = await fetch('/api/system/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ text, options: { voiceId: 'rTRIfF56tbuqzTpo5jWy' } })
+        body: JSON.stringify({
+          text,
+          voice: options.voice || this.defaultVoice,
+          rate: options.rate || '+0%',
+          pitch: options.pitch || '+0Hz',
+          volume: options.volume || '+0%',
+        }),
       });
 
       if (response.ok) {
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          if (onEnd) onEnd();
-        };
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
 
-        audio.onerror = (e) => {
-          console.error('[ElevenLabs] Audio playback error:', e);
-          this.fallbackSpeak(text, onEnd);
-        };
-
-        await audio.play();
-        console.log('[Guardian AI] Speaking (ElevenLabs):', text);
+        await new Promise<void>((resolve) => {
+          audio.onended = () => { URL.revokeObjectURL(url); this.isSpeaking = false; resolve(); };
+          audio.onerror = () => { URL.revokeObjectURL(url); this.isSpeaking = false; resolve(); };
+          audio.play();
+        });
         return;
-      } else {
-        const errorText = await response.text();
-        console.warn(`[ElevenLabs] Backend failed (${response.status}: ${errorText}), using fallback.`);
       }
     } catch (err) {
-      console.error('[ElevenLabs] Fetch failed:', err);
+      console.warn('Edge TTS failed, using browser fallback');
     }
 
-    // Fallback to browser TTS
-    this.fallbackSpeak(text, onEnd);
+    // Browser Fallback
+    await this.speakWithBrowser(text, options);
+    this.isSpeaking = false;
   }
 
-  private fallbackSpeak(text: string, onEnd?: () => void) {
-    if (!this.synth) return;
-    try {
-      this.synth.cancel();
+  private async speakWithBrowser(text: string, options: VoiceOptions): Promise<void> {
+    return new Promise((resolve) => {
+      if (!('speechSynthesis' in window)) return resolve();
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'fil-PH';
-      const voices = this.synth.getVoices();
-      
-      // Choose a professional sounding voice, preferring Filipino
-      const preferred = ['Google Filipino', 'Microsoft Filipino', 'fil-PH', 'fil'];
-      const voice = voices.find(v => preferred.some(p => v.name.includes(p) || v.lang.includes(p))) || 
-                    voices[0];
-      
-      if (voice) utterance.voice = voice;
+      utterance.rate = 0.95;
+      utterance.pitch = 1.05;
 
-      utterance.pitch = 0.9;
-      utterance.rate = 1.0;
-      utterance.volume = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const filVoice = voices.find(v => v.lang.includes('fil') || v.name.toLowerCase().includes('filipino'));
+      if (filVoice) utterance.voice = filVoice;
 
-      if (onEnd) utterance.onend = onEnd;
-      
-      utterance.onerror = (e) => {
-        console.error('[TTS Error]', e);
-        if (onEnd) onEnd();
-      };
+      utterance.onend = () => resolve();
+      utterance.onerror = () => resolve();
 
-      this.synth.speak(utterance);
-      console.log('[Guardian AI] Speaking (Fallback):', text);
-    } catch (err) {
-      console.error('[Voice] Speak failed:', err);
-      if (onEnd) onEnd();
-    }
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    });
   }
 
-  /**
-   * Starts listening for tactical commands
-   */
-  public startListening(onResult: (text: string, isFinal: boolean) => void, onError: (err: any) => void) {
-    if (!this.recognition || this.isListening) return;
+  startListening(onResult: (text: string, isFinal: boolean) => void, onError?: (err: any) => void) {
+    const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      onError?.({ message: 'Speech recognition not supported' });
+      return null;
+    }
 
-    this.recognition.onresult = (event: any) => {
-      this.retryCount = 0; // Reset on success
-      const result = event.results[event.results.length - 1];
-      const text = result[0].transcript;
-      onResult(text, result.isFinal);
-    };
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'fil-PH';
 
-    this.recognition.onerror = (err: any) => {
-      console.error('[Voice] Recognition Error:', err.error);
-      
-      if (err.error === 'network' && this.retryCount < this.maxRetries) {
-        this.retryCount++;
-        console.log(`[Voice] Retrying (${this.retryCount}/${this.maxRetries})...`);
-        setTimeout(() => this.startListening(onResult, onError), 1000 * this.retryCount);
-        return;
+    recognition.onresult = (event: any) => {
+      let transcript = '';
+      let isFinal = false;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+        isFinal = event.results[i].isFinal;
       }
-
-      onError(err);
-      this.isListening = false;
+      onResult(transcript, isFinal);
     };
 
-    this.recognition.onend = () => {
-      if (this.isListening) {
-        try {
-          this.recognition.start(); // Auto-restart for continuous mode
-        } catch (e) {
-          console.warn('[Voice] Failed to auto-restart');
-        }
-      }
-    };
+    recognition.onerror = onError || console.error;
+    recognition.start();
 
-    try {
-      this.isListening = true;
-      this.recognition.start();
-      console.log('[Guardian AI] Listening Mode: ACTIVE');
-    } catch (e) {
-      console.error('[Voice] Start error:', e);
-      this.isListening = false;
-      this.setupRecognition(); // Re-init on hard fail
-    }
+    return recognition;
   }
 
-  public stopListening() {
-    this.isListening = false;
-    if (this.recognition) {
-      this.recognition.stop();
-    }
-  }
-
-  public cancelSpeech() {
-    if (this.synth) this.synth.cancel();
+  stopListening(recognition: any) {
+    if (recognition) recognition.stop();
   }
 }
 
-export const voiceService = new VoiceService();
+export const voiceService = VoiceService.getInstance();

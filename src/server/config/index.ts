@@ -51,8 +51,8 @@ export const config = {
       .map((k) => k.trim())
       .filter(Boolean),
     voiceId: (() => {
-      // Antoni (good male voice fluency)
-      const vid = (process.env.JARVIS_VOICE_ID || 'rTRIfF56tbuqzTpo5jWy').trim();
+      // Adam (pNInz6obpgDQGcFmaJgB) - Male, fluent Tagalog
+      const vid = (process.env.JARVIS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB').trim();
       if (vid.includes('voiceId=')) {
         const parts = vid.split('voiceId=');
         if (parts[1]) return parts[1].split('&')[0];
