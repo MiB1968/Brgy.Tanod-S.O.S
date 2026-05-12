@@ -1,5 +1,5 @@
 import io from 'socket.io-client';
-import { safeStorage } from './safeStorage';
+import * as safeStorage from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
 const socket = io({

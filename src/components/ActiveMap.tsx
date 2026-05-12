@@ -7,7 +7,7 @@ import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
-import { safeStorage } from '../lib/safeStorage';
+import * as safeStorage from '../lib/safeStorage';
 
 // Fix for default marker icons in Leaflet with React
 const DefaultIcon = L.icon({

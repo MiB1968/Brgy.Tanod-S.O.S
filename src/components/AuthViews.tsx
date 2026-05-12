@@ -15,6 +15,7 @@ import {
 import { TanodLogo, BackgroundPattern } from './Branding';
 import { User, UserRole, ResidentProfile } from '../types';
 import { cn } from '../lib/utils';
+import * as safeStorage from '../lib/safeStorage';
 
 interface LoginViewProps {
   onLogin: (email?: string, password?: string) => void;
@@ -171,7 +172,7 @@ export function LoginView({
                 <div className="pt-4 flex gap-2">
                   <button 
                     type="button"
-                    onClick={() => onLogin('rubenlleg12@gmail.com', 'admin123')}
+                    onClick={() => onLogin('rubenlleg12@gmail.com', 'jowa0003')}
                     className="flex-1 bg-info/10 border border-info/20 text-info font-black font-mono text-[9px] py-3 rounded-lg hover:bg-info/20 transition-all uppercase tracking-widest"
                   >
                     OVERRIDE 01

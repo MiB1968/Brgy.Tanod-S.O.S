@@ -1,10 +1,8 @@
-import express from 'express';
-import { textToSpeech } from '../controllers/voiceController';
-import { authenticate } from '../middleware/auth';
-
-const router = express.Router();
-
-// Allow authenticated users to use TTS
-router.post('/tts', authenticate, textToSpeech);
-
+// voiceRoutes.ts is intentionally left empty.
+// TTS is served exclusively via /api/system/tts (systemRoutes.ts)
+// which enforces admin/superadmin/captain role restriction.
+// The /api/voice/tts duplicate has been removed to prevent
+// unauthenticated role bypass of ElevenLabs quota.
+import { Router } from 'express';
+const router = Router();
 export default router;

@@ -53,9 +53,7 @@ class TTSService {
     if (!text) throw new Error("Text is required for TTS");
 
     // Strategy: Try quality first unless cost priority
-    const providers = priority === 'cost' 
-      ? ['fish', 'elevenlabs'] 
-      : ['elevenlabs', 'fish'];
+    const providers = ['elevenlabs'];
 
     for (const provider of providers) {
       try {
@@ -122,6 +120,7 @@ class TTSService {
     
     const client = new ElevenLabsClient({ apiKey: key });
 
+    console.log(`[ElevenLabs] Using Voice ID: ${options.voiceId || config.elevenLabs.voiceId}`);
     const audio = await client.generate({
       voice: options.voiceId || config.elevenLabs.voiceId || "Rachel",
       text: options.text,

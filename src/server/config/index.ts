@@ -35,7 +35,7 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY?.trim() || null,
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,
-  geminiModel: (process.env.GEMINI_MODEL || 'gemini-1.5-flash').replace(/^models\//, ''),
+  geminiModel: (process.env.GEMINI_MODEL || 'gemini-2.0-flash').replace(/^models\//, ''),
 
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,
@@ -51,7 +51,8 @@ export const config = {
       .map((k) => k.trim())
       .filter(Boolean),
     voiceId: (() => {
-      const vid = (process.env.JARVIS_VOICE_ID || 'llN1Ei50DSCIEuoOIaH7').trim();
+      // Antoni (good male voice fluency)
+      const vid = (process.env.JARVIS_VOICE_ID || 'rTRIfF56tbuqzTpo5jWy').trim();
       if (vid.includes('voiceId=')) {
         const parts = vid.split('voiceId=');
         if (parts[1]) return parts[1].split('&')[0];

@@ -3,7 +3,7 @@
  * Replaces Firebase SDK with standard HTTP/WebSocket patterns
  */
 
-import { safeStorage } from './safeStorage';
+import * as safeStorage from './safeStorage';
 
 const API_BASE = '/api';
 
@@ -11,6 +11,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
   const token = safeStorage.getItem('token');
   const headers = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -68,7 +69,9 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
         throw new Error(`Failed to parse response as JSON: ${response.statusText}`);
       }
     } else {
-      throw new Error(`Expected JSON response, but got content-type: ${contentType}`);
+      const text = await response.text();
+      const snippet = text.slice(0, 200).replace(/\n/g, '\\n');
+      throw new Error(`Expected JSON response, but got content-type: ${contentType}. Status: ${response.status}. Body snippet: ${snippet}`);
     }
   } catch (err: any) {
     clearTimeout(timeoutId);

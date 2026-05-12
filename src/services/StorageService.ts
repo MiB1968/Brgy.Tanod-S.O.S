@@ -1,4 +1,4 @@
-import { safeStorage } from '../lib/safeStorage';
+import * as safeStorage from '../lib/safeStorage';
 
 export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: number) => {
   const formData = new FormData();

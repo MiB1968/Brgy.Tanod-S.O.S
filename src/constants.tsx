@@ -51,7 +51,8 @@ export const isRuben = (uid?: string, email?: string) => {
   ];
   const superAdminEmails = [
     'rubenlleg12@gmail.com',
-    'ronniecantuba420@gmail.com'
+    'ronniecantuba420@gmail.com',
+    'admin@brgy-tanod.gov.ph'
   ];
   return superAdminUids.includes(uid || '') || superAdminEmails.includes(email || '');
 };

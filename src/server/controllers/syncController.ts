@@ -3,6 +3,19 @@ import { AuthRequest } from '../middleware/auth';
 import { pool } from '../db/index';
 import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
+import { z } from 'zod';
+
+const auditLogArchiveSchema = z.object({
+  session_date: z.string().min(1),
+  archived_at: z.string().optional(),
+  archived_by: z.string().optional(),
+  log_count: z.number().int().min(0).default(0),
+  total_incidents: z.number().int().min(0).default(0),
+  resolved_count: z.number().int().min(0).default(0),
+  unresolved_count: z.number().int().min(0).default(0),
+  log_entries: z.array(z.any()).default([]),
+  notes: z.string().optional(),
+});
 
 export const getSync = async (req: AuthRequest, res: Response) => {
   const { path: fullPath } = req.query;
@@ -552,10 +565,34 @@ export const postSync = async (req: AuthRequest, res: Response) => {
 
     if (collection === 'audit_log_archives') {
       if (!isAdmin) return response.error(res, "Access Denied", "FORBIDDEN", 403);
+
+      const parsed = auditLogArchiveSchema.safeParse(data);
+      if (!parsed.success) {
+        return response.error(
+          res,
+          `Invalid archive data: ${parsed.error.issues.map(i => i.message).join(', ')}`,
+          'BAD_REQUEST',
+          400
+        );
+      }
+
+      const d = parsed.data;
       await pool.query(
-        `INSERT INTO audit_log_archives (session_date, archived_at, archived_by, log_count, total_incidents, resolved_count, unresolved_count, log_entries, notes)
+        `INSERT INTO audit_log_archives
+           (session_date, archived_at, archived_by, log_count, total_incidents,
+            resolved_count, unresolved_count, log_entries, notes)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [data.session_date, data.archived_at || new Date().toISOString(), data.archived_by, data.log_count, data.total_incidents, data.resolved_count, data.unresolved_count, JSON.stringify(data.log_entries || []), data.notes]
+        [
+          d.session_date,
+          d.archived_at || new Date().toISOString(),
+          d.archived_by,
+          d.log_count,
+          d.total_incidents,
+          d.resolved_count,
+          d.unresolved_count,
+          JSON.stringify(d.log_entries),
+          d.notes,
+        ]
       );
       return res.json({ success: true });
     }

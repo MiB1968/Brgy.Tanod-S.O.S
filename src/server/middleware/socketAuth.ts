@@ -15,10 +15,15 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
   }
   const cookieToken = cookies['token'];
 
-  const token = 
+  let token = 
     socket.handshake.auth.token || 
     cookieToken ||
     socket.handshake.headers.authorization?.split(" ")[1];
+
+  // Special handling for client placeholder token
+  if (token === 'cookie-auth') {
+    token = cookieToken;
+  }
 
   if (!token) {
     console.warn(`[SocketAuth] Missing token for socket ${socket.id}`);

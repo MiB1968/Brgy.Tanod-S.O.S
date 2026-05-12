@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import socket from '../lib/socket';
-import { safeStorage } from '../lib/safeStorage';
+import * as safeStorage from '../lib/safeStorage';
 
 export function useSocketConnection() {
   const { profile } = useAuthStore();

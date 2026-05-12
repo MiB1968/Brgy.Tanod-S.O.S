@@ -17,7 +17,8 @@ const cookieOptions = {
 
 // ── Register ─────────────────────────────────────────────────────────────────
 export const register = async (req: Request, res: Response) => {
-  const { email, password, name, role: rawRole, details } = req.body;
+  const { email: rawEmail, password, name, role: rawRole, details } = req.body;
+  const email = rawEmail?.toLowerCase();
 
   // SECURITY: Enforce allowed roles server-side regardless of what was sent.
   // Validator already blocks admin/superadmin, but we double-check here.
@@ -104,10 +105,11 @@ export const register = async (req: Request, res: Response) => {
 // ── Login ────────────────────────────────────────────────────────────────────
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
+  const normalizedEmail = email?.toLowerCase();
   try {
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
-      [email]
+      [normalizedEmail]
     );
     const user = result.rows[0];
 

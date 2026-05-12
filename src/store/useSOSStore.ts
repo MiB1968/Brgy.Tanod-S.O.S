@@ -3,7 +3,7 @@ import { Alert, EmergencyType } from '../types';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { offlineService } from '../services/offlineService';
-import { safeStorage } from '../lib/safeStorage';
+import * as safeStorage from '../lib/safeStorage';
 
 interface SOSState {
   activeAlert: Alert | null;

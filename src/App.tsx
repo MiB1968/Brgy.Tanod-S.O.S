@@ -92,7 +92,7 @@ import { useIncidentStore } from './store/useIncidentStore';
 import { useTanodStore } from './store/useTanodStore';
 import { useSystemStore } from './store/useSystemStore';
 import { useSOSStore } from './store/useSOSStore';
-import { safeStorage } from './lib/safeStorage';
+import * as safeStorage from './lib/safeStorage';
 
 // Service & Lib imports
 import { getQueueSize } from './lib/offlineQueue';
@@ -283,10 +283,11 @@ export default function App() {
     try {
       if (email && password) {
         const res = await api.auth.login({ email, password });
-        safeStorage.setItem('token', res.token);
-        safeStorage.setItem('user', JSON.stringify(res.user));
-        setUser(res.user);
-        setProfile(res.user);
+        // The token is in httpOnly cookie. Set a dummy token so the app knows we are logged in.
+        safeStorage.setItem('token', 'cookie-auth');
+        safeStorage.setItem('user', JSON.stringify(res.data.user));
+        setUser(res.data.user);
+        setProfile(res.data.user);
         toast.success(`Unit Authenticated`, { icon: '🔑' });
       } else {
         toast.error("Google Login migrated to Auth Provider. Use standard login for now.");
@@ -348,10 +349,10 @@ export default function App() {
         email: role === 'admin' ? 'admin@demo.com' : 'resident@demo.com', 
         password: 'demo' 
       });
-      safeStorage.setItem('token', res.token);
-      safeStorage.setItem('user', JSON.stringify(res.user));
-      setUser(res.user);
-      setProfile(res.user);
+      safeStorage.setItem('token', 'cookie-auth');
+      safeStorage.setItem('user', JSON.stringify(res.data.user));
+      setUser(res.data.user);
+      setProfile(res.data.user);
       toast.success("Guest Session Active", { id: 'demo-login' });
     } catch (err: any) {
       console.error("Demo login failed:", err);
@@ -392,10 +393,10 @@ export default function App() {
         onComplete={async (data: any) => {
           try {
             const res = await api.auth.register(data);
-            safeStorage.setItem('token', res.token);
-            safeStorage.setItem('user', JSON.stringify(res.user));
-            setUser(res.user);
-            setProfile(res.user);
+            safeStorage.setItem('token', 'cookie-auth');
+            safeStorage.setItem('user', JSON.stringify(res.data.user));
+            setUser(res.data.user);
+            setProfile(res.data.user);
             setIsRegistering(false);
           } catch (err: any) {
             toast.error(err.message);

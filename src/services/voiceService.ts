@@ -37,11 +37,11 @@ class VoiceService {
   public async speak(text: string, onEnd?: () => void) {
     // Try ElevenLabs via backend first
     try {
-      const response = await fetch('/api/voice/tts', {
+      const response = await fetch('/api/system/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, options: { voiceId: 'rTRIfF56tbuqzTpo5jWy' } })
       });
 
       if (response.ok) {
@@ -63,7 +63,8 @@ class VoiceService {
         console.log('[Guardian AI] Speaking (ElevenLabs):', text);
         return;
       } else {
-        console.warn('[ElevenLabs] Backend failed or not configured, using fallback.');
+        const errorText = await response.text();
+        console.warn(`[ElevenLabs] Backend failed (${response.status}: ${errorText}), using fallback.`);
       }
     } catch (err) {
       console.error('[ElevenLabs] Fetch failed:', err);

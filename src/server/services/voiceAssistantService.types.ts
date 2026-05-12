@@ -1,33 +1,34 @@
 // ===============================================
-// VOICE ASSISTANT TYPES (Revised)
+// VOICE ASSISTANT TYPES
 // ===============================================
 
 export enum VoiceCommandType {
-  EMERGENCY_DISPATCH = "EMERGENCY_DISPATCH",
-  PATROL_ASSIGNMENT = "PATROL_ASSIGNMENT",
-  INCIDENT_UPDATE = "INCIDENT_UPDATE",
-  STATUS_INQUIRY = "STATUS_INQUIRY",
-  BROADCAST_ALERT = "BROADCAST_ALERT",
-  SYSTEM_CHECK = "SYSTEM_CHECK",
-  SUPER_ADMIN_ACTIVATION = "SUPER_ADMIN_ACTIVATION",
-  REPORT_GENERATION = "REPORT_GENERATION",
-  UNKNOWN = "UNKNOWN",
+  EMERGENCY_DISPATCH    = "EMERGENCY_DISPATCH",
+  PATROL_ASSIGNMENT     = "PATROL_ASSIGNMENT",
+  INCIDENT_UPDATE       = "INCIDENT_UPDATE",
+  STATUS_INQUIRY        = "STATUS_INQUIRY",
+  BROADCAST_ALERT       = "BROADCAST_ALERT",
+  SYSTEM_CHECK          = "SYSTEM_CHECK",
+  REPORT_GENERATION     = "REPORT_GENERATION",
+  UNKNOWN               = "UNKNOWN",
+  // NOTE: SUPER_ADMIN_ACTIVATION removed — role escalation via voice
+  // is not supported. Use the admin panel with proper authentication.
 }
 
 export enum VoicePermissionLevel {
-  RESIDENT = "resident",
-  TANOD = "tanod",
-  ADMIN = "admin",
-  COMMANDER = "commander",
+  RESIDENT    = "resident",
+  TANOD       = "tanod",
+  ADMIN       = "admin",
+  COMMANDER   = "commander",
   SUPER_ADMIN = "superadmin",
 }
 
 export enum VoiceResponseTone {
-  CALM = "calm",
-  URGENT = "urgent",
+  CALM          = "calm",
+  URGENT        = "urgent",
   AUTHORITATIVE = "authoritative",
-  REASSURING = "reassuring",
-  ALERT = "alert",
+  REASSURING    = "reassuring",
+  ALERT         = "alert",
 }
 
 /** Live context passed to Gemini */
@@ -57,7 +58,7 @@ export interface VoiceInput {
   transcript: string;
   confidence?: number;
   language: 'en' | 'fil' | 'en-PH' | 'fil-PH';
-  rawAudio?: Buffer;           // For biometric / future use
+  rawAudio?: Buffer;
   audioDuration?: number;
   deviceInfo?: {
     deviceId: string;
@@ -72,20 +73,20 @@ export interface ProposedAction {
   confidence: number;
   requiresConfirmation: boolean;
   payload?: Record<string, any>;
-  estimatedTime?: number; // in minutes
+  estimatedTime?: number;
 }
 
 /** Final response sent back to client */
 export interface VoiceResponse {
-  reply: string;                    // Text spoken by TTS
-  transcript: string;               // Original user input
+  reply: string;
+  transcript: string;
   proposedActions: ProposedAction[];
   permissionLevel: VoicePermissionLevel;
   isSuperAdmin: boolean;
-  tone: string; // Changed from VoiceResponseTone to string to match usage or keep as enum if preferred
+  tone: string;
   confidence: number;
   timestamp: Date;
-  specialActivation?: string;       // e.g. "RUBY_PROTOCOL"
+  // NOTE: specialActivation / RUBY_PROTOCOL field permanently removed.
   metadata?: Record<string, any>;
 }
 
@@ -97,7 +98,6 @@ export interface VoiceSession {
   language: 'en' | 'fil' | 'en-PH' | 'fil-PH';
   lastActivity: Date;
   isSuperAdmin: boolean;
-  superAdminExpiresAt?: Date;
 }
 
 /** TTS Configuration */
@@ -121,7 +121,7 @@ export interface VoiceBiometricResult {
 
 /** Audit Log Entry for Voice */
 export interface VoiceAuditEntry {
-  type: 'VOICE_COMMAND' | 'SUPER_ADMIN_ACTIVATION' | 'SECURITY_VIOLATION' | 'ACTION_EXECUTED';
+  type: 'VOICE_COMMAND' | 'SECURITY_VIOLATION' | 'ACTION_EXECUTED';
   adminId: string;
   transcript: string;
   response?: string;

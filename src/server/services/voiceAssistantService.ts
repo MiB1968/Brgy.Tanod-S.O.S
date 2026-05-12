@@ -140,7 +140,7 @@ export class SecureVoiceAssistantService {
     const context = await this.getLiveContext();
 
     const result = await ai.models.generateContent({
-      model: config.geminiModel || 'gemini-1.5-flash',
+      model: config.geminiModel || 'gemini-2.0-flash',
       contents: transcript,
       config: {
         systemInstruction: this.buildSystemPrompt(context, currentRole)

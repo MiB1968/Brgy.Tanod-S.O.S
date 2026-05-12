@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { setupRoutes } from './routes/index';
 import { globalLimiter, authLimiter, sosLimiter } from './middleware/rateLimiter';
 import { config } from './config/index';
+import { errorHandler } from './middleware/error';
 
 const app = express();
 
@@ -19,7 +20,9 @@ app.use(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        styleSrc: config.nodeEnv === 'production' 
+          ? ["'self'", 'https://fonts.googleapis.com']
+          : ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: [
           "'self'",
@@ -59,14 +62,15 @@ const allowedOrigins: string[] = config.corsOrigin
 app.use(
   cors({
     origin: (origin, callback) => {
+      const allowedOrigins = config.corsOrigin ? config.corsOrigin.split(',').map(o => o.trim()) : [];
       const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
       const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
 
-      if (!origin || isStudioPreview || isDevFallback || allowedOrigins.includes(origin)) {
+      if (!origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
         return callback(null, true);
       }
       console.warn(`[CORS] Origin rejected: ${origin}`);
-      return callback(null, false);  // ← null, not new Error()
+      return callback(null, false);
     },
     credentials: true,
   })
@@ -84,5 +88,8 @@ app.use('/api/sos/alert', sosLimiter);
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 setupRoutes(app);
+
+// Global Error Handler
+app.use(errorHandler);
 
 export default app;

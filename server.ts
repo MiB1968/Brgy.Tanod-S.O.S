@@ -19,6 +19,14 @@ async function startServer() {
 
   const server = http.createServer(app);
 
+  process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err);
+  });
+  
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNHANDLED REJECTION:', reason);
+  });
+
   // 2. Initialize Sockets
   initSocket(server);
 

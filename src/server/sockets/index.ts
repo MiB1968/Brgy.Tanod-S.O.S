@@ -43,11 +43,11 @@ function createVoiceRateLimiter(): () => boolean {
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
     path: '/socket.io/',
-    pingTimeout: 180000,
-    pingInterval: 25000,
+    pingTimeout: 60000,
+    pingInterval: 10000,
     transports: ['polling', 'websocket'],
     allowEIO3: true,
-    connectTimeout: 60000,
+    connectTimeout: 45000,
     maxHttpBufferSize: 1e7, // 10MB for voice packets
     cookie: false,
     cors: {
@@ -56,11 +56,12 @@ export function initSocket(server: HttpServer): Server {
         const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
         const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
 
-        if (!origin || isStudioPreview || isDevFallback || allowedOrigins.includes(origin)) {
+        // Include origin === 'null' to support browser iframes with sandbox attribute where Origin is literally "null"
+        if (!origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
           return callback(null, true);
         }
         console.warn(`[Socket CORS] Origin rejected: ${origin}`);
-        return callback(null, false);  // ← null, not new Error()
+        return callback(null, false);
       },
       credentials: true,
       methods: ['GET', 'POST'],
@@ -116,6 +117,23 @@ export function initSocket(server: HttpServer): Server {
 
     // Voice command handler
     socket.on('voice-command', async (data) => {
+      // Input validation
+      if (!data || typeof data.transcript !== 'string' || data.transcript.trim().length === 0) {
+        socket.emit('voice-error', {
+          message: 'Invalid voice command payload.',
+          code: 'INVALID_INPUT',
+        });
+        return;
+      }
+
+      if (data.transcript.length > 1000) {
+        socket.emit('voice-error', {
+          message: 'Voice command too long. Please keep commands under 1000 characters.',
+          code: 'INPUT_TOO_LONG',
+        });
+        return;
+      }
+
       if (!voiceAllowed()) {
         socket.emit('voice-error', {
           message: 'Too many voice commands. Please wait before trying again.',
@@ -123,10 +141,14 @@ export function initSocket(server: HttpServer): Server {
         });
         return;
       }
+
       try {
         await voiceAssistantService.processVoiceInput(
           id,
-          { transcript: data.transcript, language: 'fil' },
+          {
+            transcript: data.transcript.trim(),
+            language: data.language || 'fil',
+          },
           getPermissionLevel(role)
         );
       } catch (error: any) {

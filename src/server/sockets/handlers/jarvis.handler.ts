@@ -1,26 +1,25 @@
-// src/server/sockets/handlers/jarvis.handler.ts
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { config } from '../../config/index';
-import { normalizeRole, isAdminOrAbove, isTanodOrAbove } from '../../utils/roleUtils';
+import { isTanodOrAbove, normalizeRole } from '../../utils/roleUtils';
 import { AuthenticatedSocket } from '../../types';
 
-// Map of socket ID → active Gemini Live session
 const activeSessions = new Map<string, any>();
+
+const MAX_AUDIO_BUFFER_BYTES = 500_000;   // 500KB hard cap
+const MAX_TRANSCRIPT_LENGTH  = 1_000;     // characters
 
 export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
   const { id: userId, role: rawRole } = socket.data.user;
   const role = normalizeRole(rawRole);
 
-  // ── Only admins and tanods can use JARVIS ────────────────────────────
   if (!isTanodOrAbove(role)) {
     console.log(`[JARVIS] Access denied for role: ${role} (socket ${socket.id})`);
-    return; // Don't register any handlers — role blocked at connection
+    return;
   }
 
-  // ── Request to start a Gemini Live session ───────────────────────────
+  // ── Start session ────────────────────────────────────────────────────
   socket.on('jarvis:start-session', async () => {
     if (activeSessions.has(socket.id)) {
-      console.log(`[JARVIS] Session already exists for socket ${socket.id}`);
       socket.emit('jarvis:session-open');
       return;
     }
@@ -34,21 +33,15 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
     }
 
     try {
-      console.log(`[JARVIS] Opening Gemini session for user ${userId} (${role})`);
-
-      // Store a simple session marker — full Gemini Live streaming
-      // requires the @google/genai Live API which needs WebSocket.
-      // For now we store session metadata; audio goes through
-      // the processVoiceInput path via text transcript.
       activeSessions.set(socket.id, {
         userId,
         role,
         openedAt: new Date(),
         audioBuffer: [] as Buffer[],
+        totalBufferSize: 0,
       });
-
       socket.emit('jarvis:session-open');
-      console.log(`[JARVIS] Session opened for ${userId}`);
+      console.log(`[JARVIS] Session opened for ${userId} (${role})`);
     } catch (err: any) {
       console.error('[JARVIS] Failed to open session:', err);
       socket.emit('jarvis:error', {
@@ -58,7 +51,7 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
     }
   });
 
-  // ── Receive audio chunks from client ────────────────────────────────
+  // ── Receive audio chunks ─────────────────────────────────────────────
   socket.on('jarvis:audio-chunk', async (data: { data: string; mimeType: string }) => {
     const session = activeSessions.get(socket.id);
     if (!session) {
@@ -69,31 +62,50 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
       return;
     }
 
-    // Buffer incoming audio chunks
-    // In a full implementation, these would be forwarded to Gemini Live WebSocket.
-    // For now, we accumulate and process on silence detection or manual send.
     try {
       const audioBuffer = Buffer.from(data.data, 'base64');
+
+      // Hard cap — prevent buffer flooding
+      session.totalBufferSize = (session.totalBufferSize || 0) + audioBuffer.length;
+      if (session.totalBufferSize > MAX_AUDIO_BUFFER_BYTES) {
+        session.audioBuffer = [];
+        session.totalBufferSize = 0;
+        socket.emit('jarvis:error', {
+          code: 'BUFFER_OVERFLOW',
+          message: 'Audio buffer exceeded limit. Please try again.',
+        });
+        return;
+      }
+
       session.audioBuffer.push(audioBuffer);
 
-      // If buffer is large enough (roughly 2 seconds of audio), process it
-      const totalSize = session.audioBuffer.reduce((sum: number, b: Buffer) => sum + b.length, 0);
-      if (totalSize > 32000) {
-        // ~2 seconds of 16kHz mono PCM
+      // Process when ~2 seconds of audio accumulated
+      if (session.totalBufferSize > 32_000) {
         await processAudioBuffer(socket, session, userId, role);
+        session.totalBufferSize = 0;
       }
     } catch (err) {
       console.error('[JARVIS] Audio chunk error:', err);
     }
   });
 
+  // ── Text transcript fallback ─────────────────────────────────────────
+  socket.on('jarvis:transcript', (data: { text: string }) => {
+    if (!data?.text || typeof data.text !== 'string') return;
+
+    const trimmed = data.text.trim().substring(0, MAX_TRANSCRIPT_LENGTH);
+    if (trimmed.length === 0) return;
+
+    // Route through the existing voice-command path
+    socket.emit('voice-command', { transcript: trimmed, language: 'fil' });
+  });
+
   // ── End session ──────────────────────────────────────────────────────
   socket.on('jarvis:end-session', () => {
-    const session = activeSessions.get(socket.id);
-    if (session) {
+    if (activeSessions.has(socket.id)) {
       activeSessions.delete(socket.id);
       socket.emit('jarvis:session-closed');
-      console.log(`[JARVIS] Session closed for user ${userId}`);
+      console.log(`[JARVIS] Session closed for ${userId}`);
     }
   });
 
@@ -106,27 +118,22 @@ export function setupJarvisHandler(io: Server, socket: AuthenticatedSocket) {
   });
 }
 
-/**
- * Process buffered audio by converting to text via browser STT result
- * and running through the voice assistant service.
- *
- * NOTE: For full Gemini Live audio-in/audio-out, replace this with
- * a direct @google/genai Live WebSocket connection on the server.
- * The architecture (client → our socket → Gemini) is already correct;
- * this function is the processing bridge.
- */
 async function processAudioBuffer(
   socket: AuthenticatedSocket,
   session: any,
   userId: string,
   role: string
 ) {
-  // Clear buffer
   session.audioBuffer = [];
+  session.totalBufferSize = 0;
 
-  // The actual Gemini Live audio streaming implementation goes here.
-  // For now emit a ready signal so the client knows audio was received.
-  // The text-based voice commands still flow through the existing
-  // 'voice-command' socket event handled in sockets/index.ts.
-  console.log(`[JARVIS] Audio buffer processed for ${userId} (${session.audioBuffer?.length || 0} chunks)`);
+  // Full Gemini Live audio streaming is not yet implemented.
+  // Audio chunks are acknowledged but not processed.
+  // Text-based voice commands flow through the 'voice-command' socket event.
+  // To implement: replace this function body with a Gemini Live WebSocket call.
+  socket.emit('jarvis:audio-received', {
+    message: 'Audio received. Use voice-command event for text-based commands.',
+  });
+
+  console.log(`[JARVIS] Audio buffer cleared for ${userId} — Gemini Live not yet wired.`);
 }
