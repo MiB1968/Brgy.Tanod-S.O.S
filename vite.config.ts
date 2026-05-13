@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    publicDir: 'public',
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)
     },
@@ -15,20 +16,23 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       emptyOutDir: true,
-      sourcemap: false,
+      sourcemap: mode !== 'production',
       rollupOptions: {
         output: {
           manualChunks: {
             react: ['react', 'react-dom', 'react-router-dom'],
             maps: ['leaflet', 'react-leaflet'],
             socket: ['socket.io-client'],
-            charts: ['recharts']
+            charts: ['recharts'],
+            vendor: ['zustand', 'date-fns'],
           }
         }
       }
     },
     resolve: {
-      alias: [{ find: '@', replacement: path.resolve(__dirname, './') }]
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true'

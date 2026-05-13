@@ -164,7 +164,7 @@ export class SecureVoiceAssistantService {
       console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}"`);
       const result = await getAiClient().models.generateContent({
         model: config.geminiModel || 'gemini-1.5-flash',
-        contents: transcript,
+        contents: [{ role: 'user', parts: [{ text: transcript }] }],
         config: {
           systemInstruction: this.buildSystemPrompt(context, currentRole)
         }
@@ -462,16 +462,9 @@ STRICT CONSTRAINTS:
 
       const result = await getAiClient().models.generateContent({
         model: config.geminiModel || 'gemini-1.5-flash',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType,
-                data: audioBuffer.toString('base64')
-              }
-            }
-          ]
-        },
+        contents: [{ role: 'user', parts: [
+          { inlineData: { mimeType, data: audioBuffer.toString('base64') } }
+        ] }],
         config: {
           systemInstruction: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it."
         }
