@@ -99,7 +99,7 @@ router.post('/sms', authenticate, smsLimiter, async (req, res) => {
   }
 });
 
-router.post('/tts', authenticate, authorize(['admin', 'superadmin', 'captain']), async (req, res) => {
+router.post('/tts', authenticate, authorize(['resident', 'admin', 'superadmin', 'captain', 'tanod']), async (req, res) => {
   const { text, options } = req.body;
   if (!text) {
     return response.error(res, "Text is required", "BAD_REQUEST", 400);

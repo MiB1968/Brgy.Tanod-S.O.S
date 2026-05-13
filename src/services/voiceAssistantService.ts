@@ -44,13 +44,7 @@ class VoiceAssistantService {
     // Server sends back Jarvis text reply
     socket.on('jarvis:reply', (data: { text: string; audioBase64?: string }) => {
       if (this.onMessageCb) this.onMessageCb(data.text, data.audioBase64);
-
-      // If server sends audio, play it; otherwise use browser TTS
-      if (data.audioBase64) {
-        this.playBase64Audio(data.audioBase64);
-      } else {
-        this.fallbackSpeak(data.text);
-      }
+      // NOTE: Automatic playback is handled by the component or hook that initiated the request
     });
 
     // Server signals session open/close

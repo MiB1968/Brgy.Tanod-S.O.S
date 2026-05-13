@@ -21,7 +21,15 @@ import {
   VoiceResponseTone,
 } from './voiceAssistantService.types';
 
-const ai = new GoogleGenAI({ apiKey: config.geminiApiKey || process.env.GEMINI_API_KEY || '' });
+let aiClient: GoogleGenAI | null = null;
+
+function getAiClient(): GoogleGenAI {
+  if (!aiClient) {
+    // SDK will automatically detect GOOGLE_API_KEY or GEMINI_API_KEY
+    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return aiClient;
+}
 
 export class SecureVoiceAssistantService {
   private sessions = new Map<string, VoiceSession>();
@@ -44,7 +52,9 @@ export class SecureVoiceAssistantService {
 
   constructor() {
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    console.log(`[JARVIS] AI Service initialized. Model: ${config.geminiModel || 'gemini-1.5-flash'}. API Key present: ${!!(config.geminiApiKey || process.env.GEMINI_API_KEY)}`);
   }
+
 
   // ── SESSION & CONTEXT ────────────────────────────────────────────────────
   private getOrCreateSession(
@@ -119,80 +129,92 @@ export class SecureVoiceAssistantService {
     const startTime = Date.now();
     const { transcript } = input;
 
-    // ── SECURITY: Role comes from JWT only. Reject any attempt to ────────
-    // escalate via transcript. Log it as a security event.
-    if (this.containsSuspiciousEscalation(transcript)) {
-      await this.auditLogRepo.create({
-        type: 'SECURITY_VIOLATION',
-        citizen_id: userId,
-        notes: `Suspected privilege escalation attempt via voice: "${transcript.substring(0, 100)}"`,
-      });
-      return this.buildErrorResponse(
-        transcript,
-        currentRole,
-        'Command not recognized. Please use the dashboard for system access.'
-      );
-    }
-
-    // Enforce permission and rate limit
-    this.enforceSecurity(userId, input, currentRole);
-
-    // ── ANOMALY DETECTION ────────────────────────────────────────────────
-    const { riskScore } = await anomalyDetectionService.evaluateCommand(userId, transcript);
-    if (riskScore >= 70) {
-      return this.buildErrorResponse(
-        transcript,
-        currentRole,
-        'Command blocked due to anomalous security patterns. Please verify your intent.'
-      );
-    }
-
-    const session = this.getOrCreateSession(userId, currentRole);
-    const context = await this.getLiveContext();
-
-    const result = await ai.models.generateContent({
-      model: config.geminiModel || 'gemini-2.0-flash',
-      contents: transcript,
-      config: {
-        systemInstruction: this.buildSystemPrompt(context, currentRole)
-      }
-    });
-
-    let replyText = this.sanitizeAIResponse(result.text || "");
-    const proposedActions = this.extractProposedActions(replyText);
-
-    this.queueAuditLog(userId, input.transcript, replyText, proposedActions);
-
-    let audioBase64: string | undefined;
     try {
-      const audioBuffer = await ttsService.generateSpeech({
-        text: replyText,
-        voiceId: config.elevenLabs.voiceId,
-        format: 'mp3'
+      // ── SECURITY: Role comes from JWT only. Reject any attempt to ────────
+      // escalate via transcript. Log it as a security event.
+      if (this.containsSuspiciousEscalation(transcript)) {
+        await this.auditLogRepo.create({
+          type: 'SECURITY_VIOLATION',
+          citizen_id: userId,
+          notes: `Suspected privilege escalation attempt via voice: "${transcript.substring(0, 100)}"`,
+        });
+        return this.buildErrorResponse(
+          transcript,
+          currentRole,
+          'Command not recognized. Please use the dashboard for system access.'
+        );
+      }
+
+      // Enforce permission and rate limit
+      this.enforceSecurity(userId, input, currentRole);
+
+      // ── ANOMALY DETECTION ────────────────────────────────────────────────
+      const { riskScore } = await anomalyDetectionService.evaluateCommand(userId, transcript);
+      if (riskScore >= 85) { // Loosened for Guardian mode
+        return this.buildErrorResponse(
+          transcript,
+          currentRole,
+          'Command blocked due to anomalous security patterns. Please verify your intent.'
+        );
+      }
+
+      const session = this.getOrCreateSession(userId, currentRole);
+      const context = await this.getLiveContext();
+
+      console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}"`);
+      const result = await getAiClient().models.generateContent({
+        model: config.geminiModel || 'gemini-1.5-flash',
+        contents: transcript,
+        config: {
+          systemInstruction: this.buildSystemPrompt(context, currentRole)
+        }
       });
-      audioBase64 = audioBuffer.toString('base64');
-    } catch (err) {
-      console.error('[JARVIS] TTS generation failed:', err);
+
+      console.log('[JARVIS] Gemini result received');
+      const replyText = this.sanitizeAIResponse(result.text || "Paki-ulit, hindi ko naintindihan.");
+      const proposedActions = this.extractProposedActions(replyText);
+
+      this.queueAuditLog(userId, input.transcript, replyText, proposedActions);
+
+      let audioBase64: string | undefined;
+      try {
+        const audioBuffer = await ttsService.generateSpeech({
+          text: replyText,
+          format: 'mp3'
+        });
+        audioBase64 = audioBuffer.toString('base64');
+      } catch (err) {
+        console.error('[JARVIS] TTS generation failed:', err);
+      }
+
+      const response: VoiceResponse = {
+        reply: replyText,
+        transcript,
+        proposedActions,
+        permissionLevel: currentRole,
+        isSuperAdmin: currentRole === VoicePermissionLevel.SUPER_ADMIN,
+        tone: this.determineTone(proposedActions),
+        confidence: 0.95,
+        timestamp: new Date(),
+      };
+
+      if (audioBase64) {
+        (response as any).audioBase64 = audioBase64;
+      }
+
+      this.emitVoiceResponse(userId, response);
+      console.log(`[JARVIS] Processed in ${Date.now() - startTime}ms`);
+      return response;
+    } catch (err: any) {
+      console.error('[JARVIS] Process error:', err);
+      const errResponse = this.buildErrorResponse(
+        transcript,
+        currentRole,
+        err.status === 429 ? "Too many requests. Please wait." : "Guardian processing failed. Please try again."
+      );
+      this.emitVoiceResponse(userId, errResponse);
+      return errResponse;
     }
-
-    const response: VoiceResponse = {
-      reply: replyText,
-      transcript,
-      proposedActions,
-      permissionLevel: currentRole,
-      isSuperAdmin: currentRole === VoicePermissionLevel.SUPER_ADMIN,
-      tone: this.determineTone(proposedActions),
-      confidence: 0.88,
-      timestamp: new Date(),
-    };
-
-    if (audioBase64) {
-      (response as any).audioBase64 = audioBase64;
-    }
-
-    this.emitVoiceResponse(userId, response);
-    console.log(`[JARVIS] Processed in ${Date.now() - startTime}ms`);
-    return response;
   }
 
   // ── SECURITY HELPERS ─────────────────────────────────────────────────────
@@ -239,6 +261,7 @@ export class SecureVoiceAssistantService {
 
   private hasPermission(role: VoicePermissionLevel): boolean {
     return [
+      VoicePermissionLevel.RESIDENT,
       VoicePermissionLevel.ADMIN,
       VoicePermissionLevel.COMMANDER,
       VoicePermissionLevel.SUPER_ADMIN,
@@ -250,7 +273,7 @@ export class SecureVoiceAssistantService {
     const now = Date.now();
     let timestamps = this.commandHistory.get(userId) || [];
     timestamps = timestamps.filter((ts) => now - ts < 60_000);
-    if (timestamps.length >= 12) return false;
+    if (timestamps.length >= 15) return false;
     timestamps.push(now);
     this.commandHistory.set(userId, timestamps);
     return true;
@@ -428,67 +451,74 @@ STRICT CONSTRAINTS:
   ): Promise<VoiceResponse> {
     const startTime = Date.now();
     
-    // Security check
-    if (!this.checkRateLimit(userId)) {
-      throw new AppError('Too many voice commands. Please wait.', 429, 'RATE_LIMITED');
-    }
+    try {
+      // Security check
+      if (!this.checkRateLimit(userId)) {
+        throw new AppError('Too many voice commands. Please wait.', 429, 'RATE_LIMITED');
+      }
 
-    const session = this.getOrCreateSession(userId, currentRole);
-    const context = await this.getLiveContext();
+      const session = this.getOrCreateSession(userId, currentRole);
+      const context = await this.getLiveContext();
 
-    // Multimodal prompt (using Gemini 1.5 Flash for audio reasoning)
-    const result = await ai.models.generateContent({
-      model: config.geminiModel || 'gemini-1.5-flash',
-      contents: [
-        {
+      const result = await getAiClient().models.generateContent({
+        model: config.geminiModel || 'gemini-1.5-flash',
+        contents: {
           parts: [
             {
               inlineData: {
                 mimeType,
                 data: audioBuffer.toString('base64')
               }
-            },
-            { text: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it." }
+            }
           ]
+        },
+        config: {
+          systemInstruction: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it."
         }
-      ]
-    });
-
-    const replyText = this.sanitizeAIResponse(result.text || "");
-    const proposedActions = this.extractProposedActions(replyText);
-
-    this.queueAuditLog(userId, "[Audio Input]", replyText, proposedActions);
-
-    let audioBase64: string | undefined;
-    try {
-      const audioRes = await ttsService.generateSpeech({
-        text: replyText,
-        voiceId: config.elevenLabs.voiceId,
-        format: 'mp3'
       });
-      audioBase64 = audioRes.toString('base64');
-    } catch (err) {
-      console.error('[JARVIS] TTS generation failed:', err);
+
+      const replyText = this.sanitizeAIResponse(result.text || "Audio received. Processing.");
+      const proposedActions = this.extractProposedActions(replyText);
+
+      this.queueAuditLog(userId, "[Audio Input]", replyText, proposedActions);
+
+      let audioBase64: string | undefined;
+      try {
+        const audioRes = await ttsService.generateSpeech({
+          text: replyText,
+          format: 'mp3'
+        });
+        audioBase64 = audioRes.toString('base64');
+      } catch (err) {
+        console.error('[JARVIS] TTS generation failed:', err);
+      }
+
+      const response: VoiceResponse = {
+        reply: replyText,
+        transcript: "[Audio processed by Gemini]",
+        proposedActions,
+        permissionLevel: currentRole,
+        isSuperAdmin: currentRole === VoicePermissionLevel.SUPER_ADMIN,
+        tone: this.determineTone(proposedActions),
+        confidence: 0.9,
+        timestamp: new Date(),
+      };
+
+      if (audioBase64) {
+        (response as any).audioBase64 = audioBase64;
+      }
+
+      this.emitVoiceResponse(userId, response);
+      console.log(`[JARVIS] Multimodal audio processed in ${Date.now() - startTime}ms`);
+      return response;
+    } catch (err: any) {
+      console.error('[JARVIS] Audio process error:', err);
+      return this.buildErrorResponse(
+        "[Audio Input]",
+        currentRole,
+        "Voice analysis failed. Please try again or use text."
+      );
     }
-
-    const response: VoiceResponse = {
-      reply: replyText,
-      transcript: "[Audio processed by Gemini]",
-      proposedActions,
-      permissionLevel: currentRole,
-      isSuperAdmin: currentRole === VoicePermissionLevel.SUPER_ADMIN,
-      tone: this.determineTone(proposedActions),
-      confidence: 0.9,
-      timestamp: new Date(),
-    };
-
-    if (audioBase64) {
-      (response as any).audioBase64 = audioBase64;
-    }
-
-    this.emitVoiceResponse(userId, response);
-    console.log(`[JARVIS] Multimodal audio processed in ${Date.now() - startTime}ms`);
-    return response;
   }
 
   public shutdown() {

@@ -4,6 +4,22 @@
  */
 export const audioUtils = {
   /**
+   * Unlocks audio context on mobile devices after user interaction
+   */
+  kickstartAudio() {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContext) {
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+    }
+    // Play a silent sound to unlock speechSynthesis if needed
+    const utterance = new SpeechSynthesisUtterance('');
+    window.speechSynthesis.speak(utterance);
+  },
+
+  /**
    * Analyzes an audio stream for visualizer data
    */
   createVisualizer(stream: MediaStream, onData: (data: Uint8Array) => void) {

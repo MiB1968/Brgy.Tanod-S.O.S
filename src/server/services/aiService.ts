@@ -9,8 +9,7 @@ import {
   type ModelConfig,
 } from '../config/aiModels';
 
-const getApiKey = () => config.guardianAiKey || process.env.GEMINI_API_KEY || "";
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // =============================================================================
 // Schema

@@ -42,33 +42,40 @@ function isVoiceAllowed(userId: string): boolean {
 // Socket.IO server init
 // ---------------------------------------------------------------------------
 export function initSocket(server: HttpServer): Server {
-  io = new Server(server, {
-    path: '/socket.io/',
-    pingTimeout: 60000,
-    pingInterval: 10000,
-    transports: ['polling', 'websocket'],
-    allowEIO3: true,
-    connectTimeout: 45000,
-    maxHttpBufferSize: 1e7, // 10MB for voice packets
-    cookie: false,
-    cors: {
-      origin: (origin, callback) => {
-        const allowedOrigins = config.corsOrigin ? config.corsOrigin.split(',').map(o => o.trim()) : [];
-        const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
-        const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
+  console.log('[Socket] Initializing Socket.IO with server...');
+  try {
+    io = new Server(server, {
+      path: '/socket.io/',
+      pingTimeout: 60000,
+      pingInterval: 10000,
+      transports: ['polling', 'websocket'],
+      allowEIO3: true,
+      connectTimeout: 45000,
+      maxHttpBufferSize: 1e7, // 10MB for voice packets
+      cookie: false,
+      cors: {
+        origin: (origin, callback) => {
+          const allowedOrigins = config.corsOrigin ? config.corsOrigin.split(',').map(o => o.trim()) : [];
+          const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
+          const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
 
-        // Include origin === 'null' to support browser iframes with sandbox attribute where Origin is literally "null"
-        // Allow broadly in development to help debug socket/CORS issues
-        if (config.nodeEnv !== 'production' || !origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
-          return callback(null, true);
-        }
-        console.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
-        return callback(null, false);
+          // Include origin === 'null' to support browser iframes with sandbox attribute where Origin is literally "null"
+          // Allow broadly in development to help debug socket/CORS issues
+          if (config.nodeEnv !== 'production' || !origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
+            return callback(null, true);
+          }
+          console.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
+          return callback(null, false);
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'OPTIONS'],
       },
-      credentials: true,
-      methods: ['GET', 'POST', 'OPTIONS'],
-    },
-  });
+    });
+    console.log('[Socket] Server instance created.');
+  } catch (err) {
+    console.error('[Socket] FAILED to create Server instance:', err);
+    throw err;
+  }
 
   // Global socket authentication
   io.use((socket, next) => {
@@ -116,34 +123,40 @@ export function initSocket(server: HttpServer): Server {
     };
 
     // Voice command handler
-    socket.on('voice-command', async (data) => {
+    socket.on('voice-command', async (data, callback) => {
       // Input validation
       if (!data || typeof data.transcript !== 'string' || data.transcript.trim().length === 0) {
-        socket.emit('voice-error', {
+        const error = {
           message: 'Invalid voice command payload.',
           code: 'INVALID_INPUT',
-        });
+        };
+        socket.emit('voice-error', error);
+        if (callback) callback({ success: false, error });
         return;
       }
 
       if (data.transcript.length > 1000) {
-        socket.emit('voice-error', {
+        const error = {
           message: 'Voice command too long. Please keep commands under 1000 characters.',
           code: 'INPUT_TOO_LONG',
-        });
+        };
+        socket.emit('voice-error', error);
+        if (callback) callback({ success: false, error });
         return;
       }
 
       if (!isVoiceAllowed(id)) {
-        socket.emit('voice-error', {
+        const error = {
           message: 'Too many voice commands. Please wait before trying again.',
           code: 'RATE_LIMITED',
-        });
+        };
+        socket.emit('voice-error', error);
+        if (callback) callback({ success: false, error });
         return;
       }
 
       try {
-        await voiceAssistantService.processVoiceInput(
+        const response = await voiceAssistantService.processVoiceInput(
           id,
           {
             transcript: data.transcript.trim(),
@@ -151,11 +164,14 @@ export function initSocket(server: HttpServer): Server {
           },
           getPermissionLevel(role)
         );
+        if (callback) callback({ success: true, data: response });
       } catch (error: any) {
-        socket.emit('voice-error', {
+        const errPayload = {
           message: error.message,
           code: error.code || 'VOICE_PERMISSION_ERROR',
-        });
+        };
+        socket.emit('voice-error', errPayload);
+        if (callback) callback({ success: false, error: errPayload });
       }
     });
 

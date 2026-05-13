@@ -6,6 +6,7 @@ import { TanodLogo } from '../Branding';
 import { toast } from 'react-hot-toast';
 import { useGuardian } from '../../hooks/useGuardian';
 import { audioUtils } from '../../lib/audio';
+import socket from '../../lib/socket';
 
 export const GuardianVoiceAssistant: React.FC = () => {
   const { 
@@ -14,7 +15,9 @@ export const GuardianVoiceAssistant: React.FC = () => {
     isListening, 
     startListening, 
     stopListening, 
-    speak 
+    speak,
+    setTranscript,
+    setStatus
   } = useGuardian();
 
   const isSpeaking = status === 'RESPONDING';
@@ -24,6 +27,8 @@ export const GuardianVoiceAssistant: React.FC = () => {
   const [isDraggable, setIsDraggable] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [debug, setDebug] = useState<string | null>(null);
+
   const dragControls = useDragControls();
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,11 +40,13 @@ export const GuardianVoiceAssistant: React.FC = () => {
     if (isListening) {
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
+          setDebug("Microphone stabilized.");
           visualizer = audioUtils.createVisualizer(stream, (data) => {
             setVisualData(data);
           });
         })
         .catch(err => {
+          setDebug("Audio Error: " + err.message);
           console.error('Access denied for tactical audio analysis', err);
           if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
             toast.error("Tactical analysis requires microphone access.", { id: 'mic-denied' });
@@ -62,14 +69,21 @@ export const GuardianVoiceAssistant: React.FC = () => {
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (chatInput.trim()) {
-      // In a real enterprise app, we'd have a separate text processInput
-      // For now, we'll use the speak response logic with a manual text trigger
-      // Note: useGuardian's processInput logic is private to the hook's internal listeners,
-      // but we can expose it if needed or just handle simple speak here.
-      toast("Text command received", { icon: '⌨️' });
+    const text = chatInput.trim();
+    if (text) {
       setChatInput('');
       setShowChat(false);
+      setTranscript(text);
+      setStatus('PROCESSING');
+      
+      socket.emit('voice-command', { transcript: text }, (response: any) => {
+        if (response?.success && response.data) {
+          speak(response.data.reply, response.data.audioBase64);
+        } else {
+          toast.error(response?.error?.message || 'Guardian sync failure');
+          setStatus('IDLE');
+        }
+      });
     }
   };
 
@@ -110,6 +124,13 @@ export const GuardianVoiceAssistant: React.FC = () => {
       className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 touch-none"
       style={{ x: 0, y: 0 }} // Initialize with 0 to prevent jumping
     >
+      {/* DEBUG BOX */}
+      {debug && (
+        <div className="bg-black/80 text-green-400 p-2 text-[10px] font-mono text-left mb-2 rounded border border-green-900/50">
+          LOG: {debug}
+        </div>
+      )}
+
       {/* Interaction Feedback Bubble & Chat Input */}
       <AnimatePresence>
         {(isListening || isSpeaking || showChat) && (
@@ -230,6 +251,10 @@ export const GuardianVoiceAssistant: React.FC = () => {
           onPointerUp={clearLongPressTimer}
           onPointerLeave={clearLongPressTimer}
           onClick={(e) => {
+            // Kickstart for mobile
+            audioUtils.kickstartAudio();
+            setDebug("Audio kickstarted");
+
             if (isDraggable) {
               e.preventDefault();
               e.stopPropagation();

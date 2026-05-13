@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { setupRoutes } from './routes/index';
 import { globalLimiter, authLimiter, sosLimiter } from './middleware/rateLimiter';
+import { errorHandler } from './middleware/error';
 import { config } from './config/index';
 
 const app = express();
@@ -89,5 +90,8 @@ app.use('/api/auth/register', authLimiter);
 app.use('/api/sos/alert', sosLimiter);
 
 setupRoutes(app);
+
+// Error Handler
+app.use(errorHandler);
 
 export default app;

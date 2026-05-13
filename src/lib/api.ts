@@ -5,7 +5,7 @@
 
 import * as safeStorage from './safeStorage';
 
-const API_BASE = '/api';
+const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}, retries = 2) {
   const token = safeStorage.getItem('token');
@@ -21,30 +21,36 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
+    // If endpoint already starts with /, remove it before appending to API_BASE
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    const url = `${API_BASE}/${cleanEndpoint}`;
+    console.log(`[API] Fetching: ${url}`);
+    
     if (endpoint.includes('/undefined')) {
       console.error(`Attempted to fetch API endpoint with undefined ID: ${endpoint}`);
       throw new Error(`Invalid API endpoint (contains undefined): ${endpoint}`);
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
       headers,
       credentials: 'include', // send cookies for cross-origin authentication
       signal: controller.signal,
     });
+    
     clearTimeout(timeoutId);
 
     if (!response.ok) {
       // If it's a 5xx error or rate limit, we might want to retry
       if ((response.status >= 500 || response.status === 429) && retries > 0) {
-        console.warn(`API ${endpoint} failed with ${response.status}. Retrying... (${retries} left)`);
+        console.warn(`API ${url} failed with ${response.status}. Retrying... (${retries} left)`);
         await new Promise(res => setTimeout(res, 1000 * (3 - retries))); // Exponential-ish backoff
         return fetchAPI(endpoint, options, retries - 1);
       }
 
       const status = response.status;
       const statusText = response.statusText;
-      console.error(`API request to ${endpoint} failed with status ${status}: ${statusText}`);
+      console.error(`API request to ${url} failed with status ${status}: ${statusText}`);
       
       let errorMessage = `Server error (${status}): ${statusText}`;
       
