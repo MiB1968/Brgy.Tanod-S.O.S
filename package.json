@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "build:client": "cross-env NODE_OPTIONS=--max-old-space-size=4096 vite build",
     "build:server": "esbuild server.ts --bundle --platform=node --outfile=dist/server.cjs --format=cjs --packages=external",
-    "build": "rimraf dist && npm run build:client && npm run build:server",
+    "build": "rimraf dist && mkdir dist && vite build && esbuild server.ts --bundle --platform=node --outfile=dist/server.cjs --format=cjs --packages=external",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "typecheck:client": "tsc -p tsconfig.client.json --noEmit",

@@ -98,43 +98,32 @@ export function useGuardian() {
   }, [setStatus, setEmergency, speak, synth]);
 
   const askGuardian = useCallback(async (userText: string): Promise<string> => {
-    const BACKEND_URL = window.location.origin + "/api/guardian/analyze";
-    // Using environment variable check, but providing disclaimer for demo
-    const GEMINI_BACKUP_KEY = import.meta.env.VITE_GEMINI_API_KEY || ""; 
+    // Demo Bypass: Direct call to Google API
+    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-    setStatus("Thinking...");
+    if (!GEMINI_API_KEY) {
+        console.error("No VITE_GEMINI_API_KEY configured for demo bypass.");
+        return "I'm monitoring the situation. Stay calm, help is on the way.";
+    }
+
+    setStatus('PROCESSING');
 
     try {
-      // UNANG TRY: Tawagan ang iyong Backend
-      const response = await fetch(BACKEND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: userText }),
-      });
-
-      if (!response.ok) throw new Error("Backend Offline");
-
-      const data = await response.json();
-      return data.data?.reply || data.reply || "Help is on the way.";
-
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.` }] }]
+                }),
+            }
+        );
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
     } catch (err) {
-      console.log("Backend failed, switching to Direct AI Backup...");
-      
-      // BACKUP TRY: Direkta sa Google AI Studio
-      try {
-        if (!GEMINI_BACKUP_KEY) throw new Error("No backup key");
-        const backupRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_BACKUP_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.` }] }]
-          })
-        });
-        const backupData = await backupRes.json();
-        return backupData.candidates[0].content.parts[0].text;
-      } catch (backupErr) {
+        console.error("Direct AI call failed:", err);
         return "I'm monitoring the situation. Stay calm, help is on the way.";
-      }
     }
   }, [setStatus]);
 
