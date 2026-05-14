@@ -8,6 +8,34 @@
       "when": 1778543717554,
       "tag": "0000_goofy_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778749342767,
+      "tag": "0001_wise_toad_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778749740871,
+      "tag": "0002_early_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778749768901,
+      "tag": "0003_tiresome_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778750334571,
+      "tag": "0004_mature_green_goblin",
+      "breakpoints": true
     }
   ]
 }

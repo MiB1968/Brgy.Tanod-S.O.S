@@ -1,14 +1,38 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { Shield, MapPin, Clock, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Shield, MapPin, Clock, User, CheckCircle } from 'lucide-react';
 import { Incident } from '../../types';
 
 interface DispatchAlertProps {
   incident: Incident;
-  onDispatch: (incidentId: string) => void;
+  onDispatch: (incidentId: string) => Promise<void>;
 }
 
 export const DispatchAlert = ({ incident, onDispatch }: DispatchAlertProps) => {
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleDispatch = async () => {
+    setLoading(true);
+    await onDispatch(incident.id);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+    setLoading(false);
+  };
+
+  if (success) {
+      return (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-panel border-l-4 border-emerald-500 p-4 rounded-xl flex items-center gap-3 text-emerald-400"
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span className="font-bold text-xs uppercase tracking-widest">Dispatched Successfully</span>
+          </motion.div>
+      );
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -35,10 +59,11 @@ export const DispatchAlert = ({ incident, onDispatch }: DispatchAlertProps) => {
       </div>
 
       <button 
-        onClick={() => onDispatch(incident.id)}
+        onClick={handleDispatch}
+        disabled={loading}
         className="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-lg transition-colors"
       >
-        Dispatch Units Now
+        {loading ? 'Dispatching...' : 'Dispatch Units Now'}
       </button>
     </motion.div>
   );

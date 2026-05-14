@@ -9,7 +9,18 @@ import {
   type ModelConfig,
 } from '../config/aiModels';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai: GoogleGenAI | null = null;
+
+function getAIClient(): GoogleGenAI {
+  if (!ai) {
+    const key = process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY_NEW or GEMINI_API_KEY (Free Tier) is required for server-side AI');
+    }
+    ai = new GoogleGenAI({ apiKey: key });
+  }
+  return ai;
+}
 
 // =============================================================================
 // Schema
@@ -23,6 +34,11 @@ const AIAnalysisSchema = z.object({
   riskFactors: z.array(z.string()),
   estimatedResponseTimeMins: z.number().int().min(1).max(60),
   actionRecommendations: z.array(z.string()),
+  broadcastRecommendation: z.object({
+    shouldBroadcast: z.boolean(),
+    message: z.string().optional(),
+    reason: z.string().optional()
+  }).optional()
 });
 
 export type AIAnalysis = z.infer<typeof AIAnalysisSchema>;
@@ -69,7 +85,7 @@ async function callModel(
   );
 
   const callPromise = (async () => {
-    const result = await ai.models.generateContent({
+    const result = await getAIClient().models.generateContent({
       model: modelConfig.name,
       contents: prompt,
       config: {
@@ -221,6 +237,11 @@ Required JSON format:
   "recommendedResponders": ["string"],
   "riskFactors": ["string"],
   "estimatedResponseTimeMins": 1-60,
-  "actionRecommendations": ["string"]
+  "actionRecommendations": ["string"],
+  "broadcastRecommendation": {
+    "shouldBroadcast": boolean,
+    "message": "string",
+    "reason": "string"
+  }
 }`;
 }

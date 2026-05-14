@@ -25,8 +25,11 @@ let aiClient: GoogleGenAI | null = null;
 
 function getAiClient(): GoogleGenAI {
   if (!aiClient) {
-    // SDK will automatically detect GOOGLE_API_KEY or GEMINI_API_KEY
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const key = process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY_NEW or GEMINI_API_KEY (Free Tier) is required for voice assistant');
+    }
+    aiClient = new GoogleGenAI({ apiKey: key });
   }
   return aiClient;
 }

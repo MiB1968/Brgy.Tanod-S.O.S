@@ -1,0 +1,1 @@
+ALTER TABLE "alerts" ALTER COLUMN "responder_recommendations" SET DATA TYPE jsonb;

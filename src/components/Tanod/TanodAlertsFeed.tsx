@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Filter, MapPin, Shield, CheckCircle, AlertTriangle, Zap, Radio, Signal } from 'lucide-react';
 import { Alert, User } from '../../types';
-import { cn } from '../../lib/utils';
+import { cn, dist } from '../../lib/utils';
 import { IconNewIncident } from '../TacticalIcons';
 import { DispatchAlert } from '../Admin/DispatchAlert';
 import { TacticalCard } from '../Tactical/TacticalCard';
 import { TacticalButton } from '../Tactical/TacticalButton';
+import { useTanodStore } from '../../store/useTanodStore';
 
 interface TanodAlertsFeedProps {
   alerts: Alert[];
@@ -24,6 +25,25 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
   const [filterTime, setFilterTime] = useState<string>('ALL');
+  const { patrols, setHighlightedPatrolId } = useTanodStore();
+
+  const handleDispatch = async (alert: Alert) => {
+    // Find nearest patrol
+    let nearest: any = null, best = Infinity;
+    patrols.forEach((p:any)=>{
+        if(!p.location?.lat||!p.location?.lng) return;
+        const d = dist(alert.location.lat, alert.location.lng, p.location.lat, p.location.lng);
+        if(d<best){ best=d; nearest=p; }
+    });
+    
+    if (nearest) {
+        setHighlightedPatrolId(nearest.tanodId);
+        // Clear highlight after a few seconds
+        setTimeout(() => setHighlightedPatrolId(null), 5000);
+    }
+    
+    await onUpdateStatus(alert, 'responding');
+  };
 
   const isActiveAlert = (alert: Alert) => ['pending', 'active'].includes(alert.status?.toLowerCase() || '');
   const isRespondedAlert = (alert: Alert) => alert.status?.toLowerCase() === 'responding';
@@ -83,7 +103,7 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
                   description: alert.description || 'No description',
                   status: 'pending'
                 }}
-                onDispatch={() => onUpdateStatus(alert, 'responding')}
+                onDispatch={() => handleDispatch(alert)}
               />
             ))}
           </div>

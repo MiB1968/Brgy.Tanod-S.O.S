@@ -386,17 +386,30 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     if (collection === 'system_broadcasts' || collection === 'broadcasts') {
       if (!isTanod) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
       if (docId) {
-        await pool.query("UPDATE system_broadcasts SET isactive = $1 WHERE id = $2", [data.isActive, docId]);
+        const fieldMapping: Record<string, string> = {
+          isActive: 'isactive',
+          approvalStatus: 'approval_status',
+          adminId: 'admin_id',
+          adminName: 'admin_name',
+          type: 'type'
+        };
+        const updateFields = Object.keys(data).filter(f => fieldMapping[f]);
+        if (updateFields.length === 0) return response.error(res, "No valid fields to update", "BAD_REQUEST", 400);
+        
+        const setClause = updateFields.map((f, i) => `${fieldMapping[f]} = $${i + 2}`).join(', ');
+        await pool.query(`UPDATE system_broadcasts SET ${setClause} WHERE id = $1`, [docId, ...updateFields.map(f => data[f])]);
+        
         const result = await pool.query("SELECT * FROM system_broadcasts WHERE id = $1", [docId]);
         socketService.emitToAll("broadcast_update", result.rows[0]);
+        return res.json({ success: true, broadcast: result.rows[0] });
       } else {
         const result = await pool.query(
-          "INSERT INTO system_broadcasts (admin_id, admin_name, message, type, isactive, timestamp) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-          [data.adminId, data.adminName, data.message, data.type, data.isActive ?? true, data.timestamp || new Date().toISOString()]
+          "INSERT INTO system_broadcasts (admin_id, admin_name, message, type, isactive, timestamp, approval_status, ai_recommendation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+          [data.adminId, data.adminName, data.message, data.type, data.isActive ?? false, data.timestamp || new Date().toISOString(), data.approvalStatus || 'pending', data.aiRecommendation ? JSON.stringify(data.aiRecommendation) : null]
         );
         socketService.emitToAll("broadcast_update", result.rows[0]);
+        return res.json({ success: true, broadcast: result.rows[0] });
       }
-      return res.json({ success: true });
     }
 
     if (collection === 'incidents') {

@@ -170,13 +170,16 @@ export interface TanodPatrolSession {
 
 export interface SystemBroadcast {
   id: string;
+  incidentId?: string;
   adminId: string;
   adminName: string;
-  type: 'evacuation' | 'calamity' | 'security' | 'other';
+  type: 'evacuation' | 'calamity' | 'security' | 'other' | 'emergency';
   message: string;
   isActive: boolean;
   timestamp: string;
   expiresAt?: string;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  aiRecommendation?: any;
 }
 
 export interface WitnessRequest {

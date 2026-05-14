@@ -242,7 +242,7 @@ export default function ActiveMap({
       >
         <OfflineTileLayer
           attribution="&copy; <a href=&quot;https://carto.com/attributions&quot;>CARTO</a>"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
         />
         <ChangeView center={mapCenter} zoom={zoom} />
         

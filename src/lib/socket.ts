@@ -11,6 +11,7 @@ const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
   rememberUpgrade: false, // Don't remember a failed or unstable websocket upgrade
   // Explicitly set path to avoid any ambiguity
   path: '/socket.io/',
+  transports: ['polling'],
   secure: true,
   withCredentials: true
 });

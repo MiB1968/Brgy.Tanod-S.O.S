@@ -121,7 +121,7 @@ export default function TanodDashboard({
       />
 
       <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">
-        <LiveMap />
+        <LiveMap effectiveRole={profile?.role} />
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

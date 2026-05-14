@@ -47,6 +47,8 @@ export const alerts = pgTable('alerts', {
   location: jsonb('location').notNull(),
   description: text('description'),
   severityScore: integer('severity_score'),
+  urgencyLevel: text('urgency_level'),
+  responderRecommendations: jsonb('responder_recommendations'),
   aiAnalysis: jsonb('ai_analysis'),
   assignedTo: uuid('assigned_to'),
   assignedToName: text('assigned_to_name'),
@@ -87,12 +89,15 @@ export const systemConfig = pgTable('system_config', {
 
 export const systemBroadcasts = pgTable('system_broadcasts', {
   id: uuid('id').primaryKey().defaultRandom(),
+  incidentId: uuid('incident_id').references(() => alerts.id),
   message: text('message').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
-  isActive: boolean('isactive').default(true),
+  isActive: boolean('isactive').default(false),
   adminId: uuid('admin_id'),
   adminName: text('admin_name'),
-  type: text('type')
+  type: text('type'),
+  approvalStatus: text('approval_status').default('pending'), // 'pending', 'approved', 'rejected'
+  aiRecommendation: jsonb('ai_recommendation')
 });
 
 export const witnessInvites = pgTable('witness_invites', {
@@ -165,13 +170,15 @@ export const incidents = pgTable('incidents', {
   personsInvolved: text('persons_involved'),
   actionsTaken: text('actions_taken'),
   status: text('status'),
+  citizenName: text('citizen_name'), // Added column
   assignedTo: uuid('assigned_to'),
   assignedToName: text('assigned_to_name'),
   respondedBy: uuid('responded_by'),
   respondedByName: text('responded_by_name'),
   respondedAt: timestamp('responded_at', { withTimezone: true }),
   resolutionNotes: text('resolution_notes'),
-  responderNotes: text('responder_notes')
+  responderNotes: text('responder_notes'),
+  adminOnDuty: uuid('admin_on_duty') // Added missing column too based on postSync query
 });
 
 export const patrolSessions = pgTable('patrol_sessions', {

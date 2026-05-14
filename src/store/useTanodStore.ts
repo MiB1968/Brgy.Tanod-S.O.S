@@ -16,6 +16,8 @@ interface TanodState {
   updateShiftStatus: (shiftId: string, status: Shift['status']) => void;
   updateTanodStatus: (tanodId: string, status: RegistryStatus) => void;
   addActivityLog: (log: TanodActivityLog) => void;
+  highlightedPatrolId: string | null;
+  setHighlightedPatrolId: (id: string | null) => void;
 }
 
 export const useTanodStore = create<TanodState>((set) => ({
@@ -24,6 +26,8 @@ export const useTanodStore = create<TanodState>((set) => ({
   activityLogs: [],
   patrolSessions: [],
   tanods: [],
+  highlightedPatrolId: null,
+  setHighlightedPatrolId: (id) => set({ highlightedPatrolId: id }),
   updatePatrol: (patrol: PatrolLocation) => set((state) => {
     const tid = patrol.tanodId || patrol.id;
     if (!tid) return state;

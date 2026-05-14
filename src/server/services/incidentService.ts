@@ -85,6 +85,18 @@ export const incidentService = {
 
     const incident = await incidentRepository.create(incidentData);
 
+    // Handle automated broadcast recommendation
+    if (aiAnalysis.broadcastRecommendation?.shouldBroadcast) {
+      try {
+        await pool.query(
+          "INSERT INTO system_broadcasts (incident_id, message, type, approval_status, ai_recommendation) VALUES ($1, $2, $3, 'pending', $4)",
+          [incident.id, aiAnalysis.broadcastRecommendation.message, 'emergency', JSON.stringify(aiAnalysis.broadcastRecommendation)]
+        );
+      } catch (e) {
+        console.error("Failed to create automated broadcast recommendation", e);
+      }
+    }
+
     // Fetch the resident name for realtime emission
     let residentName = 'Resident';
     try {

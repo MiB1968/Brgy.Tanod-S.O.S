@@ -37,7 +37,7 @@ export default function ReportMap({ lat, lng }: ReportMapProps) {
       >
         <OfflineTileLayer
           attribution="&copy; <a href=&quot;https://carto.com/attributions&quot;>CARTO</a>"
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
         />
         <Marker position={[lat, lng]} icon={IncidentIcon}>
           <Popup>

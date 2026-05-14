@@ -96,7 +96,7 @@ export function useSocketListeners(
         tanodName: loc.name || 'Active Responder',
         location: { lat: loc.lat, lng: loc.lng },
         isActive: true,
-        status: 'patrolling',
+        status: loc.status || 'patrolling',
         lastUpdate: loc.timestamp || new Date().toISOString()
       }));
       useTanodStore.getState().setPatrols(patrolsToSet);
@@ -109,7 +109,7 @@ export function useSocketListeners(
         tanodName: loc.name || 'Active Responder',
         location: { lat: loc.lat, lng: loc.lng },
         isActive: true,
-        status: 'patrolling',
+        status: loc.status || 'patrolling',
         lastUpdate: loc.timestamp || new Date().toISOString()
       });
     });

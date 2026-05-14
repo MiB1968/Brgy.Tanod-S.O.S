@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import type { UserRole } from "./types";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import { cn, isValidCoord } from "./lib/utils";
@@ -114,6 +115,12 @@ const makeOfficerIcon = () => L.divIcon({
   className: "",
   html: `<div class="officer-wrap"><div class="officer-ring"></div><div class="officer-dot">👮</div></div>`,
   iconSize: [36, 36], iconAnchor: [18, 18],
+});
+
+const makeHighlightedOfficerIcon = () => L.divIcon({
+  className: "",
+  html: `<div class="officer-wrap"><div class="officer-ring" style="border: 3px solid #FACC15;"></div><div class="officer-dot" style="background:#422006; border: 3px solid #FACC15; transform: scale(1.3);">👮</div></div>`,
+  iconSize: [45, 45], iconAnchor: [22, 22],
 });
 
 const makeSosIcon = (type: string) => {
@@ -336,9 +343,9 @@ function MapDownloadControl() {
 }
 
 // ─── LiveMap ──────────────────────────────────────────────────────────────────
-export default function LiveMap() {
+export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | string }) {
   const { alerts }  = useIncidentStore();
-  const { patrols } = useTanodStore();
+  const { patrols, highlightedPatrolId } = useTanodStore();
   const [showPatrols, setShowPatrols] = useState(true);
   const [showSOS,     setShowSOS]     = useState(true);
   const [showRoutes,  setShowRoutes]  = useState(true);
@@ -353,9 +360,10 @@ export default function LiveMap() {
 
   useEffect(() => {
     const loadResidents = async () => {
+        if (!['admin', 'superadmin', 'tanod'].includes(effectiveRole || '')) {
+            return;
+        }
       try {
-        // Skip resident listing for non-tanods to avoid 403 errors
-        // Note: Real solution would be a public-safe endpoint, but for now we safeguard it.
         const data = await api.residents.getAll();
         const validData = data.filter((r: any) => r.gpsLat && r.gpsLng && r.status === 'approved');
         setResidents(validData);
@@ -496,7 +504,7 @@ export default function LiveMap() {
       >
         <OfflineTileLayer
           attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
         />
 
         <MapController patrols={patrols} alerts={alerts} showP={showPatrols} showS={showSOS} />
@@ -543,20 +551,23 @@ export default function LiveMap() {
         ))}
 
         {/* Active patrols */}
-        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => (
-          <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={makeOfficerIcon()} zIndexOffset={100}>
-            <Popup>
-              <div className="pp">
-                <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
-                <p className="pp-name">{p.tanodName}</p>
-                <span className="pp-badge" style={{ background:"rgba(74,239,128,0.12)", color:"#4AEF80", border:"1px solid rgba(74,239,128,0.25)" }}>
-                  🟢 ON DUTY
-                </span>
-                <p className="pp-meta">Last ping: {new Date(p.lastUpdate).toLocaleTimeString()}</p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => {
+          const isHighlighted = p.tanodId === highlightedPatrolId;
+          return (
+            <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
+              <Popup>
+                <div className="pp">
+                  <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
+                  <p className="pp-name">{p.tanodName}</p>
+                  <span className="pp-badge" style={{ background:"rgba(74,239,128,0.12)", color:"#4AEF80", border:"1px solid rgba(74,239,128,0.25)" }}>
+                    {p.status?.toUpperCase() || 'PATROLLING'}
+                  </span>
+                  <p className="pp-meta">Last ping: {new Date(p.lastUpdate).toLocaleTimeString()}</p>
+                </div>
+              </Popup>
+            </Marker>
+          )
+        })}
 
         {/* SOS alerts */}
         {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)).map((a) => {

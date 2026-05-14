@@ -22,7 +22,8 @@ export function useLocationTracking() {
               lat: loc.lat,
               lng: loc.lng,
               name: profile.name,
-              accuracy: loc.accuracy
+              accuracy: loc.accuracy,
+              status: 'patrolling'
             });
           }
         },
@@ -40,7 +41,8 @@ export function useLocationTracking() {
               lat: loc.lat,
               lng: loc.lng,
               name: profile.name,
-              accuracy: loc.accuracy
+              accuracy: loc.accuracy,
+              status: 'active'
             });
           }
         },

@@ -6,13 +6,18 @@ export class IncidentRepository {
   async create(data: any): Promise<Incident> {
     try {
       const location = JSON.stringify({ lat: data.latitude, lng: data.longitude });
-      const aiAnalysis = data.aiAnalysis ? JSON.stringify(data.aiAnalysis) : null;
+      const aiAnalysisObj = data.aiAnalysis;
+      const aiAnalysis = aiAnalysisObj ? JSON.stringify(aiAnalysisObj) : null;
+      const severityScore = aiAnalysisObj?.severityScore || null;
+      const urgencyLevel = aiAnalysisObj?.urgency || null;
+      const responderRecommendations = aiAnalysisObj?.recommendedResponders ? JSON.stringify(aiAnalysisObj.recommendedResponders) : null;
+      
       // Note: barangayId, photos, and voiceClip are ignored or properly handled depending on your DB schema.
       // Since 'alerts' is the SOS table, we map reporterId -> resident_id.
       const result = await pool.query(
-        `INSERT INTO alerts (resident_id, type, description, location, status, ai_analysis, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, now(), now()) RETURNING *`,
-        [data.reporterId, data.type, data.description || '', location, data.status ? data.status.toLowerCase() : 'pending', aiAnalysis]
+        `INSERT INTO alerts (resident_id, type, description, location, status, ai_analysis, severity_score, urgency_level, responder_recommendations, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()) RETURNING *`,
+        [data.reporterId, data.type, data.description || '', location, data.status ? data.status.toLowerCase() : 'pending', aiAnalysis, severityScore, urgencyLevel, responderRecommendations]
       );
       const row = result.rows[0];
       return {

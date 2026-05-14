@@ -669,7 +669,7 @@ export default function App() {
                       <div className="flex items-center gap-2"><span className="text-base">🟢</span> TANOD ON DUTY</div>
                     </div>
                   </div>
-                  <LiveMap />
+                  <LiveMap effectiveRole={effectiveRole} />
                 </div>
               )}
               {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}

@@ -9,6 +9,7 @@ interface LocationEntry {
   lng: number;
   name?: string;
   timestamp?: string;
+  status?: string;
 }
 
 const activeLocations: Record<string, LocationEntry> = {};
