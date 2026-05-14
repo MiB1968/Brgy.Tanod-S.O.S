@@ -76,6 +76,17 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes slideIn {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes flash {
+  0% { background-color: #ff3b30; }
+  50% { background-color: #990000; }
+  100% { background-color: #ff3b30; }
+}
+
 
 
 

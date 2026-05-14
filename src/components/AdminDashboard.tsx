@@ -19,6 +19,7 @@ import { TanodActivityLogs } from './Admin/TanodActivityLogs';
 import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import { SOSBroadcastPanel } from './Admin/SOSBroadcastPanel';
 import { BroadcastReview } from './Admin/BroadcastReview';
+import { EmergencyAlertBanner } from './Admin/EmergencyAlertBanner';
 import { GuardianVoiceAssistant } from './ai/GuardianVoiceAssistant';
 import { GuardianGreeting } from './ai/GuardianGreeting';
 import { PoliceLights } from './PoliceLights';
@@ -232,6 +233,13 @@ export default function AdminDashboard({
       animate="show"
       className="space-y-6 md:space-y-8 pb-20 tactical-grid min-h-screen p-4 md:p-8 bg-tactical-dark"
     >
+      <EmergencyAlertBanner 
+        activeIncident={alerts.filter(isActiveAlert)[0] || null}
+        onAcknowledge={() => {
+            const first = alerts.filter(isActiveAlert)[0];
+            if(first) setSelectedAlertForDetails(first);
+        }}
+      />
       <PoliceLights active={isFlashing} />
       
       <DashboardHeader 

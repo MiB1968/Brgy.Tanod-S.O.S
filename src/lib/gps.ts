@@ -45,7 +45,7 @@ export async function getCurrentLocation(): Promise<Location> {
   });
 }
 
-export function watchLocation(onUpdate: (location: Location) => void, onError?: (error: Error) => void) {
+export function watchLocation(onUpdate: (location: Location) => void, onError?: (error: Error) => void, options: PositionOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }) {
   if (!navigator.geolocation) {
     onError?.(new Error('Geolocation is not supported by your browser'));
     return () => {};
@@ -63,11 +63,7 @@ export function watchLocation(onUpdate: (location: Location) => void, onError?: 
     (error) => {
       onError?.(new Error(error.message));
     },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    }
+    options
   );
 
   return () => navigator.geolocation.clearWatch(watchId);
