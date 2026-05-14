@@ -32,6 +32,11 @@ export const config = {
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, ''),
 
+  apiSecretKey:
+    process.env.VITE_API_SECRET_KEY?.trim() ||
+    process.env.API_SECRET_KEY?.trim() ||
+    (process.env.NODE_ENV !== 'production' ? 'dev_fallback_secret' : ''),
+
   geminiApiKey: process.env.GEMINI_API_KEY?.trim() || null,
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,

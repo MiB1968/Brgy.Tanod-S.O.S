@@ -12,6 +12,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'x-api-key': import.meta.env.VITE_API_SECRET_KEY || 'dev_fallback_secret',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };

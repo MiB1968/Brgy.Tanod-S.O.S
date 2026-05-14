@@ -72,7 +72,7 @@ export function AdminStatsGrid({
         label="Online Tanods" 
         value={onDutyTanods.filter((t: any) => {
           const s = (t.status as string)?.toLowerCase();
-          return s === 'on-duty' || s === 'on patrol' || s === 'responding' || s === 'available';
+          return s === 'on-duty' || s === 'responding' || s === 'available';
         }).length} 
         icon={IconOnlineTanods}
         color="text-tactical-cyan" 
