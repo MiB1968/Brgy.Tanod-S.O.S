@@ -13,6 +13,18 @@ export interface AuthRequest extends Request {
 
 export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  const apiKey = req.headers['x-api-key'];
+
+  // Check for API Key first, if present and valid, skip JWT
+  if (apiKey && config.apiKey && apiKey === config.apiKey) {
+    // Treat as system-level user
+    req.user = {
+      id: 'system',
+      email: 'system@tanod.sos',
+      role: 'admin' // Or some kind of system role
+    };
+    return next();
+  }
   
   if (!token) {
     return res.status(401).json({ 

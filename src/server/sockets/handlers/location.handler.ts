@@ -39,6 +39,13 @@ export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
     // Broadcast delta to responders room only
     io.to('responders').emit('location_update_delta', newEntry);
   });
+
+  socket.on('disconnect', () => {
+    if (user && user.id) {
+      delete activeLocations[user.id];
+      io.to('responders').emit('location_remove_delta', { user_id: user.id });
+    }
+  });
 }
 
 export function startLocationExpiryTask(io: Server) {

@@ -221,7 +221,11 @@ function buildPrompt(
   initialType?: string,
   nearestTanodDistanceKm?: number
 ): string {
-  return `You are an emergency triage AI for a Philippine barangay (Brgy. Tanod S.O.S. System).
+  return `You are an expert AI emergency triage coordinator for a Philippine Barangay Tanod system (Brgy. Tanod S.O.S.).
+Your task is to analyze incoming disaster, neighborhood security, medical, and public disturbance reports from residents, categorize them accurately based on local Philippine Barangay context, and recommend appropriate, actionable responses.
+
+Be proactive, authoritative, concise, and context-aware. Consider local factors typical in Philippine barangays such as narrow streets/accessibility, localized hazards (flooding, fires), and common neighborhood disputes.
+
 Analyze this incident report and respond with ONLY a valid JSON object — no markdown, no explanation.
 
 Incident Description: "${description}"

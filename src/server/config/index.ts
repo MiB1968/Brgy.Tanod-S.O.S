@@ -32,10 +32,10 @@ export const config = {
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, ''),
 
-  geminiApiKey: process.env.GEMINI_API_KEY?.trim() || null,
+  geminiApiKey: (process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   guardianAiKey:
-    (process.env.GUARDIAN_AI_KEY || process.env.GEMINI_API_KEY)?.trim() || null,
-  geminiModel: (process.env.GEMINI_MODEL || 'gemini-1.5-flash').replace(/^models\//, ''),
+    (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
+  geminiModel: (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').replace(/^models\//, ''),
 
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,
@@ -72,4 +72,5 @@ export const config = {
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project',
   },
+  apiKey: process.env.API_KEY || null,
 };

@@ -5,7 +5,7 @@
 
 import * as safeStorage from './safeStorage';
 
-const API_BASE = typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api';
+const API_BASE = '/api';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}, retries = 2) {
   const token = safeStorage.getItem('token');

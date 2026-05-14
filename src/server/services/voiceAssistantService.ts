@@ -9,6 +9,7 @@ import { SOCKET_EVENTS } from '../constants';
 import { anomalyDetectionService } from './anomalyDetectionService';
 import { ttsService } from './ttsService';
 import { config } from '../config/index';
+import { AI_MODELS } from '../config/aiModels';
 
 import {
   VoiceInput,
@@ -55,7 +56,7 @@ export class SecureVoiceAssistantService {
 
   constructor() {
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
-    console.log(`[JARVIS] AI Service initialized. Model: ${config.geminiModel || 'gemini-1.5-flash'}. API Key present: ${!!(config.geminiApiKey || process.env.GEMINI_API_KEY)}`);
+    console.log(`[JARVIS] AI Service initialized. Model: ${config.geminiModel || AI_MODELS.flash.name}. API Key present: ${!!(config.geminiApiKey || process.env.GEMINI_API_KEY)}`);
   }
 
 
@@ -166,7 +167,7 @@ export class SecureVoiceAssistantService {
 
       console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}"`);
       const result = await getAiClient().models.generateContent({
-        model: config.geminiModel || 'gemini-1.5-flash',
+        model: config.geminiModel || AI_MODELS.flash.name,
         contents: [{ role: 'user', parts: [{ text: transcript }] }],
         config: {
           systemInstruction: this.buildSystemPrompt(context, currentRole)
@@ -464,7 +465,7 @@ STRICT CONSTRAINTS:
       const context = await this.getLiveContext();
 
       const result = await getAiClient().models.generateContent({
-        model: config.geminiModel || 'gemini-1.5-flash',
+        model: config.geminiModel || AI_MODELS.flash.name,
         contents: [{ role: 'user', parts: [
           { inlineData: { mimeType, data: audioBuffer.toString('base64') } }
         ] }],
