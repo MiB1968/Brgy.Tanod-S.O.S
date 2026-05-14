@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import { setupRoutes } from './routes/index';
 import { globalLimiter, authLimiter, sosLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/error';
+import { requireApiKey } from './middleware/apiKey';
 import { config } from './config/index';
 
 const app = express();
@@ -85,6 +86,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use('/api/', globalLimiter);
+app.use('/api/', requireApiKey);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 app.use('/api/sos/alert', sosLimiter);
