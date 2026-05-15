@@ -20,6 +20,7 @@ const auditLogArchiveSchema = z.object({
 
 export const getSync = async (req: AuthRequest, res: Response) => {
   const { path: fullPath } = req.query;
+  console.log(`[SYNC] getSync requested: ${fullPath}`);
   if (!fullPath) return response.error(res, "Path required", "BAD_REQUEST", 400);
 
   const fullPathStr = decodeURIComponent(fullPath as string);
@@ -419,7 +420,9 @@ export const postSync = async (req: AuthRequest, res: Response) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           data.alertId || null, 
-          data.tanodId, 
+          // If tanodId is passed as "Name (Handle)", it wont be a valid UUID. 
+          // We need to resolve the ID from name/handle or set to null if not a valid UUID.
+          (data.tanodId && data.tanodId.length === 36 && data.tanodId.includes('-')) ? data.tanodId : null, 
           data.tanodName, 
           data.citizenName || data.citizen || 'Unknown',
           data.timestamp || new Date().toISOString(), 
@@ -432,7 +435,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
           data.status || 'pending',
           data.respondedAt || null,
           data.resolvedAt || null,
-          data.adminOnDuty || null
+          (data.adminOnDuty && data.adminOnDuty.length === 36 && data.adminOnDuty.includes('-')) ? data.adminOnDuty : null
         ]
       );
       return res.json({ success: true });

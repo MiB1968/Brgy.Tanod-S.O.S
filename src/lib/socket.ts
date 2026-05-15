@@ -12,6 +12,7 @@ const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
   // Explicitly set path to avoid any ambiguity
   path: '/socket.io/',
   transports: ['polling', 'websocket'],
+  timeout: 60000, 
   secure: true,
   withCredentials: true
 });
