@@ -673,7 +673,7 @@ export default function App() {
                 </div>
               )}
               {activeTab === 'residents' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <AdminResidents profile={effectiveProfile} />}
-              {activeTab === 'resident-map' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && <ResidentTacticalMap />}
+              {activeTab === 'resident-map' && (effectiveRole === 'admin' || effectiveRole === 'superadmin') && effectiveProfile && <ResidentTacticalMap profile={effectiveProfile} />}
               {activeTab === 'directory' && <DirectoryView />}
               {activeTab === 'schedule' && effectiveProfile && <ScheduleView profile={effectiveProfile} role={effectiveRole as any} />}
               {activeTab === 'reports' && <ReportsView />}

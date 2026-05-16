@@ -20,7 +20,8 @@ const auditLogArchiveSchema = z.object({
 
 export const getSync = async (req: AuthRequest, res: Response) => {
   const { path: fullPath } = req.query;
-  console.log(`[SYNC] getSync requested: ${fullPath}`);
+  console.log(`[SYNC] getSync requested: ${fullPath} from user: ${req.user?.id} role: ${req.user?.role}`);
+
   if (!fullPath) return response.error(res, "Path required", "BAD_REQUEST", 400);
 
   const fullPathStr = decodeURIComponent(fullPath as string);

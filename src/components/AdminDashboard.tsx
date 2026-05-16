@@ -89,14 +89,17 @@ export default function AdminDashboard({
   const pendingAlertsCount = alerts.filter(a => isActiveAlert(a)).length;
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
+    // Hard restrict: Resident role should never be here, and if they are, do nothing.
+    if (!profile || profile.role === 'resident') return;
 
     const hasActive = alerts.some(a => isActiveAlert(a));
     setIsFlashing(hasActive || sirenActive);
   }, [alerts, profile, sirenActive]);
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
+    console.log('[DEBUG] AdminDashboard loadStats useEffect mounted with profile role:', profile?.role);
+    // Hard restrict: Resident role should never be here, and if they are, do nothing.
+    if (!profile || profile.role === 'resident') return;
 
     const loadStats = async () => {
       try {
@@ -321,7 +324,7 @@ export default function AdminDashboard({
           </div>
         </div>
         <div className="lg:col-span-1 space-y-8">
-          { (profile?.role === 'admin' || profile?.role === 'superadmin') && <AdminAnalytics /> }
+          { (profile?.role === 'admin' || profile?.role === 'superadmin') && <AdminAnalytics profile={profile} /> }
           <ManageBroadcasts />
         </div>
       </div>

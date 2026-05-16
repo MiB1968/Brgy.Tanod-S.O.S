@@ -17,19 +17,20 @@ interface DashboardViewProps {
   activeBroadcast: SystemBroadcast | null;
 }
 
-export default function DashboardView({ 
-  profile, 
-  alerts, 
-  patrols, 
-  visiblePatrols, 
-  onTabChange, 
-  isOnline, 
-  deferredPrompt, 
-  onInstall, 
-  sirenActive, 
-  onToggleSiren, 
-  activeBroadcast 
+export default function DashboardView({
+  profile,
+  alerts,
+  patrols,
+  visiblePatrols,
+  onTabChange,
+  isOnline,
+  deferredPrompt,
+  onInstall,
+  sirenActive,
+  onToggleSiren,
+  activeBroadcast,
 }: DashboardViewProps) {
+  console.log('[DEBUG] DashboardView rendered with profile role:', profile.role);
   if (profile.role === 'resident') {
     return (
       <ResidentDashboard 

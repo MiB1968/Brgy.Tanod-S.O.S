@@ -4,9 +4,9 @@ import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import * as api from '../../lib/api';
 import socket from '../../lib/socket';
-import { ResidentProfile } from '../../types';
+import { ResidentProfile, User } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Filter, MapPin, Phone, User, Calendar, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Users, Filter, MapPin, Phone, User as UserIcon, Calendar, ShieldCheck, ExternalLink } from 'lucide-react';
 import { cn, isValidCoord } from '../../lib/utils';
 import 'leaflet/dist/leaflet.css';
 
@@ -36,7 +36,7 @@ const ResidentIcon = L.divIcon({
   iconAnchor: [16, 32]
 });
 
-export default function ResidentTacticalMap() {
+export default function ResidentTacticalMap({ profile }: { profile: User | null }) {
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -46,6 +46,9 @@ export default function ResidentTacticalMap() {
 
   useEffect(() => {
     const loadResidents = async () => {
+      // Security: only allow admin/tanod
+      if (!profile || !['admin', 'superadmin', 'tanod'].includes(profile.role)) return;
+
       try {
         const data = await api.residents.getAll();
         // Since api.residents.getAll returns raw data from /sync?path=residents
@@ -172,7 +175,7 @@ export default function ResidentTacticalMap() {
                             <div className="p-4 bg-[#0D0D12] text-white font-mono min-w-[240px] rounded-2xl border-2 border-white/10 shadow-2xl">
                                 <div className="flex items-start gap-4 mb-4">
                                     <div className="w-12 h-12 rounded-xl bg-info/10 border border-info/20 flex items-center justify-center">
-                                       <User className="w-6 h-6 text-info" />
+                                       <UserIcon className="w-6 h-6 text-info" />
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-black uppercase italic tracking-tighter text-white">

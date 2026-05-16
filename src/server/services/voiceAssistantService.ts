@@ -91,9 +91,10 @@ export class SecureVoiceAssistantService {
       return cached.data;
     }
 
-    const [activeIncidents, availableTanods] = await Promise.all([
+    const [activeIncidents, availableTanods, counts] = await Promise.all([
       this.incidentRepo.findActiveByBarangay(barangayId),
       this.tanodRepo.getActiveTanods(),
+      this.incidentRepo.getCountsByStatus(),
     ]);
 
     const contextData: VoiceContext = {
@@ -116,7 +117,8 @@ export class SecureVoiceAssistantService {
       barangayInfo: {
         name: 'Barangay Command',
         zoneCount: 12,
-        activeAlerts: activeIncidents.length,
+        pendingIncidents: counts.pending,
+        respondingIncidents: counts.responding,
       },
     };
 
@@ -289,7 +291,8 @@ export class SecureVoiceAssistantService {
 CONTEXT: You are assisting citizens and responders in a potential emergency in the Philippines.
 CURRENT ROLE: ${role}
 UNITS AVAILABLE: ${context.availableTanods.length}
-PENDING INCIDENTS: ${context.activeIncidents.length}
+PENDING INCIDENTS: ${context.barangayInfo.pendingIncidents}
+RESPONDING INCIDENTS: ${context.barangayInfo.respondingIncidents}
 
 STRICT CONSTRAINTS:
 - NEVER exceed 15 words per response.

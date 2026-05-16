@@ -40,6 +40,19 @@ export class IncidentRepository {
     }
   }
 
+  async getCountsByStatus(): Promise<{ pending: number, responding: number }> {
+    const result = await pool.query(`
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'responding') as responding
+      FROM alerts;
+    `);
+    return {
+      pending: parseInt(result.rows[0].pending, 10),
+      responding: parseInt(result.rows[0].responding, 10)
+    };
+  }
+
   async findActiveByBarangay(barangayId: string, limit = 30): Promise<Incident[]> {
     const result = await pool.query(`
       SELECT * FROM alerts 

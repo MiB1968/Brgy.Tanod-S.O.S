@@ -4,16 +4,19 @@ import { motion } from 'motion/react';
 import { BarChart as ChartIcon, Zap, Shield, Users, Activity } from 'lucide-react';
 import { fetchAPI } from '../../lib/api';
 import { toast } from 'react-hot-toast';
+import { User } from '../../types';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
-export default function AdminAnalytics() {
+export default function AdminAnalytics({ profile }: { profile: User | null }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
 
   const fetchAnalytics = async (silent = false) => {
+    if (!profile || !['admin', 'superadmin', 'tanod'].includes(profile.role)) return;
+    
     if (!silent) setLoading(true);
     try {
       const json = await fetchAPI('analytics/dashboard');

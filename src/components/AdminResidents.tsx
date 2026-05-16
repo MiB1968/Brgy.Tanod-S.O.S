@@ -16,7 +16,12 @@ export default function AdminResidents({ profile }: { profile: any }) {
   const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) return;
+    // Extra safety, although conditional rendering in App.tsx prevents this component
+    // from being rendered if not authorized
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'tanod' && profile.role !== 'superadmin')) {
+      setLoading(false);
+      return;
+    }
 
     const fetchResidents = async () => {
       try {
@@ -40,10 +45,10 @@ export default function AdminResidents({ profile }: { profile: any }) {
     };
 
     fetchResidents();
-    socket.on('resident_update', () => fetchResidents());
+    socket.on('resident_update', fetchResidents);
     
     return () => {
-      socket.off('resident_update');
+      socket.off('resident_update', fetchResidents);
     };
   }, [filter, profile]);
 

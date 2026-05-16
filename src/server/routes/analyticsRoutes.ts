@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { getDashboardAnalytics } from '../controllers/analyticsController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
-router.get('/dashboard', authenticate, getDashboardAnalytics);
+router.get('/dashboard', authenticate, authorize(['admin', 'superadmin', 'tanod']), getDashboardAnalytics);
 
 export default router;

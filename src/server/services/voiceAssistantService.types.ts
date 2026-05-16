@@ -49,7 +49,8 @@ export interface VoiceContext {
   barangayInfo: {
     name: string;
     zoneCount: number;
-    activeAlerts: number;
+    pendingIncidents: number;
+    respondingIncidents: number;
   };
 }
 
