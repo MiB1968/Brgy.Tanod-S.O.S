@@ -24,6 +24,7 @@
     "@fontsource/rajdhani": "^5.2.7",
     "@google-cloud/text-to-speech": "^6.4.1",
     "@google/genai": "^1.52.0",
+    "@mlc-ai/web-llm": "^0.2.83",
     "@tailwindcss/vite": "^4.3.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
