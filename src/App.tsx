@@ -181,27 +181,45 @@ export default function App() {
 
   // Super Admin Welcome Greeting
   useEffect(() => {
-    if (isMasterAdmin) {
-      const greeting = async () => {
-        // Small delay so audio context is ready
-        await new Promise((resolve) => setTimeout(resolve, 800));
+    if (!isMasterAdmin || !user) return;
+
+    const playGreeting = async () => {
+      try {
+        const greetingKey = `super_admin_greeting_${user.id || user.email}`;
+
+        // Check if greeting was already played
+        if (localStorage.getItem(greetingKey)) {
+          console.log("🎤 Super Admin greeting already played this session");
+          return;
+        }
+
+        // Wait for audio system to be ready
+        await new Promise((resolve) => setTimeout(resolve, 1300));
 
         const { EmergencySoundManager } =
           await import("./lib/EmergencySoundManager");
         const manager = EmergencySoundManager.getInstance();
-        await manager.initialize();
+
+        // Stop any ongoing speech
+        speechSynthesis.cancel();
 
         // Play welcome message
         await manager.speakCustom(
-          "Welcome Sir. Full power is ready. Just say the word.",
+          "Welcome Sir Ben. Full power is ready. Just say the word.",
+          { lang: "en-US" },
         );
 
-        console.log("🎤 Super Admin Voice Greeting Played");
-      };
+        // Mark as played
+        localStorage.setItem(greetingKey, "true");
 
-      greeting();
-    }
-  }, [isMasterAdmin]);
+        console.log("🎤 Super Admin Voice Greeting Played");
+      } catch (err) {
+        console.warn("Greeting TTS failed", err);
+      }
+    };
+
+    playGreeting();
+  }, [isMasterAdmin, user]);
 
   const baseRole = useMemo(() => {
     if (isMasterAdmin) return "superadmin";

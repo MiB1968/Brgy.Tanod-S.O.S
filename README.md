@@ -1,28 +1,30 @@
 # 🚨 Brgy. Tanod S.O.S.
 
-**Mobile-first, offline-resilient emergency response system for Philippine Barangays**
+**A mobile-first, offline-resilient emergency response system for Philippine Barangays**
 
-Real-time SOS • Tagalog Voice Alerts • Live Tanod GPS • Guardian Floating Button
+Real-time SOS alerts • Tagalog Voice System • Live Tanod GPS Tracking • Guardian Floating Button
+
+![Hero](https://via.placeholder.com/1280x600?text=Brgy+Tanod+S.O.S)
 
 ---
 
 ## ✨ Key Features
 
-- **🔊 Advanced Audio System** — Procedural sirens, heartbeat, reverb + **Full Tagalog TTS** (Web Speech API + SSML fallback)
-- **📱 Draggable Floating Guardian SOS Button** — Always accessible
-- **🌐 True Offline Support** — Cached maps, local TTS, resilient uploads
-- **🛰️ Real-time Tracking** — Live Tanod GPS via WebSocket
+- **🔊 Advanced Hybrid Audio System** — Procedural sirens, heartbeat, reverb + **Tagalog TTS** (Web Speech + Smart Fallback)
+- **📱 Draggable Floating Guardian SOS Button** — Always accessible even while using other apps
+- **🌐 True Offline-First** — Works without internet (local TTS fallback, cached maps, resilient SOS)
+- **🛰️ Real-time GPS Tracking** — Live location of Tanod responders
 - **🔒 Strong Security** — Backend as Single Source of Truth
-- **📲 Excellent Mobile UX** — PWA-ready
+- **📲 Excellent Mobile Experience** — PWA-ready with touch-first design
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React + TypeScript + Vite + Tailwind
+- **Frontend**: React + TypeScript + Vite + TailwindCSS
+- **Audio**: Web Audio API + Hybrid TTS (Web Speech + Fallback)
+- **Maps**: Leaflet.js + Offline tiles
 - **Backend**: Express + TypeScript + Firebase
-- **Audio**: Web Audio API + Web Speech API (Tagalog)
-- **Maps**: Leaflet + Offline tiles
 - **Real-time**: WebSocket
 
 ---
@@ -32,6 +34,7 @@ Real-time SOS • Tagalog Voice Alerts • Live Tanod GPS • Guardian Floating 
 ```bash
 git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
 cd Brgy.Tanod-S.O.S
+
 npm install
 cp .env.example .env
 npm run dev
@@ -39,4 +42,18 @@ npm run dev
 
 ---
 
-**Made with ❤️ for safer Philippine communities**
+## 📜 License
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## Made with ❤️ for Philippine Barangays
+
+**Brgy. Tanod S.O.S.** aims to help local government units (LGUs) respond faster and save lives.
+
+---
+
+**Repository**: [github.com/MiB1968/Brgy.Tanod-S.O.S](https://github.com/MiB1968/Brgy.Tanod-S.O.S)

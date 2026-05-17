@@ -1,6 +1,7 @@
 // src/lib/EmergencySoundManager.ts
 import { emergencySSML } from "./ssmlTagalog"; // Keep your Tagalog SSML
 import { TagalogTTS } from "./TagalogTTS";
+import { HybridTTS } from "./HybridTTS";
 import { getTagalogMessage, type PhraseKey } from "./tagalogPhrases";
 
 export type EmergencyType = "sos" | "medical" | "fire" | "crime" | "test";
@@ -83,34 +84,34 @@ export class EmergencySoundManager {
       case "sos":
         this.startSiren("wail");
         if (options.speak && options.messageKey)
-          await this.speakTagalog(options.messageKey);
+          await this.speak(options.messageKey);
         break;
       case "medical":
         this.startSiren("yelp");
         this.playHeartbeat(18000);
-        if (options.speak) await this.speakTagalog("medical");
+        if (options.speak) await this.speak("medical");
         break;
       case "fire":
         this.startSiren("wail");
         this.playFireEffect();
-        if (options.speak) await this.speakTagalog("fire");
+        if (options.speak) await this.speak("fire");
         break;
       case "crime":
         this.startSiren("wail");
-        if (options.speak) await this.speakTagalog("crime");
+        if (options.speak) await this.speak("crime");
         break;
       case "test":
         this.playTestSequence();
-        if (options.speak) await this.speakTagalog("test");
+        if (options.speak) await this.speak("test");
         break;
     }
   }
 
-  private playAttentionBeep() {
+  playAttentionBeep() {
     this.playBeep(1350, 80, 0.75);
   }
 
-  private playBeep(freq: number, duration: number, vol: number = 0.6) {
+  playBeep(freq: number, duration: number, vol: number = 0.6) {
     const ctx = this.getContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -193,34 +194,14 @@ export class EmergencySoundManager {
     setTimeout(() => this.playBeep(1600, 300, 0.8), 500);
   }
 
-  private async speakTagalog(key: PhraseKey | string) {
+  private async speak(key: PhraseKey | string) {
     const message =
       typeof key === "string" ? key : getTagalogMessage(key as PhraseKey);
-    await TagalogTTS.getInstance().speak(message);
+    await HybridTTS.getInstance().speak(message);
   }
 
-  async speakCustom(
-    text: string,
-    options: { rate?: number; pitch?: number; volume?: number } = {},
-  ) {
-    await this.initialize();
-
-    // We already have TagalogTTS initialized in initialize()
-    // but just in case, we will use SpeechSynthesis directly or via TagalogTTS
-    // Wait, TagalogTTS doesn't allow bypassing lang or using en-US unless we pass it.
-    // TagalogTTS speak method allows `lang: 'en-US'`? Let's check TagalogTTS.ts. We defined `utterance.lang = options.lang || 'tl-PH';`
-    const { TagalogTTS } = await import("./TagalogTTS");
-    await TagalogTTS.getInstance().initialize();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    utterance.lang = "en-US"; // English for this greeting
-    utterance.rate = options.rate ?? 0.96;
-    utterance.pitch = options.pitch ?? 1.08;
-    utterance.volume = options.volume ?? 0.95;
-
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utterance);
+  async speakCustom(text: string, options: any = {}) {
+    await HybridTTS.getInstance().speak(text, options);
   }
 
   setMasterVolume(volume: number) {
@@ -230,7 +211,7 @@ export class EmergencySoundManager {
 
   stopAll() {
     this.stopSiren();
-    TagalogTTS.getInstance().stop();
+    HybridTTS.getInstance().stop();
   }
 }
 
@@ -245,5 +226,6 @@ export const useEmergencySound = () => {
     stopSiren: () => manager.stopSiren(),
     stopAll: () => manager.stopAll(),
     setVolume: (vol: number) => manager.setMasterVolume(vol),
+    speakCustom: (text: string, opts?: any) => manager.speakCustom(text, opts),
   };
 };
