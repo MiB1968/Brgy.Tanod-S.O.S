@@ -123,12 +123,12 @@ export default function App() {
 
   const {
     profile,
-    setProfile,
     residentProfile,
-    setResidentProfile,
     isLoading: loading,
-    setIsLoading: setLoading,
   } = useAuthStore();
+  const setProfile = useAuthStore((s) => s.setProfile);
+  const setResidentProfile = useAuthStore((s) => s.setResidentProfile);
+  const setLoading = useAuthStore((s) => s.setIsLoading);
   const { alerts, setAlerts, addAlert } = useIncidentStore();
   const { patrols, setPatrols, setTanods, updateTanodStatus, updatePatrol } =
     useTanodStore();
@@ -285,6 +285,7 @@ export default function App() {
 
   // Authentication persistence
   useEffect(() => {
+    console.log('App useEffect run');
     const token = safeStorage.getItem("token");
     const storedUser = safeStorage.getItem("user");
     if (token && storedUser) {
@@ -520,39 +521,85 @@ export default function App() {
   }
 
   // Handle Auth & Registration
-  const AuthElement = (
-    <AppNavigator
-        user={user}
-        profile={profile}
-        residentProfile={residentProfile}
-        isRegistering={isRegistering}
-        setIsRegistering={setIsRegistering}
-        handleLogin={handleLogin}
-        isLoggingIn={isLoggingIn}
-        handleDemoLogin={handleDemoLogin}
-        deferredPrompt={deferredPrompt}
-        handleInstallApp={handleInstallApp}
-        resetAuthSession={resetAuthSession}
-        handleSetRole={handleSetRole}
-        isSettingRole={isSettingRole}
-        effectiveRole={effectiveRole}
-        viewOverride={viewOverride}
-        handleLogout={handleLogout}
-        onRegisterComplete={async (data: any) => {
-            try {
-                const res = await api.auth.register(data);
-                safeStorage.setItem("token", "cookie-auth");
-                safeStorage.setItem("user", JSON.stringify(res.data.user));
-                setUser(res.data.user);
-                setProfile(res.data.user);
-                setIsRegistering(false);
-            } catch (err: any) {
-                toast.error(err.message);
+  const renderAuthView = () => {
+    if (isRegistering)
+      return (
+        <GlobalErrorBoundary>
+          <RegistrationForm
+            onCancel={() => setIsRegistering(false)}
+            onComplete={async (data: any) => {
+                try {
+                    const res = await api.auth.register(data);
+                    safeStorage.setItem("token", "cookie-auth");
+                    safeStorage.setItem("user", JSON.stringify(res.data.user));
+                    setUser(res.data.user);
+                    setProfile(res.data.user);
+                    setIsRegistering(false);
+                } catch (err: any) {
+                    toast.error(err.message);
+                }
+            }}
+          />
+        </GlobalErrorBoundary>
+      );
+
+    if (!user)
+      return (
+        <GlobalErrorBoundary>
+          <LoginView
+            onLogin={handleLogin}
+            onRegister={() => setIsRegistering(true)}
+            isLoggingIn={isLoggingIn}
+            onDemoLogin={() => handleDemoLogin("resident")}
+            onDemoAdminLogin={() => handleDemoLogin("admin")}
+            deferredPrompt={deferredPrompt}
+            onInstall={handleInstallApp}
+            onResetSession={resetAuthSession}
+          />
+        </GlobalErrorBoundary>
+      );
+
+    if (user && !profile && !residentProfile)
+      return (
+        <GlobalErrorBoundary>
+          <RoleSelection
+            onSelect={handleSetRole}
+            onRegister={() => setIsRegistering(true)}
+            isSettingRole={isSettingRole}
+            deferredPrompt={deferredPrompt}
+            onInstall={handleInstallApp}
+          />
+        </GlobalErrorBoundary>
+      );
+
+    if (effectiveRole === "resident" && profile && !viewOverride) {
+      if (profile.status === "pending")
+        return (
+          <PendingApproval
+            user={user}
+            deferredPrompt={deferredPrompt}
+            onInstall={handleInstallApp}
+            onLogout={handleLogout}
+          />
+        );
+      if (profile.status === "rejected")
+        return (
+          <RejectedScreen
+            reason={
+              residentProfile?.rejectionReason || "Documents verification failed."
             }
-        }}
-    />
-  );
-  if (AuthElement) return AuthElement;
+            deferredPrompt={deferredPrompt}
+            onInstall={handleInstallApp}
+            onLogout={handleLogout}
+          />
+        );
+    }
+    return null;
+  };
+
+  const authView = renderAuthView();
+  if (authView) return authView;
+
 
   const items = navItems.filter((item) => {
     if (effectiveRole === "admin" || effectiveRole === "superadmin")

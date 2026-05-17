@@ -108,11 +108,11 @@ async function callModel(
 export async function generateChatResponse(userText: string): Promise<string> {
   try {
     const ai = getAIClient();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(
-      `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.`
-    );
-    return result.response.text() || "I'm monitoring the situation. Stay calm, help is on the way.";
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.`,
+    });
+    return result.text || "I'm monitoring the situation. Stay calm, help is on the way.";
   } catch (err) {
     console.error("[AI Service] Chat failed:", err);
     return "I'm monitoring the situation. Stay calm, help is on the way.";
