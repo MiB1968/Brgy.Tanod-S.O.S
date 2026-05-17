@@ -66,15 +66,21 @@ export const useSOSStore = create<SOSState>()(
           })
         );
 
+        // Map older generic 'type' string to new restricted enum type, defaulting to 'other'
+        let mappedType: 'emergency' | 'medical' | 'fire' | 'crime' | 'other' = 'other';
+        if (['emergency', 'medical', 'fire', 'crime'].includes(type)) {
+          mappedType = type as 'emergency' | 'medical' | 'fire' | 'crime';
+        }
+
         await offlineService.queueSOS({
-          type,
-          description,
-          location,
-          timestamp: alertData.timestamp,
           userId: user?.id || 'anonymous',
-          userName: user?.name || 'Resident',
-          photos: photoBlobs
-        });
+          latitude: location.lat,
+          longitude: location.lng,
+          type: mappedType,
+          priority: 'high',
+          description,
+          mediaUrls: [],
+        }, photoBlobs);
 
         // Optimistic update for UI tracking
         set({ activeAlert: { ...alertData, id: tempId, isOfflineQueued: true } });

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardian AI - Local Detection</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: sans-serif; height: 100vh; transition: background 0.5s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #status { font-size: 1.5rem; margin-top: 20px; }
+        .red-mode { background-color: #ff0000; color: white; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@latest/dist/speech-commands.min.js"></script>
+</head>
+<body>
+    <h1>Guardian AI</h1>
+    <button onclick="startListening()">Start Monitoring</button>
+    <div id="status">Ready</div>
+
+    <script>
+        let recognizer;
+
+        async function startListening() {
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = 'Requesting microphone access...';
+
+            try {
+                // Request microphone permission first
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                statusEl.innerText = 'Initializing...';
+
+                recognizer = speechCommands.create('BROWSER_FFT');
+                await recognizer.ensureModelLoaded();
+
+                recognizer.listen(result => {
+                    const scores = Array.from(result.scores);
+                    const word = recognizer.wordLabels()[scores.indexOf(Math.max(...scores))];
+                    console.log(`Detected: ${word}`);
+
+                    if (Math.max(...scores) > 0.85 && (word === 'up' || word === 'down' || word === 'help')) {
+                         triggerEmergency();
+                    }
+                }, {
+                    includeSpectrogram: false,
+                    probabilityThreshold: 0.85,
+                    invokeCallbackOnNoiseAndUnknown: true,
+                    overlapFactor: 0.5
+                });
+
+                statusEl.innerText = 'Monitoring...';
+            } catch (err) {
+                console.error("Error starting speech recognition:", err);
+                statusEl.innerText = 'Error: ' + err.message + '. Ensure you allowed microphone access.';
+            }
+        }
+
+        function triggerEmergency() {
+            document.body.classList.add('red-mode');
+            document.getElementById('status').innerText = 'SCREAM DETECTED - ALERTING TANODS';
+        }
+    </script>
+</body>
+</html>
