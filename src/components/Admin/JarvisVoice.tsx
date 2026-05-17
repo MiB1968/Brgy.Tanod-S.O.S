@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import * as safeStorage from '../../lib/safeStorage';
 import { JarvisSettingsPanel, VoiceSettings, defaultSettings } from './JarvisSettingsPanel';
 import VoiceBiometricModal from './VoiceBiometricModal';
+import { promptWebLLM, isWebLLMReady } from '../../lib/webllm';
 
 export function JarvisVoice() {
   const { profile } = useAuthStore();
@@ -118,8 +119,19 @@ export function JarvisVoice() {
       }
     };
 
-    const handleVoiceAnomaly = (data: any) => {
+    const handleVoiceAnomaly = async (data: any) => {
       setStatus("Anomaly Detected");
+      if (isWebLLMReady() || window.confirm("WebLLM will load to explain this anomaly. Allow?")) {
+          try {
+            speak("Nagsusuri ng anomalya...");
+            const sysPrompt = "You are a serious Filipino Security System AI. Given the anomaly details, explain in short, plain Tagalog to the Admin what happened and why it is suspicious. Keep it under 2 sentences. DO NOT say 'Understood' or general AI fluff.";
+            const explanation = await promptWebLLM(sysPrompt, `Admin issued command: "${data.command}"\nRisk Score: ${data.riskScore}\nSystem Message: ${data.message}`);
+            speak(explanation);
+            return;
+          } catch (e) {
+            console.error("WebLLM Anomaly Explain fail:", e);
+          }
+      }
       speak(data.message);
     };
 

@@ -1,7 +1,7 @@
 // src/services/guardianAIService.ts
 // CLIENT-SIDE — powered by WebLLM (runs 100% in browser, no API key needed)
 
-import * as webllm from "@mlc-ai/web-llm";
+import { getWebLLMEngine, setWebLLMProgressCallback, isWebLLMReady } from '../lib/webllm';
 
 export interface GuardianContext {
   pendingSOS: number;
@@ -14,48 +14,10 @@ export interface GuardianResponse {
   action?: 'SUMMARIZE' | 'SUGGEST_DISPATCH' | 'STATUS_REPORT' | 'HELP';
 }
 
-// ── WebLLM setup ────────────────────────────────────────────────────────────
-// Using a small, fast model that works well on mobile/low-end devices.
-// Qwen2-0.5B is only ~300MB and loads quickly.
-// You can upgrade to "Phi-3-mini-4k-instruct-q4f16_1-MLC" for smarter replies.
-const SELECTED_MODEL = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
-
-let engine: webllm.MLCEngine | null = null;
-let isLoading = false;
-let loadProgress = 0;
-
-// Callback so UI can show download progress
 type ProgressCallback = (progress: number, text: string) => void;
-let onProgressCallback: ProgressCallback | null = null;
 
 export function setGuardianProgressCallback(cb: ProgressCallback) {
-  onProgressCallback = cb;
-}
-
-async function getEngine(): Promise<webllm.MLCEngine> {
-  if (engine) return engine;
-  if (isLoading) {
-    // Wait until loading finishes
-    while (isLoading) {
-      await new Promise((r) => setTimeout(r, 300));
-    }
-    return engine!;
-  }
-
-  isLoading = true;
-  try {
-    engine = await webllm.CreateMLCEngine(SELECTED_MODEL, {
-      initProgressCallback: (report) => {
-        loadProgress = Math.round(report.progress * 100);
-        onProgressCallback?.(loadProgress, report.text);
-        console.log(`[Guardian AI] Loading: ${loadProgress}% — ${report.text}`);
-      },
-    });
-    console.log("[Guardian AI] WebLLM engine ready.");
-  } finally {
-    isLoading = false;
-  }
-  return engine!;
+  setWebLLMProgressCallback(cb);
 }
 
 // ── Main Service ─────────────────────────────────────────────────────────────
@@ -67,23 +29,16 @@ class GuardianAIService {
    */
   public preload(onProgress?: ProgressCallback) {
     if (onProgress) setGuardianProgressCallback(onProgress);
-    getEngine().catch((err) =>
+    getWebLLMEngine().catch((err) =>
       console.warn("[Guardian AI] Preload failed:", err)
     );
-  }
-
-  /**
-   * Returns current load progress (0-100).
-   */
-  public getLoadProgress(): number {
-    return loadProgress;
   }
 
   /**
    * Returns true if the model is ready to use.
    */
   public isReady(): boolean {
-    return engine !== null;
+    return isWebLLMReady();
   }
 
   /**
@@ -97,7 +52,7 @@ class GuardianAIService {
     // Try WebLLM first
     try {
       const eng = await Promise.race([
-        getEngine(),
+        getWebLLMEngine(),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Engine not ready")), 500)
         ),
@@ -194,7 +149,7 @@ Rules:
 
     return {
       reply:
-        engine === null
+        !isWebLLMReady()
           ? "Guardian AI is loading. Please wait a moment before sending commands."
           : "Acknowledged. Standing by for tactical instructions.",
     };

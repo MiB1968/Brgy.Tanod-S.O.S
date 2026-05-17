@@ -19,23 +19,17 @@
 //   - Web Speech API (built into Chrome/Edge, no install needed)
 // ============================================================
 
-import * as webllm from "@mlc-ai/web-llm";
 import type { EmergencyType } from "../types";
+import { getWebLLMEngine, setWebLLMProgressCallback, isWebLLMReady } from "../lib/webllm";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface SOSPayload {
-  /** Detected emergency type — maps directly to your EmergencyType union */
   type: EmergencyType;
-  /** Short description the server will receive */
   description: string;
-  /** Raw location string extracted from speech (e.g. "likod ng simbahan") */
   locationHint: string;
-  /** 1–10 urgency estimate from the model */
   severity: number;
-  /** The original transcript so the resident can verify it */
   transcript: string;
-  /** True = WebLLM parsed it. False = regex fallback was used. */
   parsedByAI: boolean;
 }
 
@@ -50,48 +44,16 @@ export type AgentStatus =
 export type StatusCallback = (status: AgentStatus, detail?: string) => void;
 export type ResultCallback = (payload: SOSPayload) => void;
 
-// ── WebLLM Engine (singleton, shared with guardianAIService) ─────────────────
-
-// We reuse your existing model size — no extra download.
-const MODEL_ID = "Qwen2-0.5B-Instruct-q4f16_1-MLC";
-
-let _engine: webllm.MLCEngine | null = null;
-let _loading = false;
-
 type ProgressCb = (pct: number, text: string) => void;
-let _progressCb: ProgressCb | null = null;
 
 export function setLoadProgressCallback(cb: ProgressCb) {
-  _progressCb = cb;
-}
-
-async function getEngine(): Promise<webllm.MLCEngine> {
-  if (_engine) return _engine;
-
-  // If another call is already loading, wait for it
-  if (_loading) {
-    while (_loading) await new Promise((r) => setTimeout(r, 300));
-    return _engine!;
-  }
-
-  _loading = true;
-  try {
-    _engine = await webllm.CreateMLCEngine(MODEL_ID, {
-      initProgressCallback: (report) => {
-        const pct = Math.round(report.progress * 100);
-        _progressCb?.(pct, report.text);
-      },
-    });
-  } finally {
-    _loading = false;
-  }
-  return _engine!;
+  setWebLLMProgressCallback(cb);
 }
 
 /** Call this early (e.g. when ResidentDashboard mounts) to pre-warm the model */
 export function preloadModel(onProgress?: ProgressCb) {
   if (onProgress) setLoadProgressCallback(onProgress);
-  getEngine().catch((e) =>
+  getWebLLMEngine().catch((e) =>
     console.warn("[VoiceSOSAgent] Model preload failed:", e)
   );
 }
@@ -233,7 +195,7 @@ class VoiceSOSAgent {
 
       try {
         const engine = await Promise.race([
-          getEngine(),
+          getWebLLMEngine(),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error("Engine not ready")), 800)
           ),
@@ -286,7 +248,7 @@ class VoiceSOSAgent {
 
   /** Returns true if the WebLLM model is already in memory */
   isModelReady(): boolean {
-    return _engine !== null;
+    return isWebLLMReady();
   }
 }
 

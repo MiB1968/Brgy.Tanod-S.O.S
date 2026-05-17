@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area } from 'recharts';
-import { motion } from 'motion/react';
-import { BarChart as ChartIcon, Zap, Shield, Users, Activity } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { BarChart as ChartIcon, Zap, Shield, Users, Activity, Bot } from 'lucide-react';
 import { fetchAPI } from '../../lib/api';
 import { toast } from 'react-hot-toast';
 import { User } from '../../types';
+import { promptWebLLM, setWebLLMProgressCallback } from '../../lib/webllm';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
@@ -13,6 +14,10 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+
+  const [aiBriefing, setAIBriefing] = useState<string | null>(null);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
 
   const fetchAnalytics = async (silent = false) => {
     if (!profile || !['admin', 'superadmin', 'tanod'].includes(profile.role)) return;
@@ -46,6 +51,24 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
   const handleRetry = () => {
     setIsRetrying(true);
     fetchAnalytics();
+  };
+
+  const generateAIBriefing = async () => {
+    if (!data) return;
+    setIsGeneratingAI(true);
+    setAiProgress(0);
+    setWebLLMProgressCallback((pct) => setAiProgress(pct));
+
+    try {
+      const systemPrompt = "You are the AI Intelligence Analyst for a Philippine Barangay. Analyze the provided statistical data. Provide a short, written intelligence briefing to the Captain in Tagalog/English. Identify the most common incident type and any increasing trends. Keep it strictly under 3 sentences.";
+      const brief = await promptWebLLM(systemPrompt, `Data: ${JSON.stringify({ alertsByType: data.alertsByType, history: data.alertsHistory })}`);
+      setAIBriefing(brief);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to generate AI brief');
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   if (error && !data) {
@@ -82,7 +105,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-info/10 rounded-2xl">
             <Zap className="w-6 h-6 text-info" />
@@ -92,11 +115,43 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
             <p className="text-[10px] font-mono text-white/30 uppercase tracking-[0.2em] mt-1 text-info">Live CockroachLab Intelligence</p>
           </div>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
+          <button
+            onClick={generateAIBriefing}
+            disabled={isGeneratingAI}
+            className="flex items-center gap-2 px-4 py-2 bg-info/10 text-info hover:bg-info/20 border border-info/20 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <Bot className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest font-mono">
+              {isGeneratingAI ? `Analyzing ${aiProgress}%` : 'AI Briefing'}
+            </span>
+          </button>
           <MetricSmall label="Verified Residents" value={overview.verified_residents} icon={Shield} color="text-success" />
           <MetricSmall label="Online Patrols" value={overview.total_tanods} icon={Users} color="text-info" />
         </div>
       </div>
+
+      <AnimatePresence>
+        {aiBriefing && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="glass-panel p-6 rounded-[24px] border-info/30 bg-info/5 relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-info rounded-l-[24px]" />
+              <div className="flex items-start gap-4">
+                <Bot className="w-6 h-6 text-info shrink-0 mt-1" />
+                <div>
+                  <h4 className="text-[10px] font-black tracking-[0.2em] uppercase text-info font-mono mb-2">Automated Intelligence Briefing</h4>
+                  <p className="text-sm font-mono text-white/90 leading-relaxed">{aiBriefing}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group">

@@ -3,6 +3,7 @@ import * as api from '../lib/api';
 import { User, IncidentStatus } from '../types';
 import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
+import { promptWebLLM, setWebLLMProgressCallback } from '../lib/webllm';
 
 interface IncidentFormProps {
   profile: User;
@@ -20,6 +21,30 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceProgress, setEnhanceProgress] = useState(0);
+  const [enhanceText, setEnhanceText] = useState('');
+
+  const handleAIEnhance = async () => {
+    if (!formData.description) return;
+    setIsEnhancing(true);
+    setEnhanceProgress(0);
+    setWebLLMProgressCallback((pct, text) => {
+        setEnhanceProgress(pct);
+        setEnhanceText(text);
+    });
+
+    try {
+        const sysPrompt = "You are a professional Philippine Barangay Secretary. Rewrite the following brief incident notes into a formal, clear, and complete incident report narrative in proper Tagalog. IT MUST SOUND LIKE AN OFFICIAL BLOTTER. ONLY output the written narrative, nothing else. Do not add made up details, but ensure sentences are complete.";
+        const enhanced = await promptWebLLM(sysPrompt, `Notes:\nType: ${formData.type}\nLocation: ${formData.location}\nPersons: ${formData.personsInvolved}\nNotes: ${formData.description}\nActions: ${formData.actionsTaken}`);
+        setFormData(prev => ({ ...prev, description: enhanced }));
+    } catch (e) {
+        console.error("AI Enhance failed:", e);
+    } finally {
+        setIsEnhancing(false);
+    }
+  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -108,18 +133,36 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Incident Description</label>
+            <div className="flex items-center justify-between ml-1">
+              <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest">Incident Description</label>
+              <button 
+                type="button" 
+                onClick={handleAIEnhance}
+                disabled={!formData.description || isEnhancing}
+                className="text-[10px] flex items-center gap-1 font-black uppercase tracking-widest text-[#f59e0b] hover:text-[#fbbf24] disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#f59e0b]/10 px-2 py-1 rounded"
+              >
+                {isEnhancing ? (
+                  <>
+                    <span className="animate-spin text-[10px]">⏳</span>
+                    {enhanceProgress < 100 ? `${enhanceProgress}%` : 'Enhancing...'}
+                  </>
+                ) : (
+                  <>✨ AI Enhance</>
+                )}
+              </button>
+            </div>
             <textarea 
               required
-              rows={4}
-              maxLength={500}
-              placeholder="Provide a detailed narrative of the event..."
+              rows={5}
+              maxLength={2000}
+              placeholder="Provide a detailed narrative of the event... or type brief notes and click AI Enhance."
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               className="w-full bg-[#252932] border border-[#2D3139] rounded-2xl p-4 text-white focus:border-[#FF4B4B] outline-none resize-none" 
             />
-            <div className="text-[10px] text-[#8E9299] text-right">
-              {formData.description.length} / 500 characters
+            <div className="flex justify-between items-center text-[10px] text-[#8E9299]">
+              {isEnhancing && enhanceProgress < 100 && <span className="font-mono text-cyan-400">{enhanceText}</span>}
+              <span className="ml-auto">{formData.description.length} / 2000 characters</span>
             </div>
           </div>
 

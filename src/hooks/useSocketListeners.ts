@@ -11,6 +11,7 @@ import {
   SystemBroadcast
 } from '../types';
 import { toast } from 'react-hot-toast';
+import { isWebLLMReady, promptWebLLM } from '../lib/webllm';
 
 export function useSocketListeners(
   profile: User | null, 
@@ -20,7 +21,7 @@ export function useSocketListeners(
   setIsShaking: (shaking: boolean) => void,
   setActiveTab: (tab: any) => void
 ) {
-  const { addAlert } = useIncidentStore();
+  const { addAlert, alerts } = useIncidentStore();
   const { updatePatrol, updateTanodStatus } = useTanodStore();
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export function useSocketListeners(
       }
     };
 
-    const handleAlert = (data: any) => {
+    const handleAlert = async (data: any) => {
       const alert = data.alert || data; // Handle both alert_new and alert_update structures
       if (!alert) return;
       
@@ -64,6 +65,7 @@ export function useSocketListeners(
         type: alert.type as EmergencyType,
         location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
         status: (alert.status as string).toLowerCase() as AlertStatus,
+        description: alert.description || '',
         timestamp: alert.created_at || alert.timestamp || new Date().toISOString()
       };
       
@@ -71,10 +73,29 @@ export function useSocketListeners(
       
       if (profile.role === 'admin' || profile.role === 'tanod' || effectiveRole === 'superadmin') {
         // Either it's a new alert or status is pending/PENDING
-        // We can just check the lowercase status.
         if (formattedAlert.status.toLowerCase() === 'pending') {
           toast.error(`🚨 SOS EMERGENCY: ${formattedAlert.type}`, { duration: 10000, id: `sos-${formattedAlert.id}` });
           showSOSNotification(formattedAlert);
+
+          // WebLLM Duplicate SOS Checking (Admin side AI feature)
+          if (isWebLLMReady() && data.type !== 'update') { // Only on new alerts
+             const activeAlerts = useIncidentStore.getState().alerts.filter(a => a.status === 'pending' || a.status === 'active' || a.status === 'ongoing');
+             if (activeAlerts.length > 0) {
+                 // Compare against the most recent active alert
+                 const recentAlert = activeAlerts[0];
+                 // If it's literally the same ID, ignore
+                 if (recentAlert.id !== formattedAlert.id) {
+                     try {
+                        const sysPrompt = "You are an AI deduplication agent. Given two emergency reports, determine if they likely describe the EXACT SAME INCIDENT happening right now. Reply ONLY with 'DUPLICATE' or 'UNIQUE'. No other words.";
+                        const promptText = `Report 1: ${recentAlert.type} near ${recentAlert.location.lat},${recentAlert.location.lng} by ${recentAlert.residentName}. Desc: ${recentAlert.description}\nReport 2: ${formattedAlert.type} near ${formattedAlert.location.lat},${formattedAlert.location.lng} by ${formattedAlert.residentName}. Desc: ${formattedAlert.description}`;
+                        const response = await promptWebLLM(sysPrompt, promptText, 0.1);
+                        if (response.includes("DUPLICATE")) {
+                            toast(`🤖 AI Alert: Possible Duplicate SOS Detected. Resembling active incident from ${recentAlert.residentName}.`, { icon: '⚠️', duration: 10000, style: { background: '#f59e0b', color: 'black' } });
+                        }
+                     } catch(e) { console.error("Duplicate check fail:", e); }
+                 }
+             }
+          }
         }
       }
       
