@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as api from '../lib/api';
-import socket from '../lib/socket';
-import { SOSChatMessage, User } from '../types';
-import { Send, MessageSquare, Shield, User as UserIcon, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
-import { cn } from '../lib/utils';
-import { format } from 'date-fns';
+import React, { useState, useEffect, useRef } from "react";
+import * as api from "../lib/api";
+import socket from "../lib/socket";
+import { SOSChatMessage, User } from "../types";
+import {
+  Send,
+  MessageSquare,
+  Shield,
+  User as UserIcon,
+  Loader2,
+} from "lucide-react";
+import { motion } from "motion/react";
+import { cn } from "../lib/utils";
+import { format } from "date-fns";
 
 interface SOSChatProps {
   alertId: string;
@@ -14,7 +20,7 @@ interface SOSChatProps {
 
 export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
   const [messages, setMessages] = useState<SOSChatMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -34,15 +40,19 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
 
     loadMessages();
 
-    // Listen for new messages
-    socket.on('sos_chat_message', (data) => {
+    const handleNewMessage = (data: any) => {
       if (data.alertId === alertId) {
-        setMessages(prev => [...prev, data.message]);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.message.id)) return prev;
+          return [...prev, data.message];
+        });
       }
-    });
+    };
+
+    socket.on("sos_chat_message", handleNewMessage);
 
     return () => {
-      socket.off('sos_chat_message');
+      socket.off("sos_chat_message", handleNewMessage);
     };
   }, [alertId]);
 
@@ -61,10 +71,10 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
       senderName: currentUser.name,
       senderRole: currentUser.role,
       message: newMessage.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    setNewMessage('');
+    setNewMessage("");
 
     try {
       await api.chat.sendMessage(alertId, msgData);
@@ -79,16 +89,20 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
       <div className="px-4 py-3 border-b border-white/5 bg-brand-bg/30 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-info" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-white/60 font-mono">Tactical Comms</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-white/60 font-mono">
+            Tactical Comms
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-          <span className="text-[8px] font-mono text-success font-bold uppercase">SECURE LINK</span>
+          <span className="text-[8px] font-mono text-success font-bold uppercase">
+            SECURE LINK
+          </span>
         </div>
       </div>
 
       {/* Messages area */}
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth scrollbar-tactical"
       >
@@ -99,45 +113,58 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full opacity-20 space-y-2">
             <Shield className="w-8 h-8" />
-            <p className="text-[10px] font-mono uppercase font-black">No signals detected</p>
+            <p className="text-[10px] font-mono uppercase font-black">
+              No signals detected
+            </p>
           </div>
         ) : (
           messages.map((msg) => (
             <motion.div
-              initial={{ opacity: 0, x: msg.senderId === currentUser.uid ? 10 : -10 }}
+              initial={{
+                opacity: 0,
+                x: msg.senderId === currentUser.uid ? 10 : -10,
+              }}
               animate={{ opacity: 1, x: 0 }}
               key={msg.id}
               className={cn(
                 "flex flex-col max-w-[85%]",
-                msg.senderId === currentUser.uid ? "ml-auto items-end" : "mr-auto items-start"
+                msg.senderId === currentUser.uid
+                  ? "ml-auto items-end"
+                  : "mr-auto items-start",
               )}
             >
               <div className="flex items-center gap-1.5 mb-1 px-1">
-                {msg.senderRole === 'tanod' || msg.senderRole === 'admin' ? (
+                {msg.senderRole === "tanod" || msg.senderRole === "admin" ? (
                   <Shield className="w-3 h-3 text-info" />
                 ) : (
                   <UserIcon className="w-3 h-3 text-white/40" />
                 )}
                 <span className="text-[9px] font-mono font-black uppercase text-white/40">
-                  {msg.senderName} 
-                  <span className={cn(
-                    "ml-1 opacity-50 px-1 border border-white/10 rounded",
-                    msg.senderRole === 'tanod' ? "text-info border-info/30" : "text-white/40"
-                  )}>
+                  {msg.senderName}
+                  <span
+                    className={cn(
+                      "ml-1 opacity-50 px-1 border border-white/10 rounded",
+                      msg.senderRole === "tanod"
+                        ? "text-info border-info/30"
+                        : "text-white/40",
+                    )}
+                  >
                     {msg.senderRole}
                   </span>
                 </span>
               </div>
-              <div className={cn(
-                "px-4 py-2 rounded-2xl text-xs font-medium leading-relaxed shadow-lg",
-                msg.senderId === currentUser.uid 
-                  ? "bg-info text-white rounded-tr-none" 
-                  : "bg-white/5 text-white/90 border border-white/5 rounded-tl-none"
-              )}>
+              <div
+                className={cn(
+                  "px-4 py-2 rounded-2xl text-xs font-medium leading-relaxed shadow-lg",
+                  msg.senderId === currentUser.uid
+                    ? "bg-info text-white rounded-tr-none"
+                    : "bg-white/5 text-white/90 border border-white/5 rounded-tl-none",
+                )}
+              >
                 {msg.message}
               </div>
               <span className="text-[8px] font-mono text-white/20 mt-1 uppercase tracking-tighter">
-                {format(new Date(msg.timestamp), 'HH:mm:ss')}
+                {format(new Date(msg.timestamp), "HH:mm:ss")}
               </span>
             </motion.div>
           ))
@@ -145,7 +172,10 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
       </div>
 
       {/* Input area */}
-      <form onSubmit={sendMessage} className="p-4 bg-brand-bg/30 border-t border-white/5">
+      <form
+        onSubmit={sendMessage}
+        className="p-4 bg-brand-bg/30 border-t border-white/5"
+      >
         <div className="relative group">
           <input
             type="text"
