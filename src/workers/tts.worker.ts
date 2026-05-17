@@ -86,7 +86,7 @@ self.onmessage = async (e: MessageEvent) => {
     
     console.log(`[TTS Worker Telemetry] Latency: ${(endTime - startTime).toFixed(2)}ms, Memory Delta: ${((endMemory - startMemory) / 1024 / 1024).toFixed(2)}MB`);
 
-    self.postMessage({ type: 'audio', pcm: wavData.buffer }, [wavData.buffer]);
+    self.postMessage({ type: 'audio', pcm: wavData.buffer }, { transfer: [wavData.buffer] });
   } catch (err: any) {
     self.postMessage({ type: 'error', error: err.message });
   }
