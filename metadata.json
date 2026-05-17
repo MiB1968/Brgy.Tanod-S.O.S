@@ -1,6 +1,6 @@
 {
   "name": "Brgy. Tanod S.O.S.",
-  "description": "Mobile-first emergency response and coordination platform for Philippine barangays. Real-time SOS dispatch and responder tracking.",
+  "description": "A responsive emergency alert and response system built for Philippine barangay (Brgy. Tanod) operations.",
   "requestFramePermissions": [
     "geolocation",
     "camera",

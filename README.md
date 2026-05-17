@@ -37,3 +37,7 @@ It uses Firebase for Authentication and Firestore as the database. The system st
 - **Offline Voice Pack (TTS):** Gracefully degrades from Google TTS down to fully local edge WebGPU/WASM ONNX models via Supertonic, providing spoken feedback even in complete offline mode.
 - **Resilient Uploads:** Implements smart exponential backoff, network awareness, and capability checks for robust media and chunked video transmission over unstable connections.
 - **Backend Analytics:** Dedicated API endpoints for fetching real-time dashboard analytics and statistics.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) — feel free to use, modify, and deploy it for your barangay or LGU.
