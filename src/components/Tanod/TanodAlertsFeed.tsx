@@ -35,7 +35,7 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
     // Detect new incoming alerts
     if (alerts.length > prevAlertsLength.current) {
       const newAlertsCount = alerts.length - prevAlertsLength.current;
-      speak(`Bagong alerto natanggap. May ${newAlertsCount} bagong emergency.`, 'en');
+      speak(`Bagong alerto natanggap. May ${newAlertsCount} bagong emergency.`, { lang: 'en' });
     }
     prevAlertsLength.current = alerts.length;
   }, [alerts.length, speak]);

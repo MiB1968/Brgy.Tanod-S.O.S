@@ -2,7 +2,7 @@
 import * as ort from 'onnxruntime-web';
 
 // LOW-END OPTIMIZED WASM CONFIG
-ort.env.wasm.wasmPaths = {
+(ort.env.wasm as any).wasmPaths = {
   'ort-wasm.wasm': '/onnx/ort-wasm.wasm',
   'ort-wasm-simd.wasm': '/onnx/ort-wasm-simd.wasm',
   'ort-wasm-threaded.wasm': '/onnx/ort-wasm-threaded.wasm',
@@ -142,14 +142,17 @@ function createWavBuffer(audioData: Float32Array, sampleRate = 24000): ArrayBuff
 // =============================================
 // Main Handler
 // =============================================
-self.onmessage = async (e: MessageEvent) => {
+
+const ctx: Worker = self as any;
+
+ctx.onmessage = async (e: MessageEvent) => {
   const { type, text, lang = 'tl' } = e.data;
 
   try {
     if (type === 'INIT') {
       await loadConfigAndIndexer();
       await initSessions();
-      self.postMessage({ type: 'READY' });
+      ctx.postMessage({ type: 'READY' });
       return;
     }
 
@@ -207,7 +210,7 @@ self.onmessage = async (e: MessageEvent) => {
       const audioData = audioOut['output'].data as Float32Array;
       const wavBuffer = createWavBuffer(audioData, config?.sample_rate || 24000);
 
-      self.postMessage({
+      ctx.postMessage({
         type: 'AUDIO_READY',
         buffer: wavBuffer,
         text,
@@ -216,7 +219,7 @@ self.onmessage = async (e: MessageEvent) => {
     }
   } catch (err: any) {
     console.error('[TTS Worker] Error:', err);
-    self.postMessage({
+    ctx.postMessage({
       type: 'ERROR',
       message: err.message || 'TTS generation failed'
     });

@@ -64,7 +64,7 @@ export function useGuardian() {
     setStatus('RESPONDING');
     setLastResponse(text);
     // Use offline TTS capabilities directly
-    await ttsSpeak(text, 'en');
+    await ttsSpeak(text, { lang: 'en' });
     // If we're not listening again, go back to IDLE
     setStatus('IDLE');
   }, [setStatus, setLastResponse, ttsSpeak]);

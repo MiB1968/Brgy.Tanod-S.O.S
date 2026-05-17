@@ -119,7 +119,7 @@ export default function ResidentDashboard({
 
       if (!isOnline) {
         await handleQueueSOS(type, description, location, photosToProcess);
-        speak('SOS natanggap. Tanod papunta na.', 'en');
+        speak('SOS natanggap. Tanod papunta na.', { lang: 'en' });
         setSelectedPhotos([]);
         return;
       }
@@ -137,7 +137,7 @@ export default function ResidentDashboard({
         );
 
         await createSOS(type, description, location, b64Photos);
-        speak('SOS natanggap. Tanod papunta na.', 'en');
+        speak('SOS natanggap. Tanod papunta na.', { lang: 'en' });
         setSelectedPhotos([]);
         toast.success('SOS Protocol Initiated. Units alerted.');
       } catch (err) {

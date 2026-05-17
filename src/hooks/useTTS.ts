@@ -17,6 +17,7 @@ interface UseTTSReturn {
   supported: boolean;
   retryCount: number;
   queueLength: number;
+  availableVoices: SpeechSynthesisVoice[];
 }
 
 export function useTTS(): UseTTSReturn {
@@ -30,6 +31,7 @@ export function useTTS(): UseTTSReturn {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [queueLength, setQueueLength] = useState(0);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const MAX_RETRIES = 3;
   const isLowEnd = useRef(false);
@@ -42,6 +44,39 @@ export function useTTS(): UseTTSReturn {
     const deviceMemory = (navigator as any).deviceMemory || 4;
     const cores = navigator.hardwareConcurrency || 4;
     isLowEnd.current = deviceMemory < 4 || cores <= 4;
+  }, []);
+
+  // ==================== VOICE PRELOADING ====================
+  useEffect(() => {
+    let mounted = true;
+
+    const loadVoices = () => {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (mounted && voices.length > 0) {
+        setAvailableVoices(voices);
+        console.log(`[TTS] Preloaded ${voices.length} voices`);
+      }
+    };
+
+    // Load voices immediately
+    loadVoices();
+
+    // Also listen for async voice loading
+    if ('speechSynthesis' in window && 'onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    // Retry loading voices after a short delay (some Android devices need this)
+    const retryTimer = setTimeout(loadVoices, 800);
+
+    return () => {
+      mounted = false;
+      clearTimeout(retryTimer);
+      if ('speechSynthesis' in window && 'onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
   }, []);
 
   const createWorker = useCallback((): Worker => {
@@ -138,11 +173,11 @@ export function useTTS(): UseTTSReturn {
           speed: item.options.speed || 1.0,
         });
       } else {
-        fallbackToSpeechSynthesis(item.text);
+        fallbackToSpeechSynthesis(item.text, item.options);
         setTimeout(processQueue, 300);
       }
     } catch (err) {
-      fallbackToSpeechSynthesis(item.text);
+      fallbackToSpeechSynthesis(item.text, item.options);
       setTimeout(processQueue, 300);
     } finally {
       isProcessingQueue.current = false;
@@ -181,13 +216,38 @@ export function useTTS(): UseTTSReturn {
     });
   }, []);
 
-  const fallbackToSpeechSynthesis = (text: string) => {
-    if (!('speechSynthesis' in window)) return;
+  const fallbackToSpeechSynthesis = useCallback((text: string, options: TTSOptions = {}) => {
+    if (!('speechSynthesis' in window)) {
+      console.warn('[TTS] Web Speech API not supported on this device');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fil-PH';
-    utterance.rate = isLowEnd.current ? 0.95 : 1.05;
+    utterance.lang = options.lang || 'fil-PH';
+    utterance.rate = isLowEnd.current ? 0.96 : (options.priority === 'high' ? 1.12 : 1.05);
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Use best available Filipino/Tagalog voice
+    const bestVoice = availableVoices.find(voice => 
+      voice.lang.includes('fil') || 
+      voice.lang.includes('tl') || 
+      voice.name.toLowerCase().includes('filipino') ||
+      voice.name.toLowerCase().includes('tagalog')
+    ) || availableVoices.find(voice => voice.lang.startsWith('en')) || null;
+
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+      console.log(`[TTS Fallback] Using voice: ${bestVoice.name} (${bestVoice.lang})`);
+    }
+
+    utterance.onend = () => {
+      console.log('[TTS Fallback] Finished playing');
+    };
+
     window.speechSynthesis.speak(utterance);
-  };
+  }, [availableVoices]);
 
   const stop = useCallback(() => {
     speechQueue.current = [];
@@ -220,5 +280,6 @@ export function useTTS(): UseTTSReturn {
     supported: 'Worker' in window && 'AudioContext' in window,
     retryCount,
     queueLength,
+    availableVoices,
   };
 }
