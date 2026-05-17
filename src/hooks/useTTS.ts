@@ -25,24 +25,31 @@ export function useTTS() {
   /**
    * Speak a given text using offline Web Worker.
    */
-  const speak = useCallback(async (text: string, lang = 'en') => {
+  const speak = useCallback(async (text: string, lang = 'en', options?: { priority?: 'high' | 'normal' }) => {
     if (!text.trim()) return;
     
-    // [ASSUMPTION]: For extremely low-end devices, we might want to check navigator.deviceMemory and abort.
-    // if ('deviceMemory' in navigator && (navigator as any).deviceMemory < 2) {
-    //   console.warn("Low memory device detected. Skipping local TTS.");
-    //   return;
-    // }
+    if ('deviceMemory' in navigator && (navigator as any).deviceMemory < 2) {
+      console.warn("Low memory device detected. Skipping local TTS.");
+      return;
+    }
 
     setState('loading');
 
+    // 1. Try Google TTS if online
+    if (navigator.onLine) {
+       // Mock of what Google TTS try/catch would look like:
+       // try { await playGoogleTTS(text); setState('idle'); return; } catch (err) { /* fallback to offline */ }
+       // For now, if online, just log and fallback to local worker to test it anyway, 
+       // but in a full implementation this branch invokes voiceService or server TTS.
+    }
+
+    // 2. Offline Fallback using Web Worker
     const worker = getWorker();
 
     return new Promise<void>((resolve, reject) => {
       worker.onmessage = async (e) => {
         if (e.data.type === 'audio') {
           setState('speaking');
-          // Start playback process
           const ctx = audioCtxRef.current ||= new AudioContext();
           try {
             const buf = await ctx.decodeAudioData(e.data.pcm);
@@ -69,7 +76,7 @@ export function useTTS() {
         reject(err.message);
       };
 
-      worker.postMessage({ text, lang });
+      worker.postMessage({ text, voicePreset: lang === 'en' ? 'default' : lang });
     });
   }, [getWorker]);
 
