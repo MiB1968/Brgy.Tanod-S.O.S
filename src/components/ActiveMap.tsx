@@ -133,6 +133,10 @@ function MyLocationButton({ onLocated }: { onLocated: (lat: number, lng: number)
   const [locating, setLocating] = useState(false);
 
   const locateMe = () => {
+    if (!('geolocation' in navigator)) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -297,13 +301,6 @@ export default function ActiveMap({
           </Marker>
         )}
         
-        {/* Tactical Overlay */}
-        <div className="absolute inset-0 pointer-events-none z-[400] opacity-20 overflow-hidden">
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(255,75,75,0.1)_90deg,rgba(255,75,75,0.3)_180deg,transparent_180deg)] animate-[radar_10s_linear_infinite]"></div>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(15,17,21,0.6)_100%)]"></div>
-        </div>
-        
         {alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location.lat, a.location.lng)).map(alert => (
           <React.Fragment key={alert.id}>
             {showHeatmap && alert.aiAnalysis && alert.aiAnalysis.severityScore > 6 && (
@@ -443,12 +440,20 @@ export default function ActiveMap({
         ))}
       </MapContainer>
 
+      {/* Tactical Overlay */}
+      <div className="absolute top-0 right-0 bottom-0 left-0 pointer-events-none z-[400] opacity-20 overflow-hidden" style={{ pointerEvents: 'none' }}>
+        <div className="absolute top-0 right-0 bottom-0 left-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        <div className="absolute top-1/2 left-1/2 w-[200%] h-[200%] bg-[conic-gradient(from_0deg,transparent_0deg,rgba(255,75,75,0.1)_90deg,rgba(255,75,75,0.3)_180deg,transparent_180deg)] animate-[radar_10s_linear_infinite]" style={{ transform: 'translate(-50%, -50%)' }}></div>
+        <div className="absolute top-0 right-0 bottom-0 left-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(15,17,21,0.6)_100%)]"></div>
+      </div>
+
       {/* Offline Download Controls */}
-      <div className="absolute top-4 right-4 z-[400]">
+      <div className="absolute top-4 right-4 z-[400]" style={{ top: '1rem', right: '1rem' }}>
         {!isDownloaded ? (
           <button
             onClick={handleDownload}
             disabled={downloading}
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
             className={cn(
               "flex items-center gap-2 px-4 py-2 bg-[#16191F]/90 backdrop-blur-md border border-[#2D3139] rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:border-[#FF4B4B] transition-all",
               downloading && "cursor-not-allowed opacity-80"
@@ -457,7 +462,7 @@ export default function ActiveMap({
             {downloading ? (
               <>
                 <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                DOWNLOADING {Math.round((progress.current / progress.total) * 100)}%
+                DOWNLOADING {Math.round((progress.current / Math.max(progress.total, 1)) * 100)}%
               </>
             ) : (
               <>

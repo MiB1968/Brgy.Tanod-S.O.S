@@ -18,15 +18,15 @@ export async function initDb(retries = 3) {
         // No admin exists, require the bootstrap keys
         const { email: adminEmail, password: adminPassword } = config.adminBootstrap;
         if (!adminEmail || !adminPassword) {
-          throw new Error('ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD must be set in .env to create the first admin account.');
+          logger.warn('ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD not set in .env. Skipping initial admin creation.');
+        } else {
+          const hashedPass = await bcrypt.hash(adminPassword, 10);
+          await client.query(
+            "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
+            [adminEmail, hashedPass, 'Super Admin', 'admin', 'verified']
+          );
+          console.log(`Successfully bootstrapped first admin: ${adminEmail}`);
         }
-
-        const hashedPass = await bcrypt.hash(adminPassword, 10);
-        await client.query(
-          "INSERT INTO users (email, password, name, role, status) VALUES ($1, $2, $3, $4, $5)",
-          [adminEmail, hashedPass, 'Super Admin', 'admin', 'verified']
-        );
-        console.log(`Successfully bootstrapped first admin: ${adminEmail}`);
       }
 
       // Initialize Siren config
@@ -35,6 +35,20 @@ export async function initDb(retries = 3) {
         VALUES ('siren', '{"sirenActive": false}') 
         ON CONFLICT DO NOTHING
       `);
+
+      // Apply necessary schema migrations manually
+      try {
+        await client.query("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1");
+        await client.query("ALTER TABLE users ADD CONSTRAINT check_token_version CHECK (token_version > 0)");
+        await client.query("CREATE INDEX idx_users_token_version ON users(id, token_version)");
+        logger.info("DB_INIT: Applied token_version migration to users table.");
+      } catch (e: any) {
+        // Ignore if column already exists
+        if (e.code !== '42701') { 
+          // 42701 = duplicate_column
+          logger.warn(`DB_INIT: Migration warning: ${e.message}`);
+        }
+      }
 
       logger.info("DB_INIT: Schema synchronized.");
       return;

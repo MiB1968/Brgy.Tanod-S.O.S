@@ -23,10 +23,13 @@ export function OfflineTileLayer(props: any) {
       getCachedTile(url).then(cachedUrl => {
         if (cachedUrl) {
           tile.src = cachedUrl;
+          if (cachedUrl.startsWith('blob:')) {
+            tile.onload = () => URL.revokeObjectURL(cachedUrl);
+          }
         } else {
           tile.src = url;
           // Cache on the fly if online
-          fetch(url).then(res => res.blob()).then(blob => {
+          fetch(url, { mode: 'cors' }).then(res => res.blob()).then(blob => {
             cacheTile(url, blob);
           }).catch(err => {
             console.error("Failed to fetch map tile", err);

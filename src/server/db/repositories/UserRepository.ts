@@ -2,6 +2,10 @@
 import { pool } from '../index';
 import { AppError } from '../../middleware/error';
 import { logger } from '../../utils/logger';
+import { z } from 'zod';
+
+const UserStatusSchema = z.enum(['pending', 'verified', 'active', 'suspended', 'inactive']);
+const UserRoleSchema = z.enum(['resident', 'tanod', 'admin', 'superadmin', 'captain']);
 
 export class UserRepository {
   async findById(id: string) {
@@ -55,9 +59,29 @@ export class UserRepository {
   }
 
   async updateStatus(id: string, status: string) {
+    try {
+      UserStatusSchema.parse(status);
+    } catch (err) {
+      throw new AppError(`Invalid status. Must be one of: ${UserStatusSchema.options.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
     const result = await pool.query(
-      'UPDATE users SET status = $1, updated_at = now() WHERE id = $2 RETURNING *',
+      'UPDATE users SET status = $1, last_active = now() WHERE id = $2 RETURNING *',
       [status, id]
+    );
+    return result.rows[0];
+  }
+
+  async updateRole(id: string, role: string) {
+    try {
+      UserRoleSchema.parse(role);
+    } catch (err) {
+      throw new AppError(`Invalid role. Must be one of: ${UserRoleSchema.options.join(', ')}`, 400, 'VALIDATION_ERROR');
+    }
+
+    const result = await pool.query(
+      'UPDATE users SET role = $1, last_active = now() WHERE id = $2 RETURNING *',
+      [role, id]
     );
     return result.rows[0];
   }

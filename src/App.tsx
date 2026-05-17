@@ -411,6 +411,16 @@ export default function App() {
     await handleLogout();
   }, [handleLogout]);
 
+  useEffect(() => {
+    const onAuthExpired = () => {
+      console.warn('Authentication expired. Redirecting to login.');
+      toast.error('Session expired. Please log in again.');
+      handleLogout();
+    };
+    window.addEventListener('auth-expired', onAuthExpired);
+    return () => window.removeEventListener('auth-expired', onAuthExpired);
+  }, [handleLogout]);
+
   // Socket Listeners for Real-time Updates (Removed - now in useSocketListeners hook)
 
   const [isSettingRole, setIsSettingRole] = useState(false);

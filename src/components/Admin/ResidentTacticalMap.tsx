@@ -1,11 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import * as api from '../../lib/api';
 import socket from '../../lib/socket';
 import { ResidentProfile, User } from '../../types';
-import { motion, AnimatePresence } from 'motion/react';
 import { Users, Filter, MapPin, Phone, User as UserIcon, Calendar, ShieldCheck, ExternalLink } from 'lucide-react';
 import { cn, isValidCoord } from '../../lib/utils';
 import 'leaflet/dist/leaflet.css';
@@ -22,6 +21,22 @@ const DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+function MapResizeController() {
+  const map = useMap();
+  useEffect(() => {
+    // Re-evaluate map size slightly after mount to catch tab unhiding
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    ro.observe(map.getContainer());
+    return () => ro.disconnect();
+  }, [map]);
+  return null;
+}
 
 const CENTER: [number, number] = [13.2236, 120.596];
 
@@ -157,9 +172,10 @@ export default function ResidentTacticalMap({ profile }: { profile: User | null 
             <MapContainer 
                 center={CENTER} 
                 zoom={14} 
-                className="w-full h-full grayscale-[0.8] contrast-[1.2] invert-[0.9] hue-rotate-[180deg]"
+                className="w-full h-full rtmap-filter"
                 zoomControl={false}
             >
+                <MapResizeController />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -232,6 +248,10 @@ export default function ResidentTacticalMap({ profile }: { profile: User | null 
       </div>
 
       <style>{`
+        .rtmap-filter {
+            filter: grayscale(0.8) contrast(1.2) invert(0.9) hue-rotate(180deg);
+            -webkit-filter: grayscale(0.8) contrast(1.2) invert(0.9) hue-rotate(180deg);
+        }
         .tactical-popup .leaflet-popup-content-wrapper {
             background: transparent !important;
             padding: 0 !important;

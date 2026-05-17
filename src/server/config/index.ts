@@ -11,8 +11,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export const config = {
-  // Port 3000 is hardcoded by infrastructure mapping
-  port: 3000,
+  // Support Cloud Run which sets process.env.PORT
+  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
 
   nodeEnv: process.env.NODE_ENV || (process.argv[1]?.includes('dist') ? 'production' : 'development'),
 

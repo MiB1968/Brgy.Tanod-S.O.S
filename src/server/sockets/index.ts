@@ -9,6 +9,7 @@ import { setupIncidentHandlers } from './handlers/incident.handler';
 import { setupJarvisHandler } from './handlers/jarvis.handler';
 import { setupGuardianHandler } from './handlers/guardian.handler';
 import { config } from '../config/index';
+import { logger } from '../utils/logger';
 import { normalizeRole, isTanodOrAbove, isAdminOrAbove } from '../utils/roleUtils';
 
 let io: Server;
@@ -50,7 +51,7 @@ export function initSocket(server: HttpServer): Server {
       pingInterval: 10000,
       transports: ['websocket'],
       connectTimeout: 45000,
-      maxHttpBufferSize: 1e7, // 10MB for voice packets
+      maxHttpBufferSize: 2 * 1024 * 1024, // 2MB for voice packets
       cookie: false,
       cors: {
         origin: (origin, callback) => {
@@ -63,7 +64,7 @@ export function initSocket(server: HttpServer): Server {
           if (config.nodeEnv !== 'production' || !origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
             return callback(null, true);
           }
-          console.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
+          logger.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
           return callback(null, false);
         },
         credentials: true,
@@ -83,6 +84,24 @@ export function initSocket(server: HttpServer): Server {
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {
+    let inboundBytesThisWindow = 0;
+    const windowSize = 60 * 1000;
+    const maxBytesPerWindow = 10 * 1024 * 1024;
+
+    socket.onAny((eventName, ...args) => {
+      const payloadSize = JSON.stringify(args).length;
+      inboundBytesThisWindow += payloadSize;
+
+      if (inboundBytesThisWindow > maxBytesPerWindow) {
+        logger.warn(`[SOCKET] Client ${socket.id} exceeds inbound quota`);
+        socket.disconnect(true);
+      }
+    });
+
+    const intervalId = setInterval(() => {
+      inboundBytesThisWindow = 0;
+    }, windowSize);
+
     const { id, role: rawRole, barangayId } = socket.data.user;
 
     // Normalize once at connection time — all checks below use this value
@@ -204,6 +223,7 @@ export function initSocket(server: HttpServer): Server {
     socket.on('ping', () => socket.emit('pong'));
 
     socket.on('disconnect', (reason) => {
+      clearInterval(intervalId);
       console.log(`[Socket] Disconnected → ${role} ${id} | Reason: ${reason}`);
     });
   });

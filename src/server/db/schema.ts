@@ -17,6 +17,7 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   role: text('role').notNull().default('resident'),
   status: text('status').notNull().default('pending'),
+  tokenVersion: integer('token_version').default(1).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastActive: timestamp('last_active', { withTimezone: true }).defaultNow()
 });

@@ -1,15 +1,28 @@
-import React from "react";
-import { MapContainer, Marker, Popup } from "react-leaflet";
+import React, { useEffect } from "react";
+import { MapContainer, Marker, Popup, useMap } from "react-leaflet";
 import L from 'leaflet';
 import { OfflineTileLayer } from './OfflineTileLayer';
 import { isValidCoord } from "../lib/utils";
 
 const IncidentIcon = L.divIcon({
   className: 'custom-div-icon',
-  html: `<div style="font-size: 24px; text-align: center; text-shadow: 0 0 10px rgba(255, 75, 75, 0.5);">📍</div>`,
+  html: `<div style="font-size: 24px; text-shadow: 0 0 10px rgba(255, 75, 75, 0.5); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; line-height: 1;">📍</div>`,
   iconSize: [24, 24],
   iconAnchor: [12, 12]
 });
+
+function MapResizeController() {
+  const map = useMap();
+  useEffect(() => {
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe(map.getContainer());
+    return () => ro.disconnect();
+  }, [map]);
+  return null;
+}
 
 interface ReportMapProps {
   lat: number;
@@ -33,8 +46,11 @@ export default function ReportMap({ lat, lng }: ReportMapProps) {
         style={{ height: "100%", width: "100%", zIndex: 1 }}
         dragging={false}
         scrollWheelZoom={false}
+        touchZoom={false}
+        doubleClickZoom={false}
         zoomControl={false}
       >
+        <MapResizeController />
         <OfflineTileLayer
           attribution="&copy; <a href=&quot;https://carto.com/attributions&quot;>CARTO</a>"
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"

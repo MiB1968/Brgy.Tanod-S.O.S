@@ -38,6 +38,21 @@ export const authLimiter = rateLimit({
   },
 });
 
+export const apiKeyAuthLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: "TOO_MANY_REQUESTS",
+      message: "Too many API key authentication attempts. Please contact support.",
+    },
+  },
+  skip: (req) => !req.headers['x-api-key'],
+});
+
 export const sosLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   limit: 20, // 20 SOS per minute per IP

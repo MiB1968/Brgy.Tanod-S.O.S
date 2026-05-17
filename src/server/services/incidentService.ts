@@ -6,6 +6,7 @@ import { getIO } from '../sockets';
 import { SOCKET_EVENTS } from '../constants';
 import { pool } from '../db/index';
 import { LocationUpdate } from '../types';
+import { validate as uuidValidate } from 'uuid';
 
 const incidentRepository = new IncidentRepository();
 
@@ -29,6 +30,9 @@ export const incidentService = {
 
     // 1. Client-Side UUID Deduplication (Highly effective for offline-sync retry)
     if (clientUuid) {
+      if (!uuidValidate(clientUuid) || !clientUuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+        throw new AppError("Invalid clientUuid format. Must be UUID v4.", 400, "INVALID_UUID");
+      }
       if (processedUuids.has(clientUuid)) {
         console.log(`[SOS] Duplicate report ignored: ${clientUuid}`);
         throw new AppError("Duplicate report already processed", 200, "DUPLICATE");
@@ -44,6 +48,10 @@ export const incidentService = {
       throw new AppError("System busy. Please wait 5 seconds before another transmission.", 429, "RATE_LIMITED");
     }
     recentSOS.set(reporterId, Date.now());
+
+    setTimeout(() => {
+      recentSOS.delete(reporterId);
+    }, 60_000);
 
     // Calculate nearest Tanod distance
     let nearestTanodDistanceKm = 1.2; // default

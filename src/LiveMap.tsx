@@ -35,7 +35,7 @@ const MAP_STYLES = `
     display: flex; align-items: center; justify-content: center;
   }
   .officer-ring {
-    position: absolute; inset: 0; border-radius: 50%;
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 50%;
     border: 2px solid #4AEF80;
     animation: officer-ping 2.2s ease-out infinite;
   }
@@ -53,33 +53,28 @@ const MAP_STYLES = `
     display: flex; align-items: center; justify-content: center;
   }
   .sos-ring-1 {
-    position: absolute; inset: 0; border-radius: 50%;
-    border: 2px solid var(--sc, #FF4B4B);
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 50%;
     animation: sos-pulse 1.7s ease-out infinite;
   }
   .sos-ring-2 {
-    position: absolute; inset: 0; border-radius: 50%;
-    border: 2px solid var(--sc, #FF4B4B);
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 50%;
     animation: sos-pulse 1.7s ease-out infinite 0.55s;
   }
   .sos-dot {
     width: 34px; height: 34px; border-radius: 50%;
-    background: var(--sb, #2A1A1A); border: 2px solid var(--sc, #FF4B4B);
     display: flex; align-items: center; justify-content: center;
     font-size: 17px; position: relative; z-index: 2;
-    box-shadow: 0 0 18px var(--sg, rgba(255,75,75,0.6));
     animation: sos-blink 1.3s ease-in-out infinite;
   }
 
   /* ── Popup skin ── */
   .leaflet-popup-content-wrapper {
-    background: rgba(10,12,16,0.94) !important;
+    background: rgba(10,12,16,0.96) !important;
     border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 14px !important;
     box-shadow: 0 10px 36px rgba(0,0,0,0.7) !important;
-    backdrop-filter: blur(14px) !important;
   }
-  .leaflet-popup-tip { background: rgba(10,12,16,0.94) !important; }
+  .leaflet-popup-tip { background: rgba(10,12,16,0.96) !important; }
   .leaflet-popup-content { margin: 0 !important; }
   .pp { padding: 12px 15px; min-width: 164px; }
   .pp-lbl  { font-family:'Courier New',monospace; font-size:9px; letter-spacing:.14em; text-transform:uppercase; opacity:.45; margin-bottom:4px; }
@@ -127,9 +122,10 @@ const makeSosIcon = (type: string) => {
   const s = getSev(type);
   return L.divIcon({
     className: "",
-    html: `<div class="sos-wrap" style="--sc:${s.color};--sb:${s.bg};--sg:${s.glow}">
-             <div class="sos-ring-1"></div><div class="sos-ring-2"></div>
-             <div class="sos-dot">${s.emoji}</div>
+    html: `<div class="sos-wrap">
+             <div class="sos-ring-1" style="border: 2px solid ${s.color};"></div>
+             <div class="sos-ring-2" style="border: 2px solid ${s.color};"></div>
+             <div class="sos-dot" style="background: ${s.bg}; border: 2px solid ${s.color}; box-shadow: 0 0 18px ${s.glow};">${s.emoji}</div>
            </div>`,
     iconSize: [42, 42], iconAnchor: [21, 21],
   });
@@ -223,6 +219,10 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
   const [done, setDone] = useState(false);
 
   const go = () => {
+    if (!('geolocation' in navigator)) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
     setBusy(true);
     navigator.geolocation.getCurrentPosition(
       ({ coords:{ latitude:lat, longitude:lng, accuracy }}) => {
@@ -239,8 +239,9 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
     <button
       onClick={(e)=>{ e.preventDefault(); go(); }}
       title="Pinpoint My Location"
+      style={{ bottom: '1rem', right: '1rem', touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
       className={[
-        "absolute bottom-4 right-4 z-[400] w-12 h-12 text-xl rounded-full shadow-lg",
+        "absolute z-[400] w-12 h-12 text-xl rounded-full shadow-lg",
         "flex items-center justify-center transition-all",
         done  ? "bg-blue-500/80 border border-blue-400 hover:bg-blue-400"
               : "bg-[#252932] border border-[#2D3139] hover:bg-[#FF4B4B] hover:scale-110",
@@ -290,10 +291,11 @@ function MapDownloadControl() {
   };
 
   return (
-    <div className="absolute top-3 right-3 z-[401] flex flex-col items-end gap-2">
+    <div className="absolute z-[401] flex flex-col items-end gap-2" style={{ top: '0.75rem', right: '0.75rem' }}>
       <button
         onClick={handleDownload}
         disabled={downloading}
+        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
         className={cn(
           "flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border transition-all shadow-lg",
           downloading 
@@ -305,7 +307,7 @@ function MapDownloadControl() {
           <div className="flex items-center gap-3">
              <div className="w-4 h-4 border-2 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
              <span className="text-[11px] font-black font-mono">
-               CACHING: {Math.round((progress.current / progress.total) * 100)}%
+               CACHING: {Math.round((progress.current / Math.max(progress.total, 1)) * 100)}%
              </span>
           </div>
         ) : (
@@ -399,7 +401,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
     <div className="w-full h-full min-h-[400px] rounded-[32px] overflow-hidden border border-white/5 shadow-2xl relative bg-[#0F1115]">
       
       {/* ── Status badges ── */}
-      <div className="absolute top-3 left-3 z-[401] flex flex-wrap gap-2 items-center">
+      <div className="absolute z-[401] flex flex-wrap gap-2 items-center" style={{ top: '0.75rem', left: '0.75rem' }}>
         {/* Patrols count */}
         <div className="flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-white/[0.07] rounded-full px-3 py-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse" />
@@ -424,11 +426,12 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
       </div>
 
       {/* ── Filter toolbar (left-bottom) ── */}
-      <div className="absolute bottom-4 left-4 z-[401] flex flex-col gap-2">
+      <div className="absolute z-[401] flex flex-col gap-2" style={{ bottom: '1rem', left: '1rem' }}>
         {/* Residents toggle */}
         <button
           onClick={() => setShowResidents(v=>!v)}
           title="Toggle Residents"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
             ${showResidents
               ? "bg-purple-500/20 border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.25)]"
@@ -439,6 +442,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         <button
           onClick={() => setShowLegend(v=>!v)}
           title="Legend"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
             ${showLegend ? "bg-white/10 border-white/20" : "bg-black/60 border-white/10 hover:bg-white/10"}`}
         >ℹ️</button>
@@ -447,6 +451,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         <button
           onClick={() => setShowPatrols(v=>!v)}
           title="Toggle Patrols"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
             ${showPatrols
               ? "bg-emerald-500/20 border-emerald-400/40 shadow-[0_0_10px_rgba(52,211,153,0.25)]"
@@ -457,6 +462,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         <button
           onClick={() => setShowSOS(v=>!v)}
           title="Toggle SOS"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
             ${showSOS
               ? "bg-red-500/20 border-red-400/40 shadow-[0_0_10px_rgba(248,113,113,0.25)]"
@@ -467,6 +473,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         <button
           onClick={() => setShowRoutes(v=>!v)}
           title="Toggle Routing Lines"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
             ${showRoutes
               ? "bg-amber-500/20 border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.25)]"
@@ -476,7 +483,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
 
       {/* ── Legend panel ── */}
       {showLegend && (
-        <div className="absolute bottom-4 left-[3.75rem] z-[401] bg-black/85 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3 min-w-[168px]">
+        <div className="absolute z-[401] bg-black/85 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3 min-w-[168px]" style={{ bottom: '1rem', left: '3.75rem' }}>
           <p className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2.5">LEGEND</p>
           {([
             { emoji:"🏠", color:"#A78BFA", label:"Verified Resident" },

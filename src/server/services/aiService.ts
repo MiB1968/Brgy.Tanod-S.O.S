@@ -125,11 +125,13 @@ export async function analyzeIncident(
   // Sanitize
   const sanitized = description
     .replace(/<[^>]*>/g, '')
-    .replace(/[^\w\s.,!?;:()\-'"]/g, '')
+    .replace(/[^\w\s.,!?;:()\-]/g, '')
     .substring(0, 1000)
     .trim();
 
-  const prompt = buildPrompt(sanitized, initialType, nearestTanodDistanceKm);
+  const jsonSafeDescription = JSON.stringify(sanitized);
+
+  const prompt = buildPrompt(jsonSafeDescription, initialType, nearestTanodDistanceKm);
 
   // === Step 1: Route to initial model ===
   const initialModel = routeToModel({
@@ -232,7 +234,7 @@ Be proactive, authoritative, concise, and context-aware. Consider local factors 
 
 Analyze this incident report and respond with ONLY a valid JSON object — no markdown, no explanation.
 
-Incident Description: "${description}"
+Incident Description: ${description}
 ${initialType ? `Initial Type: ${initialType}` : ''}
 ${nearestTanodDistanceKm !== undefined ? `Nearest Tanod Distance: ${nearestTanodDistanceKm.toFixed(2)} km` : ''}
 

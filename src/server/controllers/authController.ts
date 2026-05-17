@@ -8,10 +8,12 @@ import { AuthRequest } from '../middleware/auth';
 import { logAction } from '../services/auditService';
 
 // ── Cookie options (single source of truth) ──────────────────────────────────
+const isProduction = process.env.NODE_ENV === 'production';
+
 const cookieOptions = {
   httpOnly: true,                              // JS cannot read this cookie
-  secure: true,                                // Require secure (needed for sameSite: 'none')
-  sameSite: 'none' as const,                   // Must be 'none' for cross-origin iframes
+  secure: isProduction,                        // Require secure (needed for sameSite: 'none' in prod)
+  sameSite: isProduction ? 'none' as const : 'lax' as const, 
   maxAge: 7 * 24 * 60 * 60 * 1000,            // 7 days
 };
 
@@ -80,7 +82,7 @@ export const register = async (req: Request, res: Response) => {
 
     // Issue JWT as httpOnly cookie ONLY — not in the response body
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
       config.jwtSecret,
       { expiresIn: '7d' }
     );
@@ -127,7 +129,7 @@ export const login = async (req: Request, res: Response) => {
     await logAction(user.id, 'USER_LOGIN', 'users', user.id);
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
       config.jwtSecret,
       { expiresIn: '7d' }
     );
@@ -147,8 +149,8 @@ export const login = async (req: Request, res: Response) => {
 export const logout = (req: Request, res: Response) => {
   res.clearCookie('token', {
     httpOnly: true,
-    secure: true,
-    sameSite: 'none',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
   });
   return response.success(res, null, 'Logged out successfully');
 };

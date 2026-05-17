@@ -5,8 +5,14 @@ import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 import { rateLimit } from 'express-rate-limit';
 import { ttsService } from '../services/ttsService';
+import { z } from 'zod';
 
 const router = Router();
+
+const PatchUserSchema = z.object({
+  status: z.enum(['pending', 'verified', 'active', 'suspended']).optional(),
+  role: z.enum(['resident', 'tanod', 'admin', 'superadmin', 'captain']).optional(),
+});
 
 const smsLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, 
@@ -31,19 +37,20 @@ router.post('/siren', authenticate, authorize(['admin', 'superadmin', 'tanod']),
 });
 
 router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
-  const { status, role } = req.body;
-  const updates = [];
-  const values = [];
-  let i = 1;
-  
-  if (status) { updates.push(`status = $${i++}`); values.push(status); }
-  if (role) { updates.push(`role = $${i++}`); values.push(role); }
-  
-  if (updates.length === 0) return response.error(res, "Nothing to update", "BAD_REQUEST", 400);
-  
-  values.push(req.params.id);
-  
   try {
+    const validated = PatchUserSchema.parse(req.body);
+    const { status, role } = validated;
+    const updates = [];
+    const values = [];
+    let i = 1;
+    
+    if (status) { updates.push(`status = $${i++}`); values.push(status); }
+    if (role) { updates.push(`role = $${i++}`); values.push(role); }
+    
+    if (updates.length === 0) return response.error(res, "Nothing to update", "BAD_REQUEST", 400);
+    
+    values.push(req.params.id);
+
     const result = await pool.query(
       `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
       values
@@ -56,11 +63,15 @@ router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), asy
     
     response.success(res, updatedUser);
   } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues || (err as any).errors || [];
+      return response.error(res, `Invalid input: ${issues.map((e: any) => e.message).join(', ')}`, "VALIDATION_ERROR", 400);
+    }
     response.error(res, err.message);
   }
 });
 
-router.post('/sms', authenticate, smsLimiter, async (req, res) => {
+router.post('/sms', authenticate, authorize(['admin', 'superadmin']), smsLimiter, async (req, res) => {
   const { to, message } = req.body ?? {};
 
   if (!to || !message) {

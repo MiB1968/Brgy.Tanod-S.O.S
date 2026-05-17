@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { setupRoutes } from './routes/index';
-import { globalLimiter, authLimiter, sosLimiter } from './middleware/rateLimiter';
+import { globalLimiter, authLimiter, sosLimiter, apiKeyAuthLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/error';
 import { config } from './config/index';
 
@@ -83,6 +83,13 @@ app.use(
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.use((req, res, next) => {
+  if (req.headers['x-api-key']) {
+    return apiKeyAuthLimiter(req, res, next);
+  }
+  next();
+});
 
 app.use('/api/', globalLimiter);
 app.use('/api/auth/login', authLimiter);

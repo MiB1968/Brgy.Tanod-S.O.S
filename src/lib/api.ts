@@ -52,6 +52,10 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
       const statusText = response.statusText;
       console.error(`API request to ${url} failed with status ${status}: ${statusText}`);
       
+      if (response.status === 401) {
+        window.dispatchEvent(new Event('auth-expired'));
+      }
+      
       let errorMessage = `Server error (${status}): ${statusText}`;
       
       const contentType = response.headers.get('content-type');
