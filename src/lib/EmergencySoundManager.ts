@@ -1,7 +1,9 @@
 // src/lib/EmergencySoundManager.ts
-import { emergencySSML } from './ssmlTagalog'; // Keep your Tagalog SSML
+import { emergencySSML } from "./ssmlTagalog"; // Keep your Tagalog SSML
+import { TagalogTTS } from "./TagalogTTS";
+import { getTagalogMessage, type PhraseKey } from "./tagalogPhrases";
 
-export type EmergencyType = 'sos' | 'medical' | 'fire' | 'crime' | 'test';
+export type EmergencyType = "sos" | "medical" | "fire" | "crime" | "test";
 
 export class EmergencySoundManager {
   private static instance: EmergencySoundManager;
@@ -21,7 +23,9 @@ export class EmergencySoundManager {
 
   private getContext(): AudioContext {
     if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.audioContext = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
     }
     return this.audioContext;
   }
@@ -30,116 +34,127 @@ export class EmergencySoundManager {
     if (this.isInitialized) return;
 
     const ctx = this.getContext();
-    if (ctx.state === 'suspended') await ctx.resume();
+    if (ctx.state === "suspended") await ctx.resume();
 
-    // Master Volume
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = this.currentVolume;
 
-    // High-quality Procedural Reverb (no external files!)
     this.reverb = ctx.createConvolver();
-    this.reverb.buffer = this.createSyntheticReverb(ctx, 2.8, 3.2);
+    this.reverb.buffer = this.createSyntheticReverb(ctx);
 
     this.masterGain.connect(this.reverb);
     this.reverb.connect(ctx.destination);
 
+    await TagalogTTS.getInstance().initialize();
+
     this.isInitialized = true;
-    console.log('✅ EmergencySoundManager Initialized with Reverb');
+    console.log("✅ EmergencySoundManager + TTS Initialized");
   }
 
-  private createSyntheticReverb(ctx: AudioContext, duration: number = 2.8, decay: number = 3.2): AudioBuffer {
-    const sampleRate = ctx.sampleRate;
-    const length = Math.floor(sampleRate * duration);
-    const buffer = ctx.createBuffer(2, length, sampleRate);
+  private createSyntheticReverb(ctx: AudioContext): AudioBuffer {
+    const duration = 2.8;
+    const length = Math.floor(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
     const left = buffer.getChannelData(0);
     const right = buffer.getChannelData(1);
 
     for (let i = 0; i < length; i++) {
-      const env = Math.pow(1 - i / length, decay);
-      left[i] = (Math.random() * 2 - 1) * env * 0.85;
-      right[i] = (Math.random() * 2 - 1) * env * 0.85;
+      const env = Math.pow(1 - i / length, 3.2);
+      left[i] = (Math.random() * 2 - 1) * env * 0.82;
+      right[i] = (Math.random() * 2 - 1) * env * 0.82;
     }
     return buffer;
   }
 
-  async triggerEmergency(type: EmergencyType, options: { speak?: boolean; messageKey?: string; volume?: number } = {}) {
+  async triggerEmergency(
+    type: EmergencyType,
+    options: {
+      speak?: boolean;
+      messageKey?: PhraseKey | string;
+      volume?: number;
+    } = {},
+  ) {
     await this.initialize();
+    if (options.volume !== undefined) this.setMasterVolume(options.volume);
 
-    const vol = options.volume ?? this.currentVolume;
-    this.setMasterVolume(vol);
-
-    // Quick attention beep
-    this.playBeep(1350, 80, 0.7);
+    this.playAttentionBeep();
 
     switch (type) {
-      case 'sos':
-        this.startSiren('wail');
-        if (options.speak && options.messageKey) {
-          this.speakTagalog(options.messageKey);
-        }
+      case "sos":
+        this.startSiren("wail");
+        if (options.speak && options.messageKey)
+          await this.speakTagalog(options.messageKey);
         break;
-
-      case 'medical':
-        this.startSiren('yelp');
+      case "medical":
+        this.startSiren("yelp");
         this.playHeartbeat(18000);
+        if (options.speak) await this.speakTagalog("medical");
         break;
-
-      case 'fire':
-        this.startSiren('wail');
+      case "fire":
+        this.startSiren("wail");
         this.playFireEffect();
+        if (options.speak) await this.speakTagalog("fire");
         break;
-
-      case 'crime':
-        this.startSiren('wail');
+      case "crime":
+        this.startSiren("wail");
+        if (options.speak) await this.speakTagalog("crime");
         break;
-
-      case 'test':
+      case "test":
         this.playTestSequence();
+        if (options.speak) await this.speakTagalog("test");
         break;
     }
   }
 
-  private playBeep(freq: number, duration: number, volume: number = 0.6) {
+  private playAttentionBeep() {
+    this.playBeep(1350, 80, 0.75);
+  }
+
+  private playBeep(freq: number, duration: number, vol: number = 0.6) {
     const ctx = this.getContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    gain.gain.value = volume;
-
     const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 2200;
+
+    osc.type = "sawtooth";
+    osc.frequency.value = freq;
+    gain.gain.value = vol;
+    filter.type = "lowpass";
+    filter.frequency.value = 2400;
 
     osc.connect(filter).connect(gain).connect(this.masterGain);
-
     osc.start();
     setTimeout(() => osc.stop(), duration);
   }
 
-  startSiren(mode: 'wail' | 'yelp' = 'wail') {
+  startSiren(mode: "wail" | "yelp" = "wail") {
     if (this.sirenOsc) this.stopSiren();
 
     const ctx = this.getContext();
     this.sirenOsc = ctx.createOscillator();
     const gain = ctx.createGain();
 
-    this.sirenOsc.type = 'sawtooth';
+    this.sirenOsc.type = "sawtooth";
     this.sirenOsc.frequency.setValueAtTime(650, ctx.currentTime);
 
     gain.gain.value = 0.65;
 
     const filter = ctx.createBiquadFilter();
-    filter.type = 'bandpass';
+    filter.type = "bandpass";
     filter.frequency.value = 1800;
     filter.Q.value = 2;
 
     this.sirenOsc.connect(filter).connect(gain).connect(this.masterGain);
 
-    if (mode === 'wail') {
-      this.sirenOsc.frequency.linearRampToValueAtTime(1250, ctx.currentTime + 0.8);
-      this.sirenOsc.frequency.linearRampToValueAtTime(650, ctx.currentTime + 1.8);
+    if (mode === "wail") {
+      this.sirenOsc.frequency.linearRampToValueAtTime(
+        1250,
+        ctx.currentTime + 0.8,
+      );
+      this.sirenOsc.frequency.linearRampToValueAtTime(
+        650,
+        ctx.currentTime + 1.8,
+      );
     } else {
       this.sirenOsc.frequency.setValueAtTime(1250, ctx.currentTime);
     }
@@ -165,7 +180,10 @@ export class EmergencySoundManager {
 
   private playFireEffect() {
     for (let i = 0; i < 6; i++) {
-      setTimeout(() => this.playBeep(420 + Math.random() * 300, 280, 0.8), i * 420);
+      setTimeout(
+        () => this.playBeep(420 + Math.random() * 300, 280, 0.8),
+        i * 420,
+      );
     }
   }
 
@@ -175,17 +193,34 @@ export class EmergencySoundManager {
     setTimeout(() => this.playBeep(1600, 300, 0.8), 500);
   }
 
-  private async speakTagalog(key: string) {
-    try {
-      // Use your existing Google TTS or Web Speech API fallback
-      const utterance = new SpeechSynthesisUtterance(key);
-      utterance.lang = 'tl-PH';
-      utterance.rate = 0.95;
-      utterance.pitch = 1.05;
-      speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn('TTS fallback failed', e);
-    }
+  private async speakTagalog(key: PhraseKey | string) {
+    const message =
+      typeof key === "string" ? key : getTagalogMessage(key as PhraseKey);
+    await TagalogTTS.getInstance().speak(message);
+  }
+
+  async speakCustom(
+    text: string,
+    options: { rate?: number; pitch?: number; volume?: number } = {},
+  ) {
+    await this.initialize();
+
+    // We already have TagalogTTS initialized in initialize()
+    // but just in case, we will use SpeechSynthesis directly or via TagalogTTS
+    // Wait, TagalogTTS doesn't allow bypassing lang or using en-US unless we pass it.
+    // TagalogTTS speak method allows `lang: 'en-US'`? Let's check TagalogTTS.ts. We defined `utterance.lang = options.lang || 'tl-PH';`
+    const { TagalogTTS } = await import("./TagalogTTS");
+    await TagalogTTS.getInstance().initialize();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    utterance.lang = "en-US"; // English for this greeting
+    utterance.rate = options.rate ?? 0.96;
+    utterance.pitch = options.pitch ?? 1.08;
+    utterance.volume = options.volume ?? 0.95;
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
   }
 
   setMasterVolume(volume: number) {
@@ -195,6 +230,7 @@ export class EmergencySoundManager {
 
   stopAll() {
     this.stopSiren();
+    TagalogTTS.getInstance().stop();
   }
 }
 
@@ -203,8 +239,9 @@ export const useEmergencySound = () => {
   const manager = EmergencySoundManager.getInstance();
   return {
     initialize: () => manager.initialize(),
-    triggerEmergency: (type: EmergencyType, opts?: any) => manager.triggerEmergency(type, opts),
-    startSiren: (mode?: 'wail' | 'yelp') => manager.startSiren(mode),
+    triggerEmergency: (type: EmergencyType, opts?: any) =>
+      manager.triggerEmergency(type, opts),
+    startSiren: (mode?: "wail" | "yelp") => manager.startSiren(mode),
     stopSiren: () => manager.stopSiren(),
     stopAll: () => manager.stopAll(),
     setVolume: (vol: number) => manager.setMasterVolume(vol),
