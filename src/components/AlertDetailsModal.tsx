@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, User, ShieldAlert, Clock, Info, CheckCircle, Activity, Shield } from 'lucide-react';
-import { Alert, ResidentProfile } from '../types';
+import { X, MapPin, User, ShieldAlert, Clock, Info, CheckCircle, Activity, Shield, Eye } from 'lucide-react';
+import { User as UserType, ResidentProfile, Alert } from '../types';
 import ReportMap from './ReportMap';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { cn } from '../lib/utils';
 import FlameAnimation from './FlameAnimation';
+import { isWebLLMReady, promptWebLLM } from '../lib/webllm';
+import toast from 'react-hot-toast';
 
 interface AlertDetailsModalProps {
   alert: Alert | null;
@@ -16,6 +18,30 @@ interface AlertDetailsModalProps {
 export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   const [resident, setResident] = useState<ResidentProfile | null>(null);
   const [loadingResident, setLoadingResident] = useState(false);
+  
+  // Witness AI State
+  const [witnessSummary, setWitnessSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [mockStatements] = useState([
+     "May nakita akong dalawang lalaki na nag-aaway sa kanto. May hawak na kahoy yung isa.",
+     "Nag-uusap lang sila tapos biglang nagsigawan. Napansin ko may dalang patalim yung naka-itim na t-shirt.",
+     "Hindi ko masyado makita kasi madilim, pero parang nagkasakitan na at may sumisigaw ng tulong."
+  ]);
+
+  const handleSummarizeWitnesses = async () => {
+      setIsSummarizing(true);
+      try {
+           const sys = "You are the Barangay AI. Read these witness statements and extract the key facts, detect contradictions, and write a clean objective summary in Tagalog.";
+           const input = mockStatements.map((s, i) => `Sakto ${i+1}: "${s}"`).join('\n');
+           const res = await promptWebLLM(sys, input);
+           setWitnessSummary(res);
+           toast.success("Witness statements summarized by AI");
+      } catch (err) {
+           toast.error("Failed to summarize");
+      } finally {
+           setIsSummarizing(false);
+      }
+  };
 
   useEffect(() => {
     if (alert && alert.residentId) {
@@ -264,6 +290,32 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                   </div>
               </div>
             )}
+            
+            {/* Witness Statements Section */}
+            <div className="glass-panel p-5 rounded-xl border border-white/5 relative overflow-hidden">
+                <div className="flex items-center gap-2 mb-4">
+                   <Eye className="w-4 h-4 text-emerald-400" />
+                   <h3 className="tex-sm font-semibold tracking-widest text-emerald-400 uppercase">Witness Circle Intelligence</h3>
+                </div>
+                {!witnessSummary ? (
+                   <div className="flex items-center justify-between bg-black/20 p-4 rounded-lg border border-white/5">
+                        <span className="text-white/60 text-xs font-mono">3 witness statements collected.</span>
+                        <button 
+                           onClick={handleSummarizeWitnesses}
+                           disabled={isSummarizing}
+                           className="px-4 py-2 bg-emerald-400/20 text-emerald-400 border border-emerald-400/50 rounded-lg text-xs font-mono font-bold uppercase tracking-widest hover:bg-emerald-400/30 transition-all"
+                        >
+                           {isSummarizing ? "ANALYZING..." : "AI SUMMARIZE STATEMENTS"}
+                        </button>
+                   </div>
+                ) : (
+                   <div className="bg-emerald-400/10 p-4 rounded-lg border border-emerald-400/20 text-emerald-400/90 text-sm font-mono leading-relaxed">
+                        <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-400/20 px-2 py-1 rounded inline-block mb-3 border border-emerald-400/30">AI Witness Summary</span>
+                        <br/>
+                        {witnessSummary}
+                   </div>
+                )}
+            </div>
 
             {/* Bottom Grid: Tactical Map & Action Logs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

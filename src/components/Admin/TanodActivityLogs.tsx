@@ -15,11 +15,14 @@ import {
   Download,
   Calendar,
   Filter,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTanodStore } from '../../store/useTanodStore';
 import { TanodActivityLog, TanodPatrolSession } from '../../types';
+import { isWebLLMReady, promptWebLLM } from '../../lib/webllm';
+import toast from 'react-hot-toast';
 
 export function TanodActivityLogs() {
   const { activityLogs, patrolSessions } = useTanodStore();
@@ -29,6 +32,8 @@ export function TanodActivityLogs() {
   const [dateFilter, setDateFilter] = useState<'ALL' | 'TODAY' | 'WEEK'>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const [isGeneratingWeekly, setIsGeneratingWeekly] = useState(false);
+  const [weeklyReport, setWeeklyReport] = useState<string | null>(null);
 
   const filteredLogs = useMemo(() => {
     return activityLogs.filter(log => {
@@ -139,6 +144,22 @@ export function TanodActivityLogs() {
     return `${h}h ${m}m`;
   };
 
+  const handleGenerateWeeklyReport = async () => {
+       setIsGeneratingWeekly(true);
+       try {
+           const sys = "You are the Barangay AI. Write a formal weekly report in Tagalog summarizing the following logs. Group them by category. Keep it professional.";
+           // Limit to 50 logs to fit WebLLM context window limits
+           const input = JSON.stringify(activityLogs.slice(0, 50));
+           const text = await promptWebLLM(sys, input);
+           setWeeklyReport(text);
+           toast.success("Weekly Report Generated!");
+       } catch (err) {
+           toast.error("Failed to generate report.");
+       } finally {
+           setIsGeneratingWeekly(false);
+       }
+  };
+
   return (
     <div className="space-y-6">
       {/* Tactical Overview Stats */}
@@ -206,6 +227,15 @@ export function TanodActivityLogs() {
               ))}
             </div>
             <button 
+              onClick={handleGenerateWeeklyReport}
+              disabled={isGeneratingWeekly}
+              className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 transition-all group flex items-center gap-2"
+              title="Generate Weekly Report"
+            >
+              {isGeneratingWeekly ? <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" /> : <FileText className="w-4 h-4" />}
+              <span className="text-[10px] font-black uppercase font-mono hidden md:block">AI WRITER</span>
+            </button>
+            <button 
               onClick={exportToCSV}
               className="p-3 rounded-2xl bg-info/10 border border-info/20 text-info hover:bg-info/20 transition-all group flex items-center gap-2"
               title="Export to CSV"
@@ -243,6 +273,30 @@ export function TanodActivityLogs() {
           ))}
         </div>
       </div>
+
+      <AnimatePresence>
+        {weeklyReport && (
+           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="glass-panel p-6 rounded-3xl border-amber-500/30 overflow-hidden">
+               <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-black font-mono uppercase text-amber-500 italic">Generated Weekly Report</h3>
+                  <button onClick={() => setWeeklyReport(null)} className="text-white/40 hover:text-white">✕</button>
+               </div>
+               <div className="text-xs font-mono text-white/80 leading-relaxed whitespace-pre-wrap">
+                  {weeklyReport}
+               </div>
+               <button onClick={() => {
+                   const blob = new Blob([weeklyReport], { type: "text/plain;charset=utf-8" });
+                   const url = URL.createObjectURL(blob);
+                   const link = document.createElement("a");
+                   link.href = url;
+                   link.download = `Weekly_Report_${new Date().toISOString().split('T')[0]}.txt`;
+                   link.click();
+               }} className="mt-4 px-4 py-2 bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-amber-500/30">
+                   Download TXT
+               </button>
+           </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Compressed Activity Feed */}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { GoogleGenAI } from '@google/genai';
 import { authenticate } from '../middleware/auth';
+import * as googleTTS from 'google-tts-api';
 
 const router = Router();
 
@@ -29,6 +30,8 @@ router.post('/speak', async (req, res) => {
   if (!text && !ssml) {
     return res.status(400).json({ error: 'Text or SSML is required' });
   }
+
+  const cleanText = text || (ssml ? ssml.replace(/<[^>]*>?/gm, '') : '');
 
   try {
     const cloudTts = getTtsClient();
@@ -63,23 +66,43 @@ router.post('/speak', async (req, res) => {
     } 
 
     // === 2. Fallback: Edge TTS (Free, no credentials needed) ===
-    const { EdgeTTS } = await import('@andresaya/edge-tts');
-    const edgeTtsClient = new EdgeTTS();
-    
-    // Note: EdgeTTS doesn't natively parse SSML as perfectly via simple synthesize string without manual SSML injection,
-    // but we can pass text logic if SSML fails. For now, synthesize text directly, stripping basic SSML tags if needed.
-    const cleanText = text || (ssml ? ssml.replace(/<[^>]*>?/gm, '') : '');
-    const edgeVoice = voice.startsWith('fil-PH') ? 'fil-PH-BlessicaNeural' : 'en-US-AriaNeural';
-    
-    await edgeTtsClient.synthesize(cleanText, edgeVoice, { 
-      rate: '+0%',
-      volume: '+0%',
-      pitch: '+0Hz'
+    try {
+        const { EdgeTTS } = await import('@andresaya/edge-tts');
+        const edgeTtsClient = new EdgeTTS();
+        
+        const edgeVoice = voice.startsWith('fil-PH') ? 'fil-PH-BlessicaNeural' : 'en-US-AriaNeural';
+        
+        await edgeTtsClient.synthesize(cleanText, edgeVoice, { 
+          rate: '+0%',
+          volume: '+0%',
+          pitch: '+0Hz'
+        });
+        const audioBuffer = edgeTtsClient.toBuffer();
+        
+        res.set('Content-Type', 'audio/mpeg');
+        return res.send(audioBuffer);
+    } catch (edgeError: any) {
+        if (edgeError?.message?.includes('429')) {
+             console.warn('EdgeTTS 429 Too Many Requests, falling back to google-tts-api');
+        } else {
+             console.warn('EdgeTTS failed:', edgeError?.message);
+        }
+    }
+
+    // === 3. Fallback: Google Translate TTS API ===
+    const results = await googleTTS.getAllAudioBase64(cleanText, {
+      lang: language === 'fil' ? 'tl' : 'en',
+      slow: false,
+      host: 'https://translate.google.com',
+      splitPunct: ',.?'
     });
-    const audioBuffer = edgeTtsClient.toBuffer();
-    
+
+    // Combine base64 strings if necessary (getAllAudioBase64 returns an array of chunks)
+    const audioDataList = results.map((result) => Buffer.from(result.base64, 'base64'));
+    const finalBuffer = Buffer.concat(audioDataList);
+
     res.set('Content-Type', 'audio/mpeg');
-    return res.send(audioBuffer);
+    return res.send(finalBuffer);
 
   } catch (error) {
     console.error('TTS Error:', error);

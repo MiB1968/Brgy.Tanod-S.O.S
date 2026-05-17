@@ -11,14 +11,17 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
+import { isWebLLMReady, promptWebLLM } from "../lib/webllm";
 import { format } from "date-fns";
+import toast from "react-hot-toast";
 
 interface SOSChatProps {
   alertId: string;
   currentUser: User;
+  alertType?: string; // e.g. MEDICAL, FIRE
 }
 
-export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
+export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser, alertType }) => {
   const [messages, setMessages] = useState<SOSChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -40,12 +43,37 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
 
     loadMessages();
 
-    const handleNewMessage = (data: any) => {
+    const handleNewMessage = async (data: any) => {
       if (data.alertId === alertId) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === data.message.id)) return prev;
           return [...prev, data.message];
         });
+
+        // ========================================================
+        // 🚨 WebLLM: Co-pilot / First-Aid & Sentiment Analysis 🚨
+        // ========================================================
+        if (isWebLLMReady() && data.message.senderRole === "resident" && currentUser.role !== "resident") {
+             try {
+                // 1. Sentiment Panic check
+                const promptSentiment = `Resident says: "${data.message.message}". Is this person exhibiting EXTREME PANIC or escalating distress? Answer ONLY "YES" or "NO".`;
+                const sentRes = await promptWebLLM("", promptSentiment, 0.1);
+                if (sentRes.includes("YES")) {
+                     toast("⚠️ Resident distress level HIGH. Expedite response.", { icon: '🚨', style: { border: '1px solid #ef4444' } });
+                }
+             } catch(e) {}
+        }
+        
+        if (isWebLLMReady() && data.message.senderId === currentUser.id && currentUser.role === "resident") {
+             // 2. Co-Pilot / First-aid offline fallback
+             if (data.message.message.toLowerCase().includes("tulong") || data.message.message.toLowerCase().includes("dugo")) {
+                 try {
+                     const fPrompt = `The resident is asking for help or bleeding. Give a 1-sentence safe First-Aid tip in Tagalog. NO formatting.`;
+                     const faReply = await promptWebLLM("", fPrompt);
+                     toast(`Guardian Copilot: ${faReply}`, { duration: 8000, icon: '🤖' });
+                 } catch(e) {}
+             }
+        }
       }
     };
 

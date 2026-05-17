@@ -3,12 +3,18 @@ import { AuditLogArchive } from '../../types/auditLog';
 import { mockArchives } from '../../data/mock/auditLogArchives';
 import { User } from '../../types';
 import * as api from '../../lib/api';
+import { isWebLLMReady, promptWebLLM } from '../../lib/webllm';
+import { Search, Sparkles } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [archives, setArchives] = useState<AuditLogArchive[]>([]);
   const [selectedArchive, setSelectedArchive] = useState<AuditLogArchive | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [aiSearchQuery, setAiSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [aiSearchResult, setAiSearchResult] = useState<string | null>(null);
 
   // GUARD: Admin only — fully unmounted for non-admin roles
   if (profile?.role !== 'admin' && profile?.role !== 'superadmin') return null;
@@ -40,6 +46,21 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
     a.download = `audit-log-${archive.session_date}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleAiSearch = async () => {
+      if (!aiSearchQuery.trim() || !selectedArchive) return;
+      setIsSearching(true);
+      try {
+          const sys = `You are an AI Log Search Assistant. The user will ask a query in Tagalog or English about the logs. Analyze the provided JSON logs and answer the query concisely.`;
+          const input = `Query: ${aiSearchQuery}\n\nLogs: ${JSON.stringify(selectedArchive.log_entries.slice(0, 50))}`;
+          const res = await promptWebLLM(sys, input);
+          setAiSearchResult(res);
+      } catch (err) {
+          toast.error("AI Search failed.");
+      } finally {
+          setIsSearching(false);
+      }
   };
 
   return (
@@ -144,11 +165,38 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
                 Log Preview — {selectedArchive.session_date}
               </h3>
               <button
-                onClick={() => setSelectedArchive(null)}
+                onClick={() => { setSelectedArchive(null); setAiSearchResult(null); setAiSearchQuery(''); }}
                 className="text-white/50 hover:text-white min-w-[44px] min-h-[44px]
                            flex items-center justify-center text-lg"
               >✕</button>
             </div>
+            
+            <div className="px-4 py-3 border-b border-white/10 bg-black/20 space-y-2">
+                 <div className="relative">
+                    <input 
+                      type="text" 
+                      value={aiSearchQuery}
+                      onChange={(e) => setAiSearchQuery(e.target.value)}
+                      placeholder="e.g. 'Ilang sunog ang nangyari sa log na ito?'"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl py-2.5 pl-9 pr-10 text-xs font-mono text-white outline-none focus:border-amber-400/50"
+                      onKeyDown={(e) => { if(e.key === 'Enter') handleAiSearch()}}
+                    />
+                    <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/50" />
+                    <button 
+                       onClick={handleAiSearch}
+                       disabled={isSearching}
+                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30"
+                    >
+                       {isSearching ? <div className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" /> : <Search className="w-3 h-3" />}
+                    </button>
+                 </div>
+                 {aiSearchResult && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-mono leading-relaxed text-amber-300">
+                      Output: {aiSearchResult}
+                    </div>
+                 )}
+            </div>
+
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {selectedArchive.log_entries.map(entry => (
                 <div key={entry.id} className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs">

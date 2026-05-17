@@ -79,7 +79,7 @@ export function useSocketListeners(
 
           // WebLLM Duplicate SOS Checking (Admin side AI feature)
           if (isWebLLMReady() && data.type !== 'update') { // Only on new alerts
-             const activeAlerts = useIncidentStore.getState().alerts.filter(a => a.status === 'pending' || a.status === 'active' || a.status === 'ongoing');
+             const activeAlerts = useIncidentStore.getState().alerts.filter(a => a.status === 'pending' || a.status === 'responding');
              if (activeAlerts.length > 0) {
                  // Compare against the most recent active alert
                  const recentAlert = activeAlerts[0];

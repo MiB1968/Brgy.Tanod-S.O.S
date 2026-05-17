@@ -20,6 +20,7 @@ import IncidentForm from "./IncidentForm";
 import { useIncidentStore } from "../store/useIncidentStore";
 import { useTanodStore } from "../store/useTanodStore";
 import { logIncidentAction } from "../services/logService";
+import { isWebLLMReady, promptWebLLM } from "../lib/webllm";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -46,6 +47,9 @@ export default function TanodDashboard({
     useState<Alert | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
+  
+  const [handoverBriefing, setHandoverBriefing] = useState<string | null>(null);
+  const [isGeneratingHandover, setIsGeneratingHandover] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -114,6 +118,20 @@ export default function TanodDashboard({
           ? error
           : JSON.stringify(error) || "Unknown error occurred";
       toast.error(`Fault: ${errorMessage}`);
+    }
+  };
+
+  const generateHandoverBriefing = async () => {
+    setIsGeneratingHandover(true);
+    try {
+        const sys = "You are a Barangay AI. Generate a short end-of-shift handover briefing for the incoming Tanod. Summarize the current alerts in Tagalog.";
+        const input = JSON.stringify(alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled'));
+        const text = await promptWebLLM(sys, input);
+        setHandoverBriefing(text);
+    } catch (e) {
+        toast.error("Failed to generate handover briefing");
+    } finally {
+        setIsGeneratingHandover(false);
     }
   };
 
@@ -188,6 +206,18 @@ export default function TanodDashboard({
                   }
                 </span>
               </div>
+              <button
+                 onClick={generateHandoverBriefing}
+                 disabled={isGeneratingHandover}
+                 className="w-full flex items-center justify-center gap-2 p-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-mono font-bold text-white uppercase hover:bg-white/10 transition-colors"
+              >
+                  {isGeneratingHandover ? "Generiting..." : "📝 Generate Shift Handover"}
+              </button>
+              {handoverBriefing && (
+                  <div className="p-4 bg-info/10 border border-info/30 rounded-2xl text-xs font-mono text-info leading-relaxed">
+                      {handoverBriefing}
+                  </div>
+              )}
             </div>
           </TacticalCard>
         </div>
