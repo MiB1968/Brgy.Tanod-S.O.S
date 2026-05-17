@@ -2,6 +2,7 @@ import * as api from '../lib/api';
 import socket from '../lib/socket';
 
 let watchId: number | null = null;
+let lastEmitTime = 0;
 
 export const startGPSTracking = (
   uid: string,
@@ -19,19 +20,12 @@ export const startGPSTracking = (
       async (pos) => {
         try {
           const { latitude: lat, longitude: lng } = pos.coords;
-          
-          // Send to API
-          await api.generic.update(`gps/heartbeat`, {
-            id: uid,
-            role,
-            lat,
-            lng,
-            timestamp: new Date().toISOString()
-          });
+          const now = Date.now();
 
-          // Also emit via socket for real-time smoothness
-          if (role === 'tanod') {
+          // Also emit via socket for real-time smoothness (throttled to 2 seconds)
+          if (role === 'tanod' && (now - lastEmitTime) > 2000) {
             socket.emit('tanod_move', { id: uid, lat, lng });
+            lastEmitTime = now;
           }
         } catch (err: any) {
           console.error("GPS Update error:", err);
