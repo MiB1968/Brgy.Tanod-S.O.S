@@ -29,10 +29,9 @@ db.version(3).stores({
 self.addEventListener('install', (e) => {
   self.skipWaiting(); // Force the waiting service worker to become the active service worker.
   e.waitUntil(
-    Promise.all([
-      caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE)),
-      caches.open(SUPER_CACHE_NAME).then((cache) => cache.addAll(SUPERTONIC_MODELS).catch(err => console.warn('Supertonic cache addAll failed: ', err)))
-    ])
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    // NOTE: Supertonic models are intentionally NOT cached automatically on install.
+    // They are 300-500MB and will be cached via an opt-in "Offline Voice Pack" download flow.
   );
 });
 

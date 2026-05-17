@@ -24,6 +24,8 @@ import { useTTS } from '../hooks/useTTS';
 import { photoService } from '../services/photoService';
 import { Camera, Image as ImageIcon, X } from 'lucide-react';
 
+import { OfflineVoiceManager } from './OfflineVoicePackManager';
+
 const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
 
 export default function ResidentDashboard({ 
@@ -307,6 +309,9 @@ export default function ResidentDashboard({
             <div className="h-[400px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative">
               <ActiveMap alerts={[]} patrols={visiblePatrols} />
             </div>
+            
+            <h3 className="text-lg font-black italic tracking-tighter uppercase font-mono mt-8">System Configuration</h3>
+            <OfflineVoiceManager />
         </div>
         <div className="space-y-8">
             <h3 className="text-lg font-black italic tracking-tighter uppercase font-mono">Personal Incident Tracker</h3>
