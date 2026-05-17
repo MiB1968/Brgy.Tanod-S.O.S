@@ -97,6 +97,7 @@ import * as safeStorage from './lib/safeStorage';
 
 // Service & Lib imports
 import { useSocketListeners } from './hooks/useSocketListeners';
+import { useAudioInitializer } from './hooks/useAudioInitializer';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
 import { GuardianGreeting } from './components/ai/GuardianGreeting';
@@ -112,6 +113,8 @@ import {
 } from './constants';
 
 export default function App() {
+  useAudioInitializer();
+  
   const { 
     profile, 
     setProfile, 

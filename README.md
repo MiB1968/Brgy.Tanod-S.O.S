@@ -1,43 +1,71 @@
-# Brgy. Tanod S.O.S. System
+# 🚨 Brgy. Tanod S.O.S.
 
-A mobile-first emergency response web app for Philippine barangay operations. The system connects citizens, Tanod patrol officers, and barangay admins in a real-time SOS and deployment coordination platform.
+**A mobile-first, offline-resilient emergency response system for Philippine Barangays**
 
-## Architecture
+Real-time SOS alerts • Tagalog Voice System • Web Audio Effects • Guardian Floating Button • Tanod GPS Tracking
 
-This project is a React/TypeScript frontend (Vite) with an Express backend (`server.ts`).
-It uses Firebase for Authentication and Firestore as the database. The system strictly adheres to the "Backend as Single Source of Truth" mandate, with all communication securely proxied and validated by the backend.
+![Hero Image](https://via.placeholder.com/800x400?text=Brgy+Tanod+SOS+Dashboard)
 
-### Security Best Practices Implemented:
-- Firebase config and external API keys (`GEMINI_API_KEY`, `SEMAPHORE_API_KEY`) are kept on the server to prevent client-side exposure.
-- All backend routes (`/api/*`) require an API key (`VITE_API_SECRET_KEY`) sent via the `x-api-key` header to prevent unauthorized access.
-- SMS dispatch calls are securely proxied through the backend (`/api/sms`).
-- Input validation on WebSocket and SOS HTTP endpoints is handled securely on the server.
-- Completely eliminated rogue direct client-side database calls.
+---
 
-## Running the Application
+## ✨ Key Features
 
-1. Install dependencies:
-   ```sh
-   npm install
-   ```
+- **🔊 Advanced Audio System** — Siren, heartbeat, procedural reverb + **Tagalog SSML TTS**
+- **📱 Floating Guardian Button** — Draggable SOS button always accessible
+- **🌐 Offline-First** — Works without internet (local TTS fallback + cached maps)
+- **🛰️ Real-time GPS** — Live tracking of Tanod responders
+- **📡 Backend as Single Source of Truth** — Strict security model
+- **📲 Mobile Optimized** — PWA-ready with excellent touch experience
 
-2. Environment Setup:
-   Copy `.env.example` to `.env` and fill in necessary keys, including `VITE_API_SECRET_KEY` and Firebase credentials.
+---
 
-3. Run Development Server:
-   ```sh
-   npm run dev
-   ```
+## 🛠 Tech Stack
 
-## Integrations
+- **Frontend**: React + TypeScript + Vite + Tailwind
+- **Backend**: Express + TypeScript + Firebase
+- **Audio**: Web Audio API + Google TTS + Local SSML Tagalog
+- **Maps**: Leaflet + Offline tiles
+- **Real-time**: WebSocket
 
-- **GPS/Maps:** `react-leaflet` combined with real-time websocket updates (`/ws/gps`) on the Express backend.
-- **SMS Notifications:** Handled by [Semaphore API](https://semaphore.co), configured in `.env` and proxied via `server.ts`.
-- **AI Triage/Guardian AI:** Configured with Gemini (`GEMINI_API_KEY`) for monitoring, summarizing, and triaging emergency reports.
-- **Offline Voice Pack (TTS):** Gracefully degrades from Google TTS down to fully local edge WebGPU/WASM ONNX models via Supertonic, providing spoken feedback even in complete offline mode.
-- **Resilient Uploads:** Implements smart exponential backoff, network awareness, and capability checks for robust media and chunked video transmission over unstable connections.
-- **Backend Analytics:** Dedicated API endpoints for fetching real-time dashboard analytics and statistics.
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone & Install
+git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
+cd Brgy.Tanod-S.O.S
+npm install
+
+# 2. Environment
+cp .env.example .env
+# Fill in your Firebase + API keys
+
+# 3. Run
+npm run dev
+```
+
+---
+
+## 🎵 Audio System Highlights
+
+- `EmergencySoundManager` — Single source of truth for all emergency audio
+- Full Tagalog voice support with SSML
+- Procedural siren, heartbeat, spatial audio + reverb
+- Global volume control ready
+
+---
+
+## 📱 Mobile Experience
+
+- Draggable Floating Guardian SOS Button
+- One-tap emergency activation
+- Voice feedback in Tagalog
+
+**Made with ❤️ for Philippine Barangays**
+
+---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) — feel free to use, modify, and deploy it for your barangay or LGU.
+MIT License — Free to use for any LGU / Barangay.

@@ -71,7 +71,13 @@ export const useTTS = () => {
         throw new Error(`TTS API error: ${response.status}`);
       }
 
-      const audioBlob = await response.blob();
+      const contentType = response.headers.get('content-type');
+      if (contentType && (contentType.includes('application/json') || contentType.includes('text/html'))) {
+         throw new Error(`TTS API error: Invalid content type ${contentType}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
 
       // Add to queue with priority

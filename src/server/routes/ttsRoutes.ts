@@ -69,8 +69,17 @@ router.post('/speak', async (req, res) => {
         };
 
         const [response] = await cloudTts.synthesizeSpeech(request);
-        res.set('Content-Type', 'audio/mp3');
-        return res.send(response.audioContent);
+        res.set('Content-Type', 'audio/mpeg');
+        
+        // Ensure audioContent is sent as raw binary data, not JSON
+        let audioData = response.audioContent;
+        if (typeof audioData === 'string') {
+          audioData = Buffer.from(audioData, 'base64');
+        } else if (audioData instanceof Uint8Array) {
+          audioData = Buffer.from(audioData);
+        }
+        
+        return res.send(audioData);
     } 
 
     res.status(503).json({ error: 'TTS services are not configured on the server.'});

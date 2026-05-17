@@ -50,6 +50,10 @@ class VoiceService {
       });
 
       if (response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && (contentType.includes('application/json') || contentType.includes('text/html'))) {
+          throw new Error('Invalid content type from TTS server: ' + contentType);
+        }
         const blob = await response.blob();
         await this.playAudioBlob(blob);
         return;
