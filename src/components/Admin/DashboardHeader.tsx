@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Info } from 'lucide-react';
+import { Info, Map as MapIcon } from 'lucide-react';
 import { TanodLogo } from '../Branding';
 import { ReviewArchivedLogsDrawer } from '../Admin/ReviewArchivedLogsDrawer';
 import { User } from '../../types';
@@ -13,9 +13,10 @@ const itemVariants = {
 interface DashboardHeaderProps {
   profile: User | null;
   setIsAboutOpen: (open: boolean) => void;
+  setIsFeatureMapOpen: (open: boolean) => void;
 }
 
-export function DashboardHeader({ profile, setIsAboutOpen }: DashboardHeaderProps) {
+export function DashboardHeader({ profile, setIsAboutOpen, setIsFeatureMapOpen }: DashboardHeaderProps) {
   return (
     <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:justify-between items-start md:items-end gap-6 mb-10 relative glass-panel p-6 sm:p-8 rounded-[32px] sm:rounded-[48px] border-white/10 skew-card shadow-2xl">
       <div className="scanline opacity-20 pointer-events-none" />
@@ -39,7 +40,14 @@ export function DashboardHeader({ profile, setIsAboutOpen }: DashboardHeaderProp
         <p className="text-[8px] sm:text-[10px] font-mono text-white/40 uppercase tracking-[0.2em] sm:tracking-[0.4em] mt-2 bg-white/5 inline-block px-4 py-1.5 rounded-full border border-white/5">Strategic Response Matrix</p>
       </div>
 
-      <div className="flex flex-row items-center gap-2 sm:gap-3 relative z-10 w-full md:w-auto mt-4 md:mt-0">
+      <div className="flex flex-row items-center gap-2 sm:gap-3 relative z-10 w-full md:w-auto mt-4 md:mt-0 flex-wrap">
+        <button
+          onClick={() => setIsFeatureMapOpen(true)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 hover:border-cyan-400/50 transition-all group shrink-0"
+        >
+          <MapIcon className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+          <span className="text-[9px] sm:text-[11px] font-black text-cyan-200 uppercase tracking-widest font-mono">WebLLM Map</span>
+        </button>
         <button
           onClick={() => setIsAboutOpen(true)}
           className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-3 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group hover:border-info/50 shrink-0"

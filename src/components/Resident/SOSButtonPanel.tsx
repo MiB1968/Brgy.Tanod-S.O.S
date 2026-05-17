@@ -6,6 +6,8 @@ import { toast } from 'react-hot-toast';
 import { TacticalCard } from '../Tactical/TacticalCard';
 import { GuardianButton } from './GuardianButton';
 
+import { VoiceSOSButton } from './VoiceSOSButton';
+
 interface SOSButtonPanelProps {
   isSending: boolean;
   guardianMode: boolean;
@@ -100,6 +102,8 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
             <span className="text-[10px] font-black text-red-400 tracking-widest uppercase">Crime</span>
           </motion.button>
         </div>
+
+        <VoiceSOSButton onSOSReady={(type, desc) => onInitiateSOS(type, desc)} />
 
         {/* Footer Bar */}
         <div className="mt-12 flex items-center justify-center gap-4 bg-tactical-dark border border-tactical-cyan/20 rounded-full py-4 text-tactical-cyan/60">

@@ -26,6 +26,7 @@ import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import DispatchModal from './DispatchModal';
 import { AlertDetailsModal } from './AlertDetailsModal';
+import { WebLLMFeatureMap } from './Admin/WebLLMFeatureMap';
 
 // Stores & hooks
 import { useIncidentStore } from '../store/useIncidentStore';
@@ -70,6 +71,7 @@ export default function AdminDashboard({
   const [selectedAlertForDispatch, setSelectedAlertForDispatch] = useState<Alert | null>(null);
   const [selectedAlertForDetails, setSelectedAlertForDetails] = useState<Alert | null>(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isFeatureMapOpen, setIsFeatureMapOpen] = useState(false);
   const [residentsCount, setResidentsCount] = useState(0);
   const [pendingRegCount, setPendingRegCount] = useState(0);
   const [recentIncidents, setRecentIncidents] = useState<any[]>([]);
@@ -248,6 +250,7 @@ export default function AdminDashboard({
       <DashboardHeader 
         profile={profile} 
         setIsAboutOpen={setIsAboutOpen} 
+        setIsFeatureMapOpen={setIsFeatureMapOpen}
       />
 
       {activeBroadcast && (
@@ -343,6 +346,26 @@ export default function AdminDashboard({
           onClose={() => setSelectedAlertForDetails(null)} 
         />
       )}
+      <AnimatePresence>
+        {isFeatureMapOpen && (
+          <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0a0c10] w-full max-w-7xl max-h-[90vh] rounded-3xl overflow-y-auto border border-white/10 shadow-2xl relative"
+            >
+              <button
+                onClick={() => setIsFeatureMapOpen(false)}
+                className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-mono text-[10px] tracking-widest uppercase transition-colors"
+              >
+                Close Map
+              </button>
+              <WebLLMFeatureMap />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
