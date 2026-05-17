@@ -73,7 +73,9 @@ export const useTTS = () => {
 
       const contentType = response.headers.get('content-type');
       if (contentType && (contentType.includes('application/json') || contentType.includes('text/html'))) {
-         throw new Error(`TTS API error: Invalid content type ${contentType}`);
+         let info = '';
+         try { info = await response.text(); } catch(e){}
+         throw new Error(`TTS API error: Invalid content type ${contentType} from ${response.url}. Body: ${info.substring(0, 100)}`);
       }
 
       const arrayBuffer = await response.arrayBuffer();

@@ -35,10 +35,11 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/tts", ttsRoutes);
 
   // 404 catch-all for unmatched API routes
-  app.use("/api/*", (req, res) => {
+  app.all("/api/*", (req, res) => {
+    console.warn(`[404] Unhandled API request: ${req.method} ${req.originalUrl}`);
     res.status(404).json({
       success: false,
-      error: { code: "NOT_FOUND", message: "API endpoint not found" },
+      error: { code: "NOT_FOUND", message: `API endpoint not found: ${req.method} ${req.originalUrl}` },
     });
   });
 };

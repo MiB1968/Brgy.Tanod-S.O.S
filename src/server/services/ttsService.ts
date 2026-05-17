@@ -52,6 +52,20 @@ class TTSService {
         console.warn('[TTS] Supertonic failed:', err);
       }
     }
+    
+    // 3. Fallback: Edge TTS (Free, no credentials needed)
+    try {
+      const { EdgeTTS } = await import('@andresaya/edge-tts');
+      const edgeTtsClient = new EdgeTTS();
+      await edgeTtsClient.synthesize(text, 'fil-PH-BlessicaNeural', {
+        rate: '+0%',
+        volume: '+0%',
+        pitch: '+0Hz'
+      });
+      return edgeTtsClient.toBuffer();
+    } catch (err) {
+      console.warn('[TTS] EdgeTTS fallback failed:', err);
+    }
 
     throw new Error("All TTS providers failed.");
   }

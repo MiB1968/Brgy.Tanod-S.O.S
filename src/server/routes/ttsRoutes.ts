@@ -31,29 +31,10 @@ router.post('/speak', async (req, res) => {
   }
 
   try {
-    const aiClient = getGenAI();
-    
-    // === 1. Try Gemini TTS First (Most Natural) if available ===
-    if (aiClient && !ssml) { // Gemini currently doesn't natively parse SSML as perfectly as GCP TTS
-        try {
-            // we skip Gemini TTS for now since there's no native TTS model in the new SDK that's publicly stable, 
-            // but if the user wants it, we would use generating audio if the model is available.
-            // "gemini-2.5-flash-preview-tts" or "gemini-3.1-flash-tts-preview"
-            /*
-            const response = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash' // adjust to correct model
-            });
-            */
-            // Skipping to Fallback since the exact Gemini TTS model is experimental
-        } catch (geminiErr) {
-            console.warn('Gemini TTS failed, falling back to Google Cloud TTS', geminiErr);
-        }
-    }
-
     const cloudTts = getTtsClient();
     
     if (cloudTts) {
-        // === 2. Fallback: Google Cloud Text-to-Speech (Very Reliable for fil-PH) ===
+        // === 1. Google Cloud Text-to-Speech (Very Reliable for fil-PH) ===
         const request: any = {
             input: ssml ? { ssml } : { text },
             voice: {
@@ -71,7 +52,6 @@ router.post('/speak', async (req, res) => {
         const [response] = await cloudTts.synthesizeSpeech(request);
         res.set('Content-Type', 'audio/mpeg');
         
-        // Ensure audioContent is sent as raw binary data, not JSON
         let audioData = response.audioContent;
         if (typeof audioData === 'string') {
           audioData = Buffer.from(audioData, 'base64');
@@ -82,7 +62,24 @@ router.post('/speak', async (req, res) => {
         return res.send(audioData);
     } 
 
-    res.status(503).json({ error: 'TTS services are not configured on the server.'});
+    // === 2. Fallback: Edge TTS (Free, no credentials needed) ===
+    const { EdgeTTS } = await import('@andresaya/edge-tts');
+    const edgeTtsClient = new EdgeTTS();
+    
+    // Note: EdgeTTS doesn't natively parse SSML as perfectly via simple synthesize string without manual SSML injection,
+    // but we can pass text logic if SSML fails. For now, synthesize text directly, stripping basic SSML tags if needed.
+    const cleanText = text || (ssml ? ssml.replace(/<[^>]*>?/gm, '') : '');
+    const edgeVoice = voice.startsWith('fil-PH') ? 'fil-PH-BlessicaNeural' : 'en-US-AriaNeural';
+    
+    await edgeTtsClient.synthesize(cleanText, edgeVoice, { 
+      rate: '+0%',
+      volume: '+0%',
+      pitch: '+0Hz'
+    });
+    const audioBuffer = edgeTtsClient.toBuffer();
+    
+    res.set('Content-Type', 'audio/mpeg');
+    return res.send(audioBuffer);
 
   } catch (error) {
     console.error('TTS Error:', error);
