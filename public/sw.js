@@ -1,8 +1,14 @@
 const CACHE_NAME = 'tanod-sos-v5';
+const SUPER_CACHE_NAME = 'supertonic-models-v1';
+
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json'
+];
+
+const SUPERTONIC_MODELS = [
+  '/models/supertonic/model.onnx',
 ];
 
 importScripts('https://unpkg.com/dexie@4.4.2/dist/dexie.js');
@@ -23,7 +29,10 @@ db.version(3).stores({
 self.addEventListener('install', (e) => {
   self.skipWaiting(); // Force the waiting service worker to become the active service worker.
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE)),
+      caches.open(SUPER_CACHE_NAME).then((cache) => cache.addAll(SUPERTONIC_MODELS).catch(err => console.warn('Supertonic cache addAll failed: ', err)))
+    ])
   );
 });
 

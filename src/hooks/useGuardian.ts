@@ -2,6 +2,7 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useGuardianStore } from '../store/useGuardianStore';
 import { voiceService } from '../services/voiceService';
+import { useTTS } from './useTTS';
 import { soundService } from '../services/soundService';
 import { useAuthStore } from '../store/useAuthStore';
 import socket from '../lib/socket';
@@ -23,6 +24,7 @@ export function useGuardian() {
   const recognitionRef = useRef<any>(null);
   const offlineQueue = useRef<string[]>([]);
   const synth = window.speechSynthesis;
+  const { speak: ttsSpeak } = useTTS();
 
   // Listen for monitoring events (for responders)
   useEffect(() => {
@@ -61,10 +63,11 @@ export function useGuardian() {
   const speak = useCallback(async (text: string, audioBase64?: string) => {
     setStatus('RESPONDING');
     setLastResponse(text);
-    await voiceService.speak(text, {}, audioBase64);
+    // Use offline TTS capabilities directly
+    await ttsSpeak(text, 'en');
     // If we're not listening again, go back to IDLE
     setStatus('IDLE');
-  }, [setStatus, setLastResponse]);
+  }, [setStatus, setLastResponse, ttsSpeak]);
 
   const handleDeterministicCommand = useCallback((text: string): boolean => {
     const input = text.toLowerCase();

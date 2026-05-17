@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Filter, MapPin, Shield, CheckCircle, AlertTriangle, Zap, Radio, Signal } from 'lucide-react';
 import { Alert, User } from '../../types';
@@ -8,6 +8,7 @@ import { DispatchAlert } from '../Admin/DispatchAlert';
 import { TacticalCard } from '../Tactical/TacticalCard';
 import { TacticalButton } from '../Tactical/TacticalButton';
 import { useTanodStore } from '../../store/useTanodStore';
+import { useTTS } from '../../hooks/useTTS';
 
 interface TanodAlertsFeedProps {
   alerts: Alert[];
@@ -26,6 +27,18 @@ export function TanodAlertsFeed({ alerts, profile, onUpdateStatus, onDetails }: 
   const [filterStatus, setFilterStatus] = useState<string>('ACTIVE');
   const [filterTime, setFilterTime] = useState<string>('ALL');
   const { patrols, setHighlightedPatrolId } = useTanodStore();
+  
+  const prevAlertsLength = useRef(alerts.length);
+  const { speak } = useTTS();
+
+  useEffect(() => {
+    // Detect new incoming alerts
+    if (alerts.length > prevAlertsLength.current) {
+      const newAlertsCount = alerts.length - prevAlertsLength.current;
+      speak(`Bagong alerto natanggap. May ${newAlertsCount} bagong emergency.`, 'en');
+    }
+    prevAlertsLength.current = alerts.length;
+  }, [alerts.length, speak]);
 
   const handleDispatch = async (alert: Alert) => {
     // Find nearest patrol

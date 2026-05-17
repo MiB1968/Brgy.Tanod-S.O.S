@@ -72,7 +72,7 @@ export class SecureVoiceAssistantService {
         context: {
           activeIncidents: [],
           availableTanods: [],
-          barangayInfo: { name: '', zoneCount: 0, activeAlerts: 0 },
+          barangayInfo: { name: '', zoneCount: 0, pendingIncidents: 0, respondingIncidents: 0 },
         },
         language: 'fil',
         lastActivity: new Date(),

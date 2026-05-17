@@ -5,3 +5,7 @@ coverage/
 .env*
 !.env.example
 firebase-applet-config.json
+
+# Supertonic ONNX model files (download via scripts/download-models.sh)
+public/models/supertonic/
+src/server/models/

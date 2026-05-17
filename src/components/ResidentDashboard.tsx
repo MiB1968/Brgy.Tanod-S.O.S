@@ -20,6 +20,7 @@ import { useSOSStore } from '../store/useSOSStore';
 import { useShoutDetection } from '../hooks/useShoutDetection';
 import { useVideoRecorder } from '../hooks/useVideoRecorder';
 import { useOfflineSOS } from '../hooks/useOfflineSOS';
+import { useTTS } from '../hooks/useTTS';
 import { photoService } from '../services/photoService';
 import { Camera, Image as ImageIcon, X } from 'lucide-react';
 
@@ -32,6 +33,7 @@ export default function ResidentDashboard({
   isOnline, 
   deferredPrompt, 
   onInstall, 
+  onTabChange, 
   sirenActive, 
   onToggleSiren 
 }: { 
@@ -45,6 +47,7 @@ export default function ResidentDashboard({
   sirenActive: boolean, 
   onToggleSiren: () => void 
 }) {
+  const { speak } = useTTS();
   const { setQueuedSOSCount } = useSystemStore();
   const { activeAlert, isSending, createSOS, subscribeToUserAlerts } = useSOSStore();
   const { queuedCount, handleQueueSOS, forceSync, isSyncing } = useOfflineSOS();
@@ -114,7 +117,7 @@ export default function ResidentDashboard({
 
       if (!isOnline) {
         await handleQueueSOS(type, description, location, photosToProcess);
-        sosConfirmationSound.current.play();
+        speak('SOS natanggap. Tanod papunta na.', 'en');
         setSelectedPhotos([]);
         return;
       }
@@ -132,7 +135,7 @@ export default function ResidentDashboard({
         );
 
         await createSOS(type, description, location, b64Photos);
-        sosConfirmationSound.current.play();
+        speak('SOS natanggap. Tanod papunta na.', 'en');
         setSelectedPhotos([]);
         toast.success('SOS Protocol Initiated. Units alerted.');
       } catch (err) {

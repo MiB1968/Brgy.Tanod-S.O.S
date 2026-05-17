@@ -1,13 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index';
-import fs from 'fs';
-import path from 'path';
-
-function logToFile(message: string) {
-  const logPath = path.join(process.cwd(), 'auth.log');
-  fs.appendFileSync(logPath, `${new Date().toISOString()}: ${message}\n`);
-}
+import { logger } from '../utils/logger';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -30,6 +24,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       email: 'system@tanod.sos',
       role: 'admin' // Or some kind of system role
     };
+    logger.warn(`[AUTH] API Key usage detected. User: system, Route: ${req.originalUrl}`);
     return next();
   }
   
@@ -43,7 +38,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as any;
     req.user = decoded;
-    logToFile(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
+    logger.info(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
     next();
   } catch (err) {
     res.status(401).json({ 
@@ -57,7 +52,7 @@ export function authorize(roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     // Only log if something goes wrong to reduce noise
     if (!req.user || !roles.includes(req.user.role)) {
-      console.error(`[AUTH] Authorization failed. User: ${JSON.stringify(req.user)}, Required roles: ${roles.join(', ')}`);
+      logger.error(`[AUTH] Authorization failed. User: ${JSON.stringify(req.user)}, Required roles: ${roles.join(', ')}`);
       return res.status(403).json({ 
         success: false, 
         error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } 

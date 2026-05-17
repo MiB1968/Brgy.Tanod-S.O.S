@@ -49,6 +49,8 @@
     "motion": "^12.23.24",
     "msedge-tts": "^2.0.5",
     "ngeohash": "^0.6.3",
+    "onnxruntime-node": "^1.26.0",
+    "onnxruntime-web": "^1.26.0",
     "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

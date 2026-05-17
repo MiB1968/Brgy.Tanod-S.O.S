@@ -626,15 +626,23 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
-    const deletable = ['alerts', 'system_broadcasts', 'tanod_activity_logs', 'incidents', 'audit_log_archives', 'shifts'];
-    if (deletable.includes(collection) && docId) {
+    const DELETABLE_COLLECTIONS: Record<string, string> = {
+      alerts: 'alerts',
+      system_broadcasts: 'system_broadcasts',
+      tanod_activity_logs: 'tanod_activity_logs',
+      incidents: 'incidents',
+      audit_log_archives: 'audit_log_archives'
+    };
+
+    if ((Object.keys(DELETABLE_COLLECTIONS).includes(collection) || collection === 'shifts') && docId) {
       if (!isTanod) return response.error(res, "Administrative clearance required for deletion", "FORBIDDEN", 403);
       
       if (collection === 'shifts') {
         await ShiftRepository.delete(docId);
         socketService.emitToAll("shift_update", { id: docId, deleted: true });
       } else {
-        await pool.query(`DELETE FROM ${collection} WHERE id = $1`, [docId]);
+        const tableName = DELETABLE_COLLECTIONS[collection];
+        await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [docId]);
       }
       return res.json({ success: true });
     }
