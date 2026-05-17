@@ -15,12 +15,14 @@ export class AppError extends Error {
 
 
 export function errorHandler(err: any, req: Request, res: Response, next: NextFunction) {
-  console.error(`[ERROR] ${new Date().toISOString()} - ${err.message || err}`);
-  if (err.stack) console.error(err.stack);
-
   const status = err.status || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
-  
+
+  if (status >= 500) {
+    console.error(`[ERROR] ${new Date().toISOString()} - ${err.message || err}`);
+    if (err.stack) console.error(err.stack);
+  }
+
   // 🛡️ SECURITY FIX: Do not leak internal error messages for 500s in production
   let message = 'Something went wrong on the server';
   if (err instanceof AppError || status < 500) {

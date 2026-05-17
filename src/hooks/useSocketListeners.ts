@@ -90,16 +90,27 @@ export function useSocketListeners(
     socket.on('alert_update', handleAlert);
 
     socket.on('location_map', (activeLocations: any) => {
-      const patrolsToSet: PatrolLocation[] = Object.values(activeLocations).map((loc: any) => ({
-        id: loc.user_id,
-        tanodId: loc.user_id,
-        tanodName: loc.name || 'Active Responder',
-        location: { lat: loc.lat, lng: loc.lng },
-        isActive: true,
-        status: loc.status || 'patrolling',
-        lastUpdate: loc.timestamp || new Date().toISOString()
-      }));
-      useTanodStore.getState().setPatrols(patrolsToSet);
+      const patrolsMap = new Map<string, PatrolLocation>();
+      Object.values(activeLocations).forEach((loc: any) => {
+        if (!loc.user_id) return;
+        // Keep the latest timestamp if duplicate user_id exists
+        const existing = patrolsMap.get(loc.user_id);
+        const currentTs = new Date(loc.timestamp || new Date()).getTime();
+        const existingTs = existing ? new Date(existing.lastUpdate || 0).getTime() : 0;
+        
+        if (!existing || currentTs > existingTs) {
+          patrolsMap.set(loc.user_id, {
+            id: loc.user_id,
+            tanodId: loc.user_id,
+            tanodName: loc.name || 'Active Responder',
+            location: { lat: loc.lat, lng: loc.lng },
+            isActive: true,
+            status: loc.status || 'patrolling',
+            lastUpdate: loc.timestamp || new Date().toISOString()
+          });
+        }
+      });
+      useTanodStore.getState().setPatrols(Array.from(patrolsMap.values()));
     });
 
     socket.on('location_update_delta', (loc: any) => {

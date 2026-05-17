@@ -25,7 +25,7 @@ export function useOfflineSOS() {
     try {
       const result = await offlineService.syncPending(async (data) => {
         // We call the global store action for actual transmission
-        return createSOS(data.type, data.description, data.location, data.photos);
+        return createSOS(data.type, data.description, data.location, data.photos, data.clientUuid);
       });
 
       if (result.success > 0) {
@@ -78,7 +78,8 @@ export function useOfflineSOS() {
         timestamp: new Date().toISOString(),
         userId: profile.id,
         userName: profile.name || 'Citizen',
-        photos: photoBlobs
+        photos: photoBlobs,
+        clientUuid: crypto.randomUUID()
       });
 
       await updateCount();

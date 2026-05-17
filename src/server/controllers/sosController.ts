@@ -44,7 +44,11 @@ export const createSOS = async (req: AuthRequest, res: Response) => {
       message: "SOS alert successfully created"
     });
   } catch (error: any) {
-    console.error("[SOS Controller] Create failed:", error);
+    if (error instanceof AppError && error.status < 500) {
+      // Expected client error, don't spam console
+    } else {
+      console.error("[SOS Controller] Create failed:", error);
+    }
     throw error; // Let global error handler manage it
   }
 };

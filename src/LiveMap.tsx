@@ -561,7 +561,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => {
           const isHighlighted = p.tanodId === highlightedPatrolId;
           return (
-            <Marker key={p.tanodId} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
+            <Marker key={p.id} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
               <Popup>
                 <div className="pp">
                   <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>

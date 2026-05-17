@@ -14,6 +14,7 @@ interface SOSState {
     description: string,
     location: { lat: number; lng: number },
     photos?: string[],
+    clientUuid?: string
   ) => Promise<string | null>;
   cancelSOS: (id: string) => Promise<void>;
   clearActiveAlert: () => void;
@@ -25,10 +26,11 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
   isSending: false,
   setActiveAlert: (alert) => set({ activeAlert: alert }),
 
-  createSOS: async (type, description, location, photos = []) => {
+  createSOS: async (type, description, location, photos = [], clientUuid?: string) => {
     set({ isSending: true });
     const storedUser = safeStorage.getItem("user");
     const user = storedUser ? JSON.parse(storedUser) : null;
+    const finalClientUuid = clientUuid || crypto.randomUUID();
 
     const alertData: any = {
       residentId: user?.id || "anonymous",
@@ -39,7 +41,7 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
       timestamp: new Date().toISOString(),
       description,
       photos,
-      clientUuid: crypto.randomUUID(),
+      clientUuid: finalClientUuid,
     };
 
     try {
@@ -48,21 +50,35 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
       if (navigator.onLine) {
         try {
           const res = await api.alerts.create(alertData);
-          finalAlertId = res.id;
+          if (res && res.success === false) {
+            if (res.error?.code === 'DUPLICATE') {
+               console.warn('[SOS] Duplicate report ignored by server.');
+               set({ isSending: false });
+               return null;
+            }
+            throw new Error(res.error?.message || 'Server rejected SOS');
+          }
+          finalAlertId = res.data ? res.data.id : res.id;
           set({ activeAlert: { ...alertData, id: finalAlertId } });
           return finalAlertId;
-        } catch (apiError) {
-          console.warn(
-            "[SOS] API call failed, falling back to outbox queue",
-            apiError,
-          );
-          throw apiError;
+        } catch (apiError: any) {
+          const msg = apiError?.message || '';
+          if (msg.includes('System busy') || msg.includes('Duplicate')) {
+             console.warn('[SOS] Refusing to queue due to rate limit/duplicate:', msg);
+             set({ isSending: false });
+             throw apiError; 
+          }
+          console.warn("[SOS] API call failed, falling back to outbox queue", apiError);
+          // Only re-throw if it came from sync (already has a clientUuid provided initially)
+          if (clientUuid) throw apiError;
         }
       } else {
         // Explicitly offline
-        throw new Error("OFFLINE_MODE");
+        if (clientUuid) throw new Error("OFFLINE_MODE");
       }
     } catch (error) {
+      if (clientUuid) throw error; // Let sync orchestrator handle logic
+
       console.warn("[SOS] Queuing report due to connection failure");
       const tempId = crypto.randomUUID();
 
@@ -82,6 +98,7 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
         userId: user?.id || "anonymous",
         userName: user?.name || "Resident",
         photos: photoBlobs,
+        clientUuid: finalClientUuid
       });
 
       // Optimistic update for UI tracking

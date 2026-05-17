@@ -6,8 +6,8 @@ export const offlineService = {
   /**
    * Primary entry point for SOS submission in any state
    */
-  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts' | 'clientUuid'>): Promise<number> {
-    const clientUuid = crypto.randomUUID();
+  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts'>): Promise<number> {
+    const clientUuid = data.clientUuid || crypto.randomUUID();
     
     console.log('[Outbox] Queuing tactical report:', data.type);
     
