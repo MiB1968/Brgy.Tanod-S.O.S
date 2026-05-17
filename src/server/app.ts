@@ -48,7 +48,7 @@ app.use(
         formAction: ["'self'"]
       }
     },
-    frameguard: { action: 'sameorigin' },
+    frameguard: false,
     crossOriginEmbedderPolicy: false
   })
 );

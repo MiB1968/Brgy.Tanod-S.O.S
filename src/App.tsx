@@ -107,7 +107,6 @@ import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 import { GuardianGreeting } from "./components/ai/GuardianGreeting";
 import { PWAStatus } from "./components/PWAStatus";
-import FloatingGuardianButton from "./components/FloatingGuardianButton";
 
 // Rest of App...
 import { cn, isValidCoord } from "./lib/utils";
@@ -954,7 +953,6 @@ export default function App() {
             </>
           )}
 
-          {effectiveRole === "resident" && <FloatingGuardianButton />}
 
           <SOSAlertSiren userRole={effectiveRole} />
           <BackgroundServices />

@@ -14,7 +14,7 @@ export const config = {
   // Port 3000 is hardcoded by infrastructure mapping
   port: 3000,
 
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv: process.env.NODE_ENV || (process.argv[1]?.includes('dist') ? 'production' : 'development'),
 
   // NO unsafe fallback. Dev gets a long random string; prod fails above if unset.
   jwtSecret:

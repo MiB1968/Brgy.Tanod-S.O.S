@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import * as ort from 'onnxruntime-node';
 
 // ── Model paths (downloaded by scripts/download-models.sh) ──────────────────
 const MODEL_DIR = path.resolve('src/server/models/supertonic');
@@ -14,10 +13,11 @@ export interface TTSCallOptions {
 }
 
 // ── Lazy-loaded session (singleton) ─────────────────────────────────────────
-let _session: ort.InferenceSession | null = null;
+let _session: any = null;
 
-async function getSession(): Promise<ort.InferenceSession> {
+async function getSession(): Promise<any> {
   if (!_session) {
+    const ort = await import('onnxruntime-node');
     const modelPath = path.join(MODEL_DIR, 'model.onnx');
     _session = await ort.InferenceSession.create(modelPath, {
       executionProviders: ['cpu'],  // CPU-only for server reliability

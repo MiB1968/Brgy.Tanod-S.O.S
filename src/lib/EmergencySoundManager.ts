@@ -1,221 +1,277 @@
 // src/lib/EmergencySoundManager.ts
-import { emergencySSML } from "./ssmlTagalog"; // Keep your Tagalog SSML
-import { TagalogTTS } from "./TagalogTTS";
-import { HybridTTS } from "./HybridTTS";
-import { getTagalogMessage, type PhraseKey } from "./tagalogPhrases";
+import { useAudioStore } from '../store/audioStore';
+import { emergencyHaptics } from './haptics';
+import { HybridTTS } from './HybridTTS';
+import { TagalogTTS } from './TagalogTTS';
+import { getTagalogMessage, type PhraseKey } from './tagalogPhrases';
 
-export type EmergencyType = "sos" | "medical" | "fire" | "crime" | "test";
+export type EmergencyType = 'sos' | 'medical' | 'fire' | 'crime' | 'flood' | 'other' | 'test';
 
 export class EmergencySoundManager {
   private static instance: EmergencySoundManager;
   private audioContext: AudioContext | null = null;
-  private masterGain!: GainNode;
-  private reverb!: ConvolverNode;
-  private sirenOsc: OscillatorNode | null = null;
+  private gainNode: GainNode | null = null;
+  private isPlaying = false;
+  private currentEmergencyType: EmergencyType | null = null;
+  private fallbackAudio: HTMLAudioElement | null = null;
+  private animationFrame: number | null = null;
+  private isActiveSOS = false;
   private isInitialized = false;
-  private currentVolume = 0.85;
 
-  static getInstance(): EmergencySoundManager {
+  private constructor() {
+    this.initAudioContext();
+    this.initFallbackAudio();
+  }
+
+  public static getInstance(): EmergencySoundManager {
     if (!EmergencySoundManager.instance) {
       EmergencySoundManager.instance = new EmergencySoundManager();
     }
     return EmergencySoundManager.instance;
   }
 
-  private getContext(): AudioContext {
-    if (!this.audioContext) {
-      this.audioContext = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
+  private initAudioContext() {
+    try {
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.connect(this.audioContext.destination);
+    } catch (error) {
+      console.warn('Web Audio API not supported, using fallback', error);
     }
-    return this.audioContext;
   }
 
-  async initialize(): Promise<void> {
+  private initFallbackAudio() {
+    try {
+      this.fallbackAudio = new Audio('/sounds/siren-wail.mp3');
+      this.fallbackAudio.loop = true;
+      this.fallbackAudio.preload = 'auto';
+    } catch (e) {
+      console.warn('Fallback audio failed to initialize');
+    }
+  }
+
+  private getMasterVolume(): number {
+    return useAudioStore.getState().masterVolume;
+  }
+
+  private async ensureAudioContext(): Promise<boolean> {
+    if (!this.audioContext) {
+      this.initAudioContext();
+    }
+    if (this.audioContext?.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+      } catch (e) {
+        console.warn('Failed to resume AudioContext');
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public async initialize(): Promise<void> {
     if (this.isInitialized) return;
-
-    const ctx = this.getContext();
-    if (ctx.state === "suspended") await ctx.resume();
-
-    this.masterGain = ctx.createGain();
-    this.masterGain.gain.value = this.currentVolume;
-
-    this.reverb = ctx.createConvolver();
-    this.reverb.buffer = this.createSyntheticReverb(ctx);
-
-    this.masterGain.connect(this.reverb);
-    this.reverb.connect(ctx.destination);
-
+    await this.ensureAudioContext();
     await TagalogTTS.getInstance().initialize();
-
     this.isInitialized = true;
     console.log("✅ EmergencySoundManager + TTS Initialized");
   }
 
-  private createSyntheticReverb(ctx: AudioContext): AudioBuffer {
-    const duration = 2.8;
-    const length = Math.floor(ctx.sampleRate * duration);
-    const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
-    const left = buffer.getChannelData(0);
-    const right = buffer.getChannelData(1);
+  // === PROCEDURAL SIREN ===
+  public async playSiren(type: EmergencyType = 'sos') {
+    if (this.isPlaying) this.stop();
 
-    for (let i = 0; i < length; i++) {
-      const env = Math.pow(1 - i / length, 3.2);
-      left[i] = (Math.random() * 2 - 1) * env * 0.82;
-      right[i] = (Math.random() * 2 - 1) * env * 0.82;
+    const success = await this.ensureAudioContext();
+    if (!success || !this.audioContext || !this.gainNode) {
+      this.playFallback();
+      return;
     }
-    return buffer;
+
+    this.isPlaying = true;
+    this.currentEmergencyType = type;
+    this.isActiveSOS = true;
+
+    const volume = this.getMasterVolume();
+    this.gainNode.gain.value = volume * 0.9;
+
+    const oscillator = this.audioContext.createOscillator();
+    const filter = this.audioContext.createBiquadFilter();
+
+    // Basic siren configuration
+    oscillator.type = 'sawtooth';
+    filter.type = 'lowpass';
+    filter.frequency.value = 1350;
+
+    oscillator.frequency.setValueAtTime(520, this.audioContext.currentTime);
+
+    if (type === 'medical') {
+      // Heartbeat style
+      this.playHeartbeat();
+    } else {
+      // Wailing siren
+      oscillator.frequency.linearRampToValueAtTime(
+        1520,
+        this.audioContext.currentTime + 1.7
+      );
+    }
+
+    // Connect nodes
+    oscillator.connect(filter);
+    filter.connect(this.gainNode);
+
+    oscillator.start();
+    this.animationFrame = requestAnimationFrame(() => this.updateSiren(oscillator, filter));
+
+    // Haptics
+    if (type === 'medical') emergencyHaptics.heartbeat();
+    else emergencyHaptics.sirenPulse();
   }
 
-  async triggerEmergency(
+  private updateSiren(osc: OscillatorNode, filter: BiquadFilterNode) {
+    if (!this.isPlaying) return;
+
+    // Modulate frequency for wail effect
+    const time = this.audioContext!.currentTime;
+    const freq = 520 + Math.sin(time * 3) * 500;
+    osc.frequency.setValueAtTime(freq, time);
+
+    this.animationFrame = requestAnimationFrame(() => this.updateSiren(osc, filter));
+  }
+
+  private playHeartbeat() {
+    // Additional low sine for heartbeat feel
+    if (!this.audioContext) return;
+    const heartbeatOsc = this.audioContext.createOscillator();
+    const heartbeatGain = this.audioContext.createGain();
+
+    heartbeatOsc.type = 'sine';
+    heartbeatOsc.frequency.value = 55;
+    heartbeatGain.gain.value = this.getMasterVolume() * 0.45;
+
+    heartbeatOsc.connect(heartbeatGain);
+    heartbeatGain.connect(this.gainNode!);
+
+    heartbeatOsc.start();
+    // Pulse logic can be added with setInterval if needed
+  }
+
+  public stop() {
+    this.isPlaying = false;
+    this.isActiveSOS = false;
+
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
+
+    if (this.fallbackAudio) {
+      this.fallbackAudio.pause();
+      this.fallbackAudio.currentTime = 0;
+    }
+
+    console.log('🔴 Emergency audio stopped');
+  }
+
+  private playFallback() {
+    if (this.fallbackAudio) {
+      this.fallbackAudio.play().catch(console.warn);
+    }
+  }
+
+  // === PUBLIC API ===
+  public async triggerEmergency(
     type: EmergencyType,
     options: {
       speak?: boolean;
       messageKey?: PhraseKey | string;
       volume?: number;
-    } = {},
+    } = {}
   ) {
-    await this.initialize();
     if (options.volume !== undefined) this.setMasterVolume(options.volume);
+    
+    // Volume warning
+    if (this.getMasterVolume() > 0.9) {
+      console.warn('⚠️ Maximum volume enabled - Siren will be VERY loud');
+    }
 
     this.playAttentionBeep();
+    await this.playSiren(type);
 
-    switch (type) {
-      case "sos":
-        this.startSiren("wail");
-        if (options.speak && options.messageKey)
-          await this.speak(options.messageKey);
-        break;
-      case "medical":
-        this.startSiren("yelp");
-        this.playHeartbeat(18000);
-        if (options.speak) await this.speak("medical");
-        break;
-      case "fire":
-        this.startSiren("wail");
-        this.playFireEffect();
-        if (options.speak) await this.speak("fire");
-        break;
-      case "crime":
-        this.startSiren("wail");
-        if (options.speak) await this.speak("crime");
-        break;
-      case "test":
-        this.playTestSequence();
-        if (options.speak) await this.speak("test");
-        break;
+    if (options.speak) {
+      const message = options.messageKey ? 
+        (typeof options.messageKey === 'string' ? options.messageKey : getTagalogMessage(options.messageKey as PhraseKey)) 
+        : type;
+      await this.speakCustom(message);
+    }
+
+    console.log(`🚨 Emergency triggered: ${type}`);
+  }
+
+  public setVolume(volume: number) {
+    this.setMasterVolume(volume);
+  }
+
+  public setMasterVolume(volume: number) {
+    useAudioStore.getState().setMasterVolume(volume);
+    if (this.gainNode) {
+      this.gainNode.gain.value = volume * 0.9;
     }
   }
 
-  playAttentionBeep() {
+  public pauseAll() {
+    if (this.isActiveSOS) {
+      // Keep SOS active but reduce load
+      if (this.gainNode) this.gainNode.gain.value *= 0.6;
+    } else {
+      this.stop();
+    }
+  }
+
+  public resumeSOS() {
+    if (this.isActiveSOS) {
+      this.playSiren(this.currentEmergencyType || 'sos');
+    }
+  }
+
+  public stopAll() {
+    this.stop();
+    HybridTTS.getInstance().stop();
+  }
+
+  public stopSiren() {
+    this.stop();
+  }
+
+  public startSiren(mode: "wail" | "yelp" = "wail") {
+    this.playSiren('sos');
+  }
+
+  // Legacy TTS aliases to keep HybridTTS and other things happy
+  public playAttentionBeep() {
     this.playBeep(1350, 80, 0.75);
   }
 
-  playBeep(freq: number, duration: number, vol: number = 0.6) {
-    const ctx = this.getContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
+  public playBeep(freq: number, duration: number, vol: number = 0.6) {
+    if (!this.audioContext || !this.gainNode) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
 
     osc.type = "sawtooth";
     osc.frequency.value = freq;
-    gain.gain.value = vol;
+    gain.gain.value = vol * this.getMasterVolume();
     filter.type = "lowpass";
     filter.frequency.value = 2400;
 
-    osc.connect(filter).connect(gain).connect(this.masterGain);
+    osc.connect(filter).connect(gain).connect(this.gainNode);
     osc.start();
     setTimeout(() => osc.stop(), duration);
   }
 
-  startSiren(mode: "wail" | "yelp" = "wail") {
-    if (this.sirenOsc) this.stopSiren();
-
-    const ctx = this.getContext();
-    this.sirenOsc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    this.sirenOsc.type = "sawtooth";
-    this.sirenOsc.frequency.setValueAtTime(650, ctx.currentTime);
-
-    gain.gain.value = 0.65;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 1800;
-    filter.Q.value = 2;
-
-    this.sirenOsc.connect(filter).connect(gain).connect(this.masterGain);
-
-    if (mode === "wail") {
-      this.sirenOsc.frequency.linearRampToValueAtTime(
-        1250,
-        ctx.currentTime + 0.8,
-      );
-      this.sirenOsc.frequency.linearRampToValueAtTime(
-        650,
-        ctx.currentTime + 1.8,
-      );
-    } else {
-      this.sirenOsc.frequency.setValueAtTime(1250, ctx.currentTime);
-    }
-
-    this.sirenOsc.start();
-  }
-
-  stopSiren() {
-    if (this.sirenOsc) {
-      this.sirenOsc.stop();
-      this.sirenOsc = null;
-    }
-  }
-
-  private playHeartbeat(durationMs: number = 18000) {
-    const interval = setInterval(() => {
-      this.playBeep(180, 40, 0.9);
-      setTimeout(() => this.playBeep(180, 60, 0.7), 180);
-    }, 680);
-
-    setTimeout(() => clearInterval(interval), durationMs);
-  }
-
-  private playFireEffect() {
-    for (let i = 0; i < 6; i++) {
-      setTimeout(
-        () => this.playBeep(420 + Math.random() * 300, 280, 0.8),
-        i * 420,
-      );
-    }
-  }
-
-  private playTestSequence() {
-    this.playBeep(800, 150, 0.6);
-    setTimeout(() => this.playBeep(1200, 150, 0.7), 200);
-    setTimeout(() => this.playBeep(1600, 300, 0.8), 500);
-  }
-
-  private async speak(key: PhraseKey | string) {
-    const message =
-      typeof key === "string" ? key : getTagalogMessage(key as PhraseKey);
-    await HybridTTS.getInstance().speak(message);
-  }
-
-  async speakCustom(text: string, options: any = {}) {
+  public async speakCustom(text: string, options: any = {}) {
     await HybridTTS.getInstance().speak(text, options);
-  }
-
-  setMasterVolume(volume: number) {
-    this.currentVolume = Math.max(0, Math.min(1, volume));
-    if (this.masterGain) this.masterGain.gain.value = this.currentVolume;
-  }
-
-  stopAll() {
-    this.stopSiren();
-    HybridTTS.getInstance().stop();
   }
 }
 
-// React Hook
 export const useEmergencySound = () => {
   const manager = EmergencySoundManager.getInstance();
   return {
