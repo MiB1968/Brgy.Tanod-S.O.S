@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { offlineDB } from '../db/offlineDB';
+import { db, type QueuedSOS } from '../db/offlineDB';
 import { offlineService } from '../services/offlineService';
 import { photoService } from '../services/photoService';
 import { useAuthStore } from '../store/useAuthStore';
@@ -11,9 +11,10 @@ export function useOfflineSOS() {
   const [isSyncing, setIsSyncing] = useState(false);
   const { profile } = useAuthStore();
   const { createSOS } = useSOSStore();
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const updateCount = useCallback(async () => {
-    const count = await offlineDB.outbox.where('status').anyOf(['pending', 'failed']).count();
+    const count = await db.outbox.where('status').anyOf(['pending', 'failed']).count();
     setQueuedCount(count);
   }, []);
 
@@ -70,21 +71,15 @@ export function useOfflineSOS() {
         rawPhotos.map(p => photoService.compressForSOS(p))
       );
 
-      // Map older generic 'type' string to new restricted enum type, defaulting to 'other'
-      let mappedType: 'emergency' | 'medical' | 'fire' | 'crime' | 'other' = 'other';
-      if (['emergency', 'medical', 'fire', 'crime'].includes(type)) {
-         mappedType = type as 'emergency' | 'medical' | 'fire' | 'crime';
-      }
-
       await offlineService.queueSOS({
-        userId: profile.id,
-        latitude: location.lat,
-        longitude: location.lng,
-        type: mappedType,
-        priority: 'high',
+        type,
         description,
-        mediaUrls: [], // The photoBlob are now handled in mediaStore
-      }, photoBlobs);
+        location,
+        timestamp: new Date().toISOString(),
+        userId: profile.id,
+        userName: profile.name || 'Citizen',
+        photos: photoBlobs
+      });
 
       await updateCount();
       return true;
