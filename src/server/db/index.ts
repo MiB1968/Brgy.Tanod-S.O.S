@@ -30,25 +30,30 @@ export const checkConnection = async () => {
 
 let firebaseDb: admin.firestore.Firestore;
 
-export const initDatabase = (): admin.firestore.Firestore => {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      projectId: config.firebase.projectId,
-      // For production: use service account credentials
-      // credential: admin.credential.cert({...})
-    });
-    console.log('[DB] Firebase app initialized successfully');
-  }
+export const initDatabase = (): admin.firestore.Firestore | null => {
+  try {
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        projectId: config.firebase.projectId,
+        // For production: use service account credentials
+        // credential: admin.credential.cert({...})
+      });
+      console.log('[DB] Firebase app initialized successfully');
+    }
 
-  if (!firebaseDb) {
-    firebaseDb = admin.firestore();
-    firebaseDb.settings({
-      ignoreUndefinedProperties: true,
-    });
-    console.log('[DB] Firebase Firestore initialized successfully');
+    if (!firebaseDb) {
+      firebaseDb = admin.firestore();
+      firebaseDb.settings({
+        ignoreUndefinedProperties: true,
+      });
+      console.log('[DB] Firebase Firestore initialized successfully');
+    }
+    
+    return firebaseDb;
+  } catch (err) {
+    console.error('CRITICAL: Firebase admin initialization failed! Server will run, but Firebase features will break.', err);
+    return null as any;
   }
-  
-  return firebaseDb;
 };
 
 export const getDb = (): admin.firestore.Firestore => {

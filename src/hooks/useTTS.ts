@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 
 export type TTSState = 'idle' | 'loading' | 'speaking' | 'error';
 
@@ -10,6 +10,12 @@ export function useTTS() {
   const workerRef = useRef<Worker | null>(null);
   const [state, setState] = useState<TTSState>('idle');
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const isLowEnd = useRef(false);
+
+  useEffect(() => {
+    const deviceMemory = (navigator as any).deviceMemory || 4;
+    isLowEnd.current = deviceMemory < 4 || /Android.*(SM-A|SM-J| Moto G)/i.test(navigator.userAgent);
+  }, []);
 
   const getWorker = useCallback(() => {
     if (!workerRef.current) {
@@ -28,8 +34,8 @@ export function useTTS() {
   const speak = useCallback(async (text: string, lang = 'en', options?: { priority?: 'high' | 'normal' }) => {
     if (!text.trim()) return;
     
-    if ('deviceMemory' in navigator && (navigator as any).deviceMemory < 2) {
-      console.warn("Low memory device detected. Skipping local TTS.");
+    if (isLowEnd.current && (navigator as any).deviceMemory < 2) {
+      console.warn("Extremely low memory device detected (<2GB). Skipping heavy local TTS entirely.");
       return;
     }
 
@@ -76,7 +82,7 @@ export function useTTS() {
         reject(err.message);
       };
 
-      worker.postMessage({ text, voicePreset: lang === 'en' ? 'default' : lang });
+      worker.postMessage({ text, voicePreset: lang === 'en' ? 'default' : lang, lowMemory: isLowEnd.current });
     });
   }, [getWorker]);
 

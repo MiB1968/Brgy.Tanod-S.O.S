@@ -1,23 +1,18 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-// ── Hard-fail on missing critical secrets in production ──────────────────────
+// ── Check missing critical secrets ──────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  const REQUIRED = ['JWT_SECRET', 'DATABASE_URL', 'CORS_ORIGIN'];
+  const REQUIRED = ['JWT_SECRET', 'DATABASE_URL'];
   const missing = REQUIRED.filter((k) => !process.env[k]);
   if (missing.length > 0) {
-    console.error(
-      `\n[FATAL] Missing required environment variables: ${missing.join(', ')}\n` +
-      'The server cannot start safely without these values set.\n' +
-      'Set them in your .env file or hosting dashboard and restart.\n'
-    );
-    process.exit(1);
+    console.warn(`[WARNING] Missing recommended environment variables: ${missing.join(', ')}`);
   }
 }
 
 export const config = {
-  // Port now reads from environment — required for cloud hosts (Railway, Render, etc.)
-  port: Number(process.env.PORT) || 3000,
+  // Port must be heavily hardcoded to 3000 as per AI Studio constraints.
+  port: 3000,
 
   nodeEnv: process.env.NODE_ENV || 'development',
 

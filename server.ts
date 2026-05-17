@@ -10,10 +10,13 @@ import { config } from './src/server/config/index';
 async function startServer() {
   try {
     initDatabase();
-    await initDb();
+    if (config.databaseUrl) {
+      await initDb();
+    } else {
+      console.warn('WARNING: No DATABASE_URL provided. Skipping PostgreSQL initialization.');
+    }
   } catch (err) {
-    console.error('CRITICAL: Database initialization failed. Server cannot start safely.', err);
-    process.exit(1);
+    console.error('WARNING: Database initialization failed. Some features may not work.', err);
   }
 
   const server = http.createServer(app);

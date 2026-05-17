@@ -1,6 +1,5 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { ApiResponse } from '../utils/apiResponse';
 import { incidentService } from '../services/incidentService';
 import { AppError } from '../middleware/error';
 
@@ -39,9 +38,11 @@ export const createSOS = async (req: AuthRequest, res: Response) => {
       clientUuid
     });
 
-    return res.status(201).json(
-      ApiResponse.success(incident, "SOS alert successfully created")
-    );
+    return res.status(201).json({
+      success: true,
+      data: incident,
+      message: "SOS alert successfully created"
+    });
   } catch (error: any) {
     console.error("[SOS Controller] Create failed:", error);
     throw error; // Let global error handler manage it
@@ -54,17 +55,21 @@ export const cancelSOS = async (req: AuthRequest, res: Response) => {
 
   const updatedIncident = await incidentService.cancelSOS(id, user.id, user.role);
 
-  return res.json(
-    ApiResponse.success(updatedIncident, "SOS alert cancelled")
-  );
+  return res.json({
+    success: true,
+    data: updatedIncident,
+    message: "SOS alert cancelled"
+  });
 };
 
 export const getActiveAlerts = async (req: AuthRequest, res: Response) => {
   const activeAlerts = await incidentService.getActiveAlerts();
 
-  return res.json(
-    ApiResponse.success(activeAlerts, "Active alerts retrieved successfully")
-  );
+  return res.json({
+    success: true,
+    data: activeAlerts,
+    message: "Active alerts retrieved successfully"
+  });
 };
 
 export const findNearest = async (req: AuthRequest, res: Response) => {
@@ -76,8 +81,10 @@ export const findNearest = async (req: AuthRequest, res: Response) => {
 
   const nearestData = await incidentService.findNearest(lat, lng);
 
-  return res.json(
-    ApiResponse.success(nearestData, "Nearest tanod retrieved successfully")
-  );
+  return res.json({
+    success: true,
+    data: nearestData,
+    message: "Nearest tanod retrieved successfully"
+  });
 };
 

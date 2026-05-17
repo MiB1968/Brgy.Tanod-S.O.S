@@ -96,8 +96,6 @@ import { useSOSStore } from './store/useSOSStore';
 import * as safeStorage from './lib/safeStorage';
 
 // Service & Lib imports
-import { getQueueSize } from './lib/offlineQueue';
-import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
@@ -168,8 +166,7 @@ export default function App() {
     } as User;
   }, [profile, effectiveRole, user]);
 
-  // Custom hooks for data and real-time listeners
-  useAppData(user, effectiveRole);
+  // Custom hooks for real-time listeners
   useSocketListeners(
     effectiveProfile, 
     effectiveRole, 

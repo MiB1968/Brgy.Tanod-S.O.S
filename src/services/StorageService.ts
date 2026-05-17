@@ -18,7 +18,7 @@ export class StorageService {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (signal?.aborted) {
-          throw new DOMException('Upload aborted by user', 'AbortError');
+          throw new DOMException('Kinansela ang pag-upload.', 'AbortError');
         }
 
         const formData = new FormData();
@@ -54,7 +54,7 @@ export class StorageService {
         lastError = error;
 
         if (error.name === 'AbortError') {
-          throw new DOMException('Upload was cancelled', 'AbortError');
+          throw new DOMException('Kinansela ang pag-upload.', 'AbortError');
         }
 
         const isNetworkError = !navigator.onLine || error.name === 'TypeError';
@@ -70,14 +70,18 @@ export class StorageService {
       }
     }
 
-    throw new Error(`Upload failed: ${lastError?.message || 'Unknown error'}`);
+    if (!navigator.onLine) {
+      throw new Error('Walang internet connection. Naka-queue ang file para sa offline upload.');
+    }
+
+    throw new Error(`Nabigo ang pag-upload: ${lastError?.message || 'Maaaring mahina ang signal o nakaranas ng isyu ang server.'}`);
   }
 
   async uploadMultiple(files: File[], folder?: string, signal?: AbortSignal): Promise<string[]> {
     const results: string[] = [];
 
     for (const file of files) {
-      if (signal?.aborted) throw new DOMException('Upload aborted', 'AbortError');
+      if (signal?.aborted) throw new DOMException('Kinansela ang pag-upload.', 'AbortError');
       
       try {
         const url = await this.uploadFile(file, folder, 3, signal);
@@ -109,6 +113,6 @@ export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: numb
   });
 
   if (!response.ok) {
-    throw new Error('Upload failed');
+    throw new Error('Nabigo ang pag-upload ng video chunk. Pakisuri ang iyong signal.');
   }
 };

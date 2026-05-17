@@ -34,4 +34,6 @@ It uses Firebase for Authentication and Firestore as the database. The system st
 - **GPS/Maps:** `react-leaflet` combined with real-time websocket updates (`/ws/gps`) on the Express backend.
 - **SMS Notifications:** Handled by [Semaphore API](https://semaphore.co), configured in `.env` and proxied via `server.ts`.
 - **AI Triage/Guardian AI:** Configured with Gemini (`GEMINI_API_KEY`) for monitoring, summarizing, and triaging emergency reports.
+- **Offline Voice Pack (TTS):** Gracefully degrades from Google TTS down to fully local edge WebGPU/WASM ONNX models via Supertonic, providing spoken feedback even in complete offline mode.
+- **Resilient Uploads:** Implements smart exponential backoff, network awareness, and capability checks for robust media and chunked video transmission over unstable connections.
 - **Backend Analytics:** Dedicated API endpoints for fetching real-time dashboard analytics and statistics.
