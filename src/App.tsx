@@ -96,7 +96,7 @@ import { useSOSStore } from './store/useSOSStore';
 import * as safeStorage from './lib/safeStorage';
 
 // Service & Lib imports
-import { getQueueSize } from './lib/offlineQueue';
+import { useOfflineQueue } from './hooks/useOfflineQueue';
 import { useAppData } from './hooks/useAppData';
 import { useSocketListeners } from './hooks/useSocketListeners';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
@@ -138,6 +138,11 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'map' | 'tracker' | 'reports' | 'directory' | 'schedule' | 'residents' | 'resident-map' | 'roster' | 'settings' | 'logs'>('home');
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
+  const { queueSize } = useOfflineQueue();
+  useEffect(() => {
+    setQueuedSOSCount(queueSize);
+  }, [queueSize, setQueuedSOSCount]);
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [viewOverride, setViewOverride] = useState<'admin' | 'tanod' | 'resident' | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
