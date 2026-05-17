@@ -57,6 +57,7 @@ async function startServer() {
         }
       })
     );
+    app.use(express.static(path.resolve(process.cwd(), 'public')));
 
     app.get('*', (req, res) => {
       if (req.path.startsWith('/api')) {

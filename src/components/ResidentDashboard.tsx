@@ -22,9 +22,7 @@ import { useVideoRecorder } from "../hooks/useVideoRecorder";
 import { useOfflineSOS } from "../hooks/useOfflineSOS";
 import { useTTS } from "../hooks/useTTS";
 import { photoService } from "../services/photoService";
-import { MessageSquare, Camera, Image as ImageIcon, X } from "lucide-react";
-import { isWebLLMReady, promptWebLLM } from "../lib/webllm";
-import { cn } from "../lib/utils";
+import { Camera, Image as ImageIcon, X } from "lucide-react";
 
 import { OfflineVoiceManager } from "./OfflineVoicePackManager";
 
@@ -63,29 +61,6 @@ export default function ResidentDashboard({
   const [guardianMode, setGuardianMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  // Q&A State
-  const [isQAOpen, setIsQAOpen] = useState(false);
-  const [qaInput, setQaInput] = useState("");
-  const [qaHistory, setQaHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
-  const [isQaThinking, setIsQaThinking] = useState(false);
-
-  const handleQASubmit = async () => {
-       if (!qaInput.trim() || isQaThinking) return;
-       const q = qaInput;
-       setQaInput("");
-       setQaHistory(prev => [...prev, { role: 'user', text: q }]);
-       setIsQaThinking(true);
-       try {
-           const sys = "You are Guardian, an AI assistant for Philippine citizens during emergencies. Answer their questions correctly using safe advice in proper Tagalog.";
-           const res = await promptWebLLM(sys, q);
-           setQaHistory(prev => [...prev, { role: 'ai', text: res }]);
-       } catch (err) {
-           setQaHistory(prev => [...prev, { role: 'ai', text: "Pasensya na, may error sa aking offline module. Subukan muli." }]);
-       } finally {
-           setIsQaThinking(false);
-       }
-  };
 
   useEffect(() => {
     if (profile?.id && isOnline && !activeAlert) {
@@ -241,23 +216,6 @@ export default function ResidentDashboard({
         guardianMode={guardianMode}
         setGuardianMode={setGuardianMode}
       />
-
-      {/* Guardian Mode Status Indicator */}
-      <AnimatePresence>
-        {guardianMode && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center justify-center gap-3 py-3 bg-emergency/10 border border-emergency/20 rounded-2xl mx-4"
-          >
-            <div className="w-2 h-2 rounded-full bg-emergency animate-pulse" />
-            <span className="text-[10px] font-black uppercase text-emergency tracking-[0.2em] font-mono">
-              Guardian AI Tactical Listener Active
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {queuedCount > 0 && (
@@ -479,56 +437,6 @@ export default function ResidentDashboard({
         onClose={() => setIsAboutOpen(false)}
         role={profile?.role}
       />
-
-      {/* Floating Q&A Bot */}
-      <div className="fixed bottom-6 right-6 z-50">
-          <AnimatePresence>
-             {isQAOpen && (
-                 <motion.div initial={{ opacity: 0, y: 20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.9 }} className="absolute bottom-16 right-0 w-[300px] sm:w-[350px] bg-black/90 backdrop-blur-xl border border-cyan-400/20 shadow-2xl rounded-2xl overflow-hidden flex flex-col">
-                     <div className="p-3 bg-cyan-400/10 border-b border-cyan-400/20 flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                             <MessageSquare className="w-4 h-4 text-cyan-400" />
-                             <span className="text-[10px] font-black uppercase text-cyan-400 font-mono tracking-widest">Tanong kay Guardian</span>
-                         </div>
-                         <button onClick={() => setIsQAOpen(false)} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
-                     </div>
-                     <div className="h-[300px] overflow-y-auto p-4 space-y-3 flex flex-col">
-                         <div className="text-xs font-mono text-cyan-400/80 bg-cyan-400/5 p-3 rounded-xl border border-cyan-400/10 self-start max-w-[85%] leading-relaxed">
-                              Ako si Guardian. Paano ako makakatulong sa inyo ngayon? (Hal. "Ano ang gagawin kapag may lindol?")
-                         </div>
-                         {qaHistory.map((m, i) => (
-                             <div key={i} className={cn("text-xs font-mono p-3 rounded-xl max-w-[85%] leading-relaxed", m.role === 'user' ? 'bg-white/10 text-white self-end' : 'bg-cyan-400/5 border border-cyan-400/10 text-cyan-400/80 self-start')}>
-                                 {m.text}
-                             </div>
-                         ))}
-                         {isQaThinking && (
-                             <div className="text-[10px] text-cyan-400/50 font-mono italic animate-pulse self-start">Guardian is typing...</div>
-                         )}
-                     </div>
-                     <div className="p-3 border-t border-white/10 bg-black flex items-center gap-2">
-                         <input 
-                           type="text" 
-                           value={qaInput}
-                           onChange={(e) => setQaInput(e.target.value)}
-                           onKeyDown={(e) => e.key === 'Enter' && handleQASubmit()}
-                           placeholder="Magtanong dito..."
-                           className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-cyan-400/30 font-mono"
-                         />
-                         <button onClick={handleQASubmit} disabled={isQaThinking} className="p-2 bg-cyan-400/20 text-cyan-400 rounded-xl hover:bg-cyan-400/30 transition-colors">
-                             <Zap className="w-4 h-4" />
-                         </button>
-                     </div>
-                 </motion.div>
-             )}
-          </AnimatePresence>
-          <button 
-             onClick={() => setIsQAOpen(!isQAOpen)}
-             className="w-12 h-12 rounded-full bg-cyan-400/20 border border-cyan-400/40 text-cyan-400 flex items-center justify-center hover:bg-cyan-400/30 transition-all shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-          >
-             {isQAOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-          </button>
-      </div>
-
     </motion.div>
   );
 }

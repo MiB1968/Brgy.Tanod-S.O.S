@@ -6,7 +6,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
-import * as aiService from '../services/aiService';
+import { analyzeIncident } from '../services/aiService';
 
 const router = Router();
 
@@ -23,7 +23,7 @@ router.post('/analyze', authenticate, async (req: Request, res: Response) => {
   }
 
   try {
-    const analysis = await aiService.analyzeIncident(description.slice(0, 500), initialType);
+    const analysis = await analyzeIncident(description.slice(0, 500), initialType);
     return res.json({ success: true, analysis });
   } catch (err: any) {
     console.error('[AI Route] analyzeIncident failed:', err.message);
@@ -31,21 +31,6 @@ router.post('/analyze', authenticate, async (req: Request, res: Response) => {
       success: false,
       error: { code: 'AI_ERROR', message: 'AI analysis failed. Fallback used on client.' },
     });
-  }
-});
-
-// POST /api/ai/chat
-router.post('/chat', authenticate, async (req: Request, res: Response) => {
-  const { userText } = req.body;
-  if (!userText || typeof userText !== 'string') {
-    return res.status(400).json({ success: false, message: 'Invalid input' });
-  }
-  try {
-    const response = await aiService.generateChatResponse(userText);
-    return res.json({ success: true, response });
-  } catch (err) {
-    console.error('[AI Route] Chat failed:', err);
-    return res.status(500).json({ success: false, message: 'Internal error' });
   }
 });
 

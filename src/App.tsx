@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import socket from "./lib/socket";
 import * as api from "./lib/api";
 import {
@@ -63,18 +63,11 @@ import {
   Mic,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
-const TanodDashboard = lazy(() => import("./components/TanodDashboard"));
-const AdminResidents = lazy(() => import("./components/AdminResidents"));
-const DirectoryView = lazy(() => import("./components/DirectoryView"));
-const ScheduleView = lazy(() => import("./components/ScheduleView"));
-const ReportsView = lazy(() => import("./components/ReportsView"));
-const SettingsView = lazy(() => import("./components/SettingsView"));
-const TanodRosterView = lazy(() => import("./components/TanodRosterView"));
-const IncidentForm = lazy(() => import("./components/IncidentForm"));
-const ResidentTacticalMap = lazy(() => import("./components/Admin/ResidentTacticalMap"));
-const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
-import { AppNavigator } from "./navigation/AppNavigator";
+import AdminDashboard from "./components/AdminDashboard";
+import TanodDashboard from "./components/TanodDashboard";
+import { BroadcastOverlay } from "./components/BroadcastOverlay";
+import { NavigationSidebar } from "./components/NavigationSidebar";
+import { WitnessOverlay } from "./components/WitnessOverlay";
 import { Toaster, toast } from "react-hot-toast";
 import { TanodLogo, BackgroundPattern } from "./components/Branding";
 import TanodCommandAlert from "./components/TanodCommandAlert";
@@ -83,10 +76,16 @@ import BackgroundServices from "./components/BackgroundServices";
 import SirenController from "./components/SirenController";
 import DashboardView from "./components/DashboardView";
 import ActiveMap from "./components/ActiveMap";
-import { BroadcastOverlay } from "./components/BroadcastOverlay";
-import { NavigationSidebar } from "./components/NavigationSidebar";
-import { WitnessOverlay } from "./components/WitnessOverlay";
+import AdminResidents from "./components/AdminResidents";
+import DirectoryView from "./components/DirectoryView";
+import ScheduleView from "./components/ScheduleView";
+import ReportsView from "./components/ReportsView";
+import SettingsView from "./components/SettingsView";
+import TanodRosterView from "./components/TanodRosterView";
 import { TanodActivityLogs } from "./components/Admin/TanodActivityLogs";
+import IncidentForm from "./components/IncidentForm";
+import ResidentTacticalMap from "./components/Admin/ResidentTacticalMap";
+import RegistrationForm from "./components/RegistrationForm";
 import {
   LoginView,
   RoleSelection,
@@ -123,12 +122,12 @@ export default function App() {
 
   const {
     profile,
+    setProfile,
     residentProfile,
+    setResidentProfile,
     isLoading: loading,
+    setIsLoading: setLoading,
   } = useAuthStore();
-  const setProfile = useAuthStore((s) => s.setProfile);
-  const setResidentProfile = useAuthStore((s) => s.setResidentProfile);
-  const setLoading = useAuthStore((s) => s.setIsLoading);
   const { alerts, setAlerts, addAlert } = useIncidentStore();
   const { patrols, setPatrols, setTanods, updateTanodStatus, updatePatrol } =
     useTanodStore();
@@ -285,7 +284,6 @@ export default function App() {
 
   // Authentication persistence
   useEffect(() => {
-    console.log('App useEffect run');
     const token = safeStorage.getItem("token");
     const storedUser = safeStorage.getItem("user");
     if (token && storedUser) {
@@ -520,86 +518,79 @@ export default function App() {
     );
   }
 
-  // Handle Auth & Registration
-  const renderAuthView = () => {
-    if (isRegistering)
-      return (
-        <GlobalErrorBoundary>
-          <RegistrationForm
-            onCancel={() => setIsRegistering(false)}
-            onComplete={async (data: any) => {
-                try {
-                    const res = await api.auth.register(data);
-                    safeStorage.setItem("token", "cookie-auth");
-                    safeStorage.setItem("user", JSON.stringify(res.data.user));
-                    setUser(res.data.user);
-                    setProfile(res.data.user);
-                    setIsRegistering(false);
-                } catch (err: any) {
-                    toast.error(err.message);
-                }
-            }}
-          />
-        </GlobalErrorBoundary>
-      );
-
-    if (!user)
-      return (
-        <GlobalErrorBoundary>
-          <LoginView
-            onLogin={handleLogin}
-            onRegister={() => setIsRegistering(true)}
-            isLoggingIn={isLoggingIn}
-            onDemoLogin={() => handleDemoLogin("resident")}
-            onDemoAdminLogin={() => handleDemoLogin("admin")}
-            deferredPrompt={deferredPrompt}
-            onInstall={handleInstallApp}
-            onResetSession={resetAuthSession}
-          />
-        </GlobalErrorBoundary>
-      );
-
-    if (user && !profile && !residentProfile)
-      return (
-        <GlobalErrorBoundary>
-          <RoleSelection
-            onSelect={handleSetRole}
-            onRegister={() => setIsRegistering(true)}
-            isSettingRole={isSettingRole}
-            deferredPrompt={deferredPrompt}
-            onInstall={handleInstallApp}
-          />
-        </GlobalErrorBoundary>
-      );
-
-    if (effectiveRole === "resident" && profile && !viewOverride) {
-      if (profile.status === "pending")
-        return (
-          <PendingApproval
-            user={user}
-            deferredPrompt={deferredPrompt}
-            onInstall={handleInstallApp}
-            onLogout={handleLogout}
-          />
-        );
-      if (profile.status === "rejected")
-        return (
-          <RejectedScreen
-            reason={
-              residentProfile?.rejectionReason || "Documents verification failed."
+  // Handle Registration
+  if (isRegistering)
+    return (
+      <GlobalErrorBoundary>
+        <RegistrationForm
+          onCancel={() => setIsRegistering(false)}
+          onComplete={async (data: any) => {
+            try {
+              const res = await api.auth.register(data);
+              safeStorage.setItem("token", "cookie-auth");
+              safeStorage.setItem("user", JSON.stringify(res.data.user));
+              setUser(res.data.user);
+              setProfile(res.data.user);
+              setIsRegistering(false);
+            } catch (err: any) {
+              toast.error(err.message);
             }
-            deferredPrompt={deferredPrompt}
-            onInstall={handleInstallApp}
-            onLogout={handleLogout}
-          />
-        );
-    }
-    return null;
-  };
+          }}
+        />
+      </GlobalErrorBoundary>
+    );
 
-  const authView = renderAuthView();
-  if (authView) return authView;
+  if (!user)
+    return (
+      <GlobalErrorBoundary>
+        <LoginView
+          onLogin={handleLogin}
+          onRegister={() => setIsRegistering(true)}
+          isLoggingIn={isLoggingIn}
+          onDemoLogin={() => handleDemoLogin("resident")}
+          onDemoAdminLogin={() => handleDemoLogin("admin")}
+          deferredPrompt={deferredPrompt}
+          onInstall={handleInstallApp}
+          onResetSession={resetAuthSession}
+        />
+      </GlobalErrorBoundary>
+    );
 
+  if (user && !profile && !residentProfile)
+    return (
+      <GlobalErrorBoundary>
+        <RoleSelection
+          onSelect={handleSetRole}
+          onRegister={() => setIsRegistering(true)}
+          isSettingRole={isSettingRole}
+          deferredPrompt={deferredPrompt}
+          onInstall={handleInstallApp}
+        />
+      </GlobalErrorBoundary>
+    );
+
+  if (effectiveRole === "resident" && profile && !viewOverride) {
+    if (profile.status === "pending")
+      return (
+        <PendingApproval
+          user={user}
+          deferredPrompt={deferredPrompt}
+          onInstall={handleInstallApp}
+          onLogout={handleLogout}
+        />
+      );
+    if (profile.status === "rejected")
+      return (
+        <RejectedScreen
+          reason={
+            residentProfile?.rejectionReason || "Documents verification failed."
+          }
+          deferredPrompt={deferredPrompt}
+          onInstall={handleInstallApp}
+          onLogout={handleLogout}
+        />
+      );
+  }
 
   const items = navItems.filter((item) => {
     if (effectiveRole === "admin" || effectiveRole === "superadmin")
@@ -849,111 +840,107 @@ export default function App() {
                 transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                 className="flex-1"
               >
-                <Suspense fallback={<div>Loading View...</div>}>
-                  {activeTab === "home" && effectiveProfile && (
-                    <DashboardView
-                      profile={effectiveProfile}
-                      alerts={alerts}
-                      patrols={patrols}
-                      onTabChange={(tab: any) => setActiveTab(tab as any)}
-                      isOnline={isOnline}
-                      deferredPrompt={deferredPrompt}
-                      onInstall={handleInstallApp}
-                      sirenActive={globalSirenActive}
-                      onToggleSiren={toggleGlobalSiren}
-                      visiblePatrols={visiblePatrols}
-                      activeBroadcast={activeBroadcast}
-                    />
-                  )}
-                  {activeTab === "map" && (
-                    <div className="h-full min-h-[500px] flex flex-col gap-4">
-                      <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                          <h3 className="text-lg font-bold font-mono uppercase">
-                            Offline Area Map
-                          </h3>
-                          <p className="text-xs text-[#8E9299]">
-                            Fallback view for network issues / area intelligence
-                          </p>
+                {activeTab === "home" && effectiveProfile && (
+                  <DashboardView
+                    profile={effectiveProfile}
+                    alerts={alerts}
+                    patrols={patrols}
+                    onTabChange={(tab: any) => setActiveTab(tab as any)}
+                    isOnline={isOnline}
+                    deferredPrompt={deferredPrompt}
+                    onInstall={handleInstallApp}
+                    sirenActive={globalSirenActive}
+                    onToggleSiren={toggleGlobalSiren}
+                    visiblePatrols={visiblePatrols}
+                    activeBroadcast={activeBroadcast}
+                  />
+                )}
+                {activeTab === "map" && (
+                  <div className="h-full min-h-[500px] flex flex-col gap-4">
+                    <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-bold font-mono uppercase">
+                          Offline Area Map
+                        </h3>
+                        <p className="text-xs text-[#8E9299]">
+                          Fallback view for network issues / area intelligence
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🔴</span> SOS
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">🔴</span> SOS
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">🟢</span> PATROL
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🟢</span> PATROL
                         </div>
                       </div>
-                      <ActiveMap alerts={alerts} patrols={visiblePatrols} />
                     </div>
-                  )}
-                  {activeTab === "tracker" && (
-                    <div className="h-full min-h-[500px] flex flex-col gap-4">
-                      <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                          <h3 className="text-lg font-bold font-mono uppercase">
-                            Tactical Live GPS
-                          </h3>
-                          <p className="text-xs text-[#8E9299]">
-                            Real-time Tanod-to-Citizen streaming via
-                            WebSockets/Firebase
-                          </p>
+                    <ActiveMap alerts={alerts} patrols={visiblePatrols} />
+                  </div>
+                )}
+                {activeTab === "tracker" && (
+                  <div className="h-full min-h-[500px] flex flex-col gap-4">
+                    <div className="bg-[#16191F] p-4 rounded-xl border border-[#2D3139] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-bold font-mono uppercase">
+                          Tactical Live GPS
+                        </h3>
+                        <p className="text-xs text-[#8E9299]">
+                          Real-time Tanod-to-Citizen streaming via
+                          WebSockets/Firebase
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🔴</span> RESIDENT SOS
                         </div>
-                        <div className="flex items-center gap-4 text-xs font-black tracking-widest text-[#8E9299]">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">🔴</span> RESIDENT SOS
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">🟢</span> TANOD ON DUTY
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🟢</span> TANOD ON DUTY
                         </div>
                       </div>
-                      <LiveMap effectiveRole={effectiveRole} />
                     </div>
+                    <LiveMap effectiveRole={effectiveRole} />
+                  </div>
+                )}
+                {activeTab === "residents" &&
+                  (effectiveRole === "admin" ||
+                    effectiveRole === "superadmin") &&
+                  effectiveProfile && (
+                    <AdminResidents profile={effectiveProfile} />
                   )}
-                  {activeTab === "residents" &&
-                    (effectiveRole === "admin" ||
-                      effectiveRole === "superadmin") &&
-                    effectiveProfile && (
-                      <AdminResidents profile={effectiveProfile} />
-                    )}
-                  {activeTab === "resident-map" &&
-                    (effectiveRole === "admin" ||
-                      effectiveRole === "superadmin") &&
-                    effectiveProfile && (
-                      <ResidentTacticalMap profile={effectiveProfile} />
-                    )}
-                  {activeTab === "directory" && <DirectoryView />}
-                  {activeTab === "schedule" && effectiveProfile && (
-                    <ScheduleView
-                      profile={effectiveProfile}
-                      role={effectiveRole as any}
-                    />
+                {activeTab === "resident-map" &&
+                  (effectiveRole === "admin" ||
+                    effectiveRole === "superadmin") &&
+                  effectiveProfile && (
+                    <ResidentTacticalMap profile={effectiveProfile} />
                   )}
-                  {activeTab === "reports" && <ReportsView />}
-                  {activeTab === "settings" && effectiveProfile && (
-                    <SettingsView
-                      profile={effectiveProfile}
-                      role={effectiveRole as any}
-                    />
-                  )}
-                  {activeTab === "roster" && <TanodRosterView />}
-                  {activeTab === "logs" &&
-                    (effectiveRole === "admin" ||
-                      effectiveRole === "superadmin") && <TanodActivityLogs />}
-                </Suspense>
+                {activeTab === "directory" && <DirectoryView />}
+                {activeTab === "schedule" && effectiveProfile && (
+                  <ScheduleView
+                    profile={effectiveProfile}
+                    role={effectiveRole as any}
+                  />
+                )}
+                {activeTab === "reports" && <ReportsView />}
+                {activeTab === "settings" && effectiveProfile && (
+                  <SettingsView
+                    profile={effectiveProfile}
+                    role={effectiveRole as any}
+                  />
+                )}
+                {activeTab === "roster" && <TanodRosterView />}
+                {activeTab === "logs" &&
+                  (effectiveRole === "admin" ||
+                    effectiveRole === "superadmin") && <TanodActivityLogs />}
               </motion.div>
             </AnimatePresence>
           </GlobalErrorBoundary>
 
           {isIncidentFormOpen && effectiveProfile && (
-            <Suspense fallback={<div>Loading Form...</div>}>
-              <IncidentForm
-                profile={effectiveProfile}
-                onClose={() => setIsIncidentFormOpen(false)}
-              />
-            </Suspense>
+            <IncidentForm
+              profile={effectiveProfile}
+              onClose={() => setIsIncidentFormOpen(false)}
+            />
           )}
           {effectiveProfile && effectiveRole === "tanod" && (
             <TanodCommandAlert

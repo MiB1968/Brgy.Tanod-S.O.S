@@ -256,9 +256,8 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
 }
 
 import { downloadRegion, Bounds } from "./lib/mapDownloader";
-import { Download, HardDrive, ShieldCheck, Activity } from "lucide-react";
+import { Download, HardDrive, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { isWebLLMReady, promptWebLLM } from "./lib/webllm";
 
 function MapDownloadControl() {
   const map = useMap();
@@ -357,28 +356,9 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
   
   const [residents, setResidents] = useState<any[]>([]);
-  const [briefing, setBriefing] = useState<string | null>(null);
-  const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false);
 
-  const activePatrolsList = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng);
-  const activeSOSList     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng);
-
-  const activePatrols = activePatrolsList.length;
-  const activeSOS     = activeSOSList.length;
-
-  const generateTacticalBriefing = async () => {
-      setIsGeneratingBriefing(true);
-      try {
-          const sys = "You are the Barangay Tactical AI. Review the map data provided and give a 2-sentence Tagalog situation report.";
-          const input = `Active SOS: ${activeSOSList.map(a => a.type).join(', ') || 'None'}. Active Patrols: ${activePatrolsList.length}.`;
-          const text = await promptWebLLM(sys, input);
-          setBriefing(text);
-      } catch(e) {
-          console.error(e);
-      } finally {
-          setIsGeneratingBriefing(false);
-      }
-  };
+  const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
+  const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
 
   useEffect(() => {
     const loadResidents = async () => {
@@ -499,23 +479,6 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
               ? "bg-amber-500/20 border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.25)]"
               : "bg-black/50 border-white/10 opacity-40 hover:opacity-70"}`}
         >🔗</button>
-      </div>
-
-      {/* ── Briefing Panel ── */}
-      <AnimatePresence>
-         {briefing && (
-             <motion.div initial={{ opacity: 0, scale: 0.9, x: -20 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: -20 }} className="absolute z-[401] bg-black/85 backdrop-blur-xl border border-info/30 rounded-2xl p-4 min-w-[200px] max-w-[300px]" style={{ bottom: '4rem', left: '3.75rem' }}>
-                 <p className="text-[9px] font-mono font-black text-info uppercase mb-1 flex items-center gap-2"><Activity className="w-3 h-3" /> Tactical Briefing</p>
-                 <p className="text-xs text-white/90 leading-relaxed font-mono">{briefing}</p>
-                 <button onClick={() => setBriefing(null)} className="absolute top-2 right-2 text-white/30 hover:text-white">✕</button>
-             </motion.div>
-         )}
-      </AnimatePresence>
-
-      <div className="absolute z-[401] flex flex-col gap-2" style={{ bottom: '18rem', left: '1rem' }}>
-         <button onClick={generateTacticalBriefing} disabled={isGeneratingBriefing} className={cn("w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all", isGeneratingBriefing ? "bg-info/20 border-info text-info cursor-wait" : "bg-black/80 border-info/30 hover:bg-info/20 text-info")}>
-            {isGeneratingBriefing ? <div className="w-4 h-4 border-2 border-info border-t-transparent rounded-full animate-spin" /> : "🤖"}
-         </button>
       </div>
 
       {/* ── Legend panel ── */}

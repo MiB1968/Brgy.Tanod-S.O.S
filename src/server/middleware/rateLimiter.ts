@@ -11,10 +11,10 @@ import { rateLimit } from "express-rate-limit";
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 2000, // Increased to avoid 429s during dev
+  limit: 500, // Tightened from 1000
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  skip: (req) => req.path === "/api/health" || req.path === "/api/tts/speak" || req.path === "/api/system/tts",
+  skip: (req) => req.path === "/api/health", // health checks don't count
   message: {
     success: false,
     error: {
@@ -26,7 +26,7 @@ export const globalLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100, // Increased
+  limit: 20, // 20 login/register attempts per 15 minutes
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
@@ -40,7 +40,7 @@ export const authLimiter = rateLimit({
 
 export const apiKeyAuthLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 50,
+  limit: 5,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
@@ -55,7 +55,7 @@ export const apiKeyAuthLimiter = rateLimit({
 
 export const sosLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  limit: 100, // Increased
+  limit: 20, // 20 SOS per minute per IP
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {
@@ -72,7 +72,7 @@ export const sosRateLimiter = sosLimiter;
 
 export const strictRateLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 50,
+  limit: 10,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: {

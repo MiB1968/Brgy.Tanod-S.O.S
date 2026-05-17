@@ -1,13 +1,7 @@
-// src/components/Tanod/TanodPortalHeader.tsx
-// ADDED: <GuardianAILoader variant="compact" /> so Tanod officers can see
-// when the on-device AI model is ready (used for Incident Auto-Writer,
-// Shift Briefing, Patrol Route Suggester, etc.)
-
 import { motion } from 'motion/react';
 import { FilePlus, Info } from 'lucide-react';
 import { IconRadar } from '../TacticalIcons';
 import { User } from '../../types';
-import { GuardianAILoader } from '../GuardianAILoader';
 
 interface TanodPortalHeaderProps {
   profile: User | null;
@@ -22,13 +16,9 @@ export function TanodPortalHeader({ profile, setIsReportFormOpen, setIsAboutOpen
       <div className="tactical-bg-glow absolute inset-0 rounded-[32px] sm:rounded-[48px] pointer-events-none" />
       
       <div className="relative z-10 w-full">
-        {/* Status bar — added AI badge on the right */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_8px_#22c55e]" />
-            <span className="text-[8px] sm:text-[9px] font-mono text-success font-black uppercase tracking-[0.2em] sm:tracking-[0.4em]">Unit Identity: Verified</span>
-          </div>
-          <GuardianAILoader variant="compact" />
+        <div className="flex items-center gap-2 mb-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_8px_#22c55e]" />
+          <span className="text-[8px] sm:text-[9px] font-mono text-success font-black uppercase tracking-[0.2em] sm:tracking-[0.4em]">Unit Identity: Verified</span>
         </div>
         <h2 className="text-xl sm:text-2xl md:text-5xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-2 sm:gap-4 outline-text flex-wrap">
           <IconRadar className="w-8 h-8 sm:w-10 sm:h-10 text-success animate-pulse" />
@@ -49,10 +39,10 @@ export function TanodPortalHeader({ profile, setIsReportFormOpen, setIsAboutOpen
         </motion.button>
         <button
           onClick={() => setIsAboutOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-5 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group hover:border-info/50"
+          className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-5 rounded-xl sm:rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group"
         >
-          <Info className="w-4 h-4 text-info group-hover:scale-110 transition-transform" />
-          <span className="text-[9px] sm:text-[11px] font-black text-white/50 group-hover:text-white uppercase tracking-widest font-mono">INFO</span>
+          <Info className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
+          <span className="text-[8px] sm:text-[10px] font-bold text-white/40 group-hover:text-white uppercase tracking-[0.1em] sm:tracking-[0.25em] font-mono">APP BRIEF</span>
         </button>
       </div>
     </motion.div>

@@ -3,12 +3,11 @@ import * as api from '../lib/api';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { toast } from 'react-hot-toast';
-import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation, Mic } from 'lucide-react';
+import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
 import { TanodLogo, BackgroundPattern } from './Branding';
-import { isWebLLMReady, promptWebLLM, setWebLLMProgressCallback } from '../lib/webllm';
 
 // Fix for default marker icons
 const DefaultIcon = L.icon({
@@ -124,43 +123,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
     confirmPassword: ''
   });
 
-  const [isListening, setIsListening] = useState(false);
-
-  const handleVoiceFill = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-       toast.error("Voice dictation not supported in this browser.");
-       return;
-    }
-    const recog = new SpeechRecognition();
-    recog.lang = 'tl-PH';
-    recog.interimResults = false;
-    
-    recog.onstart = () => { setIsListening(true); toast.success("Listening... Please state your Name, Age, Sex, Date of Birth", { icon: "🎤", duration: 5000 })};
-    recog.onresult = async (e: any) => {
-       const text = e.results[0][0].transcript;
-       toast.success(`Heard: "${text}". Parsing with AI...`);
-       try {
-           const sys = "You are a data extractor. Extract JSON from the user's text for: {fullName:string, age:string, gender:string (Male/Female/Other), dob:string (YYYY-MM-DD)}. If any is missing, leave empty string. Reply ONLY with valid JSON.";
-           const res = await promptWebLLM(sys, text);
-           const parsed = JSON.parse(res.match(/\{[\s\S]*\}/)?.[0] || "{}");
-           setFormData(prev => ({...prev, ...parsed}));
-           toast.success("Form Voice Autofilled!");
-       } catch(err) {
-           console.error(err);
-           toast.error("Failed to parse voice data.");
-       }
-    };
-    recog.onend = () => setIsListening(false);
-    try {
-        recog.start();
-    } catch(err) {
-        setIsListening(false);
-    }
-  };
-
   const fillDemoData = () => {
-    if (import.meta.env.MODE !== 'development') return;                
     setFormData({
       ...formData,
       fullName: 'Juan Dela Cruz',
@@ -326,24 +289,13 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                   </div>
                   Personal Dossier
                 </h2>
-                <div className="flex gap-2">
-                  <button 
-                    type="button" 
-                    onClick={handleVoiceFill}
-                    disabled={isListening}
-                    className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] bg-info/10 hover:bg-info/20 text-info px-5 py-3 rounded-2xl border border-info/30 transition-all font-mono"
-                  >
-                    {isListening ? <div className="w-3 h-3 border border-info border-t-transparent rounded-full animate-spin" /> : <Mic className="w-3 h-3" />}
-                    VOICE FILL
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={fillDemoData}
-                    className="text-[9px] font-black uppercase tracking-[0.3em] bg-white/5 hover:bg-white/10 text-white/40 hover:text-white px-5 py-3 rounded-2xl border border-white/5 transition-all font-mono"
-                  >
-                    ⚡ Demo
-                  </button>
-                </div>
+                <button 
+                  type="button" 
+                  onClick={fillDemoData}
+                  className="text-[9px] font-black uppercase tracking-[0.3em] bg-white/5 hover:bg-white/10 text-white/40 hover:text-white px-5 py-3 rounded-2xl border border-white/5 transition-all font-mono"
+                >
+                  ⚡ Autofill Intelligence
+                </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">

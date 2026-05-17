@@ -1,11 +1,12 @@
 # ====================== Stage 1: Builder ======================
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-COPY package*.json ./
-RUN npm ci --frozen-lockfile
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy source
 COPY . .
@@ -14,17 +15,18 @@ COPY . .
 RUN npm run build
 
 # ====================== Stage 2: Production ======================
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
 # Install production dependencies only
-COPY package*.json ./
-RUN npm ci --only=production --frozen-lockfile && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --only=production && npm cache clean --force
 
 # Copy built assets
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
+# If for some reason assets need public, we can also copy it
+COPY --from=builder /app/public ./public                
 
 # Security & runtime
 ENV NODE_ENV=production
@@ -32,8 +34,5 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
-
+# Start command
 CMD ["npm", "start"]

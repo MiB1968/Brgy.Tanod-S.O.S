@@ -14,7 +14,7 @@ const ALL_FEATURES = [
 
   // ── RESIDENT (NEW) ─────────────────────────────────────────────────────────
   {
-    id: 2, status: "BUILT", tier: "RESIDENT",
+    id: 2, status: "EASY", tier: "RESIDENT",
     title: "Offline First-Aid Guide",
     tagalog: "Gabay sa Unang Tulong",
     file: "SOSChat.tsx",
@@ -23,7 +23,7 @@ const ALL_FEATURES = [
     example: "MEDICAL SOS, no network → 'Huwag ilipat. Itaas ang binti. Pigilan ang dugo...'",
   },
   {
-    id: 3, status: "BUILT", tier: "RESIDENT",
+    id: 3, status: "EASY", tier: "RESIDENT",
     title: "SOS Chat Co-pilot",
     tagalog: "AIKasama sa Chat",
     file: "SOSChat.tsx",
@@ -32,7 +32,7 @@ const ALL_FEATURES = [
     example: "FIRE alert → 'Lumayo agad sa usok. Huwag bumalik para sa gamit.'",
   },
   {
-    id: 4, status: "BUILT", tier: "RESIDENT",
+    id: 4, status: "EASY", tier: "RESIDENT",
     title: "Voice Registration Fill",
     tagalog: "Boses para sa Form",
     file: "RegistrationForm.tsx",
@@ -61,7 +61,7 @@ const ALL_FEATURES = [
 
   // ── TANOD (NEW) ────────────────────────────────────────────────────────────
   {
-    id: 7, status: "BUILT", tier: "TANOD",
+    id: 7, status: "EASY", tier: "TANOD",
     title: "Incident Report Auto-Writer",
     tagalog: "AI na Sumulat ng Blotter",
     file: "IncidentForm.tsx",
@@ -79,7 +79,7 @@ const ALL_FEATURES = [
     example: "'may dala siyang kutsilyo' → Severity 5→9, banner: '⚠️ WEAPON DETECTED'",
   },
   {
-    id: 9, status: "BUILT", tier: "TANOD",
+    id: 9, status: "MEDIUM", tier: "TANOD",
     title: "Shift Handover Briefing",
     tagalog: "Ulat sa Susunod na Tanod",
     file: "TanodDashboard.tsx",
@@ -88,7 +88,7 @@ const ALL_FEATURES = [
     example: "'3 incidents, 1 unresolved in Purok 3, resident Juan still nervous. Recommend check-in.'",
   },
   {
-    id: 10, status: "BUILT", tier: "TANOD",
+    id: 10, status: "MEDIUM", tier: "TANOD",
     title: "Patrol Route Suggester",
     tagalog: "Pinakamainam na Ruta",
     file: "PatrolScheduler.tsx",
@@ -117,7 +117,7 @@ const ALL_FEATURES = [
 
   // ── ADMIN (NEW) ────────────────────────────────────────────────────────────
   {
-    id: 13, status: "BUILT", tier: "ADMIN",
+    id: 13, status: "EASY", tier: "ADMIN",
     title: "Weekly Report Generator",
     tagalog: "Auto na Ulat sa Kapitan",
     file: "TanodActivityLogs.tsx",
@@ -153,7 +153,7 @@ const ALL_FEATURES = [
     example: "'Sunog sa simbahan' + 'Apoy sa kanto ng simbahan' → ⚠️ Likely same incident",
   },
   {
-    id: 17, status: "BUILT", tier: "ADMIN",
+    id: 17, status: "EASY", tier: "ADMIN",
     title: "Natural Language Log Search",
     tagalog: "Maghanap sa Logs ng Tagalog",
     file: "ReviewArchivedLogsDrawer.tsx",
@@ -180,7 +180,7 @@ const ALL_FEATURES = [
     example: "Two residents with same address and phone → '⚠️ Possible duplicate registration. Verify identity.'",
   },
   {
-    id: 20, status: "BUILT", tier: "ADMIN",
+    id: 20, status: "MEDIUM", tier: "ADMIN",
     title: "Map Tactical Briefing",
     tagalog: "Buod ng Live Map",
     file: "LiveMap.tsx",
@@ -209,7 +209,7 @@ const ALL_FEATURES = [
     example: "WebLLM asks: 'Anong pangalan ng inyong barangay captain?' → Admin answers → verified",
   },
   {
-    id: 23, status: "BUILT", tier: "SYSTEM",
+    id: 23, status: "EASY", tier: "SYSTEM",
     title: "SOS Sentiment Detector",
     tagalog: "Pagtukoy ng Takot sa Chat",
     file: "SOSChat.tsx",

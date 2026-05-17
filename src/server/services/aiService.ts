@@ -104,21 +104,6 @@ async function callModel(
   return Promise.race([callPromise, timeoutPromise]);
 }
 
-// New chat function
-export async function generateChatResponse(userText: string): Promise<string> {
-  try {
-    const ai = getAIClient();
-    const result = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.`,
-    });
-    return result.text || "I'm monitoring the situation. Stay calm, help is on the way.";
-  } catch (err) {
-    console.error("[AI Service] Chat failed:", err);
-    return "I'm monitoring the situation. Stay calm, help is on the way.";
-  }
-}
-
 // =============================================================================
 // Main export — with automatic routing + upgrade on underestimate
 // =============================================================================

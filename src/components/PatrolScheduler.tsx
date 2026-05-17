@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { Shift, User } from '../types';
-import { Calendar, Clock, MapPin, User as UserIcon, Plus, X, Trash2, CheckCircle2, Play, Sparkles } from 'lucide-react';
+import { Calendar, Clock, MapPin, User as UserIcon, Plus, X, Trash2, CheckCircle2, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { isWebLLMReady, promptWebLLM } from '../lib/webllm';
 
 export default function PatrolScheduler({ profile }: { profile: any }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -15,7 +14,6 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isSuggesting, setIsSuggesting] = useState(false);
 
   // Form state
   const [selectedTanod, setSelectedTanod] = useState('');
@@ -264,30 +262,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                       <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest block">Patrol Sector / Zone</label>
-                       <button 
-                          type="button" 
-                          onClick={async () => {
-                              setIsSuggesting(true);
-                              try {
-                                  const sys = "You are the Barangay AI. Suggest a patrol sector (1 to 5 words max). Keep it realistic.";
-                                  const ans = await promptWebLLM(sys, "Suggest a sector based on current trends");
-                                  setSector(ans.trim());
-                                  toast.success("Sector auto-filled by AI");
-                              } catch(e) {
-                                  toast.error("Failed to suggest sector.");
-                              } finally {
-                                  setIsSuggesting(false);
-                              }
-                          }}
-                          disabled={isSuggesting}
-                          className="flex items-center gap-1 text-[9px] font-black uppercase text-amber-500 hover:text-amber-400 font-mono tracking-widest"
-                       >
-                           {isSuggesting ? <div className="w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                           AI Suggest
-                       </button>
-                    </div>
+                    <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest mb-2 block">Patrol Sector / Zone</label>
                     <input 
                       required
                       type="text"

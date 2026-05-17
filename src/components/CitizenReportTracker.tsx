@@ -3,19 +3,14 @@ import * as api from "../lib/api";
 import socket from "../lib/socket";
 import { Alert } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { Clock, Shield, MapPin, CheckCircle, Sparkles } from "lucide-react";
+import { Clock, Shield, MapPin, CheckCircle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { AlertDetailsModal } from "./AlertDetailsModal";
-import { isWebLLMReady, promptWebLLM } from "../lib/webllm";
 
 export const CitizenReportTracker = ({ userId }: { userId: string }) => {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<Alert | null>(null);
-  
-  // AI Explainer State
-  const [explainingId, setExplainingId] = useState<string | null>(null);
-  const [explanations, setExplanations] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -41,21 +36,6 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
       socket.off("alert_update", handleUpdate);
     };
   }, [userId]);
-  
-  const generateExplanation = async (report: any) => {
-      if (explanations[report.id]) return;
-      setExplainingId(report.id);
-      try {
-          const sys = "You are the Barangay AI. Explain the current status of this resident's emergency report in 1-2 empathetic sentences in Tagalog. Make them feel cared for.";
-          const input = `Status: ${report.status}, Type: ${report.type}, Assigned Tanod: ${report.assignedToName || 'None'}`;
-          const text = await promptWebLLM(sys, input, 0.4);
-          setExplanations(prev => ({ ...prev, [report.id]: text }));
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setExplainingId(null);
-      }
-  };
 
   if (reports.length === 0 && !loading) return null;
 
@@ -148,25 +128,6 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
                     </div>
                   )}
                 </div>
-                
-                {/* AI Explainer */}
-                <div className="mt-4 pt-3 border-t border-white/5">
-                   {!explanations[report.id] ? (
-                       <button 
-                         onClick={(e) => { e.stopPropagation(); generateExplanation(report); }}
-                         disabled={explainingId === report.id}
-                         className="flex items-center gap-2 text-[10px] font-mono font-black uppercase text-amber-500 hover:text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20"
-                       >
-                           {explainingId === report.id ? <div className="w-3 h-3 border border-amber-500 border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                           Paliwanag ng Status
-                       </button>
-                   ) : (
-                       <p className="text-xs font-mono text-amber-500 bg-amber-500/5 p-3 rounded-lg border border-amber-500/10 leading-relaxed italic">
-                           {explanations[report.id]}
-                       </p>
-                   )}
-                </div>
-
               </div>
             </div>
           </motion.div>
