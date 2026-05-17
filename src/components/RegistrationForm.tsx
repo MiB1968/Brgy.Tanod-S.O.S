@@ -160,6 +160,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
   };
 
   const fillDemoData = () => {
+    if (import.meta.env.MODE !== 'development') return;                
     setFormData({
       ...formData,
       fullName: 'Juan Dela Cruz',

@@ -101,31 +101,17 @@ export function useGuardian() {
   }, [setStatus, setEmergency, speak, synth]);
 
   const askGuardian = useCallback(async (userText: string): Promise<string> => {
-    // Demo Bypass: Direct call to Google API
-    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-    if (!GEMINI_API_KEY) {
-        console.error("No VITE_GEMINI_API_KEY configured for demo bypass.");
-        return "I'm monitoring the situation. Stay calm, help is on the way.";
-    }
-
     setStatus('PROCESSING');
-
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.` }] }]
-                }),
-            }
-        );
+        const response = await fetch('/api/ai/chat', {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userText })
+        });
         const data = await response.json();
-        return data.candidates[0].content.parts[0].text;
+        return data.response;
     } catch (err) {
-        console.error("Direct AI call failed:", err);
+        console.error("Server-side AI call failed:", err);
         return "I'm monitoring the situation. Stay calm, help is on the way.";
     }
   }, [setStatus]);

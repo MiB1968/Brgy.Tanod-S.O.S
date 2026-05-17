@@ -242,6 +242,23 @@ export default function ResidentDashboard({
         setGuardianMode={setGuardianMode}
       />
 
+      {/* Guardian Mode Status Indicator */}
+      <AnimatePresence>
+        {guardianMode && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center justify-center gap-3 py-3 bg-emergency/10 border border-emergency/20 rounded-2xl mx-4"
+          >
+            <div className="w-2 h-2 rounded-full bg-emergency animate-pulse" />
+            <span className="text-[10px] font-black uppercase text-emergency tracking-[0.2em] font-mono">
+              Guardian AI Tactical Listener Active
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence mode="wait">
         {queuedCount > 0 && (
           <motion.div
