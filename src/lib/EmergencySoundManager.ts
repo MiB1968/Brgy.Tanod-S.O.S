@@ -31,6 +31,10 @@ export class EmergencySoundManager {
     if (this.isInitialized) return;
 
     const ctx = this.getContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = 0.9;
 

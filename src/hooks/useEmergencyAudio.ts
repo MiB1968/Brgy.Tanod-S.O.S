@@ -22,6 +22,10 @@ export const useEmergencyAudio = () => {
     if (isInitializedRef.current) return;
     
     const ctx = getContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+    
     const reverb = ctx.createConvolver();
     const masterGain = ctx.createGain();
     
