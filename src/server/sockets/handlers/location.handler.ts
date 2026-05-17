@@ -13,6 +13,8 @@ interface LocationEntry {
 }
 
 const activeLocations: Record<string, LocationEntry> = {};
+const pendingDeltas: Record<string, LocationEntry> = {};
+let batchInterval: NodeJS.Timeout | null = null;
 
 export function getActiveLocations(): LocationEntry[] {
   return Object.values(activeLocations);
@@ -26,6 +28,20 @@ export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
     socket.emit('location_map', activeLocations);
   }
 
+  // Start the batching interval if not already running
+  if (!batchInterval) {
+    batchInterval = setInterval(() => {
+      const deltas = Object.values(pendingDeltas);
+      if (deltas.length > 0) {
+        io.to('responders').emit('location_update_batch', deltas);
+        // Clear the batch
+        for (const key in pendingDeltas) {
+          delete pendingDeltas[key];
+        }
+      }
+    }, 1000);
+  }
+
   socket.on('location_update', (data: LocationEntry) => {
     if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
 
@@ -36,13 +52,14 @@ export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
 
     activeLocations[data.user_id] = newEntry;
 
-    // Broadcast delta to responders room only
-    io.to('responders').emit('location_update_delta', newEntry);
+    // Queue delta for batching
+    pendingDeltas[data.user_id] = newEntry;
   });
 
   socket.on('disconnect', () => {
     if (user && user.id) {
       delete activeLocations[user.id];
+      delete pendingDeltas[user.id];
       io.to('responders').emit('location_remove_delta', { user_id: user.id });
     }
   });
