@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 // Sub-components
 import { ResidentHero } from './Resident/ResidentHero';
 import { SOSButtonPanel } from './Resident/SOSButtonPanel';
+import { FloatingGuardianButton } from './Resident/FloatingGuardianButton';
 import { SOSChat } from './SOSChat';
 import { CitizenReportTracker } from './CitizenReportTracker';
 import ActiveMap from './ActiveMap';
@@ -119,7 +120,7 @@ export default function ResidentDashboard({
 
       if (!isOnline) {
         await handleQueueSOS(type, description, location, photosToProcess);
-        speak('SOS natanggap. Tanod papunta na.', { lang: 'en' });
+        speak({ text: 'SOS natanggap. Tanod papunta na.', language: 'en' });
         setSelectedPhotos([]);
         return;
       }
@@ -137,7 +138,7 @@ export default function ResidentDashboard({
         );
 
         await createSOS(type, description, location, b64Photos);
-        speak('SOS natanggap. Tanod papunta na.', { lang: 'en' });
+        speak({ text: 'SOS natanggap. Tanod papunta na.', language: 'en' });
         setSelectedPhotos([]);
         toast.success('SOS Protocol Initiated. Units alerted.');
       } catch (err) {
@@ -320,6 +321,8 @@ export default function ResidentDashboard({
       </div>
 
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} role={profile?.role} />
+      
+      {!activeAlert && <FloatingGuardianButton />}
     </motion.div>
   );
 }

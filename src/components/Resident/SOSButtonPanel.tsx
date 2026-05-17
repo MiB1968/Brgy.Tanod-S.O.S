@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { EmergencyType } from '../../types';
 import { toast } from 'react-hot-toast';
 import { TacticalCard } from '../Tactical/TacticalCard';
+import { GuardianButton } from './GuardianButton';
 
 interface SOSButtonPanelProps {
   isSending: boolean;
@@ -53,23 +54,9 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
                className="absolute w-56 h-56 md:w-72 md:h-72 rounded-full border-2 border-tactical-blue/30"
             />
             
-            <motion.button
-              whileHover={{ scale: isSending ? 1 : 1.05 }}
-              whileTap={{ scale: isSending ? 1 : 0.95 }}
-              onClick={() => onInitiateSOS('OTHER', 'General Emergency SOS')}
-              disabled={isSending}
-              className={cn(
-                "relative z-10 w-44 h-44 md:w-56 md:h-56 rounded-full flex flex-col items-center justify-center transition-all duration-500 border-[8px] backdrop-blur-xl shadow-[0_0_60px_rgba(255,59,92,0.4)]",
-                isSending ? "bg-emergency/20 border-emergency animate-pulse" : "bg-gradient-to-tr from-tactical-dark via-emergency/20 to-tactical-cyan/20 border-tactical-red/50 hover:border-tactical-cyan/80 active:border-white"
-              )}
-            >
-              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,rgba(255,59,92,0.2),transparent)] opacity-50" />
-              <Zap className={cn("w-12 h-12 md:w-20 md:h-20 text-white mb-1 filter drop-shadow-lg", isSending && "animate-bounce")} />
-              <div className="flex flex-col items-center">
-                <span className="text-3xl md:text-4xl font-black italic tracking-tighter text-white font-display leading-none drop-shadow-md">S.O.S.</span>
-                <span className="text-[8px] md:text-[10px] font-black tracking-[0.4em] text-white/70 mt-2 font-mono uppercase bg-black/40 px-3 py-0.5 rounded-full border border-white/10">GENERAL</span>
-              </div>
-            </motion.button>
+            <div className="relative z-10 scale-90 md:scale-100">
+               <GuardianButton onInitiateSOS={() => !isSending && onInitiateSOS('OTHER', 'General Emergency SOS')} />
+            </div>
         </div>
 
         {/* Specialized SOS Buttons */}
