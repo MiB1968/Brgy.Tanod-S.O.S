@@ -6,8 +6,7 @@
     "types": ["node"]
   },
   "include": [
-    "server.ts",
-    "*.ts",
+    "src/server.ts",
     "src/server/**/*.ts"
   ],
   "exclude": [

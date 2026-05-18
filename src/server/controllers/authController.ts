@@ -55,8 +55,8 @@ export const register = async (req: Request, res: Response) => {
            (id, name, phone, address, house_number, household_size,
             blood_type, medical_conditions,
             emergency_contact_name, emergency_contact_phone,
-            gps_lat, gps_lng)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            gps_lat, gps_lng, selfie_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           user.id, name,
           details.phone, details.address, details.houseNumber,
@@ -64,6 +64,7 @@ export const register = async (req: Request, res: Response) => {
           details.medicalConditions,
           details.emergencyContactName, details.emergencyContactPhone,
           details.gpsLat, details.gpsLng,
+          details.selfieUrl,
         ]
       );
     } else if (role === 'tanod') {

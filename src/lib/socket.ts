@@ -9,7 +9,8 @@ const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
     token: safeStorage.getItem('token')
   }),
   rememberUpgrade: false,
-  path: '/socket.io/',
+  path: '/socket.io',
+  transports: ['websocket'],
   timeout: 60000, 
   withCredentials: true
 });

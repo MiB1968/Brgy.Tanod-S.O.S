@@ -1,6 +1,7 @@
 import * as http from 'http';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import app from './server/app';
 import { initDb } from './server/services/dbService';
@@ -9,30 +10,47 @@ import { initSocket } from './server/sockets/index';
 import { config } from './server/config/index';
 import { errorHandler, notFoundHandler } from './server/middleware/error';
 
-async function startServer() {
-  console.log('[Server] Starting initialization sequence...');
+// ── Path Helper for ESM/CJS compatibility ──────────────────────────────────
+const getDirname = () => {
   try {
-    console.log('[Server] Initializing Firebase Admin...');
-    initDatabase();
+    // In ESM bundled as JS
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch (e) {
+    // In CJS bundled as CJS
+    return __dirname;
+  }
+};
+
+async function startServer() {
+  const PORT = config.port || 3000;
+  console.log(`[Server] Booting Brgy. Tanod S.O.S... (Port: ${PORT})`);
+  
+  try {
+    console.log('[Server] Connecting to Tactical Persistence Layer...');
+    initDatabase(); // Firebase
+    
     if (config.databaseUrl) {
-      console.log('[Server] Connecting to PostgreSQL/CockroachDB...');
-      await initDb();
+      // Connect to SQL DB with a reasonable timeout
+      await Promise.race([
+        initDb(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB connection timed out')), 15000))
+      ]);
     } else {
-      console.warn('WARNING: No DATABASE_URL provided. Skipping PostgreSQL initialization.');
+      console.warn('WARNING: DATABASE_URL not set. Running in degraded mode.');
     }
   } catch (err) {
-    console.error('WARNING: Database initialization failed. Some features may not work.', err);
+    console.error('ERROR: Initialization sequence failure:', err);
+    // We continue booting so the container stays alive and serves the "Build broken" message
   }
 
-  console.log('[Server] Creating HTTP server...');
   const server = http.createServer(app);
 
   process.on('uncaughtException', (err) => {
-    console.error('UNCAUGHT EXCEPTION:', err);
+    console.error('CRITICAL: UNCAUGHT EXCEPTION:', err);
   });
 
   process.on('unhandledRejection', (reason) => {
-    console.error('UNHANDLED REJECTION:', reason);
+    console.error('CRITICAL: UNHANDLED REJECTION:', reason);
   });
 
   initSocket(server);
@@ -46,19 +64,14 @@ async function startServer() {
 
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
+    // Production Mode: Serve static files from /dist
+    const distPath = getDirname();
     const indexPath = path.join(distPath, 'index.html');
 
-    console.log(`[Production] Booting in PRODUCTION mode.`);
-    console.log(`[Production] Root: ${process.cwd()}`);
-    console.log(`[Production] Assets: ${distPath}`);
-    console.log(`[Production] Shell: ${indexPath}`);
-    console.log(`[Production] Node: ${process.version}`);
-    console.log(`[Production] DB Configured: ${!!config.databaseUrl}`);
-    console.log(`[Production] Gemini Configured: ${!!config.geminiApiKey}`);
-
+    console.log(`[Production] Assets Root: ${distPath}`);
+    
     if (!fs.existsSync(indexPath)) {
-      console.error(`[Production] CRITICAL ERROR: index.html not found at ${indexPath}. Build may be broken.`);
+      console.error(`[Production] FATAL: index.html missing at ${indexPath}`);
     }
 
     app.use(
@@ -68,51 +81,54 @@ async function startServer() {
           if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
             res.setHeader('Cache-Control', 'public, max-age=31536000');
           }
+          // Support for WASM
+          if (filePath.endsWith('.wasm')) {
+            res.setHeader('Content-Type', 'application/wasm');
+          }
         }
       })
     );
-    app.use(express.static(path.resolve(process.cwd(), 'public')));
+    
+    // Serve /public as fallback if present in root
+    const publicPath = path.resolve(process.cwd(), 'public');
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+    }
 
-    // Only serve index.html for non-API, non-socket.io requests
+    // SPA fallback
     app.get('*', (req, res, next) => {
-      const isApi = req.path.startsWith('/api');
-      const isSocket = req.path.startsWith('/socket.io');
-      
-      if (isApi || isSocket) {
-        return next(); // Fall through to 404 handler or socket.io
+      // Exclude API and Socket
+      if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+        return next();
       }
-
-      console.log(`[Production] Serving SPA shell for: ${req.path}`);
 
       res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error(`[Production] FAILED to serve index.html: ${err.message}`);
-          res.status(500).send('Tactical Command Console offline. Build error.');
+          console.error(`[Production] SPA Route Error (${req.path}):`, err);
+          res.status(500).send('Tactical Command Console Offline. Build Incomplete.');
         }
       });
     });
   }
 
-  console.log('[Server] Mounting final error handlers...');
   app.use(notFoundHandler);
   app.use(errorHandler);
 
-  console.log(`[Server] Attempting to bind to port ${config.port} on 0.0.0.0...`);
-  server.listen(config.port, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`
   ==================================================
-  BRGY. TANOD S.O.S. - EMERGENCY PLATFORM
+  BRGY. TANOD S.O.S. - BATTLE-READY
   ==================================================
-  Server Status: OPERATIONAL
-  Port: ${config.port}
-  Environment: ${config.nodeEnv}
-  Timestamp: ${new Date().toISOString()}
+  Status: ONLINE
+  Address: http://0.0.0.0:${PORT}
+  Mode: ${config.nodeEnv}
   ==================================================
     `);
   });
 }
 
 startServer().catch((err) => {
-  console.error('FATAL: Server failed to start.', err);
+  console.error('FATAL: Startup sequence failed. Container exiting.', err);
   process.exit(1);
 });
+

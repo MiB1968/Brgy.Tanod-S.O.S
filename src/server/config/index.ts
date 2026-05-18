@@ -29,7 +29,7 @@ export const config = {
   geminiApiKey: (process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
-  geminiModel: (process.env.GEMINI_MODEL || 'models/gemini-1.5-flash').replace(/^models\//, 'models/'),
+  geminiModel: (process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, ''),
 
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,

@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js && node scripts/copy-onnx.mjs",
+    "start": "node dist/server.js",
     "gcp-build": "npm run build",
     "preview": "vite preview",
     "clean": "rimraf dist",
@@ -15,8 +15,7 @@
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "lint": "npm run typecheck:client && npm run typecheck:server",
     "check": "npm run lint && npm test && npm run build",
-    "test": "vitest run",
-    "postinstall": "node setup-onnx.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "@andresaya/edge-tts": "^1.8.0",

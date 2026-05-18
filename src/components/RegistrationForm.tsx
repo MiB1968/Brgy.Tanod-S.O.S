@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as api from '../lib/api';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { toast } from 'react-hot-toast';
-import { Shield, MapPin, Upload, User, Phone, IdCard, Home, Users, CheckCircle, Navigation } from 'lucide-react';
+import { Shield, MapPin, Camera, User, Phone, Home, CheckCircle, Navigation, RefreshCw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
@@ -37,7 +37,6 @@ function MapUpdater({ center }: { center: [number, number] }) {
         try {
           map.invalidateSize({ animate: false });
         } catch (e) {
-          // Ignore leaflet errors if container is detached
         }
       }
     };
@@ -49,21 +48,9 @@ function MapUpdater({ center }: { center: [number, number] }) {
     const container = map.getContainer();
     observer.observe(container);
     
-    const timers = [
-      setTimeout(safeInvalidate, 10),
-      setTimeout(safeInvalidate, 100),
-      setTimeout(safeInvalidate, 500),
-      setTimeout(safeInvalidate, 1000)
-    ];
-
-    map.whenReady(() => {
-      setTimeout(safeInvalidate, 0);
-    });
-
     return () => {
       isMounted = false;
       observer.disconnect();
-      timers.forEach(clearTimeout);
     };
   }, [map]);
 
@@ -72,10 +59,7 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 function LocationPicker({ onLocationSelect, initialPos }: { onLocationSelect: (lat: number, lng: number) => void, initialPos: [number, number] }) {
   const [position, setPosition] = useState<[number, number] | null>(initialPos);
-  useEffect(() => {
-    setPosition(initialPos);
-  }, [initialPos]);
-
+  
   useMapEvents({
     click(e) {
       const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
@@ -89,66 +73,113 @@ function LocationPicker({ onLocationSelect, initialPos }: { onLocationSelect: (l
   );
 }
 
+const SelfieCamera = ({ onCapture }: { onCapture: (dataUrl: string) => void }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [captured, setCaptured] = useState<string | null>(null);
+
+  const startCamera = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      setStream(s);
+      if (videoRef.current) videoRef.current.srcObject = s;
+    } catch (err) {
+      toast.error("Camera access denied.");
+    }
+  };
+
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+  }, [stream]);
+
+  const capture = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        setCaptured(dataUrl);
+        onCapture(dataUrl);
+        stopCamera();
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  if (captured) {
+    return (
+      <div className="relative rounded-3xl overflow-hidden border-2 border-emergency shadow-glow-red aspect-square max-w-[300px] mx-auto">
+        <img src={captured} alt="Selfie" className="w-full h-full object-cover" />
+        <button 
+          onClick={() => { setCaptured(null); startCamera(); }}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-emergency px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl"
+        >
+          <RefreshCw className="w-3 h-3" /> Retake
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {!stream ? (
+        <button 
+          type="button"
+          onClick={startCamera}
+          className="w-full h-64 border-2 border-dashed border-white/10 rounded-[40px] flex flex-col items-center justify-center gap-4 hover:bg-white/5 transition-all text-white/40 group active:scale-95"
+        >
+          <Camera className="w-12 h-12 group-hover:text-emergency transition-colors" />
+          <span className="font-black uppercase tracking-[0.3em] text-[10px]">Initialize Biometric Scan</span>
+        </button>
+      ) : (
+        <div className="relative rounded-[40px] overflow-hidden border-2 border-info shadow-command animate-in zoom-in duration-300 aspect-square max-w-[300px] mx-auto">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale brightness-125 contrast-125" />
+          <div className="absolute inset-0 pointer-events-none border-[20px] border-black/20">
+            <div className="w-full h-full border border-white/20 rounded-[30px]" />
+          </div>
+          <button 
+            type="button"
+            onClick={capture}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full p-1 shadow-2xl active:scale-90 transition-all"
+          >
+            <div className="w-full h-full border-4 border-emergency rounded-full" />
+          </button>
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function RegistrationForm({ onCancel, onComplete }: { onCancel: () => void, onComplete: (data: any) => void }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
   
-  const [idPhoto, setIdPhoto] = useState<File | null>(null);
-  const [selfiePhoto, setSelfiePhoto] = useState<File | null>(null);
+  const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
-    age: '',
-    gender: 'Male',
-    dob: '',
-    civilStatus: 'Single',
-    idType: 'PhilSys',
-    idNumber: '',
     mobileNumber: '',
-    altContactName: '',
-    altContactNumber: '',
-    email: '',
-    houseNumber: '',
-    street: '',
-    householdCount: '1',
-    specialNeeds: 'No',
-    specialNeedsInfo: '',
+    address: '',
     gpsLat: 13.0641,
     gpsLng: 120.7303,
-    address: '',
     username: '',
     password: '',
     confirmPassword: ''
   });
-
-  const fillDemoData = () => {
-    setFormData({
-      ...formData,
-      fullName: 'Juan Dela Cruz',
-      age: '28',
-      gender: 'Male',
-      dob: '1996-05-20',
-      civilStatus: 'Single',
-      idType: 'PhilSys',
-      idNumber: '1234-5678-9012',
-      mobileNumber: '09123456789',
-      altContactName: 'Maria Dela Cruz',
-      altContactNumber: '09987654321',
-      houseNumber: 'Blk 12 Lot 5',
-      street: 'Sampaguita St.',
-      householdCount: '4',
-      specialNeeds: 'No',
-      specialNeedsInfo: '',
-      gpsLat: 13.0641,
-      gpsLng: 120.7303,
-      username: 'juandemo123',
-      password: 'Password123!',
-      confirmPassword: 'Password123!'
-    });
-    toast.success('Form populated with demo data!', { icon: '⚡' });
-  };
 
   const reverseGeocode = async (lat: number, lng: number) => {
     try {
@@ -157,8 +188,7 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
       if (data.display_name) {
         setFormData(prev => ({
           ...prev,
-          address: data.display_name,
-          street: data.address.road || data.address.suburb || prev.street
+          address: data.display_name
         }));
       }
     } catch (e) {
@@ -188,6 +218,10 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selfieDataUrl) {
+      toast.error('Facial selfie is required.');
+      return;
+    }
     setLoading(true);
     
     try {
@@ -199,11 +233,15 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
 
       const registrationData = {
         name: formData.fullName,
-        email: formData.email || `${formData.username}@tanod.local`,
+        email: `${formData.username}@tanod.local`,
         password: formData.password,
         role: 'resident',
         details: {
-           ...formData,
+           phone: formData.mobileNumber,
+           address: formData.address,
+           gpsLat: formData.gpsLat,
+           gpsLng: formData.gpsLng,
+           selfieUrl: selfieDataUrl, // Handled as base64 in this refined flow
            status: 'pending'
         }
       };
@@ -229,14 +267,14 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
           </div>
           <h2 className="text-3xl font-black mb-4 font-mono uppercase italic tracking-tighter shadow-glow-red">REGISTRATION COMPLETE</h2>
           <p className="text-white/40 mb-8 leading-relaxed font-bold uppercase tracking-widest font-mono text-sm px-4">
-            PHASE 1 SECURED. ACCOUNT UNDER EVALUATION BY BARANGAY COMMAND.
+            IDENTITY SECURED. ACCOUNT UNDER EVALUATION BY BARANGAY COMMAND.
           </p>
           <div className="glass-panel p-8 rounded-3xl mb-8 border border-white/5">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-2 font-black font-mono">ENCRYPTED REFERENCE ID</p>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-2 font-black font-mono">REFERENCE PROTOCOL</p>
             <p className="text-xl font-mono font-black text-white italic tracking-tighter">{successId?.toUpperCase()}</p>
           </div>
           <button 
-            onClick={onComplete}
+            onClick={() => window.location.reload()}
             className="w-full py-5 bg-emergency text-white font-black italic rounded-2xl hover:scale-[1.02] active:scale-95 transition-all uppercase shadow-glow-red font-mono tracking-widest"
           >
             RETURN TO COMMAND
@@ -257,12 +295,15 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase font-mono italic leading-none">Brgy. <span className="text-emergency">Tanod</span> S.O.S</h1>
-            <p className="text-white/30 font-black uppercase text-[9px] tracking-[0.4em] mt-2 font-mono">Resident Enrollment Protocol • 4.2.0</p>
+            <p className="text-white/30 font-black uppercase text-[9px] tracking-[0.4em] mt-2 font-mono">Resident Enrollment Protocol • 5.0.0</p>
           </div>
+          <button onClick={onCancel} className="ml-auto w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-emergency/20 transition-all">
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
         {/* Progress Tracker */}
-        <div className="flex justify-between mb-16 relative">
+        <div className="flex justify-between mb-16 relative px-4">
           <div className="absolute top-1/2 left-0 w-full h-[1px] bg-white/5 -translate-y-1/2 z-0"></div>
           {[1, 2, 3, 4].map(i => (
             <div 
@@ -270,8 +311,8 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
               className={cn(
                 "w-12 h-12 rounded-2xl flex items-center justify-center z-10 font-black transition-all duration-500 font-mono italic text-lg",
                 step >= i 
-                  ? "bg-emergency text-white shadow-glow-red border border-emergency/50 rotate-0" 
-                  : "bg-brand-card text-white/20 border border-white/5 rotate-0"
+                  ? "bg-emergency text-white shadow-glow-red border border-emergency/50 scale-110" 
+                  : "bg-brand-card text-white/20 border border-white/5"
               )}
             >
               {i}
@@ -282,45 +323,24 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
         <form onSubmit={handleSubmit} className="glass-panel border-white/5 rounded-[48px] p-8 md:p-14 shadow-command animate-in slide-in-from-bottom-8 duration-700">
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in duration-300">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
-                  <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
-                    <User className="w-6 h-6 text-info" />
-                  </div>
-                  Personal Dossier
-                </h2>
-                <button 
-                  type="button" 
-                  onClick={fillDemoData}
-                  className="text-[9px] font-black uppercase tracking-[0.3em] bg-white/5 hover:bg-white/10 text-white/40 hover:text-white px-5 py-3 rounded-2xl border border-white/5 transition-all font-mono"
-                >
-                  ⚡ Autofill Intelligence
-                </button>
-              </div>
+              <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
+                <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
+                  <User className="w-6 h-6 text-info" />
+                </div>
+                Identity & Contact
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Legal Full Name</label>
-                  <input required placeholder="Enter full name" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Full Name</label>
+                  <input required placeholder="JUAN DELA CRUZ" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value.toUpperCase()})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Current Age</label>
-                  <input type="number" required placeholder="00" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Biological Sex</label>
-                  <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none appearance-none text-white font-bold font-mono transition-all">
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Date of Birth</label>
-                  <input type="date" required value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all" />
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Mobile Number</label>
+                  <input required type="tel" placeholder="09123456789" value={formData.mobileNumber} onChange={e => setFormData({...formData, mobileNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
               </div>
               <div className="pt-6">
-                <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-16 py-5 bg-emergency text-white font-black italic rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-[0.3em] shadow-glow-red uppercase font-mono">PROCEED TO SEC-2</button>
+                <button type="button" onClick={() => setStep(2)} className="w-full md:w-auto px-16 py-5 bg-emergency text-white font-black italic rounded-2xl hover:scale-[1.02] active:scale-95 transition-all text-xs tracking-[0.3em] shadow-glow-red uppercase font-mono">NEXT PHASE</button>
               </div>
             </div>
           )}
@@ -329,90 +349,20 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
             <div className="space-y-8 animate-in fade-in duration-300">
               <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
                 <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
-                  <IdCard className="w-6 h-6 text-info" />
-                </div>
-                ID & COMMUNICATIONS
-              </h2>
-
-              <div className="bg-info/5 border border-info/20 rounded-3xl p-6 flex gap-6 items-center">
-                <div className="w-12 h-12 bg-info/20 rounded-2xl flex items-center justify-center shrink-0">
-                  <Shield className="w-6 h-6 text-info" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-black text-info uppercase tracking-[0.2em] mb-1 font-mono text-[10px]">Transmission Bypass Active</p>
-                  <p className="text-white/40 text-[11px] font-bold leading-relaxed font-mono">SECURE IMAGE STORAGE IS CURRENTLY RESTRICTED TO SYSTEM ADMINS. UPLOADS ARE OPTIONAL IN CURRENT FIRMWARE VERSION.</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">ID Scan / Photo</label>
-                  <label className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus-within:border-emergency/50 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-all outline-none">
-                    <Upload className="w-6 h-6 text-white/40 mb-2" />
-                    <span className="text-[10px] text-white/60 font-mono tracking-widest uppercase truncate w-full text-center">{idPhoto ? idPhoto.name : 'Upload ID Image'}</span>
-                    <input type="file" accept="image/*" onChange={e => { if(e.target.files?.[0]) setIdPhoto(e.target.files[0]) }} className="hidden" />
-                  </label>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Biometric Selfie</label>
-                  <label className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus-within:border-emergency/50 flex flex-col items-center justify-center cursor-pointer hover:bg-white/5 transition-all outline-none">
-                    <Upload className="w-6 h-6 text-white/40 mb-2" />
-                    <span className="text-[10px] text-white/60 font-mono tracking-widest uppercase truncate w-full text-center">{selfiePhoto ? selfiePhoto.name : 'Upload Selfie w/ ID'}</span>
-                    <input type="file" accept="image/*" onChange={e => { if(e.target.files?.[0]) setSelfiePhoto(e.target.files[0]) }} className="hidden" />
-                  </label>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Government ID Type</label>
-                  <select value={formData.idType} onChange={e => setFormData({...formData, idType: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all">
-                    <option value="">No ID / Skip for now</option>
-                    <option>PhilSys</option>
-                    <option>Voter's ID</option>
-                    <option>Driver's License</option>
-                    <option>Postal ID</option>
-                    <option>Senior Citizen ID</option>
-                    <option>PWD ID</option>
-                    <option>Barangay ID</option>
-                  </select>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">ID Reference Number</label>
-                  <input placeholder="XXXX-XXXX-XXXX" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Primary Mobile Terminal</label>
-                  <input required placeholder="09XX-XXX-XXXX" value={formData.mobileNumber} onChange={e => setFormData({...formData, mobileNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Emergency Alert Email</label>
-                  <input type="email" placeholder="official@mail.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
-                </div>
-              </div>
-              <div className="flex gap-4 pt-6">
-                <button type="button" onClick={() => setStep(1)} className="flex-1 py-5 border border-white/10 font-black rounded-2xl hover:bg-white/5 transition-all uppercase tracking-widest font-mono text-xs">BACK</button>
-                <button type="button" onClick={() => setStep(3)} className="flex-1 py-5 bg-emergency text-white font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-xs italic">PROCEED TO SEC-3</button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
-                <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
                   <MapPin className="w-6 h-6 text-info" />
                 </div>
-                GEOSPATIAL COORDINATES
+                Geospatial Binding
               </h2>
               <div className="space-y-6">
-                <div className="h-80 rounded-[40px] overflow-hidden border border-white/10 shadow-command relative group">
+                <div className="h-80 rounded-[40px] overflow-hidden border border-white/10 shadow-command relative">
                   <MapContainer 
                     center={[formData.gpsLat, formData.gpsLng]} 
                     zoom={18} 
-                    className="w-full h-full grayscale-[0.5] contrast-[1.2] brightness-[0.8]"
+                    className="w-full h-full grayscale"
                     scrollWheelZoom={false}
                   >
                     <OfflineTileLayer 
                       url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                     />
                     <MapUpdater center={[formData.gpsLat, formData.gpsLng]} />
                     <LocationPicker 
@@ -423,67 +373,50 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
                       }} 
                     />
                   </MapContainer>
-                  
-                  <div className="absolute top-6 right-6 z-[1000] glass-panel border-white/20 px-5 py-2 rounded-full text-[9px] font-black text-white uppercase tracking-[0.2em] font-mono shadow-xl">
-                    ADJUST PIN MANUALLY
-                  </div>
                 </div>
-
-                <div className="space-y-4">
-                  <button 
+                <button 
                     type="button" 
                     onClick={detectLocation} 
-                    disabled={detecting}
                     className={cn(
-                      "w-full py-5 rounded-[24px] flex items-center justify-center gap-4 font-black italic uppercase tracking-[0.4em] transition-all shadow-2xl font-mono text-xs",
-                      detecting 
-                        ? "bg-info/30 cursor-wait animate-pulse" 
-                        : "bg-info text-white hover:scale-[1.02] active:scale-[0.98] shadow-info/20"
+                      "w-full py-5 rounded-[24px] flex items-center justify-center gap-4 font-black italic uppercase tracking-[0.4em] transition-all font-mono text-xs",
+                      detecting ? "bg-info/30" : "bg-info text-white shadow-info/20"
                     )}
                   >
-                    {detecting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        SYNCING GPS ENGINES...
-                      </>
-                    ) : (
-                      <>
-                        <Navigation className="w-5 h-5" /> PINPOINT MY POSITION
-                      </>
-                    )}
+                    {detecting ? 'CALIBRATING GPS...' : 'SYNC PINPOINT LOCATION'}
                   </button>
-
-                  <AnimatePresence>
-                    {formData.address && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-brand-bg/50 border border-white/5 rounded-3xl p-6 flex gap-4"
-                      >
-                        <MapPin className="w-6 h-6 text-emergency shrink-0" />
-                        <div className="min-w-0">
-                           <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30 mb-1 font-mono">Detected Address</p>
-                           <p className="text-xs text-white/80 font-bold leading-relaxed font-mono italic">"{formData.address}"</p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6 pb-2">
-                    <div className="space-y-2">
-                      <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Latitude Ref</p>
-                      <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLat ? formData.gpsLat.toFixed(8) : 'Pending...'}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[9px] font-black tracking-[0.3em] text-white/20 uppercase ml-2 font-mono">Longitude Ref</p>
-                      <div className="bg-brand-bg/50 border border-white/5 rounded-2xl p-4 text-sm text-white/40 font-mono italic">{formData.gpsLng ? formData.gpsLng.toFixed(8) : 'Pending...'}</div>
-                    </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Exact Address / Landmark</label>
+                  <textarea required placeholder="HOUSE NO., STREET, BARANGAY, LANDMARKS" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value.toUpperCase()})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 min-h-24 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all uppercase" />
                 </div>
               </div>
               <div className="flex gap-4 pt-6">
-                <button type="button" onClick={() => setStep(2)} className="flex-1 py-5 border border-white/10 font-black rounded-2xl hover:bg-white/5 transition-all uppercase tracking-widest font-mono text-xs text-white/60">BACK</button>
-                <button type="button" onClick={() => setStep(4)} className="flex-1 py-5 bg-emergency text-white font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-xs italic">PROCEED TO SEC-4</button>
+                <button type="button" onClick={() => setStep(1)} className="flex-1 py-5 border border-white/10 font-black rounded-2xl hover:bg-white/5 transition-all uppercase tracking-widest font-mono text-xs">BACK</button>
+                <button type="button" onClick={() => setStep(3)} className="flex-1 py-5 bg-emergency text-white font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-xs italic">NEXT PHASE</button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
+                <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-info" />
+                </div>
+                Biometric Selfie
+              </h2>
+              
+              <SelfieCamera onCapture={(dataUrl) => setSelfieDataUrl(dataUrl)} />
+
+              <div className="flex gap-4 pt-6">
+                <button type="button" onClick={() => setStep(2)} className="flex-1 py-5 border border-white/10 font-black rounded-2xl hover:bg-white/5 transition-all uppercase tracking-widest font-mono text-xs">BACK</button>
+                <button 
+                  type="button" 
+                  disabled={!selfieDataUrl}
+                  onClick={() => setStep(4)} 
+                  className="flex-1 py-5 bg-emergency text-white font-black rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-glow-red uppercase tracking-widest font-mono text-xs italic disabled:opacity-50"
+                >
+                  NEXT PHASE
+                </button>
               </div>
             </div>
           )}
@@ -492,36 +425,28 @@ export default function RegistrationForm({ onCancel, onComplete }: { onCancel: (
             <div className="space-y-8 animate-in fade-in duration-300">
               <h2 className="text-2xl font-black italic tracking-tighter uppercase font-mono flex items-center gap-4 text-white">
                 <div className="w-10 h-10 rounded-xl bg-info/10 border border-info/30 flex items-center justify-center">
-                  <Users className="w-6 h-6 text-info" />
+                  <Home className="w-6 h-6 text-info" />
                 </div>
-                HOUSEHOLD INTERFACE
+                Security Access
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">House / Building No.</label>
-                  <input required placeholder="Enter house number" value={formData.houseNumber} onChange={e => setFormData({...formData, houseNumber: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Guardian Username</label>
+                  <input required placeholder="ASSIGN UNIQUE HANDLE" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value.toLowerCase()})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Total Occupants</label>
-                  <input type="number" value={formData.householdCount} onChange={e => setFormData({...formData, householdCount: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono transition-all" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Network Handle</label>
-                  <input required placeholder="Assign unique username" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all font-mono italic" />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Security Access Key (Password)</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Access PIN / Password</label>
                   <input type="password" required placeholder="********" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Confirm Access Key</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 ml-2 font-mono">Verify Access PIN</label>
                   <input type="password" required placeholder="********" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 focus:border-emergency/50 outline-none text-white font-bold font-mono placeholder-white/10 transition-all" />
                 </div>
               </div>
               <div className="flex gap-4 pt-8">
                 <button type="button" onClick={() => setStep(3)} className="flex-1 py-5 border border-white/10 font-black rounded-2xl hover:bg-white/5 transition-all uppercase tracking-widest font-mono text-xs text-white/60">BACK</button>
                 <button type="submit" disabled={loading} className="flex-2 py-5 bg-emergency text-white font-black italic rounded-2xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 shadow-glow-red uppercase tracking-[0.2em] font-mono text-sm leading-none">
-                  {loading ? 'UPLOADING...' : 'AUTHORIZE ENROLLMENT'}
+                  {loading ? 'TRANSMITTING...' : 'AUTHORIZE ENROLLMENT'}
                 </button>
               </div>
             </div>

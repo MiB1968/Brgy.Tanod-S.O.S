@@ -46,7 +46,7 @@ export function initSocket(server: HttpServer): Server {
   console.log('[Socket] Initializing Socket.IO with server...');
   try {
     io = new Server(server, {
-      path: '/socket.io/',
+      path: '/socket.io',
       pingTimeout: 60000,
       pingInterval: 10000,
       connectTimeout: 45000,

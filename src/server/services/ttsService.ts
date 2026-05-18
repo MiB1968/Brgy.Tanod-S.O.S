@@ -39,7 +39,16 @@ class TTSService {
     const { text } = options;
     if (!text) throw new Error("Text is required for TTS");
 
-    // 1. Try Google TTS (requires internet)
+    // 1. Try Gemini TTS for a polished, highly realistic voice
+    if (process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY) {
+       try {
+         return await this.generateGeminiTTS(text);
+       } catch (err) {
+         console.warn('[TTS] Gemini TTS failed, falling back:', err);
+       }
+    }
+
+    // 2. Try Google TTS (requires internet)
     try {
       return await this.generateGoogleTTS(text);
     } catch { /* quota or network error — fall through to Supertonic */ }
@@ -68,6 +77,52 @@ class TTSService {
     }
 
     throw new Error("All TTS providers failed.");
+  }
+
+  private async generateGeminiTTS(text: string): Promise<Buffer> {
+    const { GoogleGenAI, Modality } = await import('@google/genai');
+    const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO], // MUST BE 1 Modality: AUDIO
+        speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' }, // Zephyr, Fenrir, Kore, Puck, Charon
+            },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      const pcmData = Buffer.from(base64Audio, 'base64');
+      
+      const sampleRate = 24000;
+      const dataLength = pcmData.length;
+      const header = Buffer.alloc(44);
+      header.write('RIFF', 0);
+      header.writeUInt32LE(36 + dataLength, 4);
+      header.write('WAVE', 8);
+      header.write('fmt ', 12);
+      header.writeUInt32LE(16, 16);
+      header.writeUInt16LE(1, 20);
+      header.writeUInt16LE(1, 22);
+      header.writeUInt32LE(sampleRate, 24);
+      header.writeUInt32LE(sampleRate * 2, 28);
+      header.writeUInt16LE(2, 32);
+      header.writeUInt16LE(16, 34);
+      header.write('data', 36);
+      header.writeUInt32LE(dataLength, 40);
+      
+      return Buffer.concat([header, pcmData]);
+    }
+    throw new Error('No audio returned from Gemini TTS');
   }
 
   private async generateGoogleTTS(text: string): Promise<Buffer> {

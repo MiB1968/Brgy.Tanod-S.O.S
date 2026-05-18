@@ -16,12 +16,35 @@ const allowedOrigins: string[] = config.corsOrigin
   ? config.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
   : [];
 
+// ── Bug 1 Fix: COOP + COEP headers ────────────────────────────────────────────
+// WebLLM uses SharedArrayBuffer for multi-threaded WASM.
+// Browsers only expose SharedArrayBuffer when the page is "cross-origin isolated",
+// which requires BOTH of these headers on every response:
+//   Cross-Origin-Opener-Policy: same-origin
+//   Cross-Origin-Embedder-Policy: require-corp
+//
+// These are applied BEFORE helmet so they aren't overridden.
+app.use((_req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
+
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+
+        // ── Bug 2a Fix: 'wasm-unsafe-eval' ──────────────────────────────────
+        // Without this, browsers refuse to JIT-compile the WebLLM WASM module.
+        // 'blob:' is needed for WebLLM's dynamically created worker scripts.
+        scriptSrc: [
+          "'self'",
+          "'wasm-unsafe-eval'", // Required for WebLLM WASM JIT compilation
+          "blob:",              // Required for WebLLM dynamic worker scripts
+        ],
+
         styleSrc:
           config.nodeEnv === 'production'
             ? ["'self'", 'https://fonts.googleapis.com']
@@ -41,17 +64,33 @@ app.use(
           "ws:",
           "https://*.googleapis.com",
           "https://*.firebaseio.com",
-          "https://api.elevenlabs.io"
+          "https://api.elevenlabs.io",
+          // WebLLM downloads the Qwen2 model from HuggingFace CDN
+          "https://huggingface.co",
+          "https://*.huggingface.co",
+          "https://cdn-lfs.huggingface.co",
+          "https://cdn-lfs-us-1.huggingface.co",
         ],
         mediaSrc: ["'self'", 'blob:'],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
-        formAction: ["'self'"]
+        formAction: ["'self'"],
+
+        // ── Bug 2b Fix: worker-src blob: ────────────────────────────────────
+        // WebLLM spawns Web Workers from blob: URLs at runtime.
+        // Without this directive the browser silently blocks all WebLLM workers
+        // and the engine never initialises.
+        workerSrc: ["'self'", "blob:"],
       }
     },
     frameguard: false,
-    crossOriginEmbedderPolicy: false
+
+    // ── Bug 1 Fix (continued) ────────────────────────────────────────────────
+    // crossOriginEmbedderPolicy was false, which disabled the COEP header that
+    // helmet would otherwise set. We now set it manually above, so we still
+    // disable helmet's version here to avoid a duplicate/conflicting header.
+    crossOriginEmbedderPolicy: false,
   })
 );
 

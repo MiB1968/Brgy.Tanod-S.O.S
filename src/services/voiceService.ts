@@ -73,7 +73,7 @@ class VoiceService {
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
-    const blob = new Blob([bytes], { type: 'audio/mp3' });
+    const blob = new Blob([bytes], { type: 'audio/wav' });
     await this.playAudioBlob(blob);
   }
 

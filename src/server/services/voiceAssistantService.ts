@@ -168,8 +168,8 @@ export class SecureVoiceAssistantService {
       const context = await this.getLiveContext();
 
     const modelName = config.geminiModel || AI_MODELS.flash.name;
-    // @google/genai SDK expects model name with 'models/' prefix
-    const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
+    // @google/genai SDK expects model name without 'models/' prefix
+    const finalModelName = modelName.startsWith('models/') ? modelName.slice(7) : modelName;
     
     console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}" using model: ${finalModelName}`);
     const result = await getAiClient().models.generateContent({
@@ -474,8 +474,8 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
       const context = await this.getLiveContext();
 
       const modelName = config.geminiModel || AI_MODELS.flash.name;
-      // @google/genai SDK expects model name with 'models/' prefix
-      const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
+      // @google/genai SDK expects model name without 'models/' prefix
+      const finalModelName = modelName.startsWith('models/') ? modelName.slice(7) : modelName;
 
       const result = await getAiClient().models.generateContent({
         model: finalModelName,

@@ -35,6 +35,7 @@ export const residents = pgTable('residents', {
   emergencyContactPhone: text('emergency_contact_phone'),
   gpsLat: doublePrecision('gps_lat'),
   gpsLng: doublePrecision('gps_lng'),
+  selfieUrl: text('selfie_url'),
   status: text('status').default('pending'),
   isVerified: boolean('is_verified').default(false),
   verificationDate: timestamp('verification_date', { withTimezone: true })
