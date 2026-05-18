@@ -87,7 +87,7 @@ class TTSService {
     });
 
     const response = await ai.models.generateContent({
-      model: "models/gemini-1.5-flash",
+      model: "gemini-3-flash-preview",
       contents: [{ parts: [{ text: text }] }],
       config: {
         responseModalities: [Modality.AUDIO], // MUST BE 1 Modality: AUDIO

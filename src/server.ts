@@ -52,7 +52,10 @@ async function startServer() {
 
   initSocket(server);
 
-  if (config.nodeEnv !== 'production') {
+  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(getDirname(), 'index.html'));
+
+  if (!isProd) {
+    console.log('[Server] Starting in DEVELOPMENT mode (Vite middleware)');
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -66,9 +69,10 @@ async function startServer() {
     const indexPath = path.join(distPath, 'index.html');
 
     console.log(`[Production] Assets Root: ${distPath}`);
+    console.log(`[Production] Index HTML: ${indexPath}`);
     
     if (!fs.existsSync(indexPath)) {
-      console.error(`[Production] FATAL: index.html missing at ${indexPath}`);
+      console.error(`[Production] ERROR: index.html not found! Static serving may fail.`);
     }
 
     app.use(
@@ -78,7 +82,6 @@ async function startServer() {
           if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
             res.setHeader('Cache-Control', 'public, max-age=31536000');
           }
-          // Support for WASM
           if (filePath.endsWith('.wasm')) {
             res.setHeader('Content-Type', 'application/wasm');
           }
@@ -94,7 +97,6 @@ async function startServer() {
 
     // SPA fallback
     app.get('*', (req, res, next) => {
-      // Exclude API and Socket
       if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
         return next();
       }
@@ -102,7 +104,7 @@ async function startServer() {
       res.sendFile(indexPath, (err) => {
         if (err) {
           console.error(`[Production] SPA Route Error (${req.path}):`, err);
-          res.status(500).send('Tactical Command Console Offline. Build Incomplete.');
+          res.status(500).send('Tactical Command Console Offline. Please refresh or contact support.');
         }
       });
     });

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { config } from '../config/index';
 import {
@@ -9,15 +9,18 @@ import {
   type ModelConfig,
 } from '../config/aiModels';
 
-let ai: GoogleGenerativeAI | null = null;
+let ai: GoogleGenAI | null = null;
 
-function getAIClient(): GoogleGenerativeAI {
+function getAIClient(): GoogleGenAI {
   if (!ai) {
     const key = process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY;
     if (!key) {
       throw new Error('GEMINI_API_KEY_NEW or GEMINI_API_KEY (Free Tier) is required for server-side AI');
     }
-    ai = new GoogleGenerativeAI(key);
+    ai = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
   }
   return ai;
 }
@@ -85,17 +88,17 @@ async function callModel(
   );
 
   const callPromise = (async () => {
-    const model = getAIClient().getGenerativeModel({ model: modelConfig.name });
-    const result = await model.generateContent({
+    const result = await getAIClient().models.generateContent({
+      model: modelConfig.name,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
+      config: {
         responseMimeType: 'application/json',
-        maxOutputTokens: modelConfig.maxOutputTokens,
         temperature: 0.2,
       },
     });
 
-    const raw = result.response.text();
+    const raw = result.text;
+    if (!raw) throw new Error("Empty AI response");
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
     return AIAnalysisSchema.parse(parsed);
@@ -224,9 +227,7 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
 
   try {
-    const modelName = config.geminiModel || "models/gemini-1.5-flash";
-    const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
-    const model = getAIClient().getGenerativeModel({ model: finalModelName });
+    const finalModelName = config.geminiModel || "gemini-3-flash-preview";
     
     const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 
     User says (in Tagalog/English): "${userText}"
@@ -237,8 +238,11 @@ export async function getGuardianResponse(userText: string): Promise<string> {
     Use a mix of Tagalog and English (Taglish) if appropriate for a local feel.
     Respond with ONLY the text of your response.`;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    const result = await getAIClient().models.generateContent({
+      model: finalModelName,
+      contents: prompt
+    });
+    return result.text?.trim() || "";
   } catch (err: any) {
     log.error("Guardian AI response failed", { requestId, error: err.message });
     return "Nakatanggap ako ng ulat. Huwag mag-alala, nakikipag-ugnayan na ang ating patrol unit. Stay safe.";
