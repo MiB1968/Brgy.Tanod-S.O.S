@@ -171,20 +171,13 @@ export function LoginView({
                   {isLoggingIn ? 'SYNCHRONIZING...' : 'ESTABLISH SECURE LINK'}
                 </button>
 
-                <div className="pt-4 flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => onLogin('rubenlleg12@gmail.com', 'jowa0003')}
-                    className="flex-1 bg-info/10 border border-info/20 text-info font-black font-mono text-[9px] py-3 rounded-lg hover:bg-info/20 transition-all uppercase tracking-widest"
-                  >
-                    OVERRIDE 01
-                  </button>
+                <div className="pt-4 flex justify-center">
                   <button 
                     type="button"
                     onClick={() => setShowEmailLogin(false)}
-                    className="flex-1 bg-white/5 border border-white/10 text-white/30 font-mono text-[9px] py-3 rounded-lg hover:bg-white/10 transition-all uppercase tracking-widest"
+                    className="w-full bg-white/5 border border-white/10 text-white/30 font-mono text-[10px] py-3.5 rounded-xl hover:bg-white/10 transition-all uppercase tracking-widest"
                   >
-                    CANCEL
+                    RETURN TO GATEWAY
                   </button>
                 </div>
               </motion.form>

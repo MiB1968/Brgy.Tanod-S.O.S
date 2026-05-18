@@ -80,6 +80,10 @@ export interface Alert {
   resolvedAt?: string;
   resolutionNotes?: string;
   responderNotes?: string;
+  // ── Offline queue flag ────────────────────────────────────────────────────
+  // Set to true when the SOS was saved to the local outbox because the device
+  // was offline. Cleared once the server confirms receipt.
+  isOfflineQueued?: boolean;
   aiAnalysis?: {
     incidentType: string;
     severityScore: number;
@@ -96,7 +100,7 @@ export interface Incident {
   alertId?: string;
   tanodId: string;
   tanodName: string;
-  timestamp: string; // Unified date/time
+  timestamp: string;
   location: string;
   gpsLocation?: { lat: number; lng: number };
   type: string;
@@ -128,9 +132,9 @@ export interface Shift {
   id: string;
   tanodId: string;
   tanodName: string;
-  startTime: string; // ISO string
-  endTime: string;   // ISO string
-  sector: string;    // e.g., "Zone 1", "Market Area"
+  startTime: string;
+  endTime: string;
+  sector: string;
   status: 'scheduled' | 'active' | 'completed';
   tanodResponse?: 'pending' | 'accepted' | 'rejected';
   notes?: string;
@@ -148,8 +152,8 @@ export interface TanodActivityLog {
     lng: number;
   };
   details: string;
-  alertId?: string; // If it's an alert response
-  responseTime?: number; // In seconds, if applicable
+  alertId?: string;
+  responseTime?: number;
 }
 
 export interface TanodRoutePoint {
@@ -165,7 +169,7 @@ export interface TanodPatrolSession {
   startTime: string;
   endTime?: string;
   route: TanodRoutePoint[];
-  distanceCovered?: number; // optional, for future analytics
+  distanceCovered?: number;
 }
 
 export interface SystemBroadcast {

@@ -1,7 +1,7 @@
 import { Express } from "express";
 import authRoutes from "./authRoutes";
 import sosRoutes from "./sosRoutes";
-import analyticsRoutes from "./analyticsRoutes";
+import intelligenceRoutes from "./intelligenceRoutes";
 import syncRoutes from "./syncRoutes";
 import systemRoutes from "./systemRoutes";
 import voiceRoutes from "./voiceRoutes";
@@ -27,7 +27,7 @@ export const setupRoutes = (app: Express): void => {
   // Feature routes
   app.use("/api/auth", authRoutes);
   app.use("/api/sos", sosRoutes);
-  app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/intelligence", intelligenceRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/system", systemRoutes);
   app.use("/api/voice", voiceRoutes);

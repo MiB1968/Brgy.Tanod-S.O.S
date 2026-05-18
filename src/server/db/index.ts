@@ -9,7 +9,7 @@ const { Pool } = pg;
 
 export const pool = new Pool({
   connectionString: config.databaseUrl || undefined,
-  ssl: (!config.databaseUrl || config.databaseUrl.includes('localhost')) ? false : { rejectUnauthorized: true },
+  ssl: (!config.databaseUrl || config.databaseUrl.includes('localhost') || config.databaseUrl.includes('127.0.0.1')) ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 5000,
   query_timeout: 10000,
 });
@@ -20,7 +20,12 @@ pool.on('error', (err) => {
 
 export const db = drizzle(pool, { schema });
 
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const query = (text: string, params?: any[]) => {
+  if (!config.databaseUrl) {
+    throw new Error('Database not configured. Operation aborted.');
+  }
+  return pool.query(text, params);
+};
 export const getClient = () => pool.connect();
 export const checkConnection = async () => {
   try {
@@ -62,7 +67,16 @@ export const initDatabase = (): admin.firestore.Firestore | null => {
 
 export const getDb = (): admin.firestore.Firestore => {
   if (!firebaseDb) {
-    firebaseDb = initDatabase();
+    const db = initDatabase();
+    if (!db) {
+      // Return a proxy that logs errors instead of crashing if the dev forgot config
+      console.error('[DB] Firestore not initialized. API calls will fail.');
+      return {
+        collection: () => { throw new Error('Firestore not initialized. Check FIREBASE_PROJECT_ID.'); },
+        doc: () => { throw new Error('Firestore not initialized. Check FIREBASE_PROJECT_ID.'); },
+      } as any;
+    }
+    firebaseDb = db;
   }
   return firebaseDb;
 };

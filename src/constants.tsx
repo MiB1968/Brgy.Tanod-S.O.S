@@ -1,4 +1,3 @@
-
 import { 
   IconRadar, 
   IconApprovedResidents, 
@@ -44,18 +43,24 @@ export const itemVariants = {
 
 export const isRuben = (uid?: string, email?: string) => {
   if (!uid && !email) return false;
+
+  // SECURITY: Only real, specific Firebase UIDs get superadmin.
+  // Never add generic strings like 'v1' or 'anonymous_admin_demo' here.
   const superAdminUids = [
     'G6fWn6Crv1Yh2Tz9fSreFmX3G1r1',
-    'v1',
-    'anonymous_admin_demo',
-    'FzSXHYkqqshwvnYpYbvjN5VnbLR2' // Ruben
+    'FzSXHYkqqshwvnYpYbvjN5VnbLR2',
   ];
+
   const superAdminEmails = [
     'rubenlleg12@gmail.com',
     'ronniecantuba420@gmail.com',
-    'admin@brgy-tanod.gov.ph'
+    'admin@brgy-tanod.gov.ph',
   ];
-  return superAdminUids.includes(uid || '') || superAdminEmails.includes(email || '');
+
+  return (
+    superAdminUids.includes(uid || '') ||
+    superAdminEmails.includes(email || '')
+  );
 };
 
 export const PATROL_TIMEOUT = 1000 * 60 * 5; // 5 minutes
@@ -71,7 +76,7 @@ export const navItems = [
   { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },
   { id: 'schedule', label: '📅 Schedule', icon: Clock },
   { id: 'reports', label: '📜 Reports', icon: FileText },
+  { id: 'records', label: '📄 Workspace', icon: FileText },
   { id: 'directory', label: '🆘 SOS Help', icon: Phone },
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
 ];
-

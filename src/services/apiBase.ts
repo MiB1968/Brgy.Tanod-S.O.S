@@ -16,9 +16,12 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     ...options.headers,
   };
 
-  const timeout = endpoint.includes('analytics') || endpoint.includes('sync') ? 60000 : 30000;
+  const timeout = endpoint.includes('sync') ? 60000 : 25000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  const timeoutId = setTimeout(() => {
+    console.warn(`[API] Request timed out for: ${endpoint}`);
+    controller.abort();
+  }, timeout);
 
   try {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;

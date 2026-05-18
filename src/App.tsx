@@ -80,10 +80,12 @@ import AdminResidents from "./components/AdminResidents";
 import DirectoryView from "./components/DirectoryView";
 import ScheduleView from "./components/ScheduleView";
 import ReportsView from "./components/ReportsView";
+import DigitalRecordsView from "./components/DigitalRecordsView";
 import SettingsView from "./components/SettingsView";
 import TanodRosterView from "./components/TanodRosterView";
 import { TanodActivityLogs } from "./components/Admin/TanodActivityLogs";
 import { ResidentVerification } from "./components/Admin/ResidentVerification";
+import EmergencyTestPanel from "./components/Test/EmergencyTestPanel";
 import IncidentForm from "./components/IncidentForm";
 import ResidentTacticalMap from "./components/Admin/ResidentTacticalMap";
 import RegistrationForm from "./components/RegistrationForm";
@@ -159,8 +161,10 @@ export default function App() {
     | "resident-map"
     | "roster"
     | "verification"
+    | "simulator"
     | "settings"
     | "logs"
+    | "records"
   >("home");
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -418,29 +422,34 @@ export default function App() {
       if (result) {
         setWorkspaceToken(result.accessToken);
         setGoogleUser(result.user);
-        
-        // Auto-login to the app if user exists with this email
+
+        // Get the Firebase ID token to send to our server for secure verification
+        const firebaseIdToken = await result.user.getIdToken();
+
         try {
-          const res = await api.auth.login({ email: result.user.email, isGoogle: true });
-          const token = res.data.token || "cookie-auth";
-          safeStorage.setItem("token", token);
-          safeStorage.setItem("user", JSON.stringify(res.data.user));
+          const res = await api.auth.login({
+            email: result.user.email,
+            isGoogle: true,
+            firebaseIdToken,   // ← server now verifies this instead of trusting blindly
+          });
+          const token = res.data.token || 'cookie-auth';
+          safeStorage.setItem('token', token);
+          safeStorage.setItem('user', JSON.stringify(res.data.user));
           setUser(res.data.user);
           setProfile(res.data.user);
         } catch (err) {
-          // If user doesn't exist, we might need them to register or we handle it on the server
-          console.warn("App login via Google failed, might need registration", err);
-          // For now, let's just set the user as guest if they are not in our DB
+          console.warn('App login via Google failed — user may need to register first.', err);
+          // If not in our DB yet, show them as a guest so they can register
           setUser({
             id: result.user.uid,
             name: result.user.displayName || 'Google User',
             email: result.user.email || '',
             role: 'resident',
-            status: 'approved'
+            status: 'approved',
           });
         }
-        
-        toast.success("Workspace Connected", { icon: "🌐" });
+
+        toast.success('Workspace Connected', { icon: '🌐' });
       }
     } catch (err: any) {
       toast.error(`Workspace Auth Error: ${err.message}`);
@@ -660,7 +669,7 @@ export default function App() {
     if (effectiveRole === "admin" || effectiveRole === "superadmin")
       return true;
     if (effectiveRole === "tanod")
-      return !["residents", "settings", "logs"].includes(item.id);
+      return !["residents", "settings", "logs", "records"].includes(item.id);
     return ["home", "map", "tracker", "directory", "settings"].includes(
       item.id,
     );
@@ -980,6 +989,28 @@ export default function App() {
                       <ResidentVerification />
                     </div>
                   )}
+                {activeTab === "simulator" &&
+                  (effectiveRole === "admin" ||
+                    effectiveRole === "superadmin") && (
+                    <div className="glass-panel p-4 md:p-8 rounded-[40px] border-white/5 h-full overflow-y-auto">
+                      <EmergencyTestPanel 
+                        onTrigger={async (type) => {
+                          try {
+                            const { createSOS } = useSOSStore.getState();
+                            await createSOS(
+                              type.toUpperCase() as any,
+                              "SIMULATED TEST ALERT",
+                              { lat: 14.5995, lng: 120.9842 } // Default Manila coords for simulation
+                            );
+                            toast.success("SIMULATION TRIGGERED");
+                            setActiveTab("map");
+                          } catch (err) {
+                            toast.error("SIMULATION FAILED");
+                          }
+                        }} 
+                      />
+                    </div>
+                  )}
                 {activeTab === "resident-map" &&
                   (effectiveRole === "admin" ||
                     effectiveRole === "superadmin") &&
@@ -994,6 +1025,7 @@ export default function App() {
                   />
                 )}
                 {activeTab === "reports" && <ReportsView />}
+                {activeTab === "records" && <DigitalRecordsView />}
                 {activeTab === "settings" && effectiveProfile && (
                   <SettingsView
                     profile={effectiveProfile}

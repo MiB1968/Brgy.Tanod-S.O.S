@@ -224,7 +224,7 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
 
   try {
-    const model = getAIClient().getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = getAIClient().getGenerativeModel({ model: "models/gemini-1.5-flash" });
     
     const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 
     User says (in Tagalog/English): "${userText}"

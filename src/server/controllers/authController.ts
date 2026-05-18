@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool } from '../db/index';
+import { pool, admin } from '../db/index';
 import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
@@ -11,19 +11,18 @@ import { logAction } from '../services/auditService';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const cookieOptions = {
-  httpOnly: true,                              // JS cannot read this cookie
-  secure: isProduction,                        // Require secure (needed for sameSite: 'none' in prod)
-  sameSite: isProduction ? 'none' as const : 'lax' as const, 
-  maxAge: 7 * 24 * 60 * 60 * 1000,            // 7 days
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' as const : 'lax' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,   // 7 days
 };
 
-// ── Register ─────────────────────────────────────────────────────────────────
+// ── Register ──────────────────────────────────────────────────────────────────
 export const register = async (req: Request, res: Response) => {
   const { email: rawEmail, password, name, role: rawRole, details } = req.body;
   const email = rawEmail?.toLowerCase();
 
   // SECURITY: Enforce allowed roles server-side regardless of what was sent.
-  // Validator already blocks admin/superadmin, but we double-check here.
   const allowedPublicRoles = ['resident', 'tanod'];
   const role = allowedPublicRoles.includes(rawRole) ? rawRole : 'resident';
 
@@ -36,19 +35,17 @@ export const register = async (req: Request, res: Response) => {
       [email]
     );
     if (userResult.rows.length > 0) {
-      // Generic message — don't confirm whether an email exists
       await client.query('ROLLBACK');
       return response.error(res, 'Registration failed. Please check your details.', 'CONFLICT', 409);
     }
 
-    // Cost factor 12 — stronger than 10, still fast enough
     const hashedPass = await bcrypt.hash(password, 12);
 
     const result = await client.query(
       `INSERT INTO users (email, password, name, role, status)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, email, name, role, status`,
-      [email, hashedPass, name, role, 'pending'] // ALL self-registrations start as 'pending'
+      [email, hashedPass, name, role, 'pending']
     );
     const user = result.rows[0];
 
@@ -80,7 +77,6 @@ export const register = async (req: Request, res: Response) => {
     await logAction(user.id, 'USER_REGISTERED', 'users', user.id, { role: user.role });
     await client.query('COMMIT');
 
-    // Issue JWT as httpOnly cookie ONLY — not in the response body
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
       config.jwtSecret,
@@ -88,7 +84,6 @@ export const register = async (req: Request, res: Response) => {
     );
     res.cookie('token', token, cookieOptions);
 
-    // Return user info with token in body for better reliability in some environments
     return response.success(
       res,
       { user, token },
@@ -104,11 +99,78 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-// ── Login ────────────────────────────────────────────────────────────────────
+// ── Login ─────────────────────────────────────────────────────────────────────
 export const login = async (req: Request, res: Response) => {
-  const { email, password, isGoogle } = req.body;
+  const { email, password, isGoogle, firebaseIdToken } = req.body;
   const normalizedEmail = email?.toLowerCase();
+
   try {
+    // ── SECURITY: Verify Google logins server-side ────────────────────────────
+    // NEVER trust isGoogle: true from the client without verifying the token.
+    if (isGoogle) {
+      if (!firebaseIdToken) {
+        return response.error(
+          res,
+          'Google login requires a valid Firebase ID token.',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      let decodedToken: admin.auth.DecodedIdToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
+      } catch (err: any) {
+        console.warn('[Auth] Firebase ID token verification failed:', err.message);
+        return response.error(
+          res,
+          'Google authentication failed. Invalid or expired token.',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      // Token email must match the email the client claims
+      if (decodedToken.email?.toLowerCase() !== normalizedEmail) {
+        return response.error(
+          res,
+          'Google token email does not match the provided email.',
+          'UNAUTHORIZED',
+          401
+        );
+      }
+
+      // Look up the user in our DB by verified email
+      const result = await pool.query(
+        'SELECT * FROM users WHERE email = $1',
+        [normalizedEmail]
+      );
+      const user = result.rows[0];
+
+      if (!user) {
+        // User authenticated with Google but not registered in our system yet
+        return response.error(
+          res,
+          'No account found for this Google email. Please register first.',
+          'NOT_FOUND',
+          404
+        );
+      }
+
+      await logAction(user.id, 'USER_LOGIN_GOOGLE', 'users', user.id);
+
+      const token = jwt.sign(
+        { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
+        config.jwtSecret,
+        { expiresIn: '7d' }
+      );
+      res.cookie('token', token, cookieOptions);
+
+      const { password: _, ...userWithoutPass } = user;
+      return response.success(res, { user: userWithoutPass, token }, 'Google login successful');
+    }
+
+    // ── Standard email/password login ─────────────────────────────────────────
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [normalizedEmail]
@@ -117,15 +179,9 @@ export const login = async (req: Request, res: Response) => {
 
     let passwordMatch = false;
     if (user) {
-      if (isGoogle) {
-        // If it's a Google login, we trust the client's Firebase validation for now
-        // In a real production app, we would verify the Firebase ID token on the server
-        passwordMatch = true;
-      } else {
-        passwordMatch = await bcrypt.compare(password, user.password);
-      }
+      passwordMatch = await bcrypt.compare(password, user.password);
     } else {
-      // Constant-time dummy comparison
+      // Constant-time dummy comparison to prevent timing attacks
       const dummyHash = '$2a$12$invaliddummyhashfortimingprotection000000000000000000';
       await bcrypt.compare(password || 'dummy', dummyHash);
     }
@@ -144,16 +200,15 @@ export const login = async (req: Request, res: Response) => {
     res.cookie('token', token, cookieOptions);
 
     const { password: _, ...userWithoutPass } = user;
-
-    // Return token in body for reliability (especially in dev environments)
     return response.success(res, { user: userWithoutPass, token }, 'Login successful');
+
   } catch (err: any) {
     console.error('[Auth] Login error:', err.message);
     return response.error(res, 'Login failed. Please try again.');
   }
 };
 
-// ── Logout ───────────────────────────────────────────────────────────────────
+// ── Logout ────────────────────────────────────────────────────────────────────
 export const logout = (req: Request, res: Response) => {
   res.clearCookie('token', {
     httpOnly: true,
@@ -163,9 +218,7 @@ export const logout = (req: Request, res: Response) => {
   return response.success(res, null, 'Logged out successfully');
 };
 
-// ── Me (current user) ────────────────────────────────────────────────────────
-// NOTE: This handler now relies on the authenticate middleware being applied
-// in authRoutes.ts. req.user is already verified — no manual re-verification.
+// ── Me (current user) ─────────────────────────────────────────────────────────
 export const me = async (req: AuthRequest, res: Response) => {
   try {
     const result = await pool.query(

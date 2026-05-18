@@ -19,7 +19,7 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
   const code = err.code || 'INTERNAL_SERVER_ERROR';
 
   if (status >= 500) {
-    console.error(`[ERROR] ${new Date().toISOString()} - ${err.message || err}`);
+    console.error(`[ERROR] ${new Date().toISOString()} | ${req.method} ${req.path} | ${err.message || err}`);
     if (err.stack) console.error(err.stack);
   }
 

@@ -19,7 +19,7 @@ export function LiveHeatmap() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await fetchAPI('analytics/heatmap');
+        const data = await fetchAPI('intelligence/heatmap');
         setPoints(data);
       } catch (err) {
         console.error("Heatmap load failure", err);

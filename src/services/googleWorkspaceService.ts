@@ -1,9 +1,10 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  User,
+} from 'firebase/auth';
+import { auth } from '../lib/firebase';   // ← shared singleton, removes double initializeApp
 
 const provider = new GoogleAuthProvider();
 // Workspace scopes
@@ -20,13 +21,15 @@ let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 
 export const workspaceAuth = {
-  init: (onAuthSuccess?: (user: User, token: string) => void, onAuthFailure?: () => void) => {
+  init: (
+    onAuthSuccess?: (user: User, token: string) => void,
+    onAuthFailure?: () => void
+  ) => {
     return onAuthStateChanged(auth, async (user: User | null) => {
       if (user) {
         if (cachedAccessToken) {
           if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
         } else if (!isSigningIn) {
-          // If we have a user but no token, we might need to re-auth or it's a silent refresh failure
           if (onAuthFailure) onAuthFailure();
         }
       } else {
@@ -44,11 +47,10 @@ export const workspaceAuth = {
       if (!credential?.accessToken) {
         throw new Error('Failed to get access token from Firebase Auth');
       }
-
       cachedAccessToken = credential.accessToken;
       return { user: result.user, accessToken: cachedAccessToken };
     } catch (error: any) {
-      console.error('Workspace login error:', error);
+      console.error('[WorkspaceAuth] Sign-in error:', error);
       throw error;
     } finally {
       isSigningIn = false;
@@ -60,125 +62,131 @@ export const workspaceAuth = {
   logout: async () => {
     await auth.signOut();
     cachedAccessToken = null;
-  }
+  },
 };
 
+// ── Helper to get the token or throw a clear error ───────────────────────────
+function requireToken(): string {
+  const token = workspaceAuth.getAccessToken();
+  if (!token) throw new Error('Not authenticated with Google Workspace');
+  return token;
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────────────
 export const calendarService = {
   listEvents: async () => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
-    const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      { headers: { Authorization: `Bearer ${requireToken()}` } }
+    );
     return res.json();
   },
   createEvent: async (event: any) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
-    const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-      method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(event)
-    });
+    const res = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${requireToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    );
     return res.json();
-  }
+  },
 };
 
+// ── Chat ─────────────────────────────────────────────────────────────────────
 export const chatService = {
   listSpaces: async () => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
     const res = await fetch('https://chat.googleapis.com/v1/spaces', {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${requireToken()}` },
     });
     return res.json();
   },
   sendMessage: async (spaceName: string, text: string) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
-    const res = await fetch(`https://chat.googleapis.com/v1/${spaceName}/messages`, {
-      method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ text })
-    });
+    const res = await fetch(
+      `https://chat.googleapis.com/v1/${spaceName}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${requireToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      }
+    );
     return res.json();
-  }
+  },
 };
 
+// ── Tasks ─────────────────────────────────────────────────────────────────────
 export const taskService = {
   listTaskLists: async () => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
-    const res = await fetch('https://tasks.googleapis.com/tasks/v1/users/@me/lists', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await fetch(
+      'https://tasks.googleapis.com/tasks/v1/users/@me/lists',
+      { headers: { Authorization: `Bearer ${requireToken()}` } }
+    );
     return res.json();
   },
   createTask: async (taskListId: string, task: any) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
-    const res = await fetch(`https://tasks.googleapis.com/tasks/v1/lists/${taskListId}/tasks`, {
-      method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(task)
-    });
+    const res = await fetch(
+      `https://tasks.googleapis.com/tasks/v1/lists/${taskListId}/tasks`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${requireToken()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(task),
+      }
+    );
     return res.json();
-  }
+  },
 };
 
+// ── Docs ──────────────────────────────────────────────────────────────────────
 export const docsService = {
   createDocument: async (title: string) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
     const res = await fetch('https://docs.googleapis.com/v1/documents', {
       method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+      headers: {
+        Authorization: `Bearer ${requireToken()}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title })
+      body: JSON.stringify({ title }),
     });
     return res.json();
-  }
+  },
 };
 
+// ── Slides ────────────────────────────────────────────────────────────────────
 export const slidesService = {
   createPresentation: async (title: string) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
     const res = await fetch('https://slides.googleapis.com/v1/presentations', {
       method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+      headers: {
+        Authorization: `Bearer ${requireToken()}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title })
+      body: JSON.stringify({ title }),
     });
     return res.json();
-  }
+  },
 };
 
+// ── Forms ─────────────────────────────────────────────────────────────────────
 export const formsService = {
   createForm: async (title: string) => {
-    const token = workspaceAuth.getAccessToken();
-    if (!token) throw new Error('Not authenticated with Google');
     const res = await fetch('https://forms.googleapis.com/v1/forms', {
       method: 'POST',
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+      headers: {
+        Authorization: `Bearer ${requireToken()}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ info: { title } })
+      body: JSON.stringify({ info: { title } }),
     });
     return res.json();
-  }
+  },
 };

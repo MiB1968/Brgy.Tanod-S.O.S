@@ -73,25 +73,21 @@ async function startServer() {
     );
     app.use(express.static(path.resolve(process.cwd(), 'public')));
 
-    app.get('*', (req, res) => {
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({
-          success: false,
-          error: 'API endpoint not found'
-        });
+    // Only serve index.html for non-API, non-socket.io requests
+    app.get('*', (req, res, next) => {
+      const isApi = req.path.startsWith('/api');
+      const isSocket = req.path.startsWith('/socket.io');
+      
+      if (isApi || isSocket) {
+        return next(); // Fall through to 404 handler or socket.io
       }
 
-      console.log(`[Production] Serving fallback shell for: ${req.path}`);
+      console.log(`[Production] Serving SPA shell for: ${req.path}`);
 
       res.sendFile(indexPath, (err) => {
         if (err) {
-          console.error(`[Production] FAILED to serve index.html from ${indexPath}: ${err.message}`);
-
-          res.status(500).json({
-            success: false,
-            error: 'Application initialization error',
-            details: 'Application shell could not be served.'
-          });
+          console.error(`[Production] FAILED to serve index.html: ${err.message}`);
+          res.status(500).send('Tactical Command Console offline. Build error.');
         }
       });
     });

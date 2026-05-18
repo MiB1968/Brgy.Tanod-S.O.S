@@ -52,19 +52,25 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       historyPromise
     ]);
 
+    const overview = (overviewRes && overviewRes.rows && overviewRes.rows[0]) ? overviewRes.rows[0] : { verified_residents: '0', total_tanods: '0', active_alerts: '0' };
+    const alertsByTypeRows = (byTypeRes && byTypeRes.rows) ? byTypeRes.rows : [];
+    const alertsHistoryRows = (historyRes && historyRes.rows) ? historyRes.rows : [];
+
+    console.log(`[Analytics] Serving dashboard data. Alerts: ${alertsByTypeRows.length}, History: ${alertsHistoryRows.length}`);
+
     return response.success(res, {
       overview: {
-        verified_residents: parseInt(overviewRes.rows[0]?.verified_residents || '0'),
-        total_tanods: parseInt(overviewRes.rows[0]?.total_tanods || '0'),
-        active_alerts: parseInt(overviewRes.rows[0]?.active_alerts || '0')
+        verified_residents: parseInt(overview.verified_residents || '0'),
+        total_tanods: parseInt(overview.total_tanods || '0'),
+        active_alerts: parseInt(overview.active_alerts || '0')
       },
-      alertsByType: byTypeRes.rows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') })),
-      alertsHistory: historyRes.rows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') }))
+      alertsByType: alertsByTypeRows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') })),
+      alertsHistory: alertsHistoryRows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') }))
     });
 
   } catch (err: any) {
     console.error("Analytics Dashboard Error:", err);
-    return response.error(res, err.message);
+    return response.error(res, "Failed to compile tactical analytics. Data link unstable.", "SERVER_ERROR", 500);
   }
 };
 
@@ -79,13 +85,16 @@ export const getHeatmapData = async (req: AuthRequest, res: Response) => {
         created_at as timestamp 
       FROM alerts 
       WHERE created_at >= NOW() - INTERVAL '30 days'
-    `);
+    `).catch(err => {
+      console.error("Heatmap Query Error:", err);
+      return { rows: [] };
+    });
 
-    const heatmap = result.rows.map(r => ({
+    const heatmap = (result.rows || []).map(r => ({
       id: r.id,
       type: r.type,
-      lat: parseFloat(r.lat),
-      lng: parseFloat(r.lng),
+      lat: parseFloat(r.lat || '14.5995'),
+      lng: parseFloat(r.lng || '120.9842'),
       timestamp: r.timestamp
     }));
 

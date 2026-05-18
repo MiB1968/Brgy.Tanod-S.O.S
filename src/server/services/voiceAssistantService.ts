@@ -167,14 +167,17 @@ export class SecureVoiceAssistantService {
       const session = this.getOrCreateSession(userId, currentRole);
       const context = await this.getLiveContext();
 
-      console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}"`);
-      const result = await getAiClient().models.generateContent({
-        model: config.geminiModel || AI_MODELS.flash.name,
-        contents: [{ role: 'user', parts: [{ text: transcript }] }],
-        config: {
-          systemInstruction: this.buildSystemPrompt(context, currentRole)
-        }
-      });
+    const modelName = config.geminiModel || AI_MODELS.flash.name;
+    const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
+    
+    console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}" using model: ${finalModelName}`);
+    const result = await getAiClient().models.generateContent({
+      model: finalModelName,
+      contents: [{ role: 'user', parts: [{ text: transcript }] }],
+      config: {
+        systemInstruction: this.buildSystemPrompt(context, currentRole)
+      }
+    });
 
       console.log('[JARVIS] Gemini result received');
       const replyText = this.sanitizeAIResponse(result.text || "Paki-ulit, hindi ko naintindihan.");
@@ -467,8 +470,11 @@ STRICT CONSTRAINTS:
       const session = this.getOrCreateSession(userId, currentRole);
       const context = await this.getLiveContext();
 
+      const modelName = config.geminiModel || AI_MODELS.flash.name;
+      const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
+
       const result = await getAiClient().models.generateContent({
-        model: config.geminiModel || AI_MODELS.flash.name,
+        model: finalModelName,
         contents: [{ role: 'user', parts: [
           { inlineData: { mimeType, data: audioBuffer.toString('base64') } }
         ] }],

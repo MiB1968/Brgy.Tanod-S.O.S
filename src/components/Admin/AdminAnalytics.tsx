@@ -25,7 +25,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
     
     if (!silent) setLoading(true);
     try {
-      const json = await fetchAPI('analytics/dashboard');
+      const json = await fetchAPI('intelligence/dashboard');
       const payload = json.data || json; // gracefully handle both forms
       setData(payload);
       setError(null);
