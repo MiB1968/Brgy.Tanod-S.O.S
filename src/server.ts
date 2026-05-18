@@ -22,8 +22,9 @@ const getDirname = () => {
 };
 
 async function startServer() {
-  const PORT = config.port || 3000;
-  console.log(`[Server] Booting Brgy. Tanod S.O.S... (Port: ${PORT})`);
+  const PORT = Number(process.env.PORT) || config.port || 3000;
+  console.log(`[Server] Booting Brgy. Tanod S.O.S... (Process PID: ${process.pid})`);
+  console.log(`[Server] Target Port: ${PORT} | Mode: ${config.nodeEnv}`);
   
   try {
     console.log('[Server] Connecting to Tactical Persistence Layer...');
@@ -122,6 +123,7 @@ async function startServer() {
   Status: ONLINE
   Address: http://0.0.0.0:${PORT}
   Mode: ${config.nodeEnv}
+  Timestamp: ${new Date().toISOString()}
   ==================================================
     `);
   });

@@ -10,21 +10,21 @@ export interface ModelConfig {
 
 export const AI_MODELS: Record<AITier, ModelConfig> = {
   flash: {
-    name: 'gemini-flash-latest',
+    name: 'gemini-1.5-flash',
     tier: 'flash',
     description: 'Fast, lightweight — for routine triage and low-severity incidents',
     maxOutputTokens: 1024,
     timeoutMs: 15000,
   },
   pro: {
-    name: 'gemini-3.1-pro-preview',
+    name: 'gemini-1.5-pro',
     tier: 'pro',
     description: 'Balanced — for moderate incidents needing deeper analysis',
     maxOutputTokens: 2048,
     timeoutMs: 20000,
   },
   critical: {
-    name: 'gemini-3.1-pro-preview',
+    name: 'gemini-1.5-pro',
     tier: 'critical',
     description: 'Life-threatening emergencies — high reliability',
     maxOutputTokens: 4096,
