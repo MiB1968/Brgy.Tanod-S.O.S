@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { FilePlus, Info } from 'lucide-react';
 import { IconRadar } from '../TacticalIcons';
 import { User } from '../../types';
+import { GuardianAILoader } from '../GuardianAILoader';
 
 interface TanodPortalHeaderProps {
   profile: User | null;
@@ -16,9 +17,12 @@ export function TanodPortalHeader({ profile, setIsReportFormOpen, setIsAboutOpen
       <div className="tactical-bg-glow absolute inset-0 rounded-[32px] sm:rounded-[48px] pointer-events-none" />
       
       <div className="relative z-10 w-full">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_8px_#22c55e]" />
-          <span className="text-[8px] sm:text-[9px] font-mono text-success font-black uppercase tracking-[0.2em] sm:tracking-[0.4em]">Unit Identity: Verified</span>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse shadow-[0_0_8px_#22c55e]" />
+            <span className="text-[8px] sm:text-[9px] font-mono text-success font-black uppercase tracking-[0.2em] sm:tracking-[0.4em]">Unit Identity: Verified</span>
+          </div>
+          <GuardianAILoader variant="compact" />
         </div>
         <h2 className="text-xl sm:text-2xl md:text-5xl font-black italic tracking-tighter uppercase text-white font-mono leading-none flex items-center gap-2 sm:gap-4 outline-text flex-wrap">
           <IconRadar className="w-8 h-8 sm:w-10 sm:h-10 text-success animate-pulse" />

@@ -168,6 +168,7 @@ export class SecureVoiceAssistantService {
       const context = await this.getLiveContext();
 
     const modelName = config.geminiModel || AI_MODELS.flash.name;
+    // @google/genai SDK expects model name with 'models/' prefix
     const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
     
     console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}" using model: ${finalModelName}`);
@@ -290,20 +291,22 @@ export class SecureVoiceAssistantService {
 
   // ── RESPONSE HELPERS ─────────────────────────────────────────────────────
   private buildSystemPrompt(context: VoiceContext, role: VoicePermissionLevel): string {
-    return `ROLE: Brgy Tanod S.O.S. Emergency Coordinator (Guardian Mode).
-CONTEXT: You are assisting citizens and responders in a potential emergency in the Philippines.
-CURRENT ROLE: ${role}
-UNITS AVAILABLE: ${context.availableTanods.length}
-PENDING INCIDENTS: ${context.barangayInfo.pendingIncidents}
-RESPONDING INCIDENTS: ${context.barangayInfo.respondingIncidents}
+    return `ROLE: Brgy Tanod S.O.S. Tactical AI (GUARDIAN MODE).
+PERSONALITY: Authoritative, calm, and protective. Like a seasoned Senior Tanod with advanced tech.
+CULTURAL CONTEXT: Philippines, Barangay setting. Use Taglish (Filipino + English) naturally.
+CURRENT ROLE OF USER: ${role}
+UNITS AVAILABLE: ${context.availableTanods.length} officers on active patrol
+PENDING INCIDENTS: ${context.barangayInfo.pendingIncidents} alerts requiring triage
+RESPONDING INCIDENTS: ${context.barangayInfo.respondingIncidents} cases in progress
 
-STRICT CONSTRAINTS:
-- NEVER exceed 15 words per response.
-- Use a calm, authoritative, and concise tone.
-- CRITICAL: No medical diagnoses or legal advice.
-- If danger is detected, prioritize immediate evacuation or responder arrival.
-- Do NOT repeat yourself.
-- Language: Match user's input (English or Filipino).`;
+VOICE GUIDELINES:
+- Keep it under 12 words. Be VERY CONCISE.
+- Sound like a high-tech tactical system. Use terms like "Tactical," "Confirmed," "Acknowledged," "Responding."
+- If units are low (${context.availableTanods.length} < 2), sound more alert.
+- Example: "Copied, Sir. Sending backup to Purok 7. Status is Red."
+- Example: "Ligtas na ang area. 3 Tanods are standard-ready."
+
+STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
   }
 
   private buildErrorResponse(
@@ -471,6 +474,7 @@ STRICT CONSTRAINTS:
       const context = await this.getLiveContext();
 
       const modelName = config.geminiModel || AI_MODELS.flash.name;
+      // @google/genai SDK expects model name with 'models/' prefix
       const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
 
       const result = await getAiClient().models.generateContent({

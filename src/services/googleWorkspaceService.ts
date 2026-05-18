@@ -13,9 +13,10 @@ provider.addScope('https://www.googleapis.com/auth/chat.spaces.readonly');
 provider.addScope('https://www.googleapis.com/auth/calendar.events');
 provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
 provider.addScope('https://www.googleapis.com/auth/tasks');
-provider.addScope('https://www.googleapis.com/auth/docs');
-provider.addScope('https://www.googleapis.com/auth/slides');
+provider.addScope('https://www.googleapis.com/auth/documents');
+provider.addScope('https://www.googleapis.com/auth/presentations');
 provider.addScope('https://www.googleapis.com/auth/forms');
+provider.addScope('https://www.googleapis.com/auth/drive');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
@@ -186,6 +187,30 @@ export const formsService = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ info: { title } }),
+    });
+    return res.json();
+  },
+};
+
+// ── Drive ─────────────────────────────────────────────────────────────────────
+export const driveService = {
+  listFiles: async (pageSize: number = 10) => {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?pageSize=${pageSize}&fields=files(id,name,mimeType,webViewLink)`, {
+      headers: { Authorization: `Bearer ${requireToken()}` },
+    });
+    return res.json();
+  },
+  createFolder: async (name: string) => {
+    const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${requireToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name,
+        mimeType: 'application/vnd.google-apps.folder',
+      }),
     });
     return res.json();
   },

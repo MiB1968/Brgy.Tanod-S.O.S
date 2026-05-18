@@ -1,7 +1,7 @@
 // src/services/guardianAIService.ts
 // CLIENT-SIDE — powered by WebLLM (runs 100% in browser, no API key needed)
 
-import { getWebLLMEngine, setWebLLMProgressCallback, isWebLLMReady } from '../lib/webllm';
+import { getWebLLMEngine, setWebLLMProgressCallback, isWebLLMReady, promptWebLLM } from '../lib/webllm';
 
 export interface GuardianContext {
   pendingSOS: number;
@@ -153,6 +153,74 @@ Rules:
           ? "Guardian AI is loading. Please wait a moment before sending commands."
           : "Acknowledged. Standing by for tactical instructions.",
     };
+  }
+
+  /**
+   * Automatically classify an incident based on its description.
+   */
+  public async classifyIncident(description: string): Promise<string> {
+    if (!isWebLLMReady() || !description.trim()) return "";
+
+    const systemPrompt = "Identify the incident category from the description. Output ONLY ONE WORD from this list: Theft, Physical Injury, Noise Complaint, Fire, Medical, Others.";
+    try {
+        const result = await promptWebLLM(systemPrompt, description);
+        const clean = result.replace(/[.]/g, "").trim();
+        const valid = ["Theft", "Physical Injury", "Noise Complaint", "Fire", "Medical", "Others"];
+        return valid.find(v => clean.toLowerCase().includes(v.toLowerCase())) || "Others";
+    } catch {
+        return "Others";
+    }
+  }
+
+  /**
+   * Summarize a collection of incidents for a shift handover report.
+   */
+  public async summarizeShift(incidents: any[]): Promise<string> {
+    if (!isWebLLMReady()) return "AI Model loading. Cannot summarize shift yet.";
+    if (incidents.length === 0) return "No incidents recorded during this shift. Overall status: Quiet and Clear.";
+
+    const incidentList = incidents.map(i => `- ${i.type} at ${i.location}: ${i.description}`).join('\n');
+    const systemPrompt = "You are a Barangay Tanod Shift Commander. Summarize the following shift incidents into a concise professional report for the next shift. Use a mix of Tagalog and English. Start with 'SHIFT SUMMARY:'";
+    
+    try {
+        return await promptWebLLM(systemPrompt, incidentList);
+    } catch (e) {
+        return "Failed to generate summary. Please review logs manually.";
+    }
+  }
+
+  /**
+   * Extract SOS details from a voice transcript or text.
+   */
+  public async extractSOSDetails(text: string): Promise<{ type: string, location: string, severity: number }> {
+    if (!isWebLLMReady()) return { type: 'Others', location: 'Unknown', severity: 3 };
+
+    const systemPrompt = `Extract emergency details from the following report. 
+    Output ONLY a JSON object like: {"type": "FIRE|MEDICAL|CRIME|FLOOD|OTHERS", "location": "string", "severity": 1-5}
+    - FIRE: sunog, apoy
+    - MEDICAL: sakit, nahimatay, sugat
+    - CRIME: nanakawan, away, gulo
+    - FLOOD: baha
+    Report: `;
+
+    try {
+        const raw = await promptWebLLM(systemPrompt, text);
+        const match = raw.match(/\{.*\}/s);
+        if (match) return JSON.parse(match[0]);
+    } catch (e) {
+        console.error("SOS Extraction failed:", e);
+    }
+    return { type: 'Others', location: 'Unknown', severity: 3 };
+  }
+
+  /**
+   * Provide offline First Aid or emergency instructions.
+   */
+  public async generateFirstAid(type: string): Promise<string> {
+    if (!isWebLLMReady()) return "Guardian AI is loading. Please follow standard emergency procedures.";
+
+    const systemPrompt = "You are a first-aid expert. Provide 3-5 immediate, life-saving steps in Tagalog for the following emergency type. Be direct and clear.";
+    return await promptWebLLM(systemPrompt, type);
   }
 
   /**

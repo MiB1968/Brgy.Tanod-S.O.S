@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 
 // Sub-components
 import { ResidentHero } from "./Resident/ResidentHero";
+import { SOSGuidance } from './Resident/SOSGuidance';
 import { SOSButtonPanel } from "./Resident/SOSButtonPanel";
 import { SOSChat } from "./SOSChat";
 import { CitizenReportTracker } from "./CitizenReportTracker";
@@ -24,6 +25,7 @@ import { useOfflineSOS } from "../hooks/useOfflineSOS";
 import { useTTS } from "../hooks/useTTS";
 import { useEmergencySound } from "../lib/EmergencySoundManager";
 import { photoService } from "../services/photoService";
+import { ResidentGuardianChat } from './Resident/ResidentGuardianChat';
 import { Camera, Image as ImageIcon, X } from "lucide-react";
 
 import { OfflineVoiceManager } from "./OfflineVoicePackManager";
@@ -357,7 +359,10 @@ export default function ResidentDashboard({
               </div>
             </div>
             <div className="mt-8 border-t border-white/5 pt-8">
-              <SOSChat alertId={activeAlert.id} currentUser={profile} />
+              <SOSGuidance type={activeAlert.type} />
+              <div className="mt-8">
+                <SOSChat alertId={activeAlert.id} currentUser={profile} />
+              </div>
             </div>
           </motion.div>
         )}
@@ -460,6 +465,8 @@ export default function ResidentDashboard({
         onClose={() => setIsAboutOpen(false)}
         role={profile?.role}
       />
+
+      <ResidentGuardianChat />
     </motion.div>
   );
 }

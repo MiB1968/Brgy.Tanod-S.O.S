@@ -3,7 +3,9 @@ import * as api from '../lib/api';
 import { User, IncidentStatus } from '../types';
 import { X } from 'lucide-react';
 import AnimatedButton from './AnimatedButton';
-import { promptWebLLM, setWebLLMProgressCallback } from '../lib/webllm';
+import { promptWebLLM, setWebLLMProgressCallback, isWebLLMReady } from '../lib/webllm';
+import { guardianAI } from '../services/guardianAIService';
+import { Sparkles, BrainCircuit } from 'lucide-react';
 
 interface IncidentFormProps {
   profile: User;
@@ -25,6 +27,21 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhanceProgress, setEnhanceProgress] = useState(0);
   const [enhanceText, setEnhanceText] = useState('');
+
+  const [isClassifying, setIsClassifying] = useState(false);
+
+  const handleSmartClassify = async () => {
+    if (!formData.description || isClassifying || !isWebLLMReady()) return;
+    setIsClassifying(true);
+    try {
+        const category = await guardianAI.classifyIncident(formData.description);
+        if (category) {
+            setFormData(prev => ({ ...prev, type: category }));
+        }
+    } finally {
+        setIsClassifying(false);
+    }
+  };
 
   const handleAIEnhance = async () => {
     if (!formData.description) return;
@@ -92,7 +109,20 @@ export default function IncidentForm({ profile, onClose }: IncidentFormProps) {
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest ml-1">Incident Type</label>
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-[10px] font-black uppercase text-[#8E9299] tracking-widest">Incident Type</label>
+                {isWebLLMReady() && formData.description && (
+                  <button 
+                   type="button" 
+                   onClick={handleSmartClassify}
+                   disabled={isClassifying}
+                   className="text-[9px] flex items-center gap-1 font-black uppercase tracking-widest text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    {isClassifying ? <span className="animate-spin text-[10px]">🔄</span> : <BrainCircuit size={12} />}
+                    Smart Detect
+                  </button>
+                )}
+              </div>
               <select 
                 required
                 value={formData.type}
