@@ -13,6 +13,7 @@ import { SOSChat } from "./SOSChat";
 import { CitizenReportTracker } from "./CitizenReportTracker";
 import ActiveMap from "./ActiveMap";
 import AboutModal from "./AboutModal";
+import { LongPressButton } from "./LongPressButton";
 
 // Stores & hooks
 import { useSystemStore } from "../store/useSystemStore";
@@ -21,6 +22,7 @@ import { useShoutDetection } from "../hooks/useShoutDetection";
 import { useVideoRecorder } from "../hooks/useVideoRecorder";
 import { useOfflineSOS } from "../hooks/useOfflineSOS";
 import { useTTS } from "../hooks/useTTS";
+import { useEmergencySound } from "../lib/EmergencySoundManager";
 import { photoService } from "../services/photoService";
 import { Camera, Image as ImageIcon, X } from "lucide-react";
 
@@ -53,6 +55,7 @@ export default function ResidentDashboard({
   onToggleSiren: () => void;
 }) {
   const { speak } = useTTS();
+  const { triggerEmergency } = useEmergencySound();
   const { setQueuedSOSCount } = useSystemStore();
   const { activeAlert, isSending, createSOS, subscribeToUserAlerts } =
     useSOSStore();
@@ -90,15 +93,6 @@ export default function ResidentDashboard({
     }
   }, [profile?.id, isOnline]);
 
-  const sosConfirmationSound = useRef(
-    new Howl({
-      src: [
-        "https://assets.mixkit.co/active_storage/sfx/2004/2004-preview.mp3",
-      ],
-      volume: 0.7,
-    }),
-  );
-
   useEffect(() => {
     if (profile?.id) {
       const unsubscribe = subscribeToUserAlerts(profile.id);
@@ -111,12 +105,12 @@ export default function ResidentDashboard({
     setQueuedSOSCount(queuedCount);
   }, [queuedCount, setQueuedSOSCount]);
 
-  const handleShout = useCallback(() => {
-    toast.error("SHOUT DETECTED: AUTO-INITIATING SOS", {
+  const handleShout = useCallback((reason: string) => {
+    toast.error(`GUARDIAN AI: ${reason.toUpperCase()}`, {
       duration: 5000,
-      icon: "🔊",
+      icon: "🛡️",
     });
-    handleSOS("OTHER", "Auto-SOS: High-decibel sound detected.");
+    handleSOS("OTHER", `Auto-SOS triggered by Guardian AI: ${reason}`);
   }, []);
 
   const { startListening, stopListening } = useShoutDetection(handleShout);
@@ -148,6 +142,9 @@ export default function ResidentDashboard({
   ) => {
     if (activeAlert || isSending) return;
 
+    // Trigger powerful siren immediately for deterrence
+    triggerEmergency(type);
+
     try {
       let location;
       try {
@@ -172,7 +169,6 @@ export default function ResidentDashboard({
 
       if (!isOnline) {
         await handleQueueSOS(type, description, location, photosToProcess);
-        speak({ text: "SOS natanggap. Tanod papunta na.", language: "en" });
         setSelectedPhotos([]);
         return;
       }
@@ -190,7 +186,6 @@ export default function ResidentDashboard({
         );
 
         await createSOS(type, description, location, b64Photos);
-        speak({ text: "SOS natanggap. Tanod papunta na.", language: "en" });
         setSelectedPhotos([]);
         toast.success("SOS Protocol Initiated. Units alerted.");
       } catch (err) {
@@ -268,9 +263,41 @@ export default function ResidentDashboard({
                   <Zap className="text-white w-10 h-10" />
                 </div>
                 <div>
-                  <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono">
-                    Emergency Incident Live
-                  </h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-2xl font-black italic tracking-tighter text-white uppercase font-mono">
+                      Emergency Incident Live
+                    </h4>
+                    <button 
+                      onClick={async () => {
+                        if (!profile?.id) return;
+                        try {
+                          const res = await api.generic.list(`alerts?residentId=${profile.id}&status=pending,responding,active`);
+                          if (res && res.length > 0) {
+                            const raw = res[0];
+                            useSOSStore.getState().setActiveAlert({
+                              ...raw,
+                              id: raw.id,
+                              residentId: raw.resident_id || raw.residentId,
+                              residentName: raw.residentName || profile.name,
+                              status: raw.status.toLowerCase(),
+                              location: typeof raw.location === "string" ? JSON.parse(raw.location) : raw.location,
+                              type: raw.type,
+                              timestamp: raw.created_at || raw.timestamp,
+                            });
+                            toast.success("STATUS UPDATED");
+                          } else {
+                            useSOSStore.getState().clearActiveAlert();
+                          }
+                        } catch (e) {
+                          toast.error("REFRESH FAILED");
+                        }
+                      }}
+                      className="p-1 text-white/20 hover:text-white transition-colors"
+                      title="Refresh Status"
+                    >
+                      <Zap className="w-3 h-3" />
+                    </button>
+                  </div>
                   <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.2em] font-mono">
                     {activeAlert.status.toUpperCase()} • {activeAlert.type}
                   </p>
@@ -310,13 +337,9 @@ export default function ResidentDashboard({
                     Acknowledge
                   </button>
                 ) : (
-                  <button
-                    onClick={async () => {
-                      if (
-                        window.confirm(
-                          "ARE YOU SURE YOU WANT TO ABORT THIS EMERGENCY ALERT? False alerts may result in penalties.",
-                        )
-                      ) {
+                  <div className="flex flex-col items-center gap-2">
+                    <LongPressButton
+                      onComplete={async () => {
                         try {
                           const { cancelSOS } = useSOSStore.getState();
                           await cancelSOS(activeAlert.id);
@@ -324,12 +347,12 @@ export default function ResidentDashboard({
                         } catch (err) {
                           toast.error("ABORT FAILED: Please call hotline");
                         }
-                      }
-                    }}
-                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40 hover:bg-emergency/20 hover:text-emergency hover:border-emergency/30 transition-all active:scale-95 whitespace-nowrap relative z-50 cursor-pointer"
-                  >
-                    Abort SOS
-                  </button>
+                      }}
+                      text="HOLD TO ABORT"
+                      subtext="PRESS & HOLD FOR 3 SECONDS"
+                      className="relative z-50"
+                    />
+                  </div>
                 )}
               </div>
             </div>

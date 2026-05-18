@@ -6,6 +6,7 @@ import { fetchAPI } from '../../lib/api';
 import { toast } from 'react-hot-toast';
 import { User } from '../../types';
 import { promptWebLLM, setWebLLMProgressCallback } from '../../lib/webllm';
+import { LiveHeatmap } from './LiveHeatmap';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
@@ -153,8 +154,17 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
         )}
       </AnimatePresence>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group min-h-[400px] flex flex-col">
+          <p className="text-[10px] font-black text-white/40 mb-6 uppercase tracking-widest font-mono flex items-center gap-2">
+            <Zap className="w-3 h-3 text-info" /> Incident Hotspot Heatmap
+          </p>
+          <div className="flex-1 rounded-3xl overflow-hidden border border-white/10 relative">
+             <LiveHeatmap />
+          </div>
+        </div>
+
+        <div className="glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group">
           <div className="scanline opacity-10" />
           <p className="text-[10px] font-black text-white/40 mb-8 uppercase tracking-widest font-mono flex items-center gap-2">
             <Activity className="w-3 h-3 text-emergency" /> Emergency Distribution
@@ -189,8 +199,10 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
             ))}
           </div>
         </div>
+      </div>
 
-        <div className="lg:col-span-2 glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group">
+      <div className="grid grid-cols-1 gap-6">
+        <div className="glass-panel p-8 rounded-[40px] border-white/5 relative overflow-hidden group">
           <div className="absolute top-8 right-8">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-bg rounded-xl border border-white/5">
               <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />

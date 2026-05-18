@@ -1,10 +1,12 @@
 {
   "name": "Brgy. Tanod S.O.S.",
-  "description": "A responsive emergency alert and response system built for Philippine barangay (Brgy. Tanod) operations.",
+  "description": "Mobile-first emergency alert and tactical coordination platform for Philippine barangays. Features AI-powered guardian mode, real-time tracking, and multi-user chat.",
   "requestFramePermissions": [
     "geolocation",
     "camera",
     "microphone"
   ],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

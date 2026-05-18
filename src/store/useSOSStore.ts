@@ -111,7 +111,7 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
 
   cancelSOS: async (id) => {
     try {
-      await api.alerts.cancel(id);
+      await api.alerts.cancelAlert(id);
       set({ activeAlert: null });
     } catch (error) {
       console.error("SOS cancel error:", error);

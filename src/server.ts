@@ -1,16 +1,21 @@
 import * as http from 'http';
+import fs from 'fs';
 import path from 'path';
 import express from 'express';
-import app from './src/server/app';
-import { initDb } from './src/server/services/dbService';
-import { initDatabase } from './src/server/db/index';
-import { initSocket } from './src/server/sockets/index';
-import { config } from './src/server/config/index';
+import app from './server/app';
+import { initDb } from './server/services/dbService';
+import { initDatabase } from './server/db/index';
+import { initSocket } from './server/sockets/index';
+import { config } from './server/config/index';
+import { errorHandler, notFoundHandler } from './server/middleware/error';
 
 async function startServer() {
+  console.log('[Server] Starting initialization sequence...');
   try {
+    console.log('[Server] Initializing Firebase Admin...');
     initDatabase();
     if (config.databaseUrl) {
+      console.log('[Server] Connecting to PostgreSQL/CockroachDB...');
       await initDb();
     } else {
       console.warn('WARNING: No DATABASE_URL provided. Skipping PostgreSQL initialization.');
@@ -19,6 +24,7 @@ async function startServer() {
     console.error('WARNING: Database initialization failed. Some features may not work.', err);
   }
 
+  console.log('[Server] Creating HTTP server...');
   const server = http.createServer(app);
 
   process.on('uncaughtException', (err) => {
@@ -43,9 +49,17 @@ async function startServer() {
     const distPath = path.resolve(process.cwd(), 'dist');
     const indexPath = path.join(distPath, 'index.html');
 
-    console.log(`[Production] Environment detected.`);
-    console.log(`[Production] System Root: ${process.cwd()}`);
-    console.log(`[Production] Target Asset Directory: ${distPath}`);
+    console.log(`[Production] Booting in PRODUCTION mode.`);
+    console.log(`[Production] Root: ${process.cwd()}`);
+    console.log(`[Production] Assets: ${distPath}`);
+    console.log(`[Production] Shell: ${indexPath}`);
+    console.log(`[Production] Node: ${process.version}`);
+    console.log(`[Production] DB Configured: ${!!config.databaseUrl}`);
+    console.log(`[Production] Gemini Configured: ${!!config.geminiApiKey}`);
+
+    if (!fs.existsSync(indexPath)) {
+      console.error(`[Production] CRITICAL ERROR: index.html not found at ${indexPath}. Build may be broken.`);
+    }
 
     app.use(
       express.static(distPath, {
@@ -83,11 +97,11 @@ async function startServer() {
     });
   }
 
-  const { errorHandler, notFoundHandler } = await import('./src/server/middleware/error');
-  
+  console.log('[Server] Mounting final error handlers...');
   app.use(notFoundHandler);
   app.use(errorHandler);
 
+  console.log(`[Server] Attempting to bind to port ${config.port} on 0.0.0.0...`);
   server.listen(config.port, '0.0.0.0', () => {
     console.log(`
   ==================================================

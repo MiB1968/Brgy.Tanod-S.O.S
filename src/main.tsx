@@ -15,9 +15,13 @@ if ('serviceWorker' in navigator) {
 }
 */
 
+import { AuthProvider } from './context/AuthContext';
+
 console.log("App starting...");
 createRoot(document.getElementById('root')!).render(
   <GlobalErrorBoundary>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </GlobalErrorBoundary>,
 );

@@ -89,7 +89,7 @@ export default function TanodDashboard({
         }
       }
 
-      await api.alerts.update(alert.id, updateData);
+      await api.alerts.updateAlert(alert.id, updateData);
 
       if (profile?.id) {
         const isOnline =

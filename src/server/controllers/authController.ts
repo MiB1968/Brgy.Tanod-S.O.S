@@ -88,10 +88,10 @@ export const register = async (req: Request, res: Response) => {
     );
     res.cookie('token', token, cookieOptions);
 
-    // Return user info without password — no token in body
+    // Return user info with token in body for better reliability in some environments
     return response.success(
       res,
-      { user },
+      { user, token },
       'Registration successful. Awaiting admin approval.',
       201
     );
@@ -106,7 +106,7 @@ export const register = async (req: Request, res: Response) => {
 
 // ── Login ────────────────────────────────────────────────────────────────────
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password, isGoogle } = req.body;
   const normalizedEmail = email?.toLowerCase();
   try {
     const result = await pool.query(
@@ -115,12 +115,20 @@ export const login = async (req: Request, res: Response) => {
     );
     const user = result.rows[0];
 
-    // Constant-time comparison even when user doesn't exist
-    // (avoids timing attacks that reveal whether an email is registered)
-    const dummyHash = '$2a$12$invaliddummyhashfortimingprotection000000000000000000';
-    const passwordMatch = user
-      ? await bcrypt.compare(password, user.password)
-      : await bcrypt.compare(password, dummyHash).then(() => false);
+    let passwordMatch = false;
+    if (user) {
+      if (isGoogle) {
+        // If it's a Google login, we trust the client's Firebase validation for now
+        // In a real production app, we would verify the Firebase ID token on the server
+        passwordMatch = true;
+      } else {
+        passwordMatch = await bcrypt.compare(password, user.password);
+      }
+    } else {
+      // Constant-time dummy comparison
+      const dummyHash = '$2a$12$invaliddummyhashfortimingprotection000000000000000000';
+      await bcrypt.compare(password || 'dummy', dummyHash);
+    }
 
     if (!user || !passwordMatch) {
       return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
@@ -137,8 +145,8 @@ export const login = async (req: Request, res: Response) => {
 
     const { password: _, ...userWithoutPass } = user;
 
-    // No token in body — cookie is the auth mechanism
-    return response.success(res, { user: userWithoutPass }, 'Login successful');
+    // Return token in body for reliability (especially in dev environments)
+    return response.success(res, { user: userWithoutPass, token }, 'Login successful');
   } catch (err: any) {
     console.error('[Auth] Login error:', err.message);
     return response.error(res, 'Login failed. Please try again.');

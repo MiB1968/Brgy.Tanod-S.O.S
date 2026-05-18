@@ -6,9 +6,21 @@
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
-import { analyzeIncident } from '../services/aiService';
+import { analyzeIncident, getGuardianResponse } from '../services/aiService';
 
 const router = Router();
+
+// POST /api/ai/guardian
+// Body: { text: string }
+router.post('/guardian', authenticate, async (req: Request, res: Response) => {
+  const { text } = req.body;
+  try {
+    const response = await getGuardianResponse(text);
+    return res.json({ success: true, response });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // POST /api/ai/analyze
 // Body: { description: string, initialType?: string }

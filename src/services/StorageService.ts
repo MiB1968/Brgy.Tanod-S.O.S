@@ -106,7 +106,7 @@ export const uploadVideoChunk = async (alertId: string, chunk: Blob, index: numb
   formData.append('alertId', alertId);
   formData.append('index', index.toString());
 
-  const response = await fetch('/api/storage/upload', {
+  const response = await fetch('/api/storage/alert-chunk', {
     method: 'POST',
     credentials: 'include',
     body: formData

@@ -67,3 +67,31 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
     return response.error(res, err.message);
   }
 };
+
+export const getHeatmapData = async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id, 
+        type, 
+        location->>'lat' as lat, 
+        location->>'lng' as lng, 
+        created_at as timestamp 
+      FROM alerts 
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+    `);
+
+    const heatmap = result.rows.map(r => ({
+      id: r.id,
+      type: r.type,
+      lat: parseFloat(r.lat),
+      lng: parseFloat(r.lng),
+      timestamp: r.timestamp
+    }));
+
+    return res.json(heatmap);
+  } catch (err: any) {
+    console.error("Heatmap Analytics Error:", err);
+    return response.error(res, err.message);
+  }
+};

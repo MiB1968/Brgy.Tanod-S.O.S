@@ -16,6 +16,17 @@ interface SOSButtonPanelProps {
 }
 
 export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onInitiateSOS }: SOSButtonPanelProps) {
+  const triggerSOS = (type: EmergencyType, desc: string) => {
+    if (isSending) return;
+    
+    // Haptic Feedback for SOS Initiation
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+    
+    onInitiateSOS(type, desc);
+  };
+
   return (
     <div className="relative max-w-2xl mx-auto mb-12">
       <TacticalCard className="p-8 md:p-12 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
@@ -34,6 +45,7 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
            <button 
             onClick={() => {
                 setGuardianMode(!guardianMode);
+                if ('vibrate' in navigator) navigator.vibrate(50);
                 toast(!guardianMode ? 'Guardian AI Activated' : 'Guardian AI Disabled');
             }}
             className={cn("relative w-14 h-7 rounded-full p-1 transition-all duration-300 border border-tactical-cyan/30", guardianMode ? 'bg-tactical-cyan/20' : 'bg-tactical-dark')}
@@ -57,7 +69,10 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
             />
             
             <div className="relative z-10 scale-90 md:scale-100">
-               <GuardianButton onInitiateSOS={() => !isSending && onInitiateSOS('OTHER', 'General Emergency SOS')} />
+               <GuardianButton 
+                guardianMode={guardianMode}
+                onInitiateSOS={() => triggerSOS('OTHER', 'General Emergency SOS')} 
+               />
             </div>
         </div>
 
@@ -66,7 +81,7 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onInitiateSOS('MEDICAL', 'Medical Emergency reported.')}
+            onClick={() => triggerSOS('MEDICAL', 'Medical Emergency reported.')}
             disabled={isSending}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-blue-600/10 border border-blue-500/30 hover:bg-blue-600/20 transition-all group"
           >
@@ -79,7 +94,7 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onInitiateSOS('FIRE', 'Fire Emergency reported.')}
+            onClick={() => triggerSOS('FIRE', 'Fire Emergency reported.')}
             disabled={isSending}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-orange-600/10 border border-orange-500/30 hover:bg-orange-600/20 transition-all group"
           >
@@ -92,7 +107,7 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onInitiateSOS('CRIME', 'Criminal activity/Crime emergency reported.')}
+            onClick={() => triggerSOS('CRIME', 'Criminal activity/Crime emergency reported.')}
             disabled={isSending}
             className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-red-600/10 border border-red-500/30 hover:bg-red-600/20 transition-all group"
           >

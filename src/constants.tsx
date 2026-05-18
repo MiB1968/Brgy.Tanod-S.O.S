@@ -15,7 +15,8 @@ import {
   ClipboardList, 
   FileText, 
   MapPin, 
-  Navigation
+  Navigation,
+  UserCheck
 } from 'lucide-react';
 
 export const SOS_SUGGESTIONS: Record<string, string[]> = {
@@ -65,6 +66,7 @@ export const navItems = [
   { id: 'map', label: '🗺 Live Intel', icon: MapIcon },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
   { id: 'residents', label: '👥 Residents', icon: IconApprovedResidents },
+  { id: 'verification', label: '🛡 Verification', icon: UserCheck },
   { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },
   { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },
   { id: 'schedule', label: '📅 Schedule', icon: Clock },

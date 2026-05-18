@@ -23,6 +23,7 @@ interface LoginViewProps {
   isLoggingIn: boolean;
   onDemoLogin: () => void;
   onDemoAdminLogin: () => void;
+  onGoogleLogin: () => void;
   deferredPrompt?: any;
   onInstall?: () => void;
   onResetSession: () => void;
@@ -34,6 +35,7 @@ export function LoginView({
   isLoggingIn, 
   onDemoLogin, 
   onDemoAdminLogin, 
+  onGoogleLogin,
   deferredPrompt, 
   onInstall, 
   onResetSession
@@ -110,7 +112,7 @@ export function LoginView({
               >
                 <button 
                   disabled={isLoggingIn}
-                  onClick={() => onLogin()}
+                  onClick={onGoogleLogin}
                   className="group relative w-full bg-white text-black font-black py-4.5 rounded-[20px] flex items-center justify-center gap-3 hover:bg-[#EAEAEA] active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] disabled:opacity-50 uppercase tracking-widest font-mono text-[13px] italic overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-shimmer" />

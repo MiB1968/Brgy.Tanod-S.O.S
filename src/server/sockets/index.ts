@@ -49,7 +49,6 @@ export function initSocket(server: HttpServer): Server {
       path: '/socket.io/',
       pingTimeout: 60000,
       pingInterval: 10000,
-      transports: ['websocket'],
       connectTimeout: 45000,
       maxHttpBufferSize: 2 * 1024 * 1024, // 2MB for voice packets
       cookie: false,

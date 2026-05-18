@@ -7,6 +7,7 @@ import { soundService } from '../services/soundService';
 import { useAuthStore } from '../store/useAuthStore';
 import socket from '../lib/socket';
 import { toast } from 'react-hot-toast';
+import { aiService } from '../services/aiService';
 
 export function useGuardian() {
   const { 
@@ -101,31 +102,13 @@ export function useGuardian() {
   }, [setStatus, setEmergency, speak, synth]);
 
   const askGuardian = useCallback(async (userText: string): Promise<string> => {
-    // Demo Bypass: Direct call to Google API
-    const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-    if (!GEMINI_API_KEY) {
-        console.error("No VITE_GEMINI_API_KEY configured for demo bypass.");
-        return "I'm monitoring the situation. Stay calm, help is on the way.";
-    }
-
     setStatus('PROCESSING');
 
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: `Act as Brgy SOS Guardian. User says: ${userText}. Give a 1-sentence calm response.` }] }]
-                }),
-            }
-        );
-        const data = await response.json();
-        return data.candidates[0].content.parts[0].text;
+        const res = await aiService.getGuardianResponse(userText);
+        return res.response || "I'm monitoring the situation. Stay calm, help is on the way.";
     } catch (err) {
-        console.error("Direct AI call failed:", err);
+        console.error("Guardian AI call failed:", err);
         return "I'm monitoring the situation. Stay calm, help is on the way.";
     }
   }, [setStatus]);

@@ -1,13 +1,43 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
-import { FileText, Shield, MapPin } from 'lucide-react';
+import { FileText, Shield, MapPin, MoreHorizontal, FileDown, Presentation, FormInput, ExternalLink } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReportMap from './ReportMap';
+import { docsService, slidesService, formsService } from '../services/googleWorkspaceService';
+import toast from 'react-hot-toast';
 
 export default function ReportsView() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingAsset, setGeneratingAsset] = useState<string | null>(null);
+
+  const generateAsset = async (report: any, type: 'doc' | 'slides' | 'form') => {
+    setGeneratingAsset(`${report.id}-${type}`);
+    const toastId = toast.loading(`Generating Tactical ${type.toUpperCase()}...`);
+    try {
+      const title = `SOS_REPORT_${report.type}_${report.date}_${report.id}`;
+      let res;
+      
+      if (type === 'doc') {
+        res = await docsService.createDocument(title);
+        toast.success(`Tactical Document Generated`, { id: toastId });
+        window.open(`https://docs.google.com/document/d/${res.documentId}/edit`, '_blank');
+      } else if (type === 'slides') {
+        res = await slidesService.createPresentation(title);
+        toast.success(`Briefing Deck Generated`, { id: toastId });
+        window.open(`https://docs.google.com/presentation/d/${res.presentationId}/edit`, '_blank');
+      } else if (type === 'form') {
+        res = await formsService.createForm(title);
+        toast.success(`Follow-up Form Generated`, { id: toastId });
+        window.open(`https://forms.google.com/v1/forms/${res.formId}/edit`, '_blank');
+      }
+    } catch (err) {
+      toast.error(`Asset Generation Failed`, { id: toastId });
+    } finally {
+      setGeneratingAsset(null);
+    }
+  };
 
   const fetchReports = async () => {
     try {
@@ -199,6 +229,36 @@ export default function ReportsView() {
                   <ReportMap lat={report.gpsLocation.lat} lng={report.gpsLocation.lng} />
                 </div>
               )}
+              
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                <button 
+                  onClick={() => generateAsset(report, 'doc')}
+                  disabled={!!generatingAsset}
+                  className="flex items-center justify-center gap-2 p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-white"
+                  title="Generate Incident Doc"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-blue-400" />
+                  DOC
+                </button>
+                <button 
+                  onClick={() => generateAsset(report, 'slides')}
+                  disabled={!!generatingAsset}
+                  className="flex items-center justify-center gap-2 p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-white"
+                  title="Generate Briefing Deck"
+                >
+                  <Presentation className="w-3.5 h-3.5 text-amber-400" />
+                  DECK
+                </button>
+                <button 
+                  onClick={() => generateAsset(report, 'form')}
+                  disabled={!!generatingAsset}
+                  className="flex items-center justify-center gap-2 p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 hover:border-white/20 transition-all text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-white"
+                  title="Generate Follow-up Form"
+                >
+                  <FormInput className="w-3.5 h-3.5 text-purple-400" />
+                  FORM
+                </button>
+              </div>
             </div>
           </div>
         ))}

@@ -8,10 +8,14 @@ import * as schema from './schema';
 const { Pool } = pg;
 
 export const pool = new Pool({
-  connectionString: config.databaseUrl,
-  ssl: config.databaseUrl?.includes('localhost') ? false : { rejectUnauthorized: true },
+  connectionString: config.databaseUrl || undefined,
+  ssl: (!config.databaseUrl || config.databaseUrl.includes('localhost')) ? false : { rejectUnauthorized: true },
   connectionTimeoutMillis: 5000,
   query_timeout: 10000,
+});
+
+pool.on('error', (err) => {
+  console.error('[DB] Unexpected error on idle client', err);
 });
 
 export const db = drizzle(pool, { schema });

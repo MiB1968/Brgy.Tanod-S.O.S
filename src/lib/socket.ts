@@ -8,12 +8,9 @@ const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
   auth: () => ({
     token: safeStorage.getItem('token')
   }),
-  rememberUpgrade: false, // Don't remember a failed or unstable websocket upgrade
-  // Explicitly set path to avoid any ambiguity
+  rememberUpgrade: false,
   path: '/socket.io/',
-  transports: ['websocket'],
   timeout: 60000, 
-  secure: true,
   withCredentials: true
 });
 

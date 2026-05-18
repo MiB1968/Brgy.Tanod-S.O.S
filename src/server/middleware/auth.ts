@@ -14,9 +14,13 @@ export interface AuthRequest extends Request {
   };
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   const apiKey = req.headers['x-api-key'];
+
+  if (config.nodeEnv !== 'production' && req.originalUrl !== '/api/health') {
+    logger.debug(`[AUTH] Request: ${req.method} ${req.originalUrl}. Token: ${token ? 'PRESENT' : 'MISSING'} (Cookie: ${req.cookies.token ? 'YES' : 'NO'}, Header: ${req.headers.authorization ? 'YES' : 'NO'})`);
+  }
 
   // Check for API Key first, if present and valid, skip JWT
   if (apiKey && config.apiKey && apiKey === config.apiKey) {
@@ -41,48 +45,56 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     const decoded = jwt.verify(token, config.jwtSecret) as any;
 
     // Verify token_version hasn't been revoked
-    (async () => {
-      try {
-        const result = await pool.query(
-          'SELECT token_version FROM users WHERE id = $1',
-          [decoded.id]
-        );
-
-        if (!result.rows[0]) {
-          return res.status(401).json({
-            success: false,
-            error: { code: 'INVALID_TOKEN', message: 'User not found' }
-          });
-        }
-
-        const currentTokenVersion = result.rows[0].token_version || 1;
-        
-        const decodedVer = Number(decoded.tokenVersion || 1);
-        const dbVer = Number(currentTokenVersion);
-
-        if (decodedVer !== dbVer) {
-          logger.warn(`[AUTH] Token revoked for user: ${decoded.id} (Token: ${decodedVer}, DB: ${dbVer})`);
-          return res.status(401).json({
-            success: false,
-            error: { code: 'TOKEN_REVOKED', message: 'Your session has been invalidated. Please log in again.' }
-          });
-        }
-
-        req.user = { ...decoded, tokenVersion: currentTokenVersion };
-        logger.info(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
-        next();
-      } catch (err) {
-        logger.error('[AUTH] Token version check failed:', err);
-        res.status(500).json({
+    // Check if decoded.id is a valid UUID before querying (optional but safer)
+    if (!decoded.id || typeof decoded.id !== 'string') {
+        return res.status(401).json({
           success: false,
-          error: { code: 'INTERNAL_ERROR', message: 'Authentication check failed' }
+          error: { code: 'INVALID_TOKEN', message: 'Token missing user identity' }
         });
-      }
-    })();
+    }
+
+    const result = await pool.query(
+      'SELECT token_version FROM users WHERE id = $1',
+      [decoded.id]
+    ).catch(e => {
+        logger.error(`[AUTH] Database query failed: ${e.message}`);
+        throw e; // Caught by outer try/catch
+    });
+
+    if (!result || result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: 'User not found' }
+      });
+    }
+
+    const currentTokenVersion = result.rows[0].token_version || 1;
+    
+    const decodedVer = Number(decoded.tokenVersion || 1);
+    const dbVer = Number(currentTokenVersion);
+
+    if (decodedVer !== dbVer) {
+      logger.warn(`[AUTH] Token revoked for user: ${decoded.id} (Token: ${decodedVer}, DB: ${dbVer})`);
+      return res.status(401).json({
+        success: false,
+        error: { code: 'TOKEN_REVOKED', message: 'Your session has been invalidated. Please log in again.' }
+      });
+    }
+
+    req.user = { ...decoded, tokenVersion: currentTokenVersion };
+    logger.info(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
+    next();
   } catch (err) {
-    res.status(401).json({
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
+      });
+    }
+    logger.error('[AUTH] Authentication failure:', err);
+    res.status(500).json({
       success: false,
-      error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
+      error: { code: 'INTERNAL_ERROR', message: 'Authentication check failed' }
     });
   }
 }

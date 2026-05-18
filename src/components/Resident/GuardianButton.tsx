@@ -11,9 +11,10 @@ const HOLD_DURATION = 900; // milliseconds
 
 interface GuardianButtonProps {
   onInitiateSOS?: () => void;
+  guardianMode?: boolean;
 }
 
-export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS }) => {
+export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS, guardianMode }) => {
   const { speak, stop: stopTTS } = useTTS();
   const { triggerEmergency, stopAll: stopSounds } = useEmergencySound();
 
@@ -63,24 +64,8 @@ export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS })
 
     try {
       // Trigger full emergency audio experience
-      await triggerEmergency('sos', { useSiren: true });
+      await triggerEmergency('sos');
 
-      // Urgent Tagalog voice with SSML
-      await speak({
-        ssml: emergencySSML.sosActivated,
-        style: 'urgent',
-        priority: 'high',
-      });
-
-      // Follow-up reassuring message
-      setTimeout(() => {
-        speak({
-          phraseKey: 'helpComing',
-          style: 'reassuring',
-          priority: 'normal',
-        });
-      }, 1400);
-      
       if (onInitiateSOS) {
           onInitiateSOS();
       }
@@ -115,7 +100,7 @@ export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS })
   return (
     <div className="guardian-button-container">
       <button
-        className={`guardian-button ${buttonState}`}
+        className={`guardian-button ${buttonState} ${guardianMode ? 'guardian-active' : ''}`}
         onPointerDown={handlePressStart}
         onPointerUp={handlePressEnd}
         onPointerLeave={handlePressEnd}
@@ -124,12 +109,21 @@ export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS })
         aria-label={isTestMode ? "Test SOS Button" : "Emergency SOS Button"}
         aria-pressed={buttonState === 'activated'}
       >
+        {/* Scanning Effect for Guardian Mode */}
+        {guardianMode && buttonState === 'idle' && (
+          <div className="guardian-scanner" />
+        )}
+        
         <div className="button-content">
           <div className="icon">
-            {buttonState === 'activated' ? '✅' : '🛡️'}
+            {buttonState === 'activated' ? '✅' : guardianMode ? '🛡️' : '🛡️'}
           </div>
-          <div className="text">
-            {buttonState === 'idle' && (isTestMode ? "TEST MODE\nHold to Simulate" : "HOLD TO ACTIVATE\nSOS")}
+          <div className="text px-4">
+            {buttonState === 'idle' && (
+              guardianMode 
+                ? <span className="text-cyan-200 animate-pulse">GUARDIAN ACTIVE<br/>LISTENING...</span>
+                : (isTestMode ? "TEST MODE\nHold to Simulate" : "HOLD TO ACTIVATE\nSOS")
+            )}
             {buttonState === 'pressing' && "HOLDING..."}
             {buttonState === 'activated' && "SOS ACTIVATED\nHELP IS COMING"}
           </div>

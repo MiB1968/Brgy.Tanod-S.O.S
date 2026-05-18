@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { config } from '../config/index';
 import {
@@ -9,15 +9,15 @@ import {
   type ModelConfig,
 } from '../config/aiModels';
 
-let ai: GoogleGenAI | null = null;
+let ai: GoogleGenerativeAI | null = null;
 
-function getAIClient(): GoogleGenAI {
+function getAIClient(): GoogleGenerativeAI {
   if (!ai) {
     const key = process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY;
     if (!key) {
       throw new Error('GEMINI_API_KEY_NEW or GEMINI_API_KEY (Free Tier) is required for server-side AI');
     }
-    ai = new GoogleGenAI({ apiKey: key });
+    ai = new GoogleGenerativeAI(key);
   }
   return ai;
 }
@@ -85,17 +85,17 @@ async function callModel(
   );
 
   const callPromise = (async () => {
-    const result = await getAIClient().models.generateContent({
-      model: modelConfig.name,
-      contents: prompt,
-      config: {
+    const model = getAIClient().getGenerativeModel({ model: modelConfig.name });
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
         responseMimeType: 'application/json',
         maxOutputTokens: modelConfig.maxOutputTokens,
         temperature: 0.2,
       },
     });
 
-    const raw = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const raw = result.response.text();
     const clean = raw.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean);
     return AIAnalysisSchema.parse(parsed);
@@ -212,6 +212,34 @@ export async function analyzeIncident(
     }
 
     return { ...createFallbackAnalysis(sanitized, initialType), _modelUsed: 'fallback', _tier: 'flash' };
+  }
+}
+
+/**
+ * Brgy SOS Guardian - Voice Assistant Responder
+ */
+export async function getGuardianResponse(userText: string): Promise<string> {
+  const requestId = `guardian_${Date.now()}`;
+  
+  if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
+
+  try {
+    const model = getAIClient().getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 
+    User says (in Tagalog/English): "${userText}"
+    
+    Give a CALM, EMPOWERING, 1-sentence response. 
+    If they are reporting an emergency, confirm alert is processed. 
+    If they are asking for status, say the team is coordinating. 
+    Use a mix of Tagalog and English (Taglish) if appropriate for a local feel.
+    Respond with ONLY the text of your response.`;
+
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch (err: any) {
+    log.error("Guardian AI response failed", { requestId, error: err.message });
+    return "Nakatanggap ako ng ulat. Huwag mag-alala, nakikipag-ugnayan na ang ating patrol unit. Stay safe.";
   }
 }
 

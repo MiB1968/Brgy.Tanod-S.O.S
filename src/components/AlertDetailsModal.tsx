@@ -4,6 +4,7 @@ import { X, MapPin, User, ShieldAlert, Clock, Info, CheckCircle, Activity, Shiel
 import { Alert, ResidentProfile } from '../types';
 import ReportMap from './ReportMap';
 import * as api from '../lib/api';
+import { fetchAPI } from '../lib/api';
 import socket from '../lib/socket';
 import { cn } from '../lib/utils';
 import FlameAnimation from './FlameAnimation';
@@ -16,6 +17,8 @@ interface AlertDetailsModalProps {
 export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   const [resident, setResident] = useState<ResidentProfile | null>(null);
   const [loadingResident, setLoadingResident] = useState(false);
+  const [evidence, setEvidence] = useState<string[]>([]);
+  const [loadingEvidence, setLoadingEvidence] = useState(false);
 
   useEffect(() => {
     if (alert && alert.residentId) {
@@ -32,6 +35,12 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
           }
         })
         .finally(() => setLoadingResident(false));
+      
+      // Load evidence
+      setLoadingEvidence(true);
+      fetchAPI(`storage/evidence/${alert.id}`)
+        .then(res => setEvidence(res.data || []))
+        .finally(() => setLoadingEvidence(false));
     }
   }, [alert]);
 
@@ -265,7 +274,7 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
               </div>
             )}
 
-            {/* Bottom Grid: Tactical Map & Action Logs */}
+            {/* Map & Logs Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                
                {/* Map View */}
@@ -279,62 +288,122 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                   
                   <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative">
                      <ReportMap lat={alert.location.lat} lng={alert.location.lng} />
-                     <div className="absolute bottom-4 left-4 z-[400] bg-black/80 backdrop-blur border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white/70 shadow-lg">
+                     <div className="absolute bottom-4 left-4 z-[400] bg-black/80 backdrop-blur border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white/70 shadow-lg" style={{ pointerEvents: 'none' }}>
                         LAT: {alert.location?.lat ? alert.location.lat.toFixed(6) : 'N/A'}<br/>
                         LNG: {alert.location?.lng ? alert.location.lng.toFixed(6) : 'N/A'}
                      </div>
                   </div>
                </div>
 
-               {/* Action Logs */}
-               <div className="glass-panel p-5 rounded-xl border border-white/5">
-                  <div className="flex items-center mb-4 gap-2">
-                     <Clock className="w-4 h-4 text-white/60" />
-                     <h3 className="tex-sm font-semibold tracking-widest text-white/60 uppercase">Chronological Event Log</h3>
+               {/* Evidence Feed */}
+               <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                       <Activity className="w-4 h-4 text-tactical-cyan" />
+                       <h3 className="tex-sm font-semibold tracking-widest text-tactical-cyan uppercase">Live Evidence Feed</h3>
+                    </div>
+                    {evidence.length > 0 && (
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-tactical-red/20 text-tactical-red text-[8px] font-black rounded border border-tactical-red/30 animate-pulse">
+                        <div className="w-1.5 h-1.5 rounded-full bg-tactical-red" /> REC
+                      </span>
+                    )}
                   </div>
-
-                  <div className="relative pl-6 space-y-6 before:absolute before:inset-y-0 before:left-[11px] before:w-[2px] before:bg-white/5 mt-6">
-                     
-                     <div className="relative">
-                       <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-emergency shadow-[0_0_10px_rgba(255,75,75,0.5)] border-2 border-[#12141a]" />
-                       <p className="text-xs text-white/50 mb-1">{new Date(alert.timestamp).toLocaleString()}</p>
-                       <p className="text-sm font-semibold">SOS Alert Transmitted</p>
-                       {alert.isManualLocation && <p className="text-xs text-white/40 mt-1">Location manually set by subject.</p>}
-                     </div>
-
-                     {alert.respondedAt && (
-                       <div className="relative">
-                         <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-info shadow-[0_0_10px_rgba(59,130,246,0.5)] border-2 border-[#12141a]" />
-                         <p className="text-xs text-white/50 mb-1">{new Date(alert.respondedAt).toLocaleString()}</p>
-                         <p className="text-sm font-semibold">Unit Engaged & Dispatched</p>
-                         <p className="text-xs text-white/40 mt-1">Confirmed by {alert.respondedByName}.</p>
-                       </div>
-                     )}
-
-                     {alert.resolvedAt && (
-                       <div className="relative">
-                         <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-success shadow-[0_0_10px_rgba(74,239,128,0.5)] border-2 border-[#12141a]" />
-                         <p className="text-xs text-white/50 mb-1">{new Date(alert.resolvedAt).toLocaleString()}</p>
-                         <p className="text-sm font-semibold text-success">Incident Stand Down</p>
-                         {alert.resolutionNotes && (
-                           <div className="mt-2 bg-black/30 p-3 rounded border border-white/5 text-sm text-white/80">
-                             "{alert.resolutionNotes}"
+                  
+                  <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative flex flex-col items-center justify-center">
+                     {loadingEvidence ? (
+                       <div className="text-white/20 text-[10px] uppercase font-mono animate-pulse">Establishing Data Link...</div>
+                     ) : evidence.length > 0 ? (
+                       <div className="w-full h-full flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
+                         {evidence.map((url, i) => (
+                           <div key={url} className="space-y-1">
+                             <div className="flex justify-between items-center text-[8px] font-mono text-white/40 uppercase">
+                               <span>Chunk_{i + 1}</span>
+                               <span>{url.split('_').pop()?.split('.')[0] ? new Date(parseInt(url.split('_').pop()!.split('.')[0])).toLocaleTimeString() : ''}</span>
+                             </div>
+                             <video 
+                               src={url} 
+                               controls 
+                               className="w-full rounded-lg border border-white/10 bg-black shadow-lg"
+                               preload="metadata"
+                             />
                            </div>
-                         )}
+                         ))}
+                       </div>
+                     ) : (
+                       <div className="text-center p-8">
+                         <Shield className="w-12 h-12 text-white/5 mx-auto mb-4" />
+                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">No Recorded Evidence Stream Available</p>
                        </div>
                      )}
-
-                     {alert.status === 'cancelled' && (
-                       <div className="relative">
-                         <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-white/30 border-2 border-[#12141a]" />
-                         <p className="text-xs text-white/50 mb-1">Unknown time</p>
-                         <p className="text-sm font-semibold text-white/50">Alert Cancelled</p>
-                       </div>
-                     )}
-
                   </div>
                </div>
+            </div>
 
+            {/* Action Logs */}
+            <div className="glass-panel p-5 rounded-xl border border-white/5">
+              <div className="flex items-center mb-4 gap-2">
+                <Clock className="w-4 h-4 text-white/60" />
+                <h3 className="tex-sm font-semibold tracking-widest text-white/60 uppercase">
+                  Chronological Event Log
+                </h3>
+              </div>
+
+              <div className="relative pl-6 space-y-6 before:absolute before:inset-y-0 before:left-[11px] before:w-[2px] before:bg-white/5 mt-6">
+                <div className="relative">
+                  <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-emergency shadow-[0_0_10px_rgba(255,75,75,0.5)] border-2 border-[#12141a]" />
+                  <p className="text-xs text-white/50 mb-1">
+                    {new Date(alert.timestamp).toLocaleString()}
+                  </p>
+                  <p className="text-sm font-semibold">SOS Alert Transmitted</p>
+                  {alert.isManualLocation && (
+                    <p className="text-xs text-white/40 mt-1">
+                      Location manually set by subject.
+                    </p>
+                  )}
+                </div>
+
+                {alert.respondedAt && (
+                  <div className="relative">
+                    <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-info shadow-[0_0_10px_rgba(59,130,246,0.5)] border-2 border-[#12141a]" />
+                    <p className="text-xs text-white/50 mb-1">
+                      {new Date(alert.respondedAt).toLocaleString()}
+                    </p>
+                    <p className="text-sm font-semibold">
+                      Unit Engaged & Dispatched
+                    </p>
+                    <p className="text-xs text-white/40 mt-1">
+                      Confirmed by {alert.respondedByName}.
+                    </p>
+                  </div>
+                )}
+
+                {alert.resolvedAt && (
+                  <div className="relative">
+                    <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-success shadow-[0_0_10px_rgba(74,239,128,0.5)] border-2 border-[#12141a]" />
+                    <p className="text-xs text-white/50 mb-1">
+                      {new Date(alert.resolvedAt).toLocaleString()}
+                    </p>
+                    <p className="text-sm font-semibold text-success">
+                      Incident Stand Down
+                    </p>
+                    {alert.resolutionNotes && (
+                      <div className="mt-2 bg-black/30 p-3 rounded border border-white/5 text-sm text-white/80">
+                        "{alert.resolutionNotes}"
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {alert.status === "cancelled" && (
+                  <div className="relative">
+                    <div className="absolute -left-6 w-[10px] h-[10px] rounded-full bg-white/30 border-2 border-[#12141a]" />
+                    <p className="text-xs text-white/50 mb-1">Unknown time</p>
+                    <p className="text-sm font-semibold text-white/50">
+                      Alert Cancelled
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

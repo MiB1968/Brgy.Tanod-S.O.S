@@ -83,6 +83,7 @@ import ReportsView from "./components/ReportsView";
 import SettingsView from "./components/SettingsView";
 import TanodRosterView from "./components/TanodRosterView";
 import { TanodActivityLogs } from "./components/Admin/TanodActivityLogs";
+import { ResidentVerification } from "./components/Admin/ResidentVerification";
 import IncidentForm from "./components/IncidentForm";
 import ResidentTacticalMap from "./components/Admin/ResidentTacticalMap";
 import RegistrationForm from "./components/RegistrationForm";
@@ -101,6 +102,8 @@ import { useSOSStore } from "./store/useSOSStore";
 import * as safeStorage from "./lib/safeStorage";
 
 // Service & Lib imports
+import { workspaceAuth } from "./services/googleWorkspaceService";
+import { useRBAC } from "./context/AuthContext";
 import { useSocketListeners } from "./hooks/useSocketListeners";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
@@ -119,6 +122,8 @@ import {
 
 export default function App() {
   useAudioInitializer();
+
+  const { user: firebaseUser, role: rbacRole, loading: rbacLoading } = useRBAC();
 
   const {
     profile,
@@ -153,6 +158,7 @@ export default function App() {
     | "residents"
     | "resident-map"
     | "roster"
+    | "verification"
     | "settings"
     | "logs"
   >("home");
@@ -169,6 +175,8 @@ export default function App() {
   const [isTacticalVoiceOpen, setIsTacticalVoiceOpen] = useState(false);
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
+  const [workspaceToken, setWorkspaceToken] = useState<string | null>(null);
+  const [googleUser, setGoogleUser] = useState<any | null>(null);
 
   const isMasterAdmin = useMemo(() => {
     return (
@@ -222,8 +230,8 @@ export default function App() {
 
   const baseRole = useMemo(() => {
     if (isMasterAdmin) return "superadmin";
-    return profile?.role || "guest";
-  }, [isMasterAdmin, profile?.role]);
+    return rbacRole || profile?.role || "guest";
+  }, [isMasterAdmin, rbacRole, profile?.role]);
 
   const effectiveRole = viewOverride || baseRole;
 
@@ -284,6 +292,7 @@ export default function App() {
 
   // Authentication persistence
   useEffect(() => {
+    // Standard Auth
     const token = safeStorage.getItem("token");
     const storedUser = safeStorage.getItem("user");
     if (token && storedUser) {
@@ -297,6 +306,19 @@ export default function App() {
         safeStorage.removeItem("token");
       }
     }
+
+    // Workspace Auth Init
+    workspaceAuth.init(
+      (user, token) => {
+        setWorkspaceToken(token);
+        setGoogleUser(user);
+      },
+      () => {
+        setWorkspaceToken(null);
+        setGoogleUser(null);
+      }
+    );
+
     setLoading(false);
   }, [setProfile, setLoading]);
 
@@ -370,16 +392,13 @@ export default function App() {
       try {
         if (email && password) {
           const res = await api.auth.login({ email, password });
-          // The token is in httpOnly cookie. Set a dummy token so the app knows we are logged in.
-          safeStorage.setItem("token", "cookie-auth");
+          // If the server returns a token, store it to ensure Authorization headers work
+          const token = res.data.token || "cookie-auth";
+          safeStorage.setItem("token", token);
           safeStorage.setItem("user", JSON.stringify(res.data.user));
           setUser(res.data.user);
           setProfile(res.data.user);
           toast.success(`Unit Authenticated`, { icon: "🔑" });
-        } else {
-          toast.error(
-            "Google Login migrated to Auth Provider. Use standard login for now.",
-          );
         }
       } catch (err: any) {
         console.error("AUTH_FAULT:", err);
@@ -391,11 +410,53 @@ export default function App() {
     [isLoggingIn, setProfile],
   );
 
+  const handleGoogleLogin = useCallback(async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      const result = await workspaceAuth.signIn();
+      if (result) {
+        setWorkspaceToken(result.accessToken);
+        setGoogleUser(result.user);
+        
+        // Auto-login to the app if user exists with this email
+        try {
+          const res = await api.auth.login({ email: result.user.email, isGoogle: true });
+          const token = res.data.token || "cookie-auth";
+          safeStorage.setItem("token", token);
+          safeStorage.setItem("user", JSON.stringify(res.data.user));
+          setUser(res.data.user);
+          setProfile(res.data.user);
+        } catch (err) {
+          // If user doesn't exist, we might need them to register or we handle it on the server
+          console.warn("App login via Google failed, might need registration", err);
+          // For now, let's just set the user as guest if they are not in our DB
+          setUser({
+            id: result.user.uid,
+            name: result.user.displayName || 'Google User',
+            email: result.user.email || '',
+            role: 'resident',
+            status: 'approved'
+          });
+        }
+        
+        toast.success("Workspace Connected", { icon: "🌐" });
+      }
+    } catch (err: any) {
+      toast.error(`Workspace Auth Error: ${err.message}`);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }, [isLoggingIn, setProfile]);
+
   const handleLogout = useCallback(async () => {
     safeStorage.removeItem("token");
     safeStorage.removeItem("user");
     setUser(null);
     setProfile(null);
+    await workspaceAuth.logout();
+    setWorkspaceToken(null);
+    setGoogleUser(null);
   }, [setProfile]);
 
   const handleInstallApp = useCallback(async () => {
@@ -457,7 +518,8 @@ export default function App() {
           email: role === "admin" ? "admin@demo.com" : "resident@demo.com",
           password: "demo",
         });
-        safeStorage.setItem("token", "cookie-auth");
+        const token = res.data.token || "cookie-auth";
+        safeStorage.setItem("token", token);
         safeStorage.setItem("user", JSON.stringify(res.data.user));
         setUser(res.data.user);
         setProfile(res.data.user);
@@ -475,7 +537,7 @@ export default function App() {
     [setLoading, setProfile],
   );
 
-  if (loading) {
+  if (loading || rbacLoading) {
     return (
       <GlobalErrorBoundary>
         <div className="min-h-screen bg-brand-bg flex flex-col items-center justify-center p-6 text-center">
@@ -527,7 +589,8 @@ export default function App() {
           onComplete={async (data: any) => {
             try {
               const res = await api.auth.register(data);
-              safeStorage.setItem("token", "cookie-auth");
+              const token = res.data.token || "cookie-auth";
+              safeStorage.setItem("token", token);
               safeStorage.setItem("user", JSON.stringify(res.data.user));
               setUser(res.data.user);
               setProfile(res.data.user);
@@ -549,6 +612,7 @@ export default function App() {
           isLoggingIn={isLoggingIn}
           onDemoLogin={() => handleDemoLogin("resident")}
           onDemoAdminLogin={() => handleDemoLogin("admin")}
+          onGoogleLogin={handleGoogleLogin}
           deferredPrompt={deferredPrompt}
           onInstall={handleInstallApp}
           onResetSession={resetAuthSession}
@@ -907,6 +971,14 @@ export default function App() {
                     effectiveRole === "superadmin") &&
                   effectiveProfile && (
                     <AdminResidents profile={effectiveProfile} />
+                  )}
+                {activeTab === "verification" &&
+                  (effectiveRole === "admin" ||
+                    effectiveRole === "superadmin") &&
+                  effectiveProfile && (
+                    <div className="glass-panel p-4 md:p-8 rounded-[40px] border-white/5 h-full overflow-y-auto">
+                      <ResidentVerification />
+                    </div>
                   )}
                 {activeTab === "resident-map" &&
                   (effectiveRole === "admin" ||

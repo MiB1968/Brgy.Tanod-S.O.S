@@ -4,15 +4,16 @@ import { emergencyHaptics } from './haptics';
 import { HybridTTS } from './HybridTTS';
 import { TagalogTTS } from './TagalogTTS';
 import { getTagalogMessage, type PhraseKey } from './tagalogPhrases';
+import { EmergencyType } from '../types';
 
-export type EmergencyType = 'sos' | 'medical' | 'fire' | 'crime' | 'flood' | 'other' | 'test';
+export type LocalEmergencyType = EmergencyType | 'test' | 'sos';
 
 export class EmergencySoundManager {
   private static instance: EmergencySoundManager;
   private audioContext: AudioContext | null = null;
   private gainNode: GainNode | null = null;
   private isPlaying = false;
-  private currentEmergencyType: EmergencyType | null = null;
+  private currentEmergencyType: LocalEmergencyType | null = null;
   private fallbackAudio: HTMLAudioElement | null = null;
   private animationFrame: number | null = null;
   private isActiveSOS = false;
@@ -78,7 +79,7 @@ export class EmergencySoundManager {
   }
 
   // === PROCEDURAL SIREN ===
-  public async playSiren(type: EmergencyType = 'sos') {
+  public async playSiren(type: LocalEmergencyType = 'sos') {
     if (this.isPlaying) this.stop();
 
     const success = await this.ensureAudioContext();
@@ -92,50 +93,62 @@ export class EmergencySoundManager {
     this.isActiveSOS = true;
 
     const volume = this.getMasterVolume();
-    this.gainNode.gain.value = volume * 0.9;
+    this.gainNode.gain.value = volume * 0.95;
 
     const oscillator = this.audioContext.createOscillator();
+    const secondOsc = this.audioContext.createOscillator();
     const filter = this.audioContext.createBiquadFilter();
 
-    // Basic siren configuration
-    oscillator.type = 'sawtooth';
+    // Polished siren configuration - Triangle is smoother than sawtooth but still cuts through
+    oscillator.type = 'triangle';
+    secondOsc.type = 'sine'; // Add some sub-bass body
+    
     filter.type = 'lowpass';
-    filter.frequency.value = 1350;
+    filter.frequency.value = 1800;
 
-    oscillator.frequency.setValueAtTime(520, this.audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    secondOsc.frequency.setValueAtTime(200, this.audioContext.currentTime);
 
-    if (type === 'medical') {
+    const normalizedType = String(type).toLowerCase();
+
+    if (normalizedType === 'medical') {
       // Heartbeat style
       this.playHeartbeat();
     } else {
       // Wailing siren
-      oscillator.frequency.linearRampToValueAtTime(
-        1520,
-        this.audioContext.currentTime + 1.7
+      oscillator.frequency.exponentialRampToValueAtTime(
+        1200,
+        this.audioContext.currentTime + 1.2
       );
     }
 
     // Connect nodes
     oscillator.connect(filter);
+    secondOsc.connect(filter);
     filter.connect(this.gainNode);
 
     oscillator.start();
-    this.animationFrame = requestAnimationFrame(() => this.updateSiren(oscillator, filter));
+    secondOsc.start();
+    this.animationFrame = requestAnimationFrame(() => this.updateSiren(oscillator, filter, secondOsc));
 
     // Haptics
-    if (type === 'medical') emergencyHaptics.heartbeat();
+    if (normalizedType === 'medical') emergencyHaptics.heartbeat();
     else emergencyHaptics.sirenPulse();
   }
 
-  private updateSiren(osc: OscillatorNode, filter: BiquadFilterNode) {
+  private updateSiren(osc: OscillatorNode, filter: BiquadFilterNode, secondOsc?: OscillatorNode) {
     if (!this.isPlaying) return;
 
     // Modulate frequency for wail effect
     const time = this.audioContext!.currentTime;
-    const freq = 520 + Math.sin(time * 3) * 500;
-    osc.frequency.setValueAtTime(freq, time);
+    const wailFreq = 500 + Math.sin(time * 2.5) * 400; // Smoother wail
+    osc.frequency.setTargetAtTime(wailFreq, time, 0.1);
+    
+    if (secondOsc) {
+      secondOsc.frequency.setTargetAtTime(wailFreq / 2, time, 0.1);
+    }
 
-    this.animationFrame = requestAnimationFrame(() => this.updateSiren(osc, filter));
+    this.animationFrame = requestAnimationFrame(() => this.updateSiren(osc, filter, secondOsc));
   }
 
   private playHeartbeat() {
@@ -179,7 +192,7 @@ export class EmergencySoundManager {
 
   // === PUBLIC API ===
   public async triggerEmergency(
-    type: EmergencyType,
+    type: LocalEmergencyType,
     options: {
       speak?: boolean;
       messageKey?: PhraseKey | string;
@@ -193,7 +206,6 @@ export class EmergencySoundManager {
       console.warn('⚠️ Maximum volume enabled - Siren will be VERY loud');
     }
 
-    this.playAttentionBeep();
     await this.playSiren(type);
 
     if (options.speak) {
@@ -276,7 +288,7 @@ export const useEmergencySound = () => {
   const manager = EmergencySoundManager.getInstance();
   return {
     initialize: () => manager.initialize(),
-    triggerEmergency: (type: EmergencyType, opts?: any) =>
+    triggerEmergency: (type: LocalEmergencyType, opts?: any) =>
       manager.triggerEmergency(type, opts),
     startSiren: (mode?: "wail" | "yelp") => manager.startSiren(mode),
     stopSiren: () => manager.stopSiren(),

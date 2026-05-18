@@ -53,7 +53,7 @@ export default function DispatchModal({ alert, onClose, patrols }: DispatchModal
         respondedAt: new Date().toISOString()
       };
 
-      await api.alerts.update(alert.id, updateData);
+      await api.alerts.updateAlert(alert.id, updateData);
 
       // Update Tanod status in roster
       try {

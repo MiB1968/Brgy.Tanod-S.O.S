@@ -27,6 +27,8 @@ import AboutModal from './AboutModal';
 import DispatchModal from './DispatchModal';
 import { AlertDetailsModal } from './AlertDetailsModal';
 import { WebLLMFeatureMap } from './Admin/WebLLMFeatureMap';
+import { WorkspaceHub } from './Admin/WorkspaceHub';
+import { calendarService } from '../services/googleWorkspaceService';
 
 // Stores & hooks
 import { useIncidentStore } from '../store/useIncidentStore';
@@ -168,9 +170,24 @@ export default function AdminDashboard({
           resolvedAt: updateData.resolvedAt,
           adminOnDuty: profile?.name || 'Unknown'
         });
+
+        // Log to Google Calendar if enabled
+        if (localStorage.getItem('brgy_calendar_enabled') === 'true') {
+          try {
+            await calendarService.createEvent({
+              summary: `🚨 INCIDENT RESOLVED: ${alert.type}`,
+              description: `Incident ID: ${alert.id}\nResolution: ${updateData.resolutionNotes}\nResident: ${alert.residentName}\nDispatcher: ${profile?.name}`,
+              start: { dateTime: new Date(alert.timestamp).toISOString() },
+              end: { dateTime: new Date().toISOString() },
+              colorId: '11' // Red-ish/Orange
+            });
+          } catch (err) {
+            console.warn("Failed to log to Google Calendar:", err);
+          }
+        }
       }
 
-      await api.alerts.update(alert.id, updateData);
+      await api.alerts.updateAlert(alert.id, updateData);
 
       if (status === 'responding' || status === 'resolved') {
         const responseTime = status === 'responding' 
@@ -291,6 +308,8 @@ export default function AdminDashboard({
         onDutyTanods={onDutyTanods}
         onTabChange={onTabChange}
       />
+
+      <WorkspaceHub profile={profile} />
 
       <TanodUnitStatusList 
         tanods={onDutyTanods} 

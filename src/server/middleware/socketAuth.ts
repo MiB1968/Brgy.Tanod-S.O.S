@@ -23,8 +23,11 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
     cookieToken ||
     socket.handshake.headers.authorization?.split(" ")[1];
 
+  console.log(`[SocketAuth] Extracted token: ${token ? 'PRESENT' : 'MISSING'}`);
+
   // Special handling for client placeholder token
   if (token === 'cookie-auth') {
+    console.log(`[SocketAuth] Placeholder 'cookie-auth' detected, swapping for cookie: ${cookieToken ? 'FOUND' : 'NOT FOUND'}`);
     token = cookieToken;
   }
 

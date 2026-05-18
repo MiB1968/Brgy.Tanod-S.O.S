@@ -36,10 +36,12 @@ app.use(
         ],
         connectSrc: [
           "'self'",
-          'wss:',
-          'ws:',
-          'https://generativelanguage.googleapis.com',
-          'https://api.elevenlabs.io'
+          "https:",
+          "wss:",
+          "ws:",
+          "https://*.googleapis.com",
+          "https://*.firebaseio.com",
+          "https://api.elevenlabs.io"
         ],
         mediaSrc: ["'self'", 'blob:'],
         frameSrc: ["'none'"],
