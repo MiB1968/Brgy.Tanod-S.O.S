@@ -12,19 +12,15 @@ import { errorHandler, notFoundHandler } from './server/middleware/error';
 
 // ── Path Helper for ESM/CJS compatibility ──────────────────────────────────
 const getDirname = () => {
-  try {
-    // In ESM bundled as JS
-    return path.dirname(fileURLToPath(import.meta.url));
-  } catch (e) {
-    // In CJS bundled as CJS
-    return __dirname;
-  }
+  return path.dirname(fileURLToPath(import.meta.url));
 };
 
 async function startServer() {
   const PORT = Number(process.env.PORT) || config.port || 3000;
-  console.log(`[Server] Booting Brgy. Tanod S.O.S... (Process PID: ${process.pid})`);
-  console.log(`[Server] Target Port: ${PORT} | Mode: ${config.nodeEnv}`);
+  console.log(`[Server] Booting Brgy. Tanod S.O.S...`);
+  console.log(`[Server] PID: ${process.pid} | Port: ${PORT} | Mode: ${config.nodeEnv}`);
+  console.log(`[Server] Database URL present: ${!!config.databaseUrl}`);
+  console.log(`[Server] Gemini API Key present: ${!!config.geminiApiKey}`);
   
   try {
     console.log('[Server] Connecting to Tactical Persistence Layer...');

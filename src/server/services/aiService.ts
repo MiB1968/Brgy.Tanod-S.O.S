@@ -224,8 +224,8 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
 
   try {
-    const modelName = config.geminiModel || "gemini-flash-latest";
-    const finalModelName = modelName.startsWith('models/') ? modelName.slice(7) : modelName;
+    const modelName = config.geminiModel || "models/gemini-1.5-flash";
+    const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
     const model = getAIClient().getGenerativeModel({ model: finalModelName });
     
     const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 

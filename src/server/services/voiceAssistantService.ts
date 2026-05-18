@@ -168,8 +168,9 @@ export class SecureVoiceAssistantService {
       const context = await this.getLiveContext();
 
     const modelName = config.geminiModel || AI_MODELS.flash.name;
-    // @google/genai SDK expects model name without 'models/' prefix
-    const finalModelName = modelName.startsWith('models/') ? modelName.slice(7) : modelName;
+    // @google/genai SDK generally handles model names with or without 'models/' prefix,
+    // but the backend error "unexpected model name format" often implies it needs the full 'models/' path.
+    const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
     
     console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}" using model: ${finalModelName}`);
     const result = await getAiClient().models.generateContent({
@@ -474,8 +475,8 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
       const context = await this.getLiveContext();
 
       const modelName = config.geminiModel || AI_MODELS.flash.name;
-      // @google/genai SDK expects model name without 'models/' prefix
-      const finalModelName = modelName.startsWith('models/') ? modelName.slice(7) : modelName;
+      // Use full model name with models/ prefix
+      const finalModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`;
 
       const result = await getAiClient().models.generateContent({
         model: finalModelName,
