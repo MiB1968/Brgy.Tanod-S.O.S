@@ -53,23 +53,19 @@ export function initSocket(server: HttpServer): Server {
       maxHttpBufferSize: 2 * 1024 * 1024, // 2MB for voice packets
       cookie: false,
       cors: {
-        origin: (origin, callback) => {
-          const allowedOrigins = config.corsOrigin ? config.corsOrigin.split(',').map(o => o.trim()) : [];
-          const isStudioPreview = origin && (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
-          const isDevFallback = allowedOrigins.length === 0 && config.nodeEnv !== 'production';
-
-          // Include origin === 'null' to support browser iframes with sandbox attribute where Origin is literally "null"
-          // Allow broadly in development to help debug socket/CORS issues
-          if (config.nodeEnv !== 'production' || !origin || origin === 'null' || isStudioPreview || isDevFallback || (origin && allowedOrigins.includes(origin))) {
-            return callback(null, true);
-          }
-          logger.warn(`[Socket CORS] Origin rejected: ${origin}. IsStudio: ${isStudioPreview}, DevFallback: ${isDevFallback}, Allowed: ${JSON.stringify(allowedOrigins)}`);
-          return callback(null, false);
-        },
+        origin: true,
         credentials: true,
         methods: ['GET', 'POST', 'OPTIONS'],
       },
     });
+
+    // Send COEP headers to appease Vite COEP requirements
+    io.engine.on('headers', (headers, req) => {
+      headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
+      headers['Cross-Origin-Opener-Policy'] = 'same-origin';
+      headers['Cross-Origin-Embedder-Policy'] = 'require-corp';
+    });
+
     console.log('[Socket] Server instance created.');
   } catch (err) {
     console.error('[Socket] FAILED to create Server instance:', err);

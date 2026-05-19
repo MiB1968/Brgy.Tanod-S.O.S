@@ -17,14 +17,14 @@ export const AI_MODELS: Record<AITier, ModelConfig> = {
     timeoutMs: 15000,
   },
   pro: {
-    name: 'gemini-2.5-pro',
+    name: 'gemini-2.5-flash',
     tier: 'pro',
     description: 'Balanced — for moderate incidents needing deeper analysis',
     maxOutputTokens: 2048,
     timeoutMs: 20000,
   },
   critical: {
-    name: 'gemini-2.5-pro',
+    name: 'gemini-2.5-flash',
     tier: 'critical',
     description: 'Life-threatening emergencies — high reliability. Requires paid tier.',
     maxOutputTokens: 4096,

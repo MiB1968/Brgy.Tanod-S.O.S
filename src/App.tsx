@@ -88,6 +88,7 @@ import { ResidentVerification } from "./components/Admin/ResidentVerification";
 import EmergencyTestPanel from "./components/Test/EmergencyTestPanel";
 import IncidentForm from "./components/IncidentForm";
 import ResidentTacticalMap from "./components/Admin/ResidentTacticalMap";
+import OpsIntegrations from "./components/Admin/OpsIntegrations";
 import RegistrationForm from "./components/RegistrationForm";
 import {
   LoginView,
@@ -168,6 +169,7 @@ export default function App() {
     | "settings"
     | "logs"
     | "records"
+    | "ops"
   >("home");
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -765,7 +767,7 @@ export default function App() {
       return true;
     if (effectiveRole === "tanod")
       return !["residents", "settings", "logs", "records"].includes(item.id);
-    return ["home", "map", "tracker", "directory", "settings"].includes(
+    return ["home", "map", "tracker", "directory", "settings", "ops"].includes(
       item.id,
     );
   });
@@ -1131,6 +1133,9 @@ export default function App() {
                 {activeTab === "logs" &&
                   (effectiveRole === "admin" ||
                     effectiveRole === "superadmin") && <TanodActivityLogs />}
+                {activeTab === "ops" && (effectiveRole === "admin" || effectiveRole === "superadmin") && (
+                  <OpsIntegrations />
+                )}
               </motion.div>
             </AnimatePresence>
           </GlobalErrorBoundary>

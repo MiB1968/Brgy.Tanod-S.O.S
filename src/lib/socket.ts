@@ -3,14 +3,14 @@ import * as safeStorage from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
 const token = safeStorage.getItem('token');
-const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
+const socket = io({
   autoConnect: true,
   auth: () => ({
     token: safeStorage.getItem('token')
   }),
   rememberUpgrade: false,
   path: '/socket.io',
-  transports: ['polling', 'websocket'],
+  transports: ['websocket'], // Force WebSocket, skip polling to avoid proxy dropping xhr
   timeout: 60000, 
   withCredentials: true
 });

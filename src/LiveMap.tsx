@@ -8,6 +8,7 @@ import { useIncidentStore } from "./store/useIncidentStore";
 import { useTanodStore } from "./store/useTanodStore";
 import * as api from "./lib/api";
 import socket from "./lib/socket";
+import { fetchRoute } from "./lib/ors";
 
 // ─── Map center ───────────────────────────────────────────────────────────────
 const CENTER: [number, number] = [13.2236, 120.596]; // Mamburao
@@ -185,6 +186,35 @@ function MapController({ patrols, alerts, showP, showS }: any) {
 
 // ─── RoutingLines: dashed line from each SOS → nearest patrol ────────────────
 function RoutingLines({ patrols, alerts, show }: any) {
+  const [routes, setRoutes] = useState<Record<string, number[][]>>({});
+
+  useEffect(() => {
+    if (!show) return;
+    
+    alerts.forEach(async (a: any) => {
+      if (a.status === 'resolved' || a.status === 'cancelled') return;
+      if (!a.location?.lat || !a.location?.lng) return;
+      
+      let nearest: any = null, best = Infinity;
+      patrols.forEach((p:any)=>{
+        if(!p.location?.lat||!p.location?.lng) return;
+        const d=dist(a.location.lat,a.location.lng,p.location.lat,p.location.lng);
+        if(d<best){ best=d; nearest=p; }
+      });
+      
+      if (nearest) {
+        const cacheKey = `${a.id}-${nearest.id}`;
+        // Basic cache hit Check - simple real-world use we only fetch once per incident-assigned-pair ideally.
+        if (routes[cacheKey]) return;
+
+        const fetchedPath = await fetchRoute([nearest.location.lat, nearest.location.lng], [a.location.lat, a.location.lng]);
+        if (fetchedPath) {
+          setRoutes(prev => ({ ...prev, [cacheKey]: fetchedPath }));
+        }
+      }
+    });
+  }, [patrols, alerts, show]);
+
   if (!show) return null;
   return (
     <>
@@ -198,11 +228,15 @@ function RoutingLines({ patrols, alerts, show }: any) {
         });
         if (!nearest) return null;
         const s = getSev(a.type);
+        
+        const cacheKey = `${a.id}-${nearest.id}`;
+        const positions = routes[cacheKey] || [[a.location.lat,a.location.lng],[nearest.location.lat,nearest.location.lng]];
+
         return (
           <Polyline
             key={`rt-${a.id}`}
-            positions={[[a.location.lat,a.location.lng],[nearest.location.lat,nearest.location.lng]]}
-            pathOptions={{ color:s.color, weight:2, opacity:0.65, dashArray:"7 6" }}
+            positions={positions as any}
+            pathOptions={{ color:s.color, weight:4, opacity:0.65, dashArray:"7 6" }}
           />
         );
       })}

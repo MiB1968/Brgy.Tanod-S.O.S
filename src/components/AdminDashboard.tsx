@@ -28,6 +28,7 @@ import DispatchModal from './DispatchModal';
 import { AlertDetailsModal } from './AlertDetailsModal';
 import { WebLLMFeatureMap } from './Admin/WebLLMFeatureMap';
 import { WorkspaceHub } from './Admin/WorkspaceHub';
+import { WeatherWidget } from './Admin/WeatherWidget';
 import { calendarService } from '../services/googleWorkspaceService';
 
 // Stores & hooks
@@ -309,7 +310,14 @@ export default function AdminDashboard({
         onTabChange={onTabChange}
       />
 
-      <WorkspaceHub profile={profile} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <WorkspaceHub profile={profile} />
+        </div>
+        <div className="lg:col-span-1">
+          <WeatherWidget />
+        </div>
+      </div>
 
       <TanodUnitStatusList 
         tanods={onDutyTanods} 

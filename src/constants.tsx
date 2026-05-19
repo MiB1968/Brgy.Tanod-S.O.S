@@ -79,4 +79,5 @@ export const navItems = [
   { id: 'records', label: '📄 Workspace', icon: FileText },
   { id: 'directory', label: '🆘 SOS Help', icon: Phone },
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
+  { id: 'ops', label: '🔌 Integrations', icon: SettingsIcon },
 ];

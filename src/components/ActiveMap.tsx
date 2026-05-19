@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
 import React, { useEffect, useState, useCallback } from 'react';
@@ -8,6 +8,7 @@ import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
 import { cn, isValidCoord } from '../lib/utils';
 import { OfflineTileLayer } from './OfflineTileLayer';
 import * as safeStorage from '../lib/safeStorage';
+import { fetchRoute } from '../lib/ors';
 
 // Fix for default marker icons in Leaflet with React
 const DefaultIcon = L.icon({
@@ -169,6 +170,38 @@ function MyLocationButton({ onLocated }: { onLocated: (lat: number, lng: number)
   );
 }
 
+function TacticalRoutes({ alerts, patrols }: { alerts: Alert[], patrols: PatrolLocation[] }) {
+  const [routes, setRoutes] = useState<Record<string, number[][]>>({});
+
+  useEffect(() => {
+    alerts.forEach(async (alert) => {
+      if (alert.status !== 'pending' && alert.status !== 'responding') return;
+      if (!alert.assignedTo) return;
+      
+      const tanod = patrols.find(p => p.tanodId === alert.assignedTo);
+      if (tanod) {
+        // Fetch only if route hasn't been fetched matching the current locations closely
+        // (A fully robust solution would check distances, this is simplified)
+        const cacheKey = `${alert.id}-${tanod.tanodId}`;
+        if (routes[cacheKey]) return; // Skip if we already have it in this simple version
+
+        const fetchedPath = await fetchRoute([tanod.location.lat, tanod.location.lng], [alert.location.lat, alert.location.lng]);
+        if (fetchedPath) {
+          setRoutes(prev => ({ ...prev, [cacheKey]: fetchedPath }));
+        }
+      }
+    })
+  }, [alerts, patrols]);
+
+  return (
+    <>
+      {Object.entries(routes).map(([key, path]) => (
+        <Polyline key={key} positions={path as any} color="#FF4B4B" weight={4} opacity={0.6} dashArray="10, 10" className="animate-[dash_20s_linear_infinite]" />
+      ))}
+    </>
+  );
+}
+
 interface MapProps {
   alerts: Alert[];
   patrols: PatrolLocation[];
@@ -249,6 +282,7 @@ export default function ActiveMap({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
         />
         <ChangeView center={mapCenter} zoom={zoom} />
+        <TacticalRoutes alerts={alerts} patrols={patrols} />
         
         <MyLocationButton onLocated={(lat, lng) => setUserMarker([lat, lng])} />
 
