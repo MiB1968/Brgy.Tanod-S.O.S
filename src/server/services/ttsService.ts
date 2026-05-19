@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-// ── Model paths (downloaded by scripts/download-models.sh) ──────────────────
+// ── Model paths ──────────────────────────────────────────────
 const MODEL_DIR = path.resolve('src/server/models/supertonic');
 const MODELS_AVAILABLE = fs.existsSync(MODEL_DIR);
 
@@ -12,28 +12,14 @@ export interface TTSCallOptions {
   format?: 'mp3' | 'wav';
 }
 
-// ── Lazy-loaded session (singleton) ─────────────────────────────────────────
-let _session: any = null;
-
-async function getSession(): Promise<any> {
-  if (!_session) {
-    const ort = await import('onnxruntime-node');
-    const modelPath = path.join(MODEL_DIR, 'model.onnx');
-    _session = await ort.InferenceSession.create(modelPath, {
-      executionProviders: ['cpu'],  // CPU-only for server reliability
-      graphOptimizationLevel: 'all',
-    });
-  }
-  return _session;
-}
-
 class TTSService {
   constructor() {}
 
   /**
    * Generates speech following a fallback priority chain: 
-   * 1. Google TTS (requires internet)
-   * 2. Supertonic local inference (offline-capable)
+   * 1. Gemini TTS
+   * 2. Edge TTS
+   * 3. Google TTS
    */
   async generateSpeech(options: TTSCallOptions): Promise<Buffer> {
     const { text } = options;
@@ -48,21 +34,7 @@ class TTSService {
        }
     }
 
-    // 2. Try Google TTS (requires internet)
-    try {
-      return await this.generateGoogleTTS(text);
-    } catch { /* quota or network error — fall through to Supertonic */ }
-
-    // 2. Try Supertonic local inference (offline-capable)
-    if (MODELS_AVAILABLE) {
-      try {
-        return await this.supertonicGenerate(text);
-      } catch (err) {
-        console.warn('[TTS] Supertonic failed:', err);
-      }
-    }
-    
-    // 3. Fallback: Edge TTS (Free, no credentials needed)
+    // 2. Try Fallback: Edge TTS (Free, no credentials needed)
     try {
       const { EdgeTTS } = await import('@andresaya/edge-tts');
       const edgeTtsClient = new EdgeTTS();
@@ -76,6 +48,11 @@ class TTSService {
       console.warn('[TTS] EdgeTTS fallback failed:', err);
     }
 
+    // 3. Try Google TTS (requires internet)
+    try {
+      return await this.generateGoogleTTS(text);
+    } catch { /* quota or network error */ }
+
     throw new Error("All TTS providers failed.");
   }
 
@@ -87,7 +64,7 @@ class TTSService {
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text: text }] }],
       config: {
         responseModalities: [Modality.AUDIO], // MUST BE 1 Modality: AUDIO
@@ -140,18 +117,6 @@ class TTSService {
         console.error("Google TTS failed:", err);
         throw new Error("Google TTS provider failed.");
     }
-  }
-
-  /**
-   * Supertonic ONNX inference
-   * [ASSUMPTION]: Official supertone-inc/supertonic Node.js tokenization and decoding logic should be implemented here.
-   */
-  private async supertonicGenerate(text: string): Promise<Buffer> {
-    const session = await getSession();
-    // Tokenize text → run inference → decode WAV
-    // (Follow official Supertonic Node.js example in their repo: js/node/)
-    // Returns raw PCM → wrap in WAV header → return as Buffer
-    throw new Error('Implement using supertone-inc/supertonic js/node/ example');
   }
 
   async saveAudio(buffer: Buffer, filename: string): Promise<string> {

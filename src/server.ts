@@ -18,7 +18,7 @@ const getDirname = () => {
 };
 
 async function startServer() {
-  const PORT = process.env.PORT || 3000;
+  const PORT = 3000;
   console.log(`[Server] Booting Brgy. Tanod S.O.S...`);
   console.log(`[Server] PID: ${process.pid} | Port: ${PORT} | Mode: ${config.nodeEnv}`);
   console.log(`[Server] Database URL present: ${!!config.databaseUrl}`);
@@ -54,7 +54,10 @@ async function startServer() {
 
   initSocket(server);
 
-  const isProd = process.env.NODE_ENV === 'production' || fs.existsSync(path.join(getDirname(), 'index.html'));
+  // Force production mode if we are running from dist/
+  const currentDir = getDirname();
+  const isRunningFromDist = currentDir.includes('dist');
+  const isProd = process.env.NODE_ENV === 'production' || isRunningFromDist || fs.existsSync(path.join(currentDir, 'index.html'));
 
   if (!isProd) {
     console.log('[Server] Starting in DEVELOPMENT mode (Vite middleware)');

@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReportMap from './ReportMap';
 import { docsService, slidesService, formsService } from '../services/googleWorkspaceService';
 import { guardianAI } from '../services/guardianAIService';
-import { isWebLLMReady } from '../lib/webllm';
 import toast from 'react-hot-toast';
 
 export default function ReportsView() {
@@ -18,10 +17,6 @@ export default function ReportsView() {
   const [shiftSummary, setShiftSummary] = useState<string | null>(null);
 
   const handleGenerateBriefing = async () => {
-    if (!isWebLLMReady()) {
-        toast.error("Guardian AI is still loading...");
-        return;
-    }
     setIsSummarizing(true);
     try {
         const summary = await guardianAI.summarizeShift(filteredReports.slice(0, 10));
@@ -117,7 +112,6 @@ export default function ReportsView() {
           <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase text-white font-mono leading-none">Incident Vault</h2>
           <div className="flex items-center gap-4 mt-3">
             <p className="text-white/30 font-bold text-xs md:text-sm uppercase tracking-[0.3em] font-mono">Archived Tactical Intelligence</p>
-            {isWebLLMReady() && (
                 <button 
                   onClick={handleGenerateBriefing}
                   disabled={isSummarizing || filteredReports.length === 0}
@@ -126,7 +120,6 @@ export default function ReportsView() {
                   {isSummarizing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                   Generate Shift Briefing
                 </button>
-            )}
           </div>
         </div>
         

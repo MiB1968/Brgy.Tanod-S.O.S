@@ -406,12 +406,14 @@ export default function App() {
           safeStorage.setItem("token", token);
           
           // Construct basic profile, actual role tracking is handled by AuthContext
-          const localProfile = {
+          const localProfile: User = {
             id: firebaseUser.uid,
+            uid: firebaseUser.uid,
             name: firebaseUser.displayName || 'System User',
-            email: firebaseUser.email,
+            email: firebaseUser.email || '',
             role: 'resident', // Default fallback, AuthContext will overwrite
-            status: 'approved'
+            status: 'approved',
+            createdAt: new Date().toISOString()
           };
           
           safeStorage.setItem("user", JSON.stringify(localProfile));
@@ -465,12 +467,14 @@ export default function App() {
 
         safeStorage.setItem('token', token);
         
-        const localProfile = {
+        const localProfile: User = {
           id: firebaseUser.uid,
+          uid: firebaseUser.uid,
           name: firebaseUser.displayName || 'Google User',
           email: firebaseUser.email || '',
-          role: userRole,
-          status: userStatus
+          role: userRole as any,
+          status: userStatus as any,
+          createdAt: new Date().toISOString()
         };
         safeStorage.setItem('user', JSON.stringify(localProfile));
         setUser(localProfile);
@@ -579,12 +583,14 @@ export default function App() {
         const token = await firebaseUser.getIdToken();
         safeStorage.setItem("token", token);
         
-        const localProfile = {
+        const localProfile: User = {
           id: firebaseUser.uid,
+          uid: firebaseUser.uid,
           name: firebaseUser.displayName || (role === 'admin' ? 'Demo Admin' : 'Demo Resident'),
-          email: firebaseUser.email,
-          role: role,
-          status: 'approved'
+          email: firebaseUser.email || '',
+          role: role as any,
+          status: 'approved',
+          createdAt: new Date().toISOString()
         };
         
         safeStorage.setItem("user", JSON.stringify(localProfile));
@@ -666,12 +672,14 @@ export default function App() {
               // Prepare user profile data
               const userRole = (data.role === 'tanod' ? 'tanod' : 'resident');
               
-              const localProfile = {
+              const localProfile: User = {
                 id: userRef.uid,
-                email: userRef.email,
+                uid: userRef.uid,
+                email: userRef.email || '',
                 name: data.name,
-                role: userRole,
-                status: 'pending' // pending approval
+                role: userRole as any,
+                status: 'pending', // pending approval
+                createdAt: new Date().toISOString()
               };
               
               // Save to Firestore

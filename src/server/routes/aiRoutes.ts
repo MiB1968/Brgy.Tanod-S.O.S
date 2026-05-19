@@ -6,7 +6,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
-import { analyzeIncident, getGuardianResponse } from '../services/aiService';
+import { analyzeIncident, getGuardianResponse, summarizeIncident, draftReport, translateText, askAssistant } from '../services/aiService';
 
 const router = Router();
 
@@ -17,6 +17,66 @@ router.post('/guardian', authenticate, async (req: Request, res: Response) => {
   try {
     const response = await getGuardianResponse(text);
     return res.json({ success: true, response });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ai/summarize
+// Body: { incidentNotes: string }
+router.post('/summarize', authenticate, async (req: Request, res: Response) => {
+  const { incidentNotes } = req.body;
+  if (!incidentNotes || typeof incidentNotes !== 'string') {
+    return res.status(400).json({ success: false, error: 'incidentNotes is required' });
+  }
+  try {
+    const summary = await summarizeIncident(incidentNotes);
+    return res.json({ success: true, summary });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ai/draft-report
+// Body: { roughNotes: string, date?: string }
+router.post('/draft-report', authenticate, async (req: Request, res: Response) => {
+  const { roughNotes, date } = req.body;
+  if (!roughNotes || typeof roughNotes !== 'string') {
+    return res.status(400).json({ success: false, error: 'roughNotes is required' });
+  }
+  try {
+    const draft = await draftReport(roughNotes, date);
+    return res.json({ success: true, draft });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ai/translate
+// Body: { text: string, targetLanguage?: string }
+router.post('/translate', authenticate, async (req: Request, res: Response) => {
+  const { text, targetLanguage } = req.body;
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ success: false, error: 'text is required' });
+  }
+  try {
+    const translation = await translateText(text, targetLanguage);
+    return res.json({ success: true, translation });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ai/assistant
+// Body: { query: string }
+router.post('/assistant', authenticate, async (req: Request, res: Response) => {
+  const { query } = req.body;
+  if (!query || typeof query !== 'string') {
+    return res.status(400).json({ success: false, error: 'query is required' });
+  }
+  try {
+    const result = await askAssistant(query);
+    return res.json({ success: true, ...result });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

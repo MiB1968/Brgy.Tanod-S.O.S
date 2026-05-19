@@ -227,7 +227,7 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
 
   try {
-    const finalModelName = config.geminiModel || "gemini-3-flash-preview";
+    const finalModelName = config.geminiModel || "gemini-2.5-flash";
     
     const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 
     User says (in Tagalog/English): "${userText}"
@@ -246,6 +246,127 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   } catch (err: any) {
     log.error("Guardian AI response failed", { requestId, error: err.message });
     return "Nakatanggap ako ng ulat. Huwag mag-alala, nakikipag-ugnayan na ang ating patrol unit. Stay safe.";
+  }
+}
+
+// =============================================================================
+// Summarization
+// =============================================================================
+export async function summarizeIncident(incidentNotes: string): Promise<string> {
+  if (!incidentNotes?.trim()) return "No incident notes available.";
+  
+  try {
+    const prompt = `Summarize this emergency incident in 3 concise sentences.
+Do not include names, phone numbers, or addresses.
+
+Incident:
+${incidentNotes}`;
+
+    const result = await getAIClient().models.generateContent({
+      model: config.geminiModel || "gemini-3-flash-preview",
+      contents: prompt
+    });
+    return result.text?.trim() || "Summary unavailable.";
+  } catch (err: any) {
+    log.error("AI Summarization failed", { error: err.message });
+    return "Failed to generate summary.";
+  }
+}
+
+// =============================================================================
+// Report Drafting
+// =============================================================================
+export async function draftReport(roughNotes: string, date: string = new Date().toLocaleDateString()): Promise<string> {
+  if (!roughNotes?.trim()) return "No rough notes available.";
+
+  try {
+    const prompt = `Draft a formal, professional Barangay Spot Report based on the following rough notes from a Tanod responder.
+Do NOT output any markdown, JSON, or XML. Just the plain text report.
+The report should be structured professionally.
+Use the date: ${date}
+
+Rough Notes:
+${roughNotes}
+
+Output the draft report below:`;
+
+    const result = await getAIClient().models.generateContent({
+      model: config.geminiModel || "gemini-3-flash-preview",
+      contents: prompt
+    });
+    return result.text?.trim() || "Drafting unavailable.";
+  } catch (err: any) {
+    log.error("AI Report Drafting failed", { error: err.message });
+    return "Failed to draft report.";
+  }
+}
+
+// =============================================================================
+// Translation
+// =============================================================================
+export async function translateText(text: string, targetLanguage: string = "English"): Promise<string> {
+  if (!text?.trim()) return "";
+
+  try {
+    const prompt = `Translate the following text to ${targetLanguage}.
+If the text contains sensitive IDs, phone numbers, or exact personal identifiers, strip them out before outputting the translation.
+Respond ONLY with the translated text.
+
+Text:
+"${text}"`;
+
+    const result = await getAIClient().models.generateContent({
+      model: config.geminiModel || "gemini-3-flash-preview",
+      contents: prompt
+    });
+    return result.text?.trim() || text; // Fallback to original text if translation fails to return anything
+  } catch (err: any) {
+    log.error("AI Translation failed", { error: err.message });
+    return text;
+  }
+}
+
+// =============================================================================
+// Assistant Chat (RAG-like)
+// =============================================================================
+export async function askAssistant(query: string): Promise<{ answer: string, needsEscalation: boolean }> {
+  if (!query?.trim()) return { answer: "Please ask a question.", needsEscalation: false };
+
+  try {
+    const prompt = `You are a Barangay Assistant support bot answering questions for a community in the Philippines.
+Answer based on typical generic barangay policies (ordinances, evacuation plans, hotlines, permit types).
+
+CRITICAL RULE: If the user indicates an immediate emergency (e.g. asking for help with domestic abuse, assault, find a bomb, someone with a weapon, fire breaking out, active distress), you MUST set "needsEscalation" to true. Do not give an answer, just acknowledge the emergency and that they should be escalated.
+
+Respond with ONLY a valid JSON object in this format:
+{
+  "answer": "string (the answer or emergency acknowledgement)",
+  "needsEscalation": boolean
+}
+
+User Query:
+"${query}"`;
+
+    const result = await getAIClient().models.generateContent({
+      model: config.geminiModel || "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const raw = result.text;
+    if (!raw) throw new Error("Empty response");
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    
+    return {
+      answer: parsed.answer || "I'm not sure.",
+      needsEscalation: !!parsed.needsEscalation
+    };
+  } catch (err: any) {
+    log.error("AI Assistant failed", { error: err.message });
+    return { answer: "I'm sorry, my answering capability is temporarily offline.", needsEscalation: false };
   }
 }
 

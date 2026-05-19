@@ -42,7 +42,11 @@ export const config = {
   geminiApiKey: (process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
-  geminiModel: (process.env.GEMINI_MODEL || 'gemini-3-flash-preview').replace(/^models\//, ''),
+  geminiModel: (() => {
+    let m = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    if (m.startsWith('AIza')) m = 'gemini-2.5-flash';
+    return m.replace(/^models\//, '');
+  })(),
 
   adminBootstrap: {
     email: process.env.ADMIN_BOOTSTRAP_EMAIL,
