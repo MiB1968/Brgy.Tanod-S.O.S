@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAPI } from '../../lib/api';
 import ReportMap from '../ReportMap';
 import { motion } from 'motion/react';
 import { Activity, Flame, ShieldAlert, Waves, MapPin } from 'lucide-react';
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface HeatmapPoint {
   id: string;
@@ -19,8 +20,37 @@ export function LiveHeatmap() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await fetchAPI('intelligence/heatmap');
-        setPoints(data);
+        const heatmap: any[] = [];
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        const alertsSnap = await getDocs(collection(db, 'alerts'));
+        
+        alertsSnap.forEach(doc => {
+          const data = doc.data();
+          let ts = 0;
+          if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at.toMillis?.() || data.created_at;
+          else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp.toMillis?.() || data.timestamp;
+          
+          if (ts && Math.abs(ts - Date.now()) < 5 * 365 * 24 * 60 * 60 * 1000) {
+            if (ts >= thirtyDaysAgo) {
+              let lat, lng;
+              if (data.location?.lat) { lat = data.location.lat; lng = data.location.lng; }
+              else if (data.lat) { lat = data.lat; lng = data.lng; }
+              else if (data.latitude) { lat = data.latitude; lng = data.longitude; }
+              
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                heatmap.push({
+                  id: doc.id,
+                  type: data.type || 'UNKNOWN',
+                  lat: parseFloat(lat),
+                  lng: parseFloat(lng),
+                  timestamp: ts
+                });
+              }
+            }
+          }
+        });
+        
+        setPoints(heatmap);
       } catch (err) {
         console.error("Heatmap load failure", err);
       } finally {

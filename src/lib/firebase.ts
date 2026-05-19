@@ -11,18 +11,12 @@ import {
   Firestore,
   enableIndexedDbPersistence,
 } from 'firebase/firestore';
+import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
+
+import firebaseAppletConfig from '../../firebase-applet-config.json';
 
 // ── Config ────────────────────────────────────────────────────────────────────
-// Replace each value with your real Firebase project credentials.
-// This file is in .gitignore — never commit real values to git.
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || '',
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || '',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || 'demo-project',
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || '',
-};
+const firebaseConfig = firebaseAppletConfig;
 
 // ── Singleton init ────────────────────────────────────────────────────────────
 // getApps().length prevents "App already exists" crash when HMR re-runs this module.
@@ -30,8 +24,9 @@ const firebaseApp: FirebaseApp =
   getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth: Auth = getAuth(firebaseApp);
-export const db: Firestore = getFirestore(firebaseApp);
-export { firebaseApp };
+export const db: Firestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
+export const messaging = typeof window !== "undefined" && firebaseConfig.messagingSenderId ? getMessaging(firebaseApp) : null;
+export { firebaseApp, getToken, onMessage };
 
 // ── Offline persistence (client-only) ────────────────────────────────────────
 if (typeof window !== 'undefined') {

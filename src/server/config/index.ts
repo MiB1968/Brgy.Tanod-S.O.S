@@ -1,5 +1,18 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+
 dotenv.config();
+
+let firebaseAppletConfig: any = {};
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  }
+} catch (e) {
+  // If not found, ignore
+}
 
 // ── Check missing critical secrets ──────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
@@ -64,7 +77,8 @@ export const config = {
   },
 
   firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project',
+    projectId: firebaseAppletConfig.projectId || process.env.FIREBASE_PROJECT_ID || 'demo-project',
+    databaseId: firebaseAppletConfig.firestoreDatabaseId || '(default)',
   },
   apiKey: process.env.API_KEY || null,
 };

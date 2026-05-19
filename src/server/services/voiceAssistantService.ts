@@ -10,6 +10,7 @@ import { anomalyDetectionService } from './anomalyDetectionService';
 import { ttsService } from './ttsService';
 import { config } from '../config/index';
 import { AI_MODELS } from '../config/aiModels';
+import { DISPATCHER_TOOLS, toolHandlers } from './dispatcherService';
 
 import {
   VoiceInput,
@@ -170,13 +171,69 @@ export class SecureVoiceAssistantService {
     const finalModelName = config.geminiModel || AI_MODELS.flash.name;
     
     console.log(`[JARVIS] Calling Gemini for user ${userId} with transcript: "${transcript}" using model: ${finalModelName}`);
-    const result = await getAiClient().models.generateContent({
+    
+    // Support function calling for Smart Dispatcher
+    const tools = (currentRole === VoicePermissionLevel.ADMIN || currentRole === VoicePermissionLevel.SUPER_ADMIN || currentRole === VoicePermissionLevel.COMMANDER || currentRole === VoicePermissionLevel.TANOD)
+      ? [{ functionDeclarations: DISPATCHER_TOOLS }]
+      : [];
+
+    let result = await getAiClient().models.generateContent({
       model: finalModelName,
       contents: [{ role: 'user', parts: [{ text: transcript }] }],
       config: {
-        systemInstruction: this.buildSystemPrompt(context, currentRole)
+        systemInstruction: this.buildSystemPrompt(context, currentRole),
+        tools,
       }
     });
+
+    // Handle tool execution loop if needed
+    if (result.functionCalls && result.functionCalls.length > 0) {
+      console.log(`[JARVIS] Model requested ${result.functionCalls.length} tool calls`);
+      const toolResponses = await Promise.all(result.functionCalls.map(async (call) => {
+        const handler = toolHandlers[call.name];
+        if (handler) {
+          try {
+            const output = await handler(call.args);
+            return {
+              functionResponse: {
+                name: call.name,
+                response: { content: output }
+              },
+              id: (call as any).id
+            };
+          } catch (e: any) {
+            return {
+              functionResponse: {
+                name: call.name,
+                response: { error: e.message }
+              },
+              id: (call as any).id
+            };
+          }
+        }
+        return {
+          functionResponse: {
+            name: call.name,
+            response: { error: "Function not found" }
+          },
+          id: (call as any).id
+        };
+      }));
+
+      // Call Gemini again with tool results to get a verbal response
+      result = await getAiClient().models.generateContent({
+        model: finalModelName,
+        contents: [
+          { role: 'user', parts: [{ text: transcript }] },
+          { role: 'model', parts: result.functionCalls.map(c => ({ functionCall: c })) },
+          { role: 'user', parts: toolResponses as any }
+        ],
+        config: {
+          systemInstruction: this.buildSystemPrompt(context, currentRole),
+          tools,
+        }
+      });
+    }
 
       console.log('[JARVIS] Gemini result received');
       const replyText = this.sanitizeAIResponse(result.text || "Paki-ulit, hindi ko naintindihan.");
@@ -289,6 +346,8 @@ export class SecureVoiceAssistantService {
 
   // ── RESPONSE HELPERS ─────────────────────────────────────────────────────
   private buildSystemPrompt(context: VoiceContext, role: VoicePermissionLevel): string {
+    const isResponder = [VoicePermissionLevel.ADMIN, VoicePermissionLevel.SUPER_ADMIN, VoicePermissionLevel.COMMANDER, VoicePermissionLevel.TANOD].includes(role);
+
     return `ROLE: Brgy Tanod S.O.S. Tactical AI (GUARDIAN MODE).
 PERSONALITY: Authoritative, calm, and protective. Like a seasoned Senior Tanod with advanced tech.
 CULTURAL CONTEXT: Philippines, Barangay setting. Use Taglish (Filipino + English) naturally.
@@ -297,8 +356,15 @@ UNITS AVAILABLE: ${context.availableTanods.length} officers on active patrol
 PENDING INCIDENTS: ${context.barangayInfo.pendingIncidents} alerts requiring triage
 RESPONDING INCIDENTS: ${context.barangayInfo.respondingIncidents} cases in progress
 
+${isResponder ? `CAPABILITIES: You are a SMART DISPATCHER. You have access to real-time tools to:
+- Browse active SOS alerts.
+- Locate nearest available Tanods.
+- Assign Tanods to specific incidents and update their status.
+- Generate tactical incident reports.
+Use these tools whenever the user asks for status updates, coordination, or dispatching chores.` : ''}
+
 VOICE GUIDELINES:
-- Keep it under 12 words. Be VERY CONCISE.
+- Keep it under 15 words. Be CONCISE.
 - Sound like a high-tech tactical system. Use terms like "Tactical," "Confirmed," "Acknowledged," "Responding."
 - If units are low (${context.availableTanods.length} < 2), sound more alert.
 - Example: "Copied, Sir. Sending backup to Purok 7. Status is Red."
@@ -473,15 +539,68 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
 
       const finalModelName = config.geminiModel || AI_MODELS.flash.name;
 
-      const result = await getAiClient().models.generateContent({
+      const tools = (currentRole === VoicePermissionLevel.ADMIN || currentRole === VoicePermissionLevel.SUPER_ADMIN || currentRole === VoicePermissionLevel.COMMANDER || currentRole === VoicePermissionLevel.TANOD)
+        ? [{ functionDeclarations: DISPATCHER_TOOLS }]
+        : [];
+
+      let result = await getAiClient().models.generateContent({
         model: finalModelName,
         contents: [{ role: 'user', parts: [
           { inlineData: { mimeType, data: audioBuffer.toString('base64') } }
         ] }],
         config: {
-          systemInstruction: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it."
+          systemInstruction: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it.",
+          tools
         }
       });
+
+      // Handle tool execution loop if needed for multimodal
+      if (result.functionCalls && result.functionCalls.length > 0) {
+        console.log(`[JARVIS] Multimodal requested ${result.functionCalls.length} tool calls`);
+        const toolResponses = await Promise.all(result.functionCalls.map(async (call) => {
+          const handler = toolHandlers[call.name];
+          if (handler) {
+            try {
+              const output = await handler(call.args);
+              return {
+                functionResponse: {
+                  name: call.name,
+                  response: { content: output }
+                },
+                id: (call as any).id
+              };
+            } catch (e: any) {
+              return {
+                functionResponse: {
+                  name: call.name,
+                  response: { error: e.message }
+                },
+                id: (call as any).id
+              };
+            }
+          }
+          return {
+            functionResponse: {
+              name: call.name,
+              response: { error: "Function not found" }
+            },
+            id: (call as any).id
+          };
+        }));
+
+        result = await getAiClient().models.generateContent({
+          model: finalModelName,
+          contents: [
+            { role: 'user', parts: [{ inlineData: { mimeType, data: audioBuffer.toString('base64') } }] },
+            { role: 'model', parts: result.functionCalls.map(c => ({ functionCall: c })) },
+            { role: 'user', parts: toolResponses as any }
+          ],
+          config: {
+            systemInstruction: this.buildSystemPrompt(context, currentRole),
+            tools
+          }
+        });
+      }
 
       const replyText = this.sanitizeAIResponse(result.text || "Audio received. Processing.");
       const proposedActions = this.extractProposedActions(replyText);

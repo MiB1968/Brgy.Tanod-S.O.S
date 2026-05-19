@@ -9,6 +9,7 @@ import aiRoutes from "./aiRoutes";
 import adminRoutes from "./adminRoutes";
 import ttsRoutes from "./ttsRoutes";
 import storageRoutes from "./storageRoutes";
+import webhookRoutes from "./webhookRoutes";
 
 export const setupRoutes = (app: Express): void => {
   // Health check
@@ -27,7 +28,7 @@ export const setupRoutes = (app: Express): void => {
   // Feature routes
   app.use("/api/auth", authRoutes);
   app.use("/api/sos", sosRoutes);
-  app.use("/api/intelligence", intelligenceRoutes);
+  app.use("/api/data", intelligenceRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/system", systemRoutes);
   app.use("/api/voice", voiceRoutes);
@@ -35,6 +36,7 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/admin", adminRoutes);
   app.use("/api/tts", ttsRoutes);
   app.use("/api/storage", storageRoutes);
+  app.use("/api/webhooks", webhookRoutes);
 
   // 404 catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {

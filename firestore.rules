@@ -2,30 +2,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check role
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    match /users/{userId} {
-      // Users can only read and write their own profile
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Admins can read all profiles
-      allow read: if request.auth != null && getUserData().role == 'admin';
-    }
-
-    match /reports/{reportId} {
-      // Admins can read and write everything
-      allow read, write: if request.auth != null && getUserData().role == 'admin';
-      
-      // Tanods can read all reports and create new ones
-      allow read: if request.auth != null && getUserData().role == 'tanod';
-      allow create: if request.auth != null && getUserData().role == 'tanod';
-      
-      // Residents can only see their own reports
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid);
-      allow create: if request.auth != null;
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

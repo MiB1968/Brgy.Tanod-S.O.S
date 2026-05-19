@@ -5,6 +5,7 @@ import { Alert, User, SystemBroadcast, RegistryStatus } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import toast from "react-hot-toast";
 import LiveMap from "../LiveMap";
+import { subscribeToTanodTopic } from "../lib/notifications";
 
 // Sub-components
 import { TanodPortalHeader } from "./Tanod/TanodPortalHeader";
@@ -49,6 +50,16 @@ export default function TanodDashboard({
 
   useEffect(() => {
     if (!profile) return;
+    
+    // Subscribe to push notifications if using PWA or mobile
+    if ('Notification' in window && Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          subscribeToTanodTopic(profile.id);
+        }
+      });
+    }
+
     const hasActive = alerts.some((a) =>
       ["pending", "active"].includes(a.status?.toLowerCase() || ""),
     );

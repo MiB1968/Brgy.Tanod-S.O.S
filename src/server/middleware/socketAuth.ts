@@ -2,10 +2,10 @@ import { Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { config } from "../config/index";
 import { AuthenticatedSocket, UserPayload } from "../types";
+import { admin } from "../db/index";
 
-export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void) => {
+export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) => void) => {
   const cookieHeader = socket.handshake.headers.cookie || '';
-  console.log(`[SocketAuth] Headers: ${JSON.stringify(socket.handshake.headers)}`);
   
   const cookies: Record<string, string> = {};
   if (cookieHeader) {
@@ -15,42 +15,60 @@ export const socketAuthMiddleware = (socket: Socket, next: (err?: Error) => void
     });
   }
   const cookieToken = cookies['token'];
-  console.log(`[SocketAuth] Found cookie 'token': ${cookieToken ? 'YES' : 'NO'}`);
-  console.log(`[SocketAuth] All cookies:`, Object.keys(cookies));
 
   let token = 
     socket.handshake.auth.token || 
     cookieToken ||
     socket.handshake.headers.authorization?.split(" ")[1];
 
-  console.log(`[SocketAuth] Extracted token: ${token ? 'PRESENT' : 'MISSING'}`);
-
-  // Special handling for client placeholder token
   if (token === 'cookie-auth') {
-    console.log(`[SocketAuth] Placeholder 'cookie-auth' detected, swapping for cookie: ${cookieToken ? 'FOUND' : 'NOT FOUND'}`);
     token = cookieToken;
   }
 
   if (!token) {
-    console.warn(`[SocketAuth] Missing token for socket ${socket.id}. Headers:`, JSON.stringify(socket.handshake.headers));
     return next(new Error("Authentication required"));
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    // Check if it's a firebase token (Firebase JWTs are usually much longer and structured differently, but we can try verifyIdToken)
+    let decodedUser: any = {};
+    
+    try {
+      // Trying Firebase Auth first if admin is available
+      if (admin && admin.apps.length > 0) {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        decodedUser = {
+          id: decodedToken.uid,
+          role: decodedToken.role || 'resident', // defaults to resident if custom claim missing
+          email: decodedToken.email,
+          name: decodedToken.name || decodedToken.email || 'Firebase User'
+        };
+      } else {
+        throw new Error('Firebase Admin not initialized');
+      }
+    } catch (fbErr) {
+      // Fallback to local JWT verification
+      const decodedLocal = jwt.verify(token, config.jwtSecret) as any;
+      decodedUser = {
+        id: decodedLocal.id,
+        role: decodedLocal.role,
+        email: decodedLocal.email,
+        name: decodedLocal.name || decodedLocal.email || 'Local User'
+      };
+    }
     
     // Set user data to socket
     (socket as AuthenticatedSocket).data = {
       user: {
-        id: decoded.id,
-        role: decoded.role?.toUpperCase() || "CITIZEN",
-        barangayId: decoded.barangayId || "default",
-        name: decoded.name || decoded.email || "Anonymous",
-        phone: decoded.phone
+        id: decodedUser.id,
+        role: decodedUser.role?.toUpperCase() || "CITIZEN",
+        barangayId: decodedUser.barangayId || "default",
+        name: decodedUser.name,
+        phone: decodedUser.phone
       }
     };
 
-    console.log(`[SocketAuth] Authenticated user ${decoded.id} (${decoded.role}) for socket ${socket.id}`);
+    console.log(`[SocketAuth] Authenticated user ${decodedUser.id} (${decodedUser.role}) for socket ${socket.id}`);
     next();
   } catch (err: any) {
     console.warn(`[SocketAuth] Authentication failed for socket ${socket.id}: ${err.message}`);

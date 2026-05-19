@@ -26,14 +26,11 @@ export function useSocketListeners(
 
   useEffect(() => {
     if (!profile) {
-      if (socket.connected) socket.disconnect();
       return;
     }
 
-    // Explicitly connect when profile is available
     if (!socket.connected) {
-      console.log('[Socket] Initiating authenticated connection...');
-      socket.connect();
+      console.log('[Socket] Socket not connected, but listeners are being attached. Connection is managed externally.');
     }
 
     const showSOSNotification = (alert: Alert) => {
@@ -212,8 +209,7 @@ export function useSocketListeners(
       socket.off('resident_update');
       socket.off('siren_update');
       
-      console.log('[Socket] Cleaning up listeners and disconnecting...');
-      socket.disconnect();
+      console.log('[Socket] Cleaning up listeners...');
     };
-  }, [profile, effectiveRole, addAlert, updatePatrol, updateTanodStatus, setActiveBroadcast, setGlobalSirenActive, setIsShaking, setActiveTab]);
+  }, [profile?.id, effectiveRole, addAlert, updatePatrol, updateTanodStatus, setActiveBroadcast, setGlobalSirenActive, setIsShaking, setActiveTab]);
 }

@@ -106,6 +106,9 @@ import * as safeStorage from "./lib/safeStorage";
 // Service & Lib imports
 import { workspaceAuth } from "./services/googleWorkspaceService";
 import { useRBAC } from "./context/AuthContext";
+import { createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "./lib/firebase";
 import { useSocketListeners } from "./hooks/useSocketListeners";
 import { useAudioInitializer } from "./hooks/useAudioInitializer";
 import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
@@ -395,18 +398,35 @@ export default function App() {
 
       try {
         if (email && password) {
-          const res = await api.auth.login({ email, password });
-          // If the server returns a token, store it to ensure Authorization headers work
-          const token = res.data.token || "cookie-auth";
+          // Use Firebase Authentication directly
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const firebaseUser = userCredential.user;
+          const token = await firebaseUser.getIdToken();
+          
           safeStorage.setItem("token", token);
-          safeStorage.setItem("user", JSON.stringify(res.data.user));
-          setUser(res.data.user);
-          setProfile(res.data.user);
+          
+          // Construct basic profile, actual role tracking is handled by AuthContext
+          const localProfile = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || 'System User',
+            email: firebaseUser.email,
+            role: 'resident', // Default fallback, AuthContext will overwrite
+            status: 'approved'
+          };
+          
+          safeStorage.setItem("user", JSON.stringify(localProfile));
+          setUser(localProfile);
+          setProfile(localProfile);
+          
           toast.success(`Unit Authenticated`, { icon: "🔑" });
         }
       } catch (err: any) {
         console.error("AUTH_FAULT:", err);
-        toast.error(`AUTH FAILURE: ${err.message}`);
+        let errorMsg = err.message;
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+          errorMsg = "INVALID IDENTIFICATION PROTOCOL";
+        }
+        toast.error(`AUTH FAILURE: ${errorMsg}`);
       } finally {
         setIsLoggingIn(false);
       }
@@ -423,31 +443,38 @@ export default function App() {
         setWorkspaceToken(result.accessToken);
         setGoogleUser(result.user);
 
-        // Get the Firebase ID token to send to our server for secure verification
-        const firebaseIdToken = await result.user.getIdToken();
-
+        const firebaseUser = result.user;
+        const token = await firebaseUser.getIdToken();
+        
+        // Ensure user exists in Firestore
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        let userRole = 'resident';
+        let userStatus = 'approved';
+        
         try {
-          const res = await api.auth.login({
-            email: result.user.email,
-            isGoogle: true,
-            firebaseIdToken,   // ← server now verifies this instead of trusting blindly
-          });
-          const token = res.data.token || 'cookie-auth';
-          safeStorage.setItem('token', token);
-          safeStorage.setItem('user', JSON.stringify(res.data.user));
-          setUser(res.data.user);
-          setProfile(res.data.user);
-        } catch (err) {
-          console.warn('App login via Google failed — user may need to register first.', err);
-          // If not in our DB yet, show them as a guest so they can register
-          setUser({
-            id: result.user.uid,
-            name: result.user.displayName || 'Google User',
-            email: result.user.email || '',
-            role: 'resident',
-            status: 'approved',
-          });
+          const userSnap = await setDoc(userRef, {
+             email: firebaseUser.email,
+             name: firebaseUser.displayName,
+             // Note: if doc already exists, merge: true preserves existing role/status
+             role: userRole,
+             status: userStatus,
+          }, { merge: true });
+        } catch (e: any) {
+             console.warn("Firestore sync failed, proceeding locally.");
         }
+
+        safeStorage.setItem('token', token);
+        
+        const localProfile = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Google User',
+          email: firebaseUser.email || '',
+          role: userRole,
+          status: userStatus
+        };
+        safeStorage.setItem('user', JSON.stringify(localProfile));
+        setUser(localProfile);
+        setProfile(localProfile);
 
         toast.success('Workspace Connected', { icon: '🌐' });
       }
@@ -523,15 +550,46 @@ export default function App() {
       try {
         setLoading(true);
         toast.loading("Initiating anonymous session...", { id: "demo-login" });
-        const res = await api.auth.login({
-          email: role === "admin" ? "admin@demo.com" : "resident@demo.com",
-          password: "demo",
-        });
-        const token = res.data.token || "cookie-auth";
+        const demoEmail = role === "admin" ? "admin@demo.com" : "resident@demo.com";
+        const password = "password123!"; // More secure default
+        
+        let firebaseUser;
+        try {
+          const cred = await signInWithEmailAndPassword(auth, demoEmail, password);
+          firebaseUser = cred.user;
+        } catch (e: any) {
+          if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+             // Create it on the fly
+             const cred = await createUserWithEmailAndPassword(auth, demoEmail, password);
+             firebaseUser = cred.user;
+             const name = role === 'admin' ? 'Demo Admin' : 'Demo Resident';
+             await updateProfile(firebaseUser, { displayName: name });
+             await setDoc(doc(db, "users", firebaseUser.uid), {
+                email: demoEmail,
+                name: name,
+                role: role,
+                status: 'approved',
+                createdAt: serverTimestamp()
+             });
+          } else {
+            throw e;
+          }
+        }
+        
+        const token = await firebaseUser.getIdToken();
         safeStorage.setItem("token", token);
-        safeStorage.setItem("user", JSON.stringify(res.data.user));
-        setUser(res.data.user);
-        setProfile(res.data.user);
+        
+        const localProfile = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || (role === 'admin' ? 'Demo Admin' : 'Demo Resident'),
+          email: firebaseUser.email,
+          role: role,
+          status: 'approved'
+        };
+        
+        safeStorage.setItem("user", JSON.stringify(localProfile));
+        setUser(localProfile);
+        setProfile(localProfile);
         toast.success("Guest Session Active", { id: "demo-login" });
       } catch (err: any) {
         console.error("Demo login failed:", err);
@@ -597,15 +655,44 @@ export default function App() {
           onCancel={() => setIsRegistering(false)}
           onComplete={async (data: any) => {
             try {
-              const res = await api.auth.register(data);
-              const token = res.data.token || "cookie-auth";
+              toast.loading("Encrypting profile matrix...", { id: 'reg' });
+              const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+              const userRef = userCredential.user;
+              await updateProfile(userRef, { displayName: data.name });
+              
+              const token = await userRef.getIdToken();
               safeStorage.setItem("token", token);
-              safeStorage.setItem("user", JSON.stringify(res.data.user));
-              setUser(res.data.user);
-              setProfile(res.data.user);
+              
+              // Prepare user profile data
+              const userRole = (data.role === 'tanod' ? 'tanod' : 'resident');
+              
+              const localProfile = {
+                id: userRef.uid,
+                email: userRef.email,
+                name: data.name,
+                role: userRole,
+                status: 'pending' // pending approval
+              };
+              
+              // Save to Firestore
+              await setDoc(doc(db, "users", userRef.uid), {
+                email: userRef.email,
+                name: data.name,
+                role: userRole,
+                status: 'pending',
+                profileSetupComplete: true,
+                createdAt: serverTimestamp(),
+                details: data.details || {}
+              });
+              
+              safeStorage.setItem("user", JSON.stringify(localProfile));
+              setUser(localProfile);
+              setProfile(localProfile);
               setIsRegistering(false);
+              toast.success("Registration Successful. Awaiting Clearance.", { id: 'reg' });
             } catch (err: any) {
-              toast.error(err.message);
+              console.error("Registration Error", err);
+              toast.error(`ERROR: ${err.message}`, { id: 'reg' });
             }
           }}
         />

@@ -7,6 +7,7 @@ import { SOCKET_EVENTS } from '../constants';
 import { pool } from '../db/index';
 import { LocationUpdate } from '../types';
 import { validate as uuidValidate } from 'uuid';
+import { triggerQwenPawDispatcher, triggerQwenPawReporter } from './qwenpawService';
 
 const incidentRepository = new IncidentRepository();
 
@@ -137,6 +138,9 @@ export const incidentService = {
       }
     }
 
+    // Auto-trigger QwenPaw Dispatcher
+    triggerQwenPawDispatcher(incident).catch(e => console.error("QwenPaw trigger failed", e));
+
     return incident;
   },
 
@@ -193,6 +197,92 @@ export const incidentService = {
       location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
       timestamp: a.created_at
     }));
+  },
+
+  async updateSOSStatus(sosId: string, status: string, notes?: string, assignedTo?: string) {
+    const result = await pool.query(
+      `UPDATE alerts 
+       SET status = $1, 
+           notes = COALESCE($2, notes), 
+           assigned_tanod_id = COALESCE($3, assigned_tanod_id),
+           updated_at = now() 
+       WHERE id = $4 RETURNING *`,
+      [status.toLowerCase(), notes || null, assignedTo || null, sosId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError("SOS alert not found", 404, "NOT_FOUND");
+    }
+
+    const updated = result.rows[0];
+    const formatted = {
+      id: updated.id,
+      status: updated.status.toUpperCase(),
+      notes: updated.notes,
+      assignedTo: updated.assigned_tanod_id,
+      updatedAt: updated.updated_at
+    };
+
+    if (getIO()) {
+      getIO().to(`incident_${sosId}`).emit('alert_update', { type: 'update', alert: formatted });
+      getIO().to('responders').emit('alert_update', { type: 'update', alert: formatted });
+    }
+
+    // Auto-trigger QwenPaw Reporter if resolved
+    if (formatted.status === 'RESOLVED') {
+      triggerQwenPawReporter(sosId).catch(e => console.error("QwenPaw report trigger failed", e));
+    }
+
+    return formatted;
+  },
+
+  async createIncidentReport(sosId: string) {
+    const alertRes = await pool.query(
+      `SELECT a.*, u.name as "residentName", t.name as "assignedTanodName"
+       FROM alerts a 
+       LEFT JOIN users u ON a.resident_id = u.id 
+       LEFT JOIN users t ON a.assigned_tanod_id = t.id
+       WHERE a.id = $1`,
+      [sosId]
+    );
+
+    if (alertRes.rows.length === 0) {
+      throw new AppError("SOS alert not found", 404, "NOT_FOUND");
+    }
+
+    const alert = alertRes.rows[0];
+    
+    // Simple report for now, could be enhanced with Gemini later
+    const report = {
+      incidentId: alert.id,
+      reporter: alert.residentName,
+      type: alert.type,
+      description: alert.description,
+      status: alert.status,
+      assignedTo: alert.assignedTanodName || 'Unassigned',
+      createdAt: alert.created_at,
+      updatedAt: alert.updated_at,
+      notes: alert.notes || 'No additional notes.',
+      aiAnalysis: alert.ai_analysis
+    };
+
+    return report;
+  },
+
+  async getTanodList(onlyAvailable: boolean = true) {
+    const { getActiveLocations } = await import('../sockets/handlers/location.handler');
+    const activeLocations = getActiveLocations();
+    
+    let tanods = activeLocations.filter(loc => 
+      loc.role === "TANOD" || loc.role === "tanod"
+    );
+
+    if (onlyAvailable) {
+      // In a real app, we'd check if they are currently responding to an alert
+      // For now, let's assume they are available if they are online
+    }
+
+    return tanods;
   },
 
   async findNearestResponders(

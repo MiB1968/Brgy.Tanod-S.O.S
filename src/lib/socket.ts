@@ -10,7 +10,7 @@ const socket = io(typeof window !== 'undefined' ? window.location.origin : '', {
   }),
   rememberUpgrade: false,
   path: '/socket.io',
-  transports: ['websocket'],
+  transports: ['polling', 'websocket'],
   timeout: 60000, 
   withCredentials: true
 });

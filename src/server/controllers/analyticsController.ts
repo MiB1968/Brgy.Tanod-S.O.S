@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { pool } from '../db/index';
+import { getDb } from '../db/index';
 import * as response from '../utils/response';
 
 export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => {
@@ -10,62 +10,75 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       return response.error(res, "Administrative clearance required", "FORBIDDEN", 403);
     }
 
-    // 1. Overview metrics
-    const overviewPromise = pool.query(`
-      SELECT 
-        (SELECT COUNT(*) FROM users WHERE role = 'resident' AND status = 'approved') as verified_residents,
-        (SELECT COUNT(*) FROM users WHERE role = 'tanod') as total_tanods,
-        (SELECT COUNT(*) FROM alerts WHERE status IN ('pending', 'active', 'responding')) as active_alerts
-    `).catch(err => {
-      console.error("Analytics Overview Query Error:", err);
-      return { rows: [{ verified_residents: 0, total_tanods: 0, active_alerts: 0 }] };
-    });
+    const db = getDb();
+    
+    let verified_residents = 0;
+    let total_tanods = 0;
+    let active_alerts = 0;
+    const alertsByTypeMap: Record<string, number> = {};
+    const alertsHistoryMap: Record<string, number> = {};
 
-    // 2. Alerts by type
-    const byTypePromise = pool.query(`
-      SELECT type, COUNT(*) as count 
-      FROM alerts 
-      GROUP BY type 
-      ORDER BY count DESC
-    `).catch(err => {
-      console.error("Analytics ByType Query Error:", err);
-      return { rows: [] };
-    });
+    try {
+      // 1. Users overview
+      const usersSnap = await db.collection('users').get();
+      usersSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.role === 'resident' && data.status === 'approved') verified_residents++;
+        if (data.role === 'tanod') total_tanods++;
+      });
+      
+      // 2. Alerts overview, types and history
+      const alertsSnap = await db.collection('alerts').get();
+      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      
+      alertsSnap.forEach(doc => {
+        const data = doc.data();
+        
+        // Active alerts
+        if (['pending', 'active', 'responding'].includes(data.status)) {
+          active_alerts++;
+        }
+        
+        // Alert types
+        if (data.type) {
+          alertsByTypeMap[data.type] = (alertsByTypeMap[data.type] || 0) + 1;
+        }
+        
+        // History (last 7 days by date)
+        let ts = 0;
+        if (data.created_at) {
+          // Could be ISO string or timestamp number
+          ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
+        } else if (data.timestamp) {
+          ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
+        }
+        
+        if (ts && ts >= sevenDaysAgo) {
+          const dateStr = new Date(ts).toISOString().split('T')[0];
+          alertsHistoryMap[dateStr] = (alertsHistoryMap[dateStr] || 0) + 1;
+        }
+      });
+      
+    } catch (dbErr) {
+      console.error("Firestore Analytics Fetch Error:", dbErr);
+    }
 
-    // 3. Alerts history (last 7 days)
-    const historyPromise = pool.query(`
-      SELECT 
-        DATE(created_at) as day, 
-        COUNT(*) as count 
-      FROM alerts 
-      WHERE created_at >= NOW() - INTERVAL '7 days'
-      GROUP BY day 
-      ORDER BY day ASC
-    `).catch(err => {
-      console.error("Analytics History Query Error:", err);
-      return { rows: [] };
-    });
-
-    const [overviewRes, byTypeRes, historyRes] = await Promise.all([
-      overviewPromise,
-      byTypePromise,
-      historyPromise
-    ]);
-
-    const overview = (overviewRes && overviewRes.rows && overviewRes.rows[0]) ? overviewRes.rows[0] : { verified_residents: '0', total_tanods: '0', active_alerts: '0' };
-    const alertsByTypeRows = (byTypeRes && byTypeRes.rows) ? byTypeRes.rows : [];
-    const alertsHistoryRows = (historyRes && historyRes.rows) ? historyRes.rows : [];
+    const alertsByTypeRows = Object.keys(alertsByTypeMap).map(type => ({
+      type,
+      count: alertsByTypeMap[type]
+    })).sort((a, b) => b.count - a.count);
+    
+    const alertsHistoryRows = Object.keys(alertsHistoryMap).map(day => ({
+      day,
+      count: alertsHistoryMap[day]
+    })).sort((a, b) => a.day.localeCompare(b.day));
 
     console.log(`[Analytics] Serving dashboard data. Alerts: ${alertsByTypeRows.length}, History: ${alertsHistoryRows.length}`);
 
     return response.success(res, {
-      overview: {
-        verified_residents: parseInt(overview.verified_residents || '0'),
-        total_tanods: parseInt(overview.total_tanods || '0'),
-        active_alerts: parseInt(overview.active_alerts || '0')
-      },
-      alertsByType: alertsByTypeRows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') })),
-      alertsHistory: alertsHistoryRows.map((r: any) => ({ ...r, count: parseInt(r.count || '0') }))
+      overview: { verified_residents, total_tanods, active_alerts },
+      alertsByType: alertsByTypeRows,
+      alertsHistory: alertsHistoryRows
     });
 
   } catch (err: any) {
@@ -76,27 +89,40 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
 
 export const getHeatmapData = async (req: AuthRequest, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        id, 
-        type, 
-        location->>'lat' as lat, 
-        location->>'lng' as lng, 
-        created_at as timestamp 
-      FROM alerts 
-      WHERE created_at >= NOW() - INTERVAL '30 days'
-    `).catch(err => {
-      console.error("Heatmap Query Error:", err);
-      return { rows: [] };
-    });
-
-    const heatmap = (result.rows || []).map(r => ({
-      id: r.id,
-      type: r.type,
-      lat: parseFloat(r.lat || '14.5995'),
-      lng: parseFloat(r.lng || '120.9842'),
-      timestamp: r.timestamp
-    }));
+    const db = getDb();
+    const heatmap: any[] = [];
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    
+    try {
+      const alertsSnap = await db.collection('alerts').get();
+      alertsSnap.forEach(doc => {
+        const data = doc.data();
+        let ts = 0;
+        if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
+        else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
+        
+        if (ts && Math.abs(ts - Date.now()) < 5 * 365 * 24 * 60 * 60 * 1000) { // arbitrary validation
+          if (ts >= thirtyDaysAgo) {
+            let lat, lng;
+            if (data.location?.lat) { lat = data.location.lat; lng = data.location.lng; }
+            else if (data.lat) { lat = data.lat; lng = data.lng; }
+            else if (data.latitude) { lat = data.latitude; lng = data.longitude; }
+            
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              heatmap.push({
+                id: doc.id,
+                type: data.type || 'UNKNOWN',
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                timestamp: ts
+              });
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.error("Heatmap query error:", e);
+    }
 
     return res.json(heatmap);
   } catch (err: any) {

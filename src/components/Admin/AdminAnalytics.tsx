@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { BarChart as ChartIcon, Zap, Shield, Users, Activity, Bot } from 'lucide-react';
-import { fetchAPI } from '../../lib/api';
 import { toast } from 'react-hot-toast';
 import { User } from '../../types';
 import { promptWebLLM, setWebLLMProgressCallback } from '../../lib/webllm';
 import { LiveHeatmap } from './LiveHeatmap';
+import { db } from '../../lib/firebase';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
@@ -25,13 +26,47 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
     
     if (!silent) setLoading(true);
     try {
-      const json = await fetchAPI('intelligence/dashboard');
-      const payload = json.data || json; // gracefully handle both forms
+      const usersSnap = await getDocs(collection(db, 'users'));
+      let verified_residents = 0;
+      let total_tanods = 0;
+      usersSnap.forEach(doc => {
+        const d = doc.data();
+        if (d.role === 'resident' && d.status === 'approved') verified_residents++;
+        if (d.role === 'tanod') total_tanods++;
+      });
+
+      const alertsSnap = await getDocs(collection(db, 'alerts'));
+      let active_alerts = 0;
+      const alertsByTypeMap: Record<string, number> = {};
+      const alertsHistoryMap: Record<string, number> = {};
+      
+      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+      alertsSnap.forEach(doc => {
+        const d = doc.data();
+        if (['pending', 'active', 'responding'].includes(d.status)) active_alerts++;
+        if (d.type) alertsByTypeMap[d.type] = (alertsByTypeMap[d.type] || 0) + 1;
+        
+        let ts = 0;
+        if (d.created_at) ts = typeof d.created_at === 'string' ? new Date(d.created_at).getTime() : d.created_at.toMillis?.() || d.created_at;
+        else if (d.timestamp) ts = typeof d.timestamp === 'string' ? new Date(d.timestamp).getTime() : d.timestamp.toMillis?.() || d.timestamp;
+        
+        if (ts && ts >= sevenDaysAgo) {
+          const dateStr = new Date(ts).toISOString().split('T')[0];
+          alertsHistoryMap[dateStr] = (alertsHistoryMap[dateStr] || 0) + 1;
+        }
+      });
+
+      const payload = {
+        overview: { verified_residents, total_tanods, active_alerts },
+        alertsByType: Object.keys(alertsByTypeMap).map(type => ({ type, count: alertsByTypeMap[type] })).sort((a, b) => b.count - a.count),
+        alertsHistory: Object.keys(alertsHistoryMap).map(day => ({ day, count: alertsHistoryMap[day] })).sort((a, b) => a.day.localeCompare(b.day))
+      };
+      
       setData(payload);
       setError(null);
     } catch (err: any) {
-      console.error("Failed to fetch analytics:", err);
-      // Only set error state if we don't have data already
+      console.error("Failed to fetch analytics directly from Firestore:", err);
       if (!data) {
         setError(err.message || 'Failed to fetch analytics');
       } else {
