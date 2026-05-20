@@ -43,7 +43,7 @@ export class EmergencySoundManager {
 
   private initFallbackAudio() {
     try {
-      this.fallbackAudio = new Audio('/sounds/siren-wail.mp3');
+      this.fallbackAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/1004/1004-preview.mp3');
       this.fallbackAudio.loop = true;
       this.fallbackAudio.preload = 'auto';
     } catch (e) {

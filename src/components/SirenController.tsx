@@ -33,7 +33,7 @@ export default function SirenController({ globalSirenActive, profile, alerts }: 
       return;
     }
 
-    const pendingAlerts = alerts.filter(a => a.status === 'pending');
+    const pendingAlerts = alerts.filter(a => a.status?.toLowerCase() === 'pending');
     const newestAlert = pendingAlerts[0]; // Alerts are usually sorted DESC by created_at
 
     if (newestAlert) {

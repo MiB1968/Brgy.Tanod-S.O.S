@@ -37,18 +37,42 @@ export async function initDb(retries = 3) {
       `);
 
       // Apply necessary schema migrations manually
-      try {
-        await client.query("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1");
-        await client.query("ALTER TABLE users ADD CONSTRAINT check_token_version CHECK (token_version > 0)");
-        await client.query("CREATE INDEX idx_users_token_version ON users(id, token_version)");
-        logger.info("DB_INIT: Applied token_version migration to users table.");
-      } catch (e: any) {
-        // Ignore if column already exists
-        if (e.code !== '42701') { 
-          // 42701 = duplicate_column
-          logger.warn(`DB_INIT: Migration warning: ${e.message}`);
+      const runQuerySilently = async (sql: string, desc: string) => {
+        try {
+          await client.query(sql);
+          logger.info(`DB_INIT: ${desc}`);
+        } catch (e: any) {
+          // 42701: duplicate_column
+          // 42710: duplicate_object (duplicate constraint / index)
+          // 42P16: duplicate_table / constraint
+          if (e.code === '42701' || e.code === '42710' || e.code === '42P16') {
+            // Already applied, skip silently
+          } else {
+            logger.warn(`DB_INIT: Migration warning for "${desc}": ${e.message} (code: ${e.code})`);
+          }
         }
-      }
+      };
+
+      await runQuerySilently("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1", "Added token_version to users");
+      await runQuerySilently("ALTER TABLE users ADD CONSTRAINT check_token_version CHECK (token_version > 0)", "Added check_token_version to users");
+      await runQuerySilently("CREATE INDEX idx_users_token_version ON users(id, token_version)", "Created idx_users_token_version index");
+
+      // system_broadcasts migrations (0004_mature_green_goblin.sql)
+      await runQuerySilently("ALTER TABLE system_broadcasts ALTER COLUMN isactive SET DEFAULT false", "Set system_broadcasts.isactive default false");
+      await runQuerySilently("ALTER TABLE system_broadcasts ADD COLUMN incident_id uuid", "Added incident_id to system_broadcasts");
+      await runQuerySilently("ALTER TABLE system_broadcasts ADD COLUMN approval_status text DEFAULT 'pending'", "Added approval_status to system_broadcasts");
+      await runQuerySilently("ALTER TABLE system_broadcasts ADD COLUMN ai_recommendation jsonb", "Added ai_recommendation to system_broadcasts");
+      await runQuerySilently(`
+        ALTER TABLE system_broadcasts 
+        ADD CONSTRAINT system_broadcasts_incident_id_alerts_id_fk 
+        FOREIGN KEY (incident_id) REFERENCES alerts(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+      `, "Added foreign key constraint system_broadcasts_incident_id_alerts_id_fk");
+
+      // Convert alerts.responder_recommendations to jsonb (0003_tiresome_bullseye.sql)
+      await runQuerySilently(`
+        ALTER TABLE alerts 
+        ALTER COLUMN responder_recommendations SET DATA TYPE jsonb USING responder_recommendations::jsonb
+      `, "Converted alerts.responder_recommendations to JSONB");
 
       logger.info("DB_INIT: Schema synchronized.");
       return;

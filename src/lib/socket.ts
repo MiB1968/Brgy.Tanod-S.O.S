@@ -10,7 +10,7 @@ const socket = io({
   }),
   rememberUpgrade: false,
   path: '/socket.io',
-  transports: ['websocket'], // Force WebSocket, skip polling to avoid proxy dropping xhr
+  transports: ['polling', 'websocket'],
   timeout: 60000, 
   withCredentials: true
 });

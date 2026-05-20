@@ -1,6 +1,6 @@
 // src/components/GuardianAIChat.tsx
 import { useState, useRef, useEffect } from 'react';
-import { Send, X, Bot, Settings as SettingsIcon, Mic, MicOff, Trash2, Download, Sun, Moon, Camera, AlertTriangle, Info } from 'lucide-react';
+import { Send, X, Bot, Settings as SettingsIcon, Mic, MicOff, Trash2, Download, Sun, Moon, Camera, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { useGuardianChat } from '../hooks/useGuardianChat';
 import GuardianAISettings from './GuardianAISettings';
 import { motion, AnimatePresence } from 'motion/react';
@@ -33,6 +33,33 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
     message: string;
     level: 'good' | 'warning' | 'error';
   }>({ supported: true, message: '', level: 'good' });
+
+  const [showFirstTimeSetup, setShowFirstTimeSetup] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const hasShownSetup = useRef(false);
+
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const toastTimerRef = useRef<any>(null);
+
+  const showToast = (message: string, type: 'error' | 'success' | 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (_) {}
+      }
+    };
+  }, []);
 
   // Enhanced Compatibility Check
   useEffect(() => {
@@ -74,21 +101,58 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
     checkCompatibility();
   }, []);
 
-  // Auto-suggest model loading when chat opens
+  // Auto-suggest model loading or first-time setup or changelog when chat opens
   useEffect(() => {
-    if (isOpen && compatibility.supported && !guardianAI.isLoaded) {
-      const timer = setTimeout(() => {
-        if (!guardianAI.isLoaded) {
-          setShowSettings(true);
-        }
-      }, 1500);
+    if (isOpen && compatibility.supported) {
+      const hasLoadedBefore = localStorage.getItem('guardianAI_hasCompletedSetup');
+      const lastVersion = localStorage.getItem('guardianAI_lastVersion');
+      const currentVersion = "1.5.0";
 
-      return () => clearTimeout(timer);
+      if (!hasLoadedBefore) {
+        // First-time setup trigger
+        if (!hasShownSetup.current) {
+          const timer = setTimeout(() => {
+            setShowFirstTimeSetup(true);
+            hasShownSetup.current = true;
+          }, 800);
+          return () => clearTimeout(timer);
+        }
+      } else if (lastVersion !== currentVersion) {
+        // Changelog release notes trigger
+        if (!hasShownSetup.current) {
+          const timer = setTimeout(() => {
+            setShowChangelog(true);
+            hasShownSetup.current = true;
+            localStorage.setItem('guardianAI_lastVersion', currentVersion);
+          }, 1000);
+          return () => clearTimeout(timer);
+        }
+      } else {
+        // Setup completed, up to date version, but no model currently loaded inside brain
+        if (guardianAI.isLoaded) return;
+        const timer = setTimeout(() => {
+          if (!guardianAI.isLoaded && !showSettings && !showFirstTimeSetup && !showChangelog) {
+            setShowSettings(true);
+          }
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [isOpen, compatibility.supported]);
+  }, [isOpen, compatibility.supported, showSettings, showFirstTimeSetup, showChangelog]);
 
   const chatRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  const completeFirstTimeSetup = () => {
+    setShowFirstTimeSetup(false);
+    setShowSettings(true);
+    localStorage.setItem('guardianAI_hasCompletedSetup', 'true');
+  };
+
+  const skipSetup = () => {
+    setShowFirstTimeSetup(false);
+    localStorage.setItem('guardianAI_hasCompletedSetup', 'true');
+  };
 
   const capturePhoto = () => {
     const fileInput = document.createElement('input');
@@ -145,38 +209,76 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
   const toggleVoiceInput = () => {
     const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
     if (!SpeechRecognitionAPI) {
-      alert("Unsupported Speech recognition in current browser. Try Microsoft Edge or Chrome.");
+      showToast("Ang voice input ay hindi suportado sa browser na ito. Pakigamit ang Google Chrome.", 'error');
       return;
     }
 
-    if (isListening) {
-      recognitionRef.current?.stop();
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
       setIsListening(false);
       return;
     }
 
     try {
       const rec = new SpeechRecognitionAPI();
-      rec.lang = 'tl-PH'; // Native Filipino
+      rec.lang = 'fil-PH'; // Native Filipino/Tagalog locale code
       rec.continuous = false;
       rec.interimResults = false;
+      rec.maxAlternatives = 1;
 
       rec.onstart = () => {
         setIsListening(true);
+        showToast("🎤 Nakikinig na... Magsalita ng iyong ulat.", 'info');
       };
 
       rec.onresult = (event: any) => {
-        const result = event.results[0][0].transcript;
-        if (result) {
-          setInput(prev => (prev ? prev + ' ' : '') + result);
-          sendMessage(result); // Auto send on transcript completion
+        const transcript = event.results[0][0].transcript.trim();
+        if (transcript) {
+          setInput(prev => (prev ? prev + ' ' : '') + transcript);
+          sendMessage(transcript);
+          showToast("✅ Narinig at naipadala!", 'success');
         }
       };
 
-      rec.onerror = (e: any) => {
-        console.error("Speech Recognition Error:", e);
+      rec.onerror = (event: any) => {
         setIsListening(false);
+        let message = "May problema sa pagkilala ng boses.";
+        let canRetry = true;
+
+        switch (event.error) {
+          case 'no-speech':
+            message = "Walang narinig na salita. Pakisubukang magsalita muli nang malinaw.";
+            break;
+          case 'audio-capture':
+            message = "Hindi ma-access ang mikropono. Pakisuri kung nakasaksak ito.";
+            break;
+          case 'not-allowed':
+          case 'permission-denied':
+            message = "Hindi binigyan ng pahintulot ang mikropono sa iyong browser.";
+            canRetry = false;
+            break;
+          case 'network':
+            message = "May problema sa koneksyon ng internet para sa voice parsing.";
+            break;
+          case 'aborted':
+            message = "Kinansela ang pag-record ng boses.";
+            break;
+          default:
+            message = `Error sa boses: ${event.error}`;
+        }
+
+        showToast(message, 'error');
+
+        // Automatically retry once if it was just a transient 'no-speech' error and dialog is still active
+        if (canRetry && event.error === 'no-speech' && isOpen) {
+          setTimeout(() => {
+            if (isOpen && !isListening) {
+              toggleVoiceInput();
+            }
+          }, 1200);
+        }
       };
 
       rec.onend = () => {
@@ -186,8 +288,9 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       recognitionRef.current = rec;
       rec.start();
     } catch (err) {
-      console.error(err);
+      console.error("Failed to start speech recognition:", err);
       setIsListening(false);
+      showToast("Hindi ma-start ang boses. Pakitiyak na pinayagan ang mic.", 'error');
     }
   };
 
@@ -203,7 +306,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
   const exportIncidentReport = async () => {
     if (messages.length === 0) {
-      alert("Walang laman ang chat para i-export.");
+      showToast("Walang laman ang chat para i-export.", 'error');
       return;
     }
 
@@ -348,10 +451,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
       await syncService.queueReport(reportPayload);
       setAttachedPhotos([]);
-      alert("✅ Na-save na ang Report bilang PDF at nakapila na ito para i-sync sa Barangay Hall kapag online!");
+      showToast("✅ Na-save na ang Report bilang PDF at naka-queue para mag-upload!", "success");
     } catch (pdfErr) {
       console.error("Failed to generate report PDF: ", pdfErr);
-      alert("❌ May problema sa pag-export. Subukan ulit.");
+      showToast("❌ May problema sa pag-export. Subukan muli.", "error");
     }
   };
 
@@ -376,12 +479,87 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 30 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className={`fixed bottom-24 right-6 w-96 h-[580px] rounded-3xl shadow-2xl flex flex-col z-[80] overflow-hidden font-sans border transition-all ${
+                className={`fixed bottom-24 right-6 w-96 h-[580px] rounded-3xl shadow-2xl flex flex-col z-[80] overflow-hidden font-sans border transition-all relative ${
                   isDark 
                     ? 'bg-[#0a1428] border-purple-500/30 text-white' 
                     : 'bg-white border-gray-200 text-gray-900 shadow-xl'
                 }`}
               >
+                {/* First Time Setup Modal - Pure Tagalog */}
+                {showFirstTimeSetup && (
+                  <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+                    <div className="flex flex-col items-center text-center max-w-[320px]">
+                      <div className="mx-auto w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5 animate-pulse">
+                        <Bot className="w-10 h-10 text-purple-400" />
+                      </div>
+                      
+                      <h2 className="text-xl font-bold mb-3 tracking-tight">Maligayang Pagdating sa Guardian AI!</h2>
+                      <p className={`text-xs mb-6 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Upang magamit ang offline na artificial intelligence, kailangan muna nating i-load ang isang AI Model. Mangyayari ito nang ligtas mismo sa iyong browser sandbox.
+                      </p>
+
+                      <div className="space-y-3 w-full">
+                        <button
+                          onClick={completeFirstTimeSetup}
+                          className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer"
+                        >
+                          <CheckCircle size={16} />
+                          I-load ang Unang Model Ngayon
+                        </button>
+
+                        <button
+                          onClick={skipSetup}
+                          className={`w-full py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isDark 
+                              ? 'border-white/10 hover:bg-white/5 text-gray-400' 
+                              : 'border-gray-200 hover:bg-gray-100 text-gray-500'
+                          }`}
+                        >
+                          Gagawin ko na lang mamaya
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-gray-400 mt-6 leading-normal">
+                        Inirerekomenda: <strong>Phi-3.5 Mini</strong><br />
+                        (Mabilis at sapat na matalino para sa Tanod)
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* What's New Modal - Pure Tagalog */}
+                {showChangelog && (
+                  <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+                    <div className="flex flex-col items-center text-center max-w-[320px]">
+                      <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-4 text-3xl animate-bounce">
+                        ✨
+                      </div>
+                      
+                      <h2 className="text-xl font-bold mb-1 tracking-tight">Ano ang Bago?</h2>
+                      <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">Bersyon v1.5.0</p>
+                      
+                      <div className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        <p className="font-semibold text-purple-400">Mga Pagbabago:</p>
+                        <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
+                          <li>One-time First Time Setup Guide</li>
+                          <li>Advanced WebGPU compatibility checker</li>
+                          <li>Automatic model loading suggestion</li>
+                          <li>Ligtas na offline Background Sync</li>
+                          <li>Suporta sa PDF Incident Report na May Larawan</li>
+                          <li>Pending Reports Viewer sa Settings Panel</li>
+                        </ul>
+                      </div>
+
+                      <button
+                        onClick={() => setShowChangelog(false)}
+                        className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs transition-all shadow-lg cursor-pointer"
+                      >
+                        Naintindihan ko, Salamat!
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Header section with operational status and actions */}
                 <div className={`p-4 border-b flex items-center justify-between transition-colors ${
                   isDark 
@@ -615,12 +793,87 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
       {isInline ? (
         <div 
-          className={`w-full max-w-4xl mx-auto h-[620px] rounded-3xl flex flex-col overflow-hidden font-sans border transition-all ${
+          className={`w-full max-w-4xl mx-auto h-[620px] rounded-3xl flex flex-col overflow-hidden font-sans border transition-all relative ${
             isDark 
               ? 'bg-[#0a1428] border-purple-500/30 text-white' 
               : 'bg-white border-gray-200 text-gray-900 shadow-xl'
           }`}
         >
+          {/* First Time Setup Modal - Pure Tagalog */}
+          {showFirstTimeSetup && (
+            <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+              <div className="flex flex-col items-center text-center max-w-[320px]">
+                <div className="mx-auto w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5 animate-pulse">
+                  <Bot className="w-10 h-10 text-purple-400" />
+                </div>
+                
+                <h2 className="text-xl font-bold mb-3 tracking-tight">Maligayang Pagdating sa Guardian AI!</h2>
+                <p className={`text-xs mb-6 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Upang magamit ang offline na artificial intelligence, kailangan muna nating i-load ang isang AI Model. Mangyayari ito nang ligtas mismo sa iyong browser sandbox.
+                </p>
+
+                <div className="space-y-3 w-full">
+                  <button
+                    onClick={completeFirstTimeSetup}
+                    className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer"
+                  >
+                    <CheckCircle size={16} />
+                    I-load ang Unang Model Ngayon
+                  </button>
+
+                  <button
+                    onClick={skipSetup}
+                    className={`w-full py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                      isDark 
+                        ? 'border-white/10 hover:bg-white/5 text-gray-400' 
+                        : 'border-gray-200 hover:bg-gray-100 text-gray-500'
+                    }`}
+                  >
+                    Gagawin ko na lang mamaya
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-gray-400 mt-6 leading-normal">
+                  Inirerekomenda: <strong>Phi-3.5 Mini</strong><br />
+                  (Mabilis at sapat na matalino para sa Tanod)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* What's New Modal - Pure Tagalog */}
+          {showChangelog && (
+            <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+              <div className="flex flex-col items-center text-center max-w-[320px]">
+                <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-4 text-3xl animate-bounce">
+                  ✨
+                </div>
+                
+                <h2 className="text-xl font-bold mb-1 tracking-tight">Ano ang Bago?</h2>
+                <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">Bersyon v1.5.0</p>
+                
+                <div className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                  <p className="font-semibold text-purple-400">Mga Pagbabago:</p>
+                  <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
+                    <li>One-time First Time Setup Guide</li>
+                    <li>Advanced WebGPU compatibility checker</li>
+                    <li>Automatic model loading suggestion</li>
+                    <li>Ligtas na offline Background Sync</li>
+                    <li>Suporta sa PDF Incident Report na May Larawan</li>
+                    <li>Pending Reports Viewer sa Settings Panel</li>
+                  </ul>
+                </div>
+
+                <button
+                  onClick={() => setShowChangelog(false)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs transition-all shadow-lg cursor-pointer"
+                >
+                  Naintindihan ko, Salamat!
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header section with operational status and actions */}
           <div className={`p-4 border-b flex items-center justify-between transition-colors ${
             isDark 
@@ -848,6 +1101,25 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold tracking-wide border border-white/10"
+            style={{
+              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6',
+              color: '#ffffff'
+            }}
+          >
+            <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '⚠️' : '🎤'}</span>
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

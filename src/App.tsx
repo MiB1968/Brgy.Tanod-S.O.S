@@ -24,6 +24,8 @@ import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
 // Overlays & Components
 import IncidentForm from "./components/IncidentForm";
 import SOSAlertSiren from "./components/SOSAlertSiren";
+import SirenController from "./components/SirenController";
+import TanodCommandAlert from "./components/TanodCommandAlert";
 import { GuardianGreeting } from "./components/ai/GuardianGreeting";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 import GuardianAIChat from "./components/GuardianAIChat";
@@ -150,6 +152,14 @@ export default function App() {
         </AnimatePresence>
 
         {/* System Components */}
+        <SirenController 
+          globalSirenActive={logic.globalSirenActive}
+          profile={logic.effectiveProfile}
+          alerts={logic.alerts}
+        />
+        {logic.effectiveProfile && logic.effectiveRole === "tanod" && (
+          <TanodCommandAlert profile={logic.effectiveProfile} />
+        )}
         <GuardianGreeting />
         <GuardianVoiceAssistant />
         <GuardianAIChat />

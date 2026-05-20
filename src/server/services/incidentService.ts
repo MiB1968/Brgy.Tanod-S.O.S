@@ -226,7 +226,7 @@ export const incidentService = {
 
   async cancelSOS(incidentId: string, userId: string, userRole: string) {
     const alertCheck = await pool.query(
-      "SELECT resident_id, status FROM alerts WHERE id = $1",
+      "SELECT resident_id, status, updated_at FROM alerts WHERE id = $1",
       [incidentId]
     );
 
@@ -239,7 +239,17 @@ export const incidentService = {
       throw new AppError("Permission denied", 403, "FORBIDDEN");
     }
 
-    if (alert.status === 'resolved' || alert.status === 'cancelled') {
+    const statusLower = (alert.status || '').toLowerCase();
+
+    if (statusLower === 'cancelled') {
+      return {
+        id: incidentId,
+        status: alert.status,
+        updatedAt: alert.updated_at || new Date()
+      };
+    }
+
+    if (statusLower === 'resolved') {
         throw new AppError("Alert is already completed", 409, "CONFLICT");
     }
 

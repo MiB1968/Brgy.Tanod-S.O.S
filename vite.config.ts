@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
           orientation: "portrait-primary"
         },
         workbox: {
+          navigateFallbackDenylist: [/^\/api/],
           maximumFileSizeToCacheInBytes: 15 * 1024 * 1024, // 15MB to allow WASM or bundle chunks to be cached
           runtimeCaching: [
             // Aggressive Offline Map Tiles Caching

@@ -102,7 +102,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       }
 
       if (!decoded) {
-        if (jwtErr instanceof jwt.JsonWebTokenError) {
+        if (jwtErr instanceof jwt.JsonWebTokenError || (jwtErr && (jwtErr.name === 'JsonWebTokenError' || jwtErr.name === 'TokenExpiredError'))) {
           return res.status(401).json({
             success: false,
             error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
@@ -152,8 +152,8 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     req.user = { ...decoded, tokenVersion: currentTokenVersion };
     logger.info(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
     next();
-  } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
+  } catch (err: any) {
+    if (err instanceof jwt.JsonWebTokenError || (err && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError'))) {
       return res.status(401).json({
         success: false,
         error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }

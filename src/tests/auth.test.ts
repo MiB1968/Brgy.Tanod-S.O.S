@@ -9,6 +9,9 @@ vi.mock('../server/config/index', () => ({
 vi.mock('../server/db/index', () => ({
   pool: {
     query: vi.fn().mockResolvedValue({ rows: [{ token_version: 0 }] })
+  },
+  admin: {
+    apps: []
   }
 }));
 
