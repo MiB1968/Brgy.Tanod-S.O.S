@@ -12,6 +12,7 @@ import ResidentTacticalMap from "../Admin/ResidentTacticalMap";
 import { ResidentVerification } from "../Admin/ResidentVerification";
 import AdminResidents from "../AdminResidents";
 import OpsIntegrations from "../Admin/OpsIntegrations";
+import GuardianAIChat from "../GuardianAIChat";
 
 interface RoleBasedContentProps {
   activeTab: string;
@@ -175,8 +176,18 @@ export function RoleBasedContent({
             <OpsIntegrations />
           )}
 
+          {/* ==================== GUARDIAN AI ==================== */}
+          {activeTab === "guardian" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold font-sans tracking-tight text-white uppercase italic">Barangay Guardian AI Advisor</h2>
+              </div>
+              <GuardianAIChat isInline={true} />
+            </div>
+          )}
+
           {/* Fallback for other tabs */}
-          {!["home", "map", "tracker", "settings", "verification", "residents", "resident-map", "ops"].includes(activeTab) && (
+          {!["home", "map", "tracker", "settings", "verification", "residents", "resident-map", "ops", "guardian"].includes(activeTab) && (
             <div className="h-[60vh] flex flex-col items-center justify-center text-center">
               <div className="text-7xl mb-6">🛠️</div>
               <h3 className="text-2xl font-bold mb-3">Coming Soon</h3>

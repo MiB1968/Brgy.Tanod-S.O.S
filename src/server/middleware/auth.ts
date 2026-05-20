@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index';
 import { logger } from '../utils/logger';
-import { pool } from '../db/index';
+import { pool, admin } from '../db/index';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -42,7 +42,75 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
+    let decoded: any = null;
+    let isFirebaseAuth = false;
+
+    try {
+      decoded = jwt.verify(token, config.jwtSecret) as any;
+    } catch (jwtErr) {
+      // If JWT verify fails, check if we can verify as a Firebase ID token
+      if (admin && admin.apps && admin.apps.length > 0) {
+        try {
+          const decodedFirebase = await admin.auth().verifyIdToken(token);
+          if (decodedFirebase && decodedFirebase.email) {
+            const userResult = await pool.query(
+              'SELECT * FROM users WHERE email = $1',
+              [decodedFirebase.email.toLowerCase()]
+            );
+            const dbUser = userResult.rows[0];
+            if (dbUser) {
+              decoded = {
+                id: dbUser.id,
+                email: dbUser.email,
+                role: dbUser.role,
+                tokenVersion: dbUser.token_version || 1
+              };
+              isFirebaseAuth = true;
+            } else {
+              logger.warn(`[AUTH] Firebase token validated but user email ${decodedFirebase.email} is not registered in CockroachDB/Postgres. Entering fallback/provision info.`);
+              // Look up or auto-register standard rubenlleg12@gmail.com or other master emails
+              const isMaster = decodedFirebase.email.toLowerCase() === 'rubenlleg12@gmail.com' || decodedFirebase.email.toLowerCase() === 'ben@brgytanod.com';
+              if (isMaster) {
+                // Since this is the Super Admin master account, auto-bootstrap it into the DB if missing!
+                logger.info(`[AUTH] Bootstrapping master admin ${decodedFirebase.email} on the fly.`);
+                const insertResult = await pool.query(
+                  `INSERT INTO users (email, password, name, role, status)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (email) DO UPDATE SET role = 'admin'
+                   RETURNING id, email, name, role, status`,
+                  [decodedFirebase.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'admin', 'verified']
+                );
+                const newUser = insertResult.rows[0];
+                decoded = {
+                  id: newUser.id,
+                  email: newUser.email,
+                  role: newUser.role,
+                  tokenVersion: 1
+                };
+                isFirebaseAuth = true;
+              } else {
+                return res.status(401).json({
+                  success: false,
+                  error: { code: 'USER_NOT_FOUND', message: 'No registered user found for this account' }
+                });
+              }
+            }
+          }
+        } catch (firebaseErr: any) {
+          logger.debug(`[AUTH] Firebase JWT check also failed: ${firebaseErr.message}`);
+        }
+      }
+
+      if (!decoded) {
+        if (jwtErr instanceof jwt.JsonWebTokenError) {
+          return res.status(401).json({
+            success: false,
+            error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
+          });
+        }
+        throw jwtErr;
+      }
+    }
 
     // Verify token_version hasn't been revoked
     // Check if decoded.id is a valid UUID before querying (optional but safer)
@@ -73,7 +141,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     const decodedVer = Number(decoded.tokenVersion || 1);
     const dbVer = Number(currentTokenVersion);
 
-    if (decodedVer !== dbVer) {
+    if (decodedVer !== dbVer && !isFirebaseAuth) {
       logger.warn(`[AUTH] Token revoked for user: ${decoded.id} (Token: ${decodedVer}, DB: ${dbVer})`);
       return res.status(401).json({
         success: false,

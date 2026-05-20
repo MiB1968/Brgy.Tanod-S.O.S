@@ -15,7 +15,8 @@ import {
   FileText, 
   MapPin, 
   Navigation,
-  UserCheck
+  UserCheck,
+  Bot
 } from 'lucide-react';
 
 export const SOS_SUGGESTIONS: Record<string, string[]> = {
@@ -68,6 +69,7 @@ export const navItems = [
   { id: 'reports', label: '📜 Reports', icon: FileText },
   { id: 'records', label: '📄 Workspace', icon: FileText },
   { id: 'directory', label: '🆘 SOS Help', icon: Phone },
+  { id: 'guardian', label: '🤖 Guardian AI', icon: Bot },
   { id: 'settings', label: '⚙️ Config', icon: SettingsIcon },
   { id: 'ops', label: '🔌 Integrations', icon: SettingsIcon },
 ];

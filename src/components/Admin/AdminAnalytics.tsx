@@ -6,8 +6,7 @@ import { toast } from 'react-hot-toast';
 import { User } from '../../types';
 import { promptWebLLM, setWebLLMProgressCallback } from '../../lib/webllm';
 import { LiveHeatmap } from './LiveHeatmap';
-import { db } from '../../lib/firebase';
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import * as api from '../../lib/api';
 
 const COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6'];
 
@@ -26,30 +25,29 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
     
     if (!silent) setLoading(true);
     try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      let verified_residents = 0;
-      let total_tanods = 0;
-      usersSnap.forEach(doc => {
-        const d = doc.data();
-        if (d.role === 'resident' && d.status === 'approved') verified_residents++;
-        if (d.role === 'tanod') total_tanods++;
-      });
+      // Fetch residents list
+      const residentsList = await api.residents.getAll();
+      let verified_residents = residentsList.filter((r: any) => r.status === 'approved').length;
 
-      const alertsSnap = await getDocs(collection(db, 'alerts'));
+      // Fetch on-duty tanods list
+      const tanodsList = await api.generic.list('users?role=tanod');
+      let total_tanods = tanodsList.length;
+
+      // Fetch alerts list
+      const alertsList = await api.alerts.getAll();
       let active_alerts = 0;
       const alertsByTypeMap: Record<string, number> = {};
       const alertsHistoryMap: Record<string, number> = {};
       
       const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
 
-      alertsSnap.forEach(doc => {
-        const d = doc.data();
+      alertsList.forEach((d: any) => {
         if (['pending', 'active', 'responding'].includes(d.status)) active_alerts++;
         if (d.type) alertsByTypeMap[d.type] = (alertsByTypeMap[d.type] || 0) + 1;
         
         let ts = 0;
-        if (d.created_at) ts = typeof d.created_at === 'string' ? new Date(d.created_at).getTime() : d.created_at.toMillis?.() || d.created_at;
-        else if (d.timestamp) ts = typeof d.timestamp === 'string' ? new Date(d.timestamp).getTime() : d.timestamp.toMillis?.() || d.timestamp;
+        if (d.created_at) ts = typeof d.created_at === 'string' ? new Date(d.created_at).getTime() : d.created_at;
+        else if (d.timestamp) ts = typeof d.timestamp === 'string' ? new Date(d.timestamp).getTime() : d.timestamp;
         
         if (ts && ts >= sevenDaysAgo) {
           const dateStr = new Date(ts).toISOString().split('T')[0];

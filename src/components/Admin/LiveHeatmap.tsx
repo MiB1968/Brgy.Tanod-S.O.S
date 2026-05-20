@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReportMap from '../ReportMap';
 import { motion } from 'motion/react';
 import { Activity, Flame, ShieldAlert, Waves, MapPin } from 'lucide-react';
-import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import * as api from '../../lib/api';
 
 interface HeatmapPoint {
   id: string;
@@ -22,13 +21,12 @@ export function LiveHeatmap() {
       try {
         const heatmap: any[] = [];
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-        const alertsSnap = await getDocs(collection(db, 'alerts'));
+        const alertsList = await api.alerts.getAll();
         
-        alertsSnap.forEach(doc => {
-          const data = doc.data();
+        alertsList.forEach((data: any) => {
           let ts = 0;
-          if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at.toMillis?.() || data.created_at;
-          else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp.toMillis?.() || data.timestamp;
+          if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
+          else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
           
           if (ts && Math.abs(ts - Date.now()) < 5 * 365 * 24 * 60 * 60 * 1000) {
             if (ts >= thirtyDaysAgo) {
@@ -39,10 +37,10 @@ export function LiveHeatmap() {
               
               if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 heatmap.push({
-                  id: doc.id,
+                  id: data.id,
                   type: data.type || 'UNKNOWN',
-                  lat: parseFloat(lat),
-                  lng: parseFloat(lng),
+                  lat: parseFloat(lat as any),
+                  lng: parseFloat(lng as any),
                   timestamp: ts
                 });
               }

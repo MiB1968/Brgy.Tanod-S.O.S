@@ -16,17 +16,13 @@ const allowedOrigins: string[] = config.corsOrigin
   ? config.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
   : [];
 
-// ── Bug 1 Fix: COOP + COEP headers ────────────────────────────────────────────
-// WebLLM uses SharedArrayBuffer for multi-threaded WASM.
-// Browsers only expose SharedArrayBuffer when the page is "cross-origin isolated",
-// which requires BOTH of these headers on every response:
-//   Cross-Origin-Opener-Policy: same-origin
-//   Cross-Origin-Embedder-Policy: require-corp
-//
-// These are applied BEFORE helmet so they aren't overridden.
+// ── Bug 1 Fix: COOP + COEP headers removed/commented ────────────────────────
+// WebLLM uses SharedArrayBuffer when available. However, in an iframe environment 
+// (like the AI Studio preview), setting COOP and COEP is rejected by the browser or
+// blocks normal API/CORS fetches, causing "Failed to fetch" on standard relative requests.
+// We remove them to ensure the web application is fully operational.
 app.use((_req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  // Relaxed to prevent blocking iframe fetches
   next();
 });
 
