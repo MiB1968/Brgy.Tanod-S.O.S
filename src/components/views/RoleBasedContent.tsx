@@ -8,6 +8,11 @@ import AdminDashboard from "../AdminDashboard";
 import TanodDashboard from "../TanodDashboard";
 import ResidentDashboard from "../ResidentDashboard";
 
+import ResidentTacticalMap from "../Admin/ResidentTacticalMap";
+import { ResidentVerification } from "../Admin/ResidentVerification";
+import AdminResidents from "../AdminResidents";
+import OpsIntegrations from "../Admin/OpsIntegrations";
+
 interface RoleBasedContentProps {
   activeTab: string;
   effectiveRole: string;
@@ -153,8 +158,25 @@ export function RoleBasedContent({
             </div>
           )}
 
+          {/* ==================== ADDITIONAL ADMIN TABS ==================== */}
+          {activeTab === "verification" && (
+            <ResidentVerification />
+          )}
+
+          {activeTab === "residents" && (
+            <AdminResidents profile={effectiveProfile} />
+          )}
+
+          {activeTab === "resident-map" && (
+            <ResidentTacticalMap profile={effectiveProfile} />
+          )}
+
+          {activeTab === "ops" && (
+            <OpsIntegrations />
+          )}
+
           {/* Fallback for other tabs */}
-          {!["home", "map", "tracker", "settings"].includes(activeTab) && (
+          {!["home", "map", "tracker", "settings", "verification", "residents", "resident-map", "ops"].includes(activeTab) && (
             <div className="h-[60vh] flex flex-col items-center justify-center text-center">
               <div className="text-7xl mb-6">🛠️</div>
               <h3 className="text-2xl font-bold mb-3">Coming Soon</h3>

@@ -28,6 +28,7 @@ import { GuardianGreeting } from "./components/ai/GuardianGreeting";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 import BroadcastOverlay from "./components/BroadcastOverlay";
 import BackgroundServices from "./components/BackgroundServices";
+import FloatingSOSButton from "./components/FloatingSOSButton";
 import PWAStatus from "./components/PWAStatus";
 
 export default function App() {
@@ -152,6 +153,10 @@ export default function App() {
         <BackgroundServices />
 
         {/* Notifications & PWA */}
+        <FloatingSOSButton 
+          onTrigger={logic.sendSOS} 
+          role={logic.effectiveRole} 
+        />
         <Toaster
           position="top-center"
           toastOptions={{

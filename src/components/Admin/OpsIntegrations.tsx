@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   Server, 
@@ -12,10 +12,13 @@ import {
   CloudRain,
   Map as MapIcon,
   Search,
-  Zap
+  Zap,
+  PhoneCall
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
+import { generic } from '../../lib/api';
+import SMSFallbackSettings from './SMSFallbackSettings';
 
 interface Integration {
   id: string;
@@ -45,6 +48,14 @@ const INITIAL_INTEGRATIONS: Integration[] = [
     status: 'connected',
     lastSync: 'Just now',
     color: 'text-amber-400 bg-amber-400/10 border-amber-400/20'
+  },
+  {
+    id: 'twilio',
+    name: 'Twilio SMS Fallback',
+    description: 'Auto-dispatch SMS alert failovers to nearby Tanods during unassigned or offline-recovered emergencies.',
+    icon: PhoneCall,
+    status: 'disconnected',
+    color: 'text-rose-400 bg-rose-400/10 border-rose-400/20'
   },
   {
     id: 'fmd',
@@ -94,8 +105,66 @@ const INITIAL_INTEGRATIONS: Integration[] = [
 export default function OpsIntegrations() {
   const [integrations, setIntegrations] = useState<Integration[]>(INITIAL_INTEGRATIONS);
   const [activeConfig, setActiveConfig] = useState<string | null>(null);
+  const [twilioSettings, setTwilioSettings] = useState({
+    enabled: false,
+    fallbackDelayMinutes: 5,
+    maxRecipients: 10
+  });
 
-  const toggleStatus = (id: string) => {
+  useEffect(() => {
+    generic.get('system/twilio')
+      .then(res => {
+        if (res) {
+          setTwilioSettings({
+            enabled: res.enabled ?? false,
+            fallbackDelayMinutes: res.fallbackDelayMinutes ?? 5,
+            maxRecipients: res.maxRecipients ?? 10
+          });
+          setIntegrations(prev => prev.map(int => {
+            if (int.id === 'twilio') {
+              return {
+                ...int,
+                status: res.enabled ? 'connected' : 'disconnected',
+                lastSync: 'Sync active'
+              };
+            }
+            return int;
+          }));
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load Twilio settings", err);
+      });
+  }, []);
+
+  const toggleStatus = async (id: string) => {
+    if (id === 'twilio') {
+      const updatedEnabled = !twilioSettings.enabled;
+      try {
+        const nextSettings = { ...twilioSettings, enabled: updatedEnabled };
+        await generic.update('system/twilio', nextSettings);
+        setTwilioSettings(nextSettings);
+        setIntegrations(prev => prev.map(int => {
+          if (int.id === 'twilio') {
+            return {
+              ...int,
+              status: updatedEnabled ? 'connected' : 'disconnected',
+              lastSync: updatedEnabled ? 'Just now' : undefined
+            };
+          }
+          return int;
+        }));
+        if (updatedEnabled) {
+          toast.success("Twilio SMS Fallback Enabled");
+        } else {
+          toast.error("Twilio SMS Fallback Disabled");
+        }
+      } catch (err) {
+        toast.error("Failed to toggle SMS Fallback");
+      }
+      return;
+    }
+
     setIntegrations(prev => prev.map(int => {
       if (int.id === id) {
         const nextStatus = int.status === 'connected' ? 'disconnected' : 'connected';
@@ -193,28 +262,50 @@ export default function OpsIntegrations() {
       {activeConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#16191F] border border-[#2D3139] p-6 rounded-2xl max-w-md w-full shadow-2xl">
-            <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">Configure Service</h3>
-            <p className="text-xs text-white/50 mb-6">Enter connection endpoints or access tokens.</p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Endpoint URL</label>
-                <input type="text" placeholder="https://api.example.com/v1" className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emergency outline-none font-mono" />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">API / Auth Token (Optional)</label>
-                <input type="password" placeholder="••••••••••••••••" className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emergency outline-none font-mono" />
-              </div>
-            </div>
+            {activeConfig === 'twilio' ? (
+              <SMSFallbackSettings 
+                onClose={() => setActiveConfig(null)}
+                onSettingsSaved={(settings) => {
+                  setTwilioSettings(settings);
+                  setIntegrations(prev => prev.map(int => {
+                    if (int.id === 'twilio') {
+                      return {
+                        ...int,
+                        status: settings.enabled ? 'connected' : 'disconnected',
+                        lastSync: 'Config updated'
+                      };
+                    }
+                    return int;
+                  }));
+                  setActiveConfig(null);
+                }}
+              />
+            ) : (
+              <>
+                <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">Configure Service</h3>
+                <p className="text-xs text-white/50 mb-6">Enter connection endpoints or access tokens.</p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Endpoint URL</label>
+                    <input type="text" placeholder="https://api.example.com/v1" className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emergency outline-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">API / Auth Token (Optional)</label>
+                    <input type="password" placeholder="••••••••••••••••" className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emergency outline-none font-mono" />
+                  </div>
+                </div>
 
-            <div className="flex gap-3 mt-8">
-              <button onClick={() => setActiveConfig(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors">
-                Cancel
-              </button>
-              <button onClick={() => { setActiveConfig(null); toast.success('Configuration saved'); }} className="flex-1 py-3 bg-emergency hover:bg-emergency/90 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)] rounded-xl text-sm font-bold transition-all">
-                Save Setttings
-              </button>
-            </div>
+                <div className="flex gap-3 mt-8">
+                  <button onClick={() => setActiveConfig(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={() => { setActiveConfig(null); toast.success('Configuration saved'); }} className="flex-1 py-3 bg-emergency hover:bg-emergency/90 text-white shadow-[0_0_15px_rgba(239,68,68,0.3)] rounded-xl text-sm font-bold transition-all">
+                    Save Settings
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -4,7 +4,8 @@ const SUPER_CACHE_NAME = 'supertonic-models-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/offline-tile.svg'
 ];
 
 const SUPERTONIC_MODELS = [
@@ -77,6 +78,32 @@ self.addEventListener('fetch', (e) => {
   // Never cache them — WebLLM manages its own persistent cache in IndexedDB.
   if (isWebLLMRequest(e.request.url)) {
     e.respondWith(fetch(e.request));
+    return;
+  }
+
+  // Aggressive Cache-First strategy for Map tiles to support Offline Maps
+  if (e.request.url.includes('tile.openstreetmap.org') || e.request.url.includes('/tiles/')) {
+    e.respondWith(
+      caches.match(e.request).then((cachedResponse) => {
+        if (cachedResponse) return cachedResponse;
+
+        return fetch(e.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, responseClone);
+            });
+          }
+          return networkResponse;
+        }).catch((err) => {
+          console.warn('[SW] Offline map tile load failed:', err);
+          // Return the cached offline-tile placeholder if available, else standard fallback
+          return caches.match('/offline-tile.svg').then((fallback) => {
+            return fallback || new Response('', { status: 404, statusText: 'Offline Map Tile Missing' });
+          });
+        });
+      })
+    );
     return;
   }
 

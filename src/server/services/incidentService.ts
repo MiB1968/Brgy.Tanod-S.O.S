@@ -10,6 +10,28 @@ import { validate as uuidValidate } from 'uuid';
 import { smsService } from './smsService';
 import { triggerQwenPawDispatcher, triggerQwenPawReporter } from './qwenpawService';
 import { config } from '../config/index';
+import { Alert } from '../../types';
+
+async function getTwilioConfig() {
+  try {
+    const res = await pool.query("SELECT data FROM system_config WHERE key = 'twilio'");
+    if (res.rows.length > 0) {
+      const data = res.rows[0].data;
+      return {
+        enabled: data.enabled ?? config.twilio.enabled,
+        fallbackDelayMinutes: data.fallbackDelayMinutes ?? config.twilio.fallbackDelayMinutes,
+        maxRecipients: data.maxRecipients ?? config.twilio.maxRecipients
+      };
+    }
+  } catch (e) {
+    console.error("Failed to read dynamic twilio config", e);
+  }
+  return {
+    enabled: config.twilio.enabled,
+    fallbackDelayMinutes: config.twilio.fallbackDelayMinutes,
+    maxRecipients: config.twilio.maxRecipients
+  };
+}
 
 const incidentRepository = new IncidentRepository();
 
@@ -145,35 +167,59 @@ export const incidentService = {
     triggerQwenPawDispatcher(incident).catch(e => console.error("QwenPaw trigger failed", e));
 
     // Twilio SMS Fallback
-    if (config.twilio.enabled) {
-      const triggerSms = async () => {
-        try {
-          // Check if alert was resolved or assigned
-          const checkRes = await pool.query("SELECT status FROM alerts WHERE id = $1", [incident.id]);
-          if (checkRes.rows.length > 0) {
-            const status = checkRes.rows[0].status;
-            if (status === 'pending' || status === 'active') {
-              const nearestTanods = await this.findNearestResponders('default', latitude, longitude, 5); // 5km
-              const tanodsData = await pool.query("SELECT phone FROM users WHERE id = ANY($1) AND phone IS NOT NULL", [nearestTanods.map((t: any) => t.user_id)]);
-              const phoneNumbers = tanodsData.rows.map(r => r.phone);
-              
-              if (phoneNumbers.length > 0) {
-                await smsService.sendSOSFallback(incident, phoneNumbers);
+    const triggerSmsFallbackIfNeeded = async () => {
+      try {
+        const twilioDbConfig = await getTwilioConfig();
+        if (!twilioDbConfig.enabled) {
+          console.log("[SMS Fallback] Disabled in system config. Skipping.");
+          return;
+        }
+
+        const triggerSms = async () => {
+          try {
+            // Check if alert was resolved or assigned
+            const checkRes = await pool.query("SELECT status FROM alerts WHERE id = $1", [incident.id]);
+            if (checkRes.rows.length > 0) {
+              const status = checkRes.rows[0].status;
+              if (status === 'pending' || status === 'active') {
+                const nearestTanods = await this.findNearestResponders('default', latitude, longitude, 5); // 5km
+                const tanodsData = await pool.query("SELECT phone FROM users WHERE id = ANY($1) AND phone IS NOT NULL", [nearestTanods.map((t: any) => t.user_id)]);
+                const phoneNumbers = tanodsData.rows.map(r => r.phone);
+                
+                if (phoneNumbers.length > 0) {
+                  const alertForSms: Alert = {
+                    id: incident.id,
+                    residentId: incident.reporterId,
+                    residentName: residentName,
+                    type: incident.type as any,
+                    status: (incident.status as any) || 'pending',
+                    timestamp: incident.createdAt ? new Date(incident.createdAt).toISOString() : new Date().toISOString(),
+                    location: {
+                      lat: latitude ?? 0,
+                      lng: longitude ?? 0
+                    }
+                  };
+                  await smsService.sendSOSFallback(alertForSms, phoneNumbers);
+                }
               }
             }
+          } catch (e) {
+            console.error("SMS Fallback failed", e);
           }
-        } catch (e) {
-          console.error("SMS Fallback failed", e);
-        }
-      };
+        };
 
-      if (isOfflineRecovered) {
-        // Send immediately if recovered from offline
-        triggerSms();
-      } else {
-        setTimeout(triggerSms, config.twilio.fallbackDelayMinutes * 60 * 1000);
+        if (isOfflineRecovered) {
+          // Send immediately if recovered from offline
+          triggerSms();
+        } else {
+          setTimeout(triggerSms, twilioDbConfig.fallbackDelayMinutes * 60 * 1000);
+        }
+      } catch (err) {
+        console.error("SMS Fallback setup failed", err);
       }
-    }
+    };
+
+    triggerSmsFallbackIfNeeded();
 
     return incident;
   },

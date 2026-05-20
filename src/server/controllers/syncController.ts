@@ -5,6 +5,7 @@ import * as socketService from '../sockets/index';
 import * as response from '../utils/response';
 import { ShiftRepository } from '../db/repositories/ShiftRepository';
 import { z } from 'zod';
+import { config } from '../config/index';
 
 const auditLogArchiveSchema = z.object({
   session_date: z.string().min(1),
@@ -48,6 +49,14 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       if (id === 'developer') {
         const result = await pool.query("SELECT data FROM system_config WHERE key = 'developer'");
         return res.json(result.rows[0]?.data || { name: 'Ruben Llego O.', avatarUrl: null });
+      }
+      if (id === 'twilio') {
+        const result = await pool.query("SELECT data FROM system_config WHERE key = 'twilio'");
+        return res.json(result.rows[0]?.data || {
+          enabled: config.twilio.enabled,
+          fallbackDelayMinutes: config.twilio.fallbackDelayMinutes,
+          maxRecipients: config.twilio.maxRecipients
+        });
       }
     }
 
@@ -259,13 +268,15 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     const isTanod = userRole === 'tanod' || isAdmin;
 
     if (collection === 'system') {
-      if (docId === 'siren' || docId === 'developer') {
+      if (docId === 'siren' || docId === 'developer' || docId === 'twilio') {
         if (!isTanod) return response.error(res, `Full clearance required for ${docId === 'siren' ? 'Siren' : 'Developer'} Control`, "FORBIDDEN", 403);
+        if (docId === 'twilio' && !isAdmin) return response.error(res, "Admin credentials required to configure Twilio settings", "FORBIDDEN", 403);
         await pool.query(
           "INSERT INTO system_config (key, data, updated_at) VALUES ($1, $2, now()) ON CONFLICT (key) DO UPDATE SET data = $2, updated_at = now()",
           [docId, JSON.stringify(data)]
         );
         if (docId === 'siren') socketService.emitToAll("siren_update", data);
+        if (docId === 'twilio') socketService.emitToAll("twilio_update", data);
         return res.json({ success: true });
       }
     }
