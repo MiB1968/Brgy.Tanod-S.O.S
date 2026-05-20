@@ -127,6 +127,23 @@ export class SecureVoiceAssistantService {
     return contextData;
   }
 
+  private async executeWithRetry<T>(operation: () => Promise<T>, retries: number = 3, delay: number = 1500): Promise<T> {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await operation();
+      } catch (err: any) {
+        const isTransientError = err.status === 503 || err.status === 429 || err.message?.includes('503') || err.message?.includes('429');
+        if (isTransientError && i < retries) {
+          console.warn(`[JARVIS] API temporary error (${err.status || 503}), retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+          await new Promise(res => setTimeout(res, delay));
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error('Retries exhausted');
+  }
+
   // ── MAIN ENTRY POINT ─────────────────────────────────────────────────────
   async processVoiceInput(
     userId: string,
@@ -177,14 +194,14 @@ export class SecureVoiceAssistantService {
       ? [{ functionDeclarations: DISPATCHER_TOOLS }]
       : [];
 
-    let result = await getAiClient().models.generateContent({
+    let result = await this.executeWithRetry(() => getAiClient().models.generateContent({
       model: finalModelName,
       contents: [{ role: 'user', parts: [{ text: transcript }] }],
       config: {
         systemInstruction: this.buildSystemPrompt(context, currentRole),
         tools,
       }
-    });
+    }));
 
     // Handle tool execution loop if needed
     if (result.functionCalls && result.functionCalls.length > 0) {
@@ -221,7 +238,7 @@ export class SecureVoiceAssistantService {
       }));
 
       // Call Gemini again with tool results to get a verbal response
-      result = await getAiClient().models.generateContent({
+      result = await this.executeWithRetry(() => getAiClient().models.generateContent({
         model: finalModelName,
         contents: [
           { role: 'user', parts: [{ text: transcript }] },
@@ -232,7 +249,7 @@ export class SecureVoiceAssistantService {
           systemInstruction: this.buildSystemPrompt(context, currentRole),
           tools,
         }
-      });
+      }));
     }
 
       console.log('[JARVIS] Gemini result received');
@@ -543,7 +560,7 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
         ? [{ functionDeclarations: DISPATCHER_TOOLS }]
         : [];
 
-      let result = await getAiClient().models.generateContent({
+      let result = await this.executeWithRetry(() => getAiClient().models.generateContent({
         model: finalModelName,
         contents: [{ role: 'user', parts: [
           { inlineData: { mimeType, data: audioBuffer.toString('base64') } }
@@ -552,7 +569,7 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
           systemInstruction: this.buildSystemPrompt(context, currentRole) + "\nListen to the audio and respond appropriately. If it's a command, identify it.",
           tools
         }
-      });
+      }));
 
       // Handle tool execution loop if needed for multimodal
       if (result.functionCalls && result.functionCalls.length > 0) {
@@ -588,7 +605,7 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
           };
         }));
 
-        result = await getAiClient().models.generateContent({
+        result = await this.executeWithRetry(() => getAiClient().models.generateContent({
           model: finalModelName,
           contents: [
             { role: 'user', parts: [{ inlineData: { mimeType, data: audioBuffer.toString('base64') } }] },
@@ -599,7 +616,7 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
             systemInstruction: this.buildSystemPrompt(context, currentRole),
             tools
           }
-        });
+        }));
       }
 
       const replyText = this.sanitizeAIResponse(result.text || "Audio received. Processing.");
