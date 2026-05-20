@@ -199,7 +199,7 @@ ctx.onmessage = async (e: MessageEvent) => {
           text_emb: textOut['last_hidden_state'] || textOut['output'],
           step: stepTensor,
         });
-        latents = vecOut['output'].data as Float32Array;
+        latents = vecOut['output'].data as any;
       }
 
       // 4. Vocoder

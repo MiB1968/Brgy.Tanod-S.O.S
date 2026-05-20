@@ -24,9 +24,22 @@ export interface SyncedReport {
   userId: string;
 }
 
+export interface PendingLocation {
+  id: string;
+  userId: string;
+  lat: number;
+  lng: number;
+  timestamp: string;
+  accuracy?: number;
+  speed?: number;
+  heading?: number;
+  status: 'pending' | 'synced';
+}
+
 export class SOSDatabase extends Dexie {
   outbox!: Table<QueuedSOS>;
   synced!: Table<SyncedReport>;
+  pendingLocations!: Table<PendingLocation>;
 
   constructor() {
     super('BrgyTanodSOS_DB');
@@ -51,6 +64,13 @@ export class SOSDatabase extends Dexie {
         if (!report.clientUuid) report.clientUuid = crypto.randomUUID();
       });
     });
+
+    // SCHEMA VERSION 4: Pending GPS locations for batch synchronizer & offline logs
+    this.version(4).stores({
+      outbox: '++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]',
+      synced: 'id, localId, userId, syncedAt',
+      pendingLocations: 'id, userId, timestamp, status'
+    });
   }
 }
 
@@ -64,6 +84,12 @@ class MockSOSDatabase {
   };
   synced = {
     add: async () => 1
+  };
+  pendingLocations = {
+    add: async () => 1,
+    where: () => ({ equals: () => ({ toArray: async () => [] }) }),
+    update: async () => 1,
+    delete: async () => 1
   };
   transaction = async (mode: any, tables: any, cb: any) => await cb();
 }

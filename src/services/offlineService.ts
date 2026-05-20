@@ -1,6 +1,7 @@
 import { db, type QueuedSOS } from '../db/offlineDB';
 import { toast } from 'react-hot-toast';
 import { photoService } from './photoService';
+import { generic as api } from '../lib/api';
 
 export const offlineService = {
   /**
@@ -94,5 +95,44 @@ export const offlineService = {
     }
 
     return { success: successCount, failed: failCount };
+  },
+
+  /**
+   * Synchronizes queued background GPS coordinates
+   */
+  async syncPendingLocations(): Promise<{ success: number; failed: number }> {
+    try {
+      const pending = await db.pendingLocations.where('status').equals('pending').toArray();
+      if (pending.length === 0) return { success: 0, failed: 0 };
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const loc of pending) {
+        try {
+          await api.update('gps/heartbeat', {
+            id: loc.userId,
+            role: 'tanod',
+            lat: loc.lat,
+            lng: loc.lng,
+            timestamp: loc.timestamp,
+            accuracy: loc.accuracy,
+            speed: loc.speed,
+            heading: loc.heading,
+          });
+
+          await db.pendingLocations.delete(loc.id);
+          successCount++;
+        } catch (err) {
+          failCount++;
+          console.error(`[Sync] Location update ${loc.id} failed:`, err);
+        }
+      }
+
+      return { success: successCount, failed: failCount };
+    } catch (err) {
+      console.error('[Sync] error syncing pending locations:', err);
+      return { success: 0, failed: 0 };
+    }
   }
 };

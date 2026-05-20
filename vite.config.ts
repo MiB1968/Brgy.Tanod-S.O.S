@@ -2,12 +2,59 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
   loadEnv(mode, '.', '');
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.ico', 'offline-tile.png', 'logo.png', 'icons/*'],
+        manifest: {
+          short_name: "TanodSOS",
+          name: "Barangay Tanod S.O.S.",
+          icons: [
+            { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+            { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+          ],
+          start_url: "/",
+          display: "standalone",
+          theme_color: "#ef4444",
+          background_color: "#040b1a",
+          description: "Real-time Emergency Response System for Barangays",
+          orientation: "portrait-primary"
+        },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 15 * 1024 * 1024, // 15MB to allow WASM or bundle chunks to be cached
+          runtimeCaching: [
+            // Aggressive Offline Map Tiles Caching
+            {
+              urlPattern: /https?:\/\/.*\.(tile\.openstreetmap\.org|tiles\.).*/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'map-tiles-v1',
+                expiration: {
+                  maxEntries: 1500,
+                  maxAgeSeconds: 60 * 24 * 60 * 60, // 60 days
+                },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            // Local Images & Assets
+            {
+              urlPattern: /\.(png|jpg|jpeg|svg|gif|webp|ico)$/,
+              handler: 'CacheFirst',
+              options: { cacheName: 'assets' }
+            }
+          ],
+        },
+        devOptions: { enabled: true },
+      }),
+    ],
     publicDir: 'public',
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode)

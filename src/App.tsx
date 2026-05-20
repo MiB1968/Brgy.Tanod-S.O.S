@@ -30,6 +30,7 @@ import BroadcastOverlay from "./components/BroadcastOverlay";
 import BackgroundServices from "./components/BackgroundServices";
 import FloatingSOSButton from "./components/FloatingSOSButton";
 import PWAStatus from "./components/PWAStatus";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 export default function App() {
   const logic = useAppLogic();
@@ -168,6 +169,7 @@ export default function App() {
           }}
         />
         <PWAStatus />
+        <PWAInstallPrompt />
       </AppLayout>
     </GlobalErrorBoundary>
   );

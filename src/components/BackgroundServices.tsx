@@ -1,15 +1,20 @@
-// src/components/BackgroundServices.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { tanodLocationService } from "../services/tanodLocationService";
+import PrivacyConsentModal from "./PrivacyConsentModal";
 
 export default function BackgroundServices() {
   const profile = useAuthStore((state) => state.profile);
+  const [hasConsent, setHasConsent] = useState(() => {
+    return typeof window !== "undefined" && localStorage.getItem("brgy_tanod_location_consent_granted") === "true";
+  });
 
   useEffect(() => {
     if (profile && (profile.role === "tanod" || (profile.role as string) === "responder")) {
       tanodLocationService.setupVisibilityHandler();
-      tanodLocationService.startTracking();
+      if (hasConsent) {
+        tanodLocationService.startTracking();
+      }
     } else {
       tanodLocationService.stopTracking();
     }
@@ -17,7 +22,15 @@ export default function BackgroundServices() {
     return () => {
       tanodLocationService.stopTracking();
     };
-  }, [profile]);
+  }, [profile, hasConsent]);
 
-  return null;
+  const handleConsentAccepted = () => {
+    setHasConsent(true);
+  };
+
+  return (
+    <>
+      <PrivacyConsentModal onAccept={handleConsentAccepted} />
+    </>
+  );
 }

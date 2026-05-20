@@ -16,9 +16,6 @@ export default function FloatingSOSButton({ onTrigger, role }: FloatingSOSButton
   const [slideProgress, setSlideProgress] = useState(0);
   const [isSliding, setIsSliding] = useState(false);
   const slideTrackRef = useRef<HTMLDivElement>(null);
-  
-  // Only render for resident users to avoid cluttered Tanod/Admin tactical layouts
-  if (role !== 'resident') return null;
 
   // Haptic feedback assist helper
   const triggerHaptic = (pattern: number | number[]) => {
@@ -103,6 +100,9 @@ export default function FloatingSOSButton({ onTrigger, role }: FloatingSOSButton
       window.removeEventListener('mouseup', handleSlideEnd);
     };
   }, [isSliding, slideProgress]);
+
+  // Only render for resident users to avoid cluttered Tanod/Admin tactical layouts
+  if (role !== 'resident') return null;
 
   const emergencyCategories = [
     { id: 'MEDICAL', label: 'Medical', icon: ShieldAlert, color: 'bg-blue-600 border-blue-500 hover:bg-blue-500' },
