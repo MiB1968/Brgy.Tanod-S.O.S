@@ -57,23 +57,38 @@
   }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
+/* ====================== CUSTOM SCROLLBAR ====================== */
+
+/* For Webkit browsers (Chrome, Edge, Safari, etc.) */
+.custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-::-webkit-scrollbar-track {
-  background: #1f2937;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 3px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(147, 51, 234, 0.5); /* Purple theme */
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(147, 51, 234, 0.8);
+}
+
+/* For horizontal scroll */
+.custom-scrollbar::-webkit-scrollbar-horizontal {
+  height: 6px;
+}
+
+/* Firefox Support */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(147, 51, 234, 0.5) rgba(255, 255, 255, 0.05);
 }
 
 /* Custom Leaflet Marker and Popup styles */
