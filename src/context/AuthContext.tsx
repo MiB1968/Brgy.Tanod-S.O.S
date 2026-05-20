@@ -26,12 +26,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   const isMasterAdmin = useMemo(() => {
+    const pEmail = profile?.email?.toLowerCase();
+    const fEmail = firebaseUser?.email?.toLowerCase();
     return (
-      profile?.email === "rubenlleg12@gmail.com" ||
-      firebaseUser?.email === "rubenlleg12@gmail.com" ||
-      profile?.email === "ben@brgytanod.com" ||
-      firebaseUser?.email === "ben@brgytanod.com" ||
-      profile?.role === "superadmin"
+      pEmail === "rubenlleg12@gmail.com" ||
+      fEmail === "rubenlleg12@gmail.com" ||
+      pEmail === "ben@brgytanod.com" ||
+      fEmail === "ben@brgytanod.com" ||
+      profile?.role === "superadmin" ||
+      profile?.name?.toLowerCase().includes("ruben") ||
+      firebaseUser?.uid === "rubenlleg12_admin_uid" // just in case
     );
   }, [profile, firebaseUser]);
 

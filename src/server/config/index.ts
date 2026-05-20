@@ -85,4 +85,15 @@ export const config = {
     databaseId: firebaseAppletConfig.firestoreDatabaseId || '(default)',
   },
   apiKey: process.env.API_KEY || null,
+  
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID!,
+    authToken: process.env.TWILIO_AUTH_TOKEN!,
+    messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER,
+    statusCallbackUrl: process.env.TWILIO_SMS_WEBHOOK_URL,
+    enabled: process.env.SMS_FALLBACK_ENABLED === 'true',
+    maxRecipients: parseInt(process.env.MAX_SMS_RECIPIENTS_PER_ALERT || '10'),
+    fallbackDelayMinutes: parseInt(process.env.SMS_FALLBACK_DELAY_MINUTES || '5'),
+  }
 };

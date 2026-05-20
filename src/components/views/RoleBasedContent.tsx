@@ -40,6 +40,9 @@ export function RoleBasedContent({
   return (
     <div className="min-h-full p-4 pb-24">
       <AnimatePresence mode="wait">
+        <div className="bg-red-900 text-white p-2 text-xs">
+          DEBUG: {activeTab} | Role: {effectiveRole} | Email: {effectiveProfile?.email}
+        </div>
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 15 }}

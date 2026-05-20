@@ -13,6 +13,7 @@ export interface QueuedSOS {
   attempts: number;
   lastError?: string;
   clientUuid: string; // Used for deduplication on server
+  smsFallback?: boolean;
 }
 
 export interface SyncedReport {

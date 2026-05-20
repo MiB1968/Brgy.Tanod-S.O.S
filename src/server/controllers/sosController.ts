@@ -35,7 +35,8 @@ export const createSOS = async (req: AuthRequest, res: Response) => {
       initialType: initialType || type,
       photos,
       voiceClip,
-      clientUuid
+      clientUuid,
+      isOfflineRecovered: req.body.isOfflineRecovered
     });
 
     return res.status(201).json({

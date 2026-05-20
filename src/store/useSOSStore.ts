@@ -14,7 +14,8 @@ interface SOSState {
     description: string,
     location: { lat: number; lng: number },
     photos?: string[],
-    clientUuid?: string
+    clientUuid?: string,
+    isOfflineRecovered?: boolean
   ) => Promise<string | null>;
   cancelSOS: (id: string) => Promise<void>;
   clearActiveAlert: () => void;
@@ -26,7 +27,7 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
   isSending: false,
   setActiveAlert: (alert) => set({ activeAlert: alert }),
 
-  createSOS: async (type, description, location, photos = [], clientUuid?: string) => {
+  createSOS: async (type, description, location, photos = [], clientUuid?: string, isOfflineRecovered?: boolean) => {
     set({ isSending: true });
     const storedUser = safeStorage.getItem("user");
     const user = storedUser ? JSON.parse(storedUser) : null;
@@ -42,6 +43,7 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
       description,
       photos,
       clientUuid: finalClientUuid,
+      isOfflineRecovered,
     };
 
     try {
@@ -98,7 +100,8 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
         userId: user?.id || "anonymous",
         userName: user?.name || "Resident",
         photos: photoBlobs,
-        clientUuid: finalClientUuid
+        clientUuid: finalClientUuid,
+        smsFallback: true
       });
 
       // Optimistic update for UI tracking

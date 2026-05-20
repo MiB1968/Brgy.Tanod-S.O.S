@@ -84,6 +84,8 @@ export default function App() {
   return (
     <GlobalErrorBoundary>
       <AppLayout
+        activeTab={logic.activeTab}
+        setActiveTab={logic.setActiveTab}
         isMobileMenuOpen={logic.isMobileMenuOpen}
         setIsMobileMenuOpen={logic.setIsMobileMenuOpen}
         effectiveRole={logic.effectiveRole}

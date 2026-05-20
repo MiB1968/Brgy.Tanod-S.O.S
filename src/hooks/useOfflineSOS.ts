@@ -25,7 +25,8 @@ export function useOfflineSOS() {
     try {
       const result = await offlineService.syncPending(async (data) => {
         // We call the global store action for actual transmission
-        return createSOS(data.type, data.description, data.location, data.photos, data.clientUuid);
+        // Passing true flag for isOfflineRecovered
+        return createSOS(data.type, data.description, data.location, data.photos, data.clientUuid, true);
       });
 
       if (result.success > 0) {

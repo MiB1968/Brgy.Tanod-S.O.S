@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import twilio from 'twilio';
 import { telegramService } from '../services/telegramService';
 import { getMessaging } from 'firebase-admin/messaging';
 
@@ -27,6 +28,17 @@ router.post('/telegram', async (req, res) => {
     console.error('[Webhook] Telegram error:', err);
     res.status(500).send('Error');
   }
+});
+
+const twilioWebhook = twilio.webhook({ validate: false }); // Set to true in prod if URL is accessible
+
+router.post('/sms-status', twilioWebhook, async (req, res) => {
+  const { MessageSid, MessageStatus, To } = req.body;
+  
+  console.log(`[SMS Status] ${MessageSid} → ${MessageStatus} to ${To}`);
+  // We can update the database if we had a dedicated column for smsStatus
+  
+  res.sendStatus(200);
 });
 
 export default router;

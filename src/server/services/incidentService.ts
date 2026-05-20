@@ -7,7 +7,9 @@ import { SOCKET_EVENTS } from '../constants';
 import { pool } from '../db/index';
 import { LocationUpdate } from '../types';
 import { validate as uuidValidate } from 'uuid';
+import { smsService } from './smsService';
 import { triggerQwenPawDispatcher, triggerQwenPawReporter } from './qwenpawService';
+import { config } from '../config/index';
 
 const incidentRepository = new IncidentRepository();
 
@@ -26,8 +28,9 @@ export const incidentService = {
     photos?: string[];
     voiceClip?: string;
     clientUuid?: string; // Added
+    isOfflineRecovered?: boolean;
   }) {
-    const { reporterId, barangayId, description, latitude, longitude, clientUuid } = data;
+    const { reporterId, barangayId, description, latitude, longitude, clientUuid, isOfflineRecovered } = data;
 
     // 1. Client-Side UUID Deduplication (Highly effective for offline-sync retry)
     if (clientUuid) {
@@ -140,6 +143,37 @@ export const incidentService = {
 
     // Auto-trigger QwenPaw Dispatcher
     triggerQwenPawDispatcher(incident).catch(e => console.error("QwenPaw trigger failed", e));
+
+    // Twilio SMS Fallback
+    if (config.twilio.enabled) {
+      const triggerSms = async () => {
+        try {
+          // Check if alert was resolved or assigned
+          const checkRes = await pool.query("SELECT status FROM alerts WHERE id = $1", [incident.id]);
+          if (checkRes.rows.length > 0) {
+            const status = checkRes.rows[0].status;
+            if (status === 'pending' || status === 'active') {
+              const nearestTanods = await this.findNearestResponders('default', latitude, longitude, 5); // 5km
+              const tanodsData = await pool.query("SELECT phone FROM users WHERE id = ANY($1) AND phone IS NOT NULL", [nearestTanods.map((t: any) => t.user_id)]);
+              const phoneNumbers = tanodsData.rows.map(r => r.phone);
+              
+              if (phoneNumbers.length > 0) {
+                await smsService.sendSOSFallback(incident, phoneNumbers);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("SMS Fallback failed", e);
+        }
+      };
+
+      if (isOfflineRecovered) {
+        // Send immediately if recovered from offline
+        triggerSms();
+      } else {
+        setTimeout(triggerSms, config.twilio.fallbackDelayMinutes * 60 * 1000);
+      }
+    }
 
     return incident;
   },

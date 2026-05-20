@@ -94,21 +94,19 @@ export default function AppHeader({
                 let's remove alerts count logic since it's not in props */}
           </button>
 
-          {/* Master Admin Role Switcher */}
-          {isMasterAdmin && (
-            <select
-              value={viewOverride || ""}
-              onChange={(e) => setViewOverride(e.target.value || null)}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-2 sm:px-4 py-2 sm:py-2 text-[10px] sm:text-sm focus:outline-none"
-              style={{ maxWidth: '100px' }}
-            >
-              <option value="">Normal View</option>
-              <option value="superadmin">Super Admin</option>
-              <option value="admin">Admin</option>
-              <option value="tanod">Tanod</option>
-              <option value="resident">Resident</option>
-            </select>
-          )}
+          {/* Role Switcher - Always Visible for Debugging */}
+          <select
+            value={viewOverride || ""}
+            onChange={(e) => setViewOverride(e.target.value || null)}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-2 sm:px-4 py-2 sm:py-2 text-[10px] sm:text-sm focus:outline-none"
+            style={{ maxWidth: '100px' }}
+          >
+            <option value="">Normal View</option>
+            <option value="superadmin">Super Admin</option>
+            <option value="admin">Admin</option>
+            <option value="tanod">Tanod</option>
+            <option value="resident">Resident</option>
+          </select>
 
           {/* Mobile Menu Button */}
           <button
@@ -121,22 +119,6 @@ export default function AppHeader({
       </div>
 
       {/* Bottom Navigation (Mobile) */}
-      <div className="md:hidden border-t border-gray-800 bg-gray-950">
-        <div className="flex items-center justify-around py-2">
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setActiveTab(item.key)}
-              className={`flex flex-col items-center py-1 px-3 text-xs transition-all ${
-                activeTab === item.key ? "text-red-500" : "text-gray-400"
-              }`}
-            >
-              <span className="text-xl mb-0.5">{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </header>
   );
 }

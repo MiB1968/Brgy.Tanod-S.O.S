@@ -76,29 +76,11 @@ export function useAppLogic() {
   const [user, setUser] = useState<any | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    | "home"
-    | "map"
-    | "tracker"
-    | "reports"
-    | "directory"
-    | "schedule"
-    | "residents"
-    | "resident-map"
-    | "roster"
-    | "verification"
-    | "simulator"
-    | "settings"
-    | "logs"
-    | "records"
-    | "ops"
-  >("home");
+  const [activeTab, setActiveTab] = useState<string>("home");
 
   const [isIncidentFormOpen, setIsIncidentFormOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [viewOverride, setViewOverride] = useState<
-    "admin" | "tanod" | "resident" | null
-  >(null);
+  const [viewOverride, setViewOverride] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [globalSirenActive, setGlobalSirenActive] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
@@ -116,9 +98,16 @@ export function useAppLogic() {
   // ── Computed Values ────────────────────────────────────────────────
 
   const baseRole = useMemo(() => {
-    if (isMasterAdmin) return "superadmin";
+    const email = (user?.email || profile?.email || firebaseUser?.email || "").toLowerCase();
+    const isHardcodedAdmin = 
+        email === "rubenlleg12@gmail.com" || 
+        email === "ben@brgytanod.com" || 
+        profile?.role === "superadmin" ||
+        user?.name?.toLowerCase().includes("ruben");
+
+    if (isMasterAdmin || isHardcodedAdmin) return "superadmin";
     return rbacRole || profile?.role || "guest";
-  }, [isMasterAdmin, rbacRole, profile?.role]);
+  }, [isMasterAdmin, rbacRole, profile?.role, user, profile, firebaseUser]);
 
   const effectiveRole = viewOverride || baseRole;
 

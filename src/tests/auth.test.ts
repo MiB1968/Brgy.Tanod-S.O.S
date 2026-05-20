@@ -6,6 +6,12 @@ vi.mock('../server/config/index', () => ({
   config: { jwtSecret: 'test_secret_only' },
 }));
 
+vi.mock('../server/db/index', () => ({
+  pool: {
+    query: vi.fn().mockResolvedValue({ rows: [{ token_version: 0 }] })
+  }
+}));
+
 function mockRes() {
   const res: any = {};
   res.status = vi.fn().mockReturnValue(res);
@@ -16,47 +22,47 @@ function mockRes() {
 const SECRET = 'test_secret_only';
 
 describe('authenticate middleware', () => {
-  it('calls next() and attaches user when token is valid (cookie)', () => {
+  it('calls next() and attaches user when token is valid (cookie)', async () => {
     const token = jwt.sign({ id: 'u1', email: 't@t.com', role: 'resident' }, SECRET);
     const req: any = { cookies: { token }, headers: {} };
     const next = vi.fn();
-    authenticate(req, mockRes(), next);
+    await authenticate(req, mockRes(), next);
     expect(next).toHaveBeenCalled();
     expect(req.user.id).toBe('u1');
     expect(req.user.role).toBe('resident');
   });
 
-  it('calls next() and attaches user when token is valid (Authorization header)', () => {
+  it('calls next() and attaches user when token is valid (Authorization header)', async () => {
     const token = jwt.sign({ id: 'u2', email: 'a@a.com', role: 'admin' }, SECRET);
     const req: any = { cookies: {}, headers: { authorization: `Bearer ${token}` } };
     const next = vi.fn();
-    authenticate(req, mockRes(), next);
+    await authenticate(req, mockRes(), next);
     expect(next).toHaveBeenCalled();
     expect(req.user.role).toBe('admin');
   });
 
-  it('returns 401 when no token is provided', () => {
+  it('returns 401 when no token is provided', async () => {
     const req: any = { cookies: {}, headers: {} };
     const res = mockRes();
-    authenticate(req, res, vi.fn());
+    await authenticate(req, res, vi.fn());
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ success: false })
     );
   });
 
-  it('returns 401 for an invalid/tampered token', () => {
+  it('returns 401 for an invalid/tampered token', async () => {
     const req: any = { cookies: { token: 'invalid.token.value' }, headers: {} };
     const res = mockRes();
-    authenticate(req, res, vi.fn());
+    await authenticate(req, res, vi.fn());
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
-  it('returns 401 for a token signed with the wrong secret', () => {
+  it('returns 401 for a token signed with the wrong secret', async () => {
     const token = jwt.sign({ id: 'u3', role: 'tanod' }, 'wrong_secret');
     const req: any = { cookies: { token }, headers: {} };
     const res = mockRes();
-    authenticate(req, res, vi.fn());
+    await authenticate(req, res, vi.fn());
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
