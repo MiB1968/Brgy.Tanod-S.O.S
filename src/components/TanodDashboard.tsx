@@ -13,6 +13,7 @@ import { TanodAlertsFeed } from "./Tanod/TanodAlertsFeed";
 import { StatusTogglePanel } from "./Tanod/StatusTogglePanel";
 import { TacticalCard } from "./Tactical/TacticalCard";
 import { PoliceLights } from "./PoliceLights";
+import TanodPerformance from "./TanodPerformance";
 import AboutModal from "./AboutModal";
 import { AlertDetailsModal } from "./AlertDetailsModal";
 import IncidentForm from "./IncidentForm";
@@ -201,6 +202,9 @@ export default function TanodDashboard({
               </div>
             </div>
           </TacticalCard>
+
+          {/* Performance Standings */}
+          <TanodPerformance />
         </div>
       </div>
 

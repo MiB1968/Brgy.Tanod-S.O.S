@@ -26,6 +26,7 @@ import IncidentForm from "./components/IncidentForm";
 import SOSAlertSiren from "./components/SOSAlertSiren";
 import { GuardianGreeting } from "./components/ai/GuardianGreeting";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
+import GuardianAIChat from "./components/GuardianAIChat";
 import BroadcastOverlay from "./components/BroadcastOverlay";
 import BackgroundServices from "./components/BackgroundServices";
 import FloatingSOSButton from "./components/FloatingSOSButton";
@@ -151,6 +152,7 @@ export default function App() {
         {/* System Components */}
         <GuardianGreeting />
         <GuardianVoiceAssistant />
+        <GuardianAIChat />
         <BackgroundServices />
 
         {/* Notifications & PWA */}
