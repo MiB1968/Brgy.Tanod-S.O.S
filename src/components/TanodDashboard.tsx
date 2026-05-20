@@ -212,8 +212,9 @@ export default function TanodDashboard({
       <AnimatePresence>
         {isReportFormOpen && profile && (
           <IncidentForm
-            profile={profile}
+            userRole={profile.role}
             onClose={() => setIsReportFormOpen(false)}
+            onSubmit={(data) => { console.log(data); }}
           />
         )}
       </AnimatePresence>

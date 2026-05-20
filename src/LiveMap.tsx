@@ -218,7 +218,7 @@ function RoutingLines({ patrols, alerts, show }: any) {
   if (!show) return null;
   return (
     <>
-      {alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').map((a: any) => {
+      {alerts.filter((a: any) => a.status !== 'resolved' && a.status !== 'cancelled').map((a: any, i: number) => {
         if (!a.location?.lat||!a.location?.lng) return null;
         let nearest: any = null, best = Infinity;
         patrols.forEach((p:any)=>{
@@ -234,7 +234,7 @@ function RoutingLines({ patrols, alerts, show }: any) {
 
         return (
           <Polyline
-            key={`rt-${a.id}`}
+            key={`rt-${a.id || i}`}
             positions={positions as any}
             pathOptions={{ color:s.color, weight:4, opacity:0.65, dashArray:"7 6" }}
           />
@@ -576,8 +576,8 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         )}
 
         {/* Verified Residents */}
-        {showResidents && residents.filter(r => isValidCoord(r.gpsLat, r.gpsLng)).map((r) => (
-          <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
+        {showResidents && residents.filter(r => isValidCoord(r.gpsLat, r.gpsLng)).map((r, i) => (
+          <Marker key={r.id || `res-${i}`} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
             <Popup>
               <div className="pp">
                 <p className="pp-lbl" style={{ color:"#A78BFA80" }}>Verified Resident</p>
@@ -592,10 +592,10 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         ))}
 
         {/* Active patrols */}
-        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p) => {
+        {showPatrols && patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng)).map((p, i) => {
           const isHighlighted = p.tanodId === highlightedPatrolId;
           return (
-            <Marker key={p.id} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
+            <Marker key={p.id || p.tanodId || `patrol-${i}`} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
               <Popup>
                 <div className="pp">
                   <p className="pp-lbl" style={{ color:"#4AEF8080" }}>Active Patrol</p>
@@ -611,10 +611,10 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         })}
 
         {/* SOS alerts */}
-        {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)).map((a) => {
+        {showSOS && alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng)).map((a, i) => {
           const s = getSev(a.type);
           return (
-            <Marker key={a.id} position={[a.location.lat, a.location.lng]} icon={makeSosIcon(a.type)} zIndexOffset={200}>
+            <Marker key={a.id || `sos-${i}`} position={[a.location.lat, a.location.lng]} icon={makeSosIcon(a.type)} zIndexOffset={200}>
               <Popup>
                 <div className="pp">
                   <p className="pp-lbl" style={{ color:`${s.color}80` }}>Emergency Alert</p>

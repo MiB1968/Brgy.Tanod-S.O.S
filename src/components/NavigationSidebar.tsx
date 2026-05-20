@@ -3,7 +3,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { TanodWordmark } from './Branding';
-import { navItems } from '../constants';
+import { navItems, isRuben } from '../constants';
 import { LogOut } from 'lucide-react';
 
 interface NavigationSidebarProps {
@@ -99,7 +99,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       <div className="p-4 sm:p-6 mt-auto border-t border-white/5 bg-brand-bg/40 backdrop-blur-xl">
         <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-brand-bg/50 mb-4 sm:mb-6 border border-white/5 shadow-inner">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-card overflow-hidden flex items-center justify-center border border-white/5 shrink-0 shadow-lg relative">
-            {user.email === 'rubenlleg12@gmail.com' ? (
+            {isRuben(user?.id, user?.email) ? (
               <img src="/ruben_avatar.jpg" referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
             ) : user.photoURL ? (
               <img src={user.photoURL} referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
@@ -110,10 +110,10 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] sm:text-xs font-black truncate uppercase font-mono italic text-white leading-tight mb-0.5 sm:mb-1">
-              {user.email === 'rubenlleg12@gmail.com' ? 'RubenLlego' : profile?.name || 'Unit_Unknown'}
+              {isRuben(user?.id, user?.email) ? 'System Admin' : profile?.name || 'Unit_Unknown'}
             </p>
             <p className="text-[7px] sm:text-[8px] text-white/30 uppercase tracking-[0.2em] font-mono font-bold truncate">
-              {user.email === 'rubenlleg12@gmail.com' ? 'SYSTEM_PRIME' : profile?.role || 'INITIATING'}
+              {isRuben(user?.id, user?.email) ? 'SYSTEM_PRIME' : profile?.role || 'INITIATING'}
             </p>
           </div>
         </div>

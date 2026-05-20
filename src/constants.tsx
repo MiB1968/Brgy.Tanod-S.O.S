@@ -42,24 +42,14 @@ export const itemVariants = {
 };
 
 export const isRuben = (uid?: string, email?: string) => {
+  // Check against env variables instead of hardcoded strings
+  const masterEmail = (import.meta.env.VITE_MASTER_EMAIL || '').toLowerCase();
+  
   if (!uid && !email) return false;
 
-  // SECURITY: Only real, specific Firebase UIDs get superadmin.
-  // Never add generic strings like 'v1' or 'anonymous_admin_demo' here.
-  const superAdminUids = [
-    'G6fWn6Crv1Yh2Tz9fSreFmX3G1r1',
-    'FzSXHYkqqshwvnYpYbvjN5VnbLR2',
-  ];
-
-  const superAdminEmails = [
-    'rubenlleg12@gmail.com',
-    'ronniecantuba420@gmail.com',
-    'admin@brgy-tanod.gov.ph',
-  ];
-
   return (
-    superAdminUids.includes(uid || '') ||
-    superAdminEmails.includes(email || '')
+    (masterEmail && email?.toLowerCase() === masterEmail) ||
+    false
   );
 };
 

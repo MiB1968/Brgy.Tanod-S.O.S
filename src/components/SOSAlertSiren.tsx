@@ -1,48 +1,22 @@
-import { useEffect, useRef } from 'react';
-import { Howl } from 'howler';
-import socket from '../lib/socket';
-import { useIncidentStore } from '../store/useIncidentStore';
-import { Alert } from '../types';
+// src/components/SOSAlertSiren.tsx
+import React from "react";
 
-// High-volume emergency siren
-const sosSiren = new Howl({
-  src: ['https://assets.mixkit.co/active_storage/sfx/1004/1004-preview.mp3'], 
-  loop: true,
-  volume: 1.0,
-});
-
-export default function SOSAlertSiren({ userRole }: { userRole: string }) {
-  const sirenRef = useRef<number | null>(null);
-  const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (userRole !== 'tanod' && userRole !== 'admin' && userRole !== 'superadmin') return;
-
-    const handleNewAlert = (data: any) => {
-      const alert = data.alert || data;
-      if (alert && (alert.status === 'pending' || alert.status === 'active')) {
-        // Trigger high-priority siren
-        if (sirenRef.current === null) {
-          sirenRef.current = sosSiren.play() as any;
-          
-          // Auto-stop after 10 seconds as requested
-          if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-          stopTimeoutRef.current = setTimeout(() => {
-            sosSiren.stop();
-            sirenRef.current = null;
-          }, 10000);
-        }
-      }
-    };
-
-    socket.on('alert_new', handleNewAlert);
-    
-    return () => {
-      socket.off('alert_new', handleNewAlert);
-      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-      sosSiren.stop();
-    };
-  }, [userRole]);
-
-  return null; // Silent component
+export default function SOSAlertSiren({ userRole, onSOS }: { userRole: string; onSOS?: (data: any) => void }) {
+  return (
+    <div className="fixed bottom-20 right-4 z-50">
+      {/* Floating SOS Button - You can enhance this with drag functionality */}
+      <button
+        onClick={() => {
+          if (onSOS) {
+            onSOS({ type: "emergency", description: "Quick SOS Alert" });
+          } else {
+            alert("🚨 SOS ACTIVATED!");
+          }
+        }}
+        className="w-16 h-16 bg-red-600 hover:bg-red-700 rounded-full shadow-2xl flex items-center justify-center text-3xl active:scale-95 transition-all"
+      >
+        SOS
+      </button>
+    </div>
+  );
 }

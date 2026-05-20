@@ -1,90 +1,79 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
-
 @import "tailwindcss";
 
-:root {
-  --bg-primary: #040b1a;
-  --bg-secondary: #071427;
-  --panel-bg: rgba(7, 20, 39, 0.75);
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary-50: #fef2f2;
+  --color-primary-500: #ef4444;
+  --color-primary-600: #dc2626;
+  --color-primary-700: #b91c1c;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-shake: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  
+  --drop-shadow-tactical: 0 0 30px rgba(0,170,255,0.35);
 
-  --blue-primary: #00aaff;
-  --blue-glow: #0088ff;
-  --red-primary: #ff2d55;
-  --cyan-primary: #00f0ff;
-
-  --text-primary: #ffffff;
-  --text-secondary: #8aa4c8;
-
-  --border-glow: rgba(0, 170, 255, 0.4);
+  --blur-xs: 2px;
 }
 
-@theme {
-  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Orbitron", sans-serif;
-  --font-mono: "Rajdhani", monospace;
-
-  /* Tactical Palette */
-  --color-tactical-blue: #00AEEF;
-  --color-tactical-cyan: #00F0FF;
-  --color-tactical-red: #FF3B5C;
-  --color-tactical-dark: #040B1A;
-  --color-emergency: #FF3B30;
-  
-  --shadow-tactical: 0 0 30px rgba(0,170,255,0.35);
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
 }
 
 @layer base {
   body {
-    background: radial-gradient(circle at top, #0d1c3d 0%, #040b1a 45%), #040b1a;
+    background-color: #111827;
     color: white;
-    font-family: 'Orbitron', sans-serif;
-    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 }
 
-@layer utilities {
-  .tactical-panel, .glass-panel {
-    background: rgba(8, 15, 30, 0.78);
-    backdrop-filter: blur(18px);
-    border: 1px solid rgba(0, 170, 255, 0.25);
-    box-shadow: 0 0 20px rgba(0, 170, 255, 0.12), inset 0 0 30px rgba(0, 170, 255, 0.05);
-    border-radius: 24px;
+@layer components {
+  .glass-panel {
+    background: rgba(31, 41, 55, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(55, 65, 81, 0.5);
   }
 
-  .tactical-glow {
-    box-shadow: 0 0 12px rgba(0, 170, 255, 0.5), 0 0 30px rgba(0, 170, 255, 0.2);
+  .sos-button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .tactical-grid {
-    background-image: linear-gradient(rgba(0,170,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,170,255,0.05) 1px, transparent 1px);
-    background-size: 30px 30px;
+  .sos-button:active {
+    transform: scale(0.95);
   }
 
-  .animate-radar { animation: radarSweep 8s linear infinite; }
-  .animate-glow { animation: pulseGlow 2s infinite; }
+  .map-container {
+    filter: contrast(1.05) saturate(1.1);
+  }
 }
 
-@keyframes pulseGlow {
-  0% { box-shadow: 0 0 8px rgba(0,170,255,0.2); }
-  50% { box-shadow: 0 0 20px rgba(0,170,255,0.5), 0 0 40px rgba(0,170,255,0.3); }
-  100% { box-shadow: 0 0 8px rgba(0,170,255,0.2); }
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-@keyframes radarSweep {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+::-webkit-scrollbar-track {
+  background: #1f2937;
 }
 
-@keyframes slideIn {
-  from { transform: translateY(-100%); }
-  to { transform: translateY(0); }
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
 }
 
-@keyframes flash {
-  0% { background-color: #ff3b30; }
-  50% { background-color: #990000; }
-  100% { background-color: #ff3b30; }
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 

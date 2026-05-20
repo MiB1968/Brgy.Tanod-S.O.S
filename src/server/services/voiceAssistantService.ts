@@ -127,14 +127,17 @@ export class SecureVoiceAssistantService {
     return contextData;
   }
 
-  private async executeWithRetry<T>(operation: () => Promise<T>, retries: number = 3, delay: number = 1500): Promise<T> {
+  private async executeWithRetry<T>(operation: () => Promise<T>, retries: number = 3, delay: number = 2000): Promise<T> {
     for (let i = 0; i <= retries; i++) {
       try {
         return await operation();
       } catch (err: any) {
-        const isTransientError = err.status === 503 || err.status === 429 || err.message?.includes('503') || err.message?.includes('429');
+        const msg = (err.message || '').toString();
+        const strErr = JSON.stringify(err);
+        const isTransientError = err.status === 503 || err.status === 429 || msg.includes('503') || msg.includes('429') || msg.includes('UNAVAILABLE') || strErr.includes('503') || strErr.includes('UNAVAILABLE');
+        
         if (isTransientError && i < retries) {
-          console.warn(`[JARVIS] API temporary error (${err.status || 503}), retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+          console.warn(`[JARVIS] API temporary error, retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
           await new Promise(res => setTimeout(res, delay));
           continue;
         }

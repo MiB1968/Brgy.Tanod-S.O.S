@@ -1,4 +1,20 @@
 export type UserRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'guest';
+
+export const RoleHierarchy: Record<UserRole, number> = {
+  resident: 1,
+  tanod: 2,
+  admin: 3,
+  superadmin: 4,
+  guest: 0,
+};
+
+export const RolePermissions: Record<UserRole, string[]> = {
+  resident: ["view_map", "create_sos", "view_own_alerts"],
+  tanod: ["view_map", "create_sos", "respond_alerts", "update_location", "view_own_alerts"],
+  admin: ["view_map", "create_sos", "respond_alerts", "manage_users", "view_all_alerts", "broadcast", "view_reports", "manage_roster"],
+  superadmin: ["*"],
+  guest: [],
+};
 export type RegistryStatus = 'pending' | 'approved' | 'rejected' | 'Available' | 'On Patrol' | 'Responding' | 'Off-Duty' | 'Break' | 'Offline';
 export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';
 export type IncidentStatus = 'pending' | 'ongoing' | 'resolved' | 'referred';
@@ -192,6 +208,27 @@ export interface WitnessRequest {
   witnessUserId: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
+}
+
+export interface QueuedSOS {
+  id: string;
+  residentId: string;
+  type: string;
+  description: string;
+  location?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+  };
+  queuedAt: number;
+  attempts: number;
+}
+
+export interface Location {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  timestamp: number;
 }
 
 export interface SOSChatMessage {

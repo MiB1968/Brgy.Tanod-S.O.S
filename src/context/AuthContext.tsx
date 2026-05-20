@@ -1,87 +1,144 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';          // ← shared singleton, no more double-init
-import * as safeStorage from '../lib/safeStorage';   // ← replaces all raw localStorage calls
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
+import * as safeStorage from '../lib/safeStorage';
+import type { User, UserRole } from '../types';
+import { RoleHierarchy, RolePermissions } from '../types';
 
-interface AuthContextType {
-  user: User | null;
-  role: string | null;
+interface RBACContextType {
+  user: FirebaseUser | null;
+  profile: User | null;
+  role: UserRole;
   loading: boolean;
-  refreshRole: () => Promise<void>;
+  isMasterAdmin: boolean;
+  hasPermission: (permission: string) => boolean;
+  canAccessRole: (requiredRole: UserRole) => boolean;
+  refreshProfile: () => Promise<void>;
+  setUserRole: (newRole: UserRole) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  role: null,
-  loading: true,
-  refreshRole: async () => {},
-});
+const AuthContext = createContext<RBACContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(
-    safeStorage.getItem('brgy_user_role')   // ← was: localStorage.getItem(...)
-  );
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = async (uid: string) => {
+  const isMasterAdmin = useMemo(() => {
+    return (
+      profile?.email === "rubenlleg12@gmail.com" ||
+      profile?.email === "ben@brgytanod.com" ||
+      profile?.role === "superadmin"
+    );
+  }, [profile]);
+
+  const currentRole: UserRole = profile?.role || "guest";
+
+  const hasPermission = useCallback((permission: string): boolean => {
+    if (isMasterAdmin) return true;
+
+    const userPerms = RolePermissions[currentRole] || [];
+    return userPerms.includes("*") || userPerms.includes(permission);
+  }, [currentRole, isMasterAdmin]);
+
+  const canAccessRole = useCallback((requiredRole: UserRole): boolean => {
+    if (isMasterAdmin) return true;
+    return (RoleHierarchy[currentRole] || 0) >= RoleHierarchy[requiredRole];
+  }, [currentRole, isMasterAdmin]);
+
+  const fetchProfile = async (uid: string) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', uid));
+      const userDoc = await getDoc(doc(db, "users", uid));
+      let userData: User;
+
       if (userDoc.exists()) {
-        const newRole = userDoc.data()?.role || 'resident';
-        setRole(newRole);
-        safeStorage.setItem('brgy_user_role', newRole);   // ← was: localStorage.setItem(...)
+        userData = userDoc.data() as User;
       } else {
-        const defaultRole = 'resident';
-        setRole(defaultRole);
-        safeStorage.setItem('brgy_user_role', defaultRole);
+        userData = {
+          id: uid,
+          uid,
+          name: firebaseUser?.displayName || "Barangay Resident",
+          email: firebaseUser?.email || "",
+          role: "resident",
+          status: "approved",
+          createdAt: new Date().toISOString(),
+        };
+
         try {
-          await setDoc(
-            doc(db, 'users', uid),
-            { role: defaultRole, createdAt: new Date().toISOString() },
-            { merge: true }
-          );
+          await setDoc(doc(db, "users", uid), {
+            ...userData,
+            createdAt: serverTimestamp(),
+          });
         } catch (e) {
-          console.warn('[AuthContext] Could not sync default role to Firestore (offline).');
+             console.warn('[AuthContext] Could not sync default profile to Firestore (offline).');
         }
       }
-    } catch (error: any) {
-      if (error.code === 'unavailable' || error.message?.includes('offline')) {
-        const cachedRole = safeStorage.getItem('brgy_user_role');  // ← was: localStorage.getItem(...)
-        setRole(cachedRole || 'resident');
-      } else {
-        console.error('[AuthContext] Error fetching user role:', error);
-        setRole('resident');
-      }
+
+      setProfile(userData);
+      safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+      // Offline fallback
+      const cached = safeStorage.getItem("brgy_user_profile");
+      if (cached) setProfile(JSON.parse(cached));
     }
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        await fetchRole(firebaseUser.uid);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+
+      if (fbUser) {
+        await fetchProfile(fbUser.uid);
       } else {
-        setUser(null);
-        setRole(null);
-        safeStorage.removeItem('brgy_user_role');  // ← was: localStorage.removeItem(...)
+        setProfile(null);
+        safeStorage.removeItem("brgy_user_profile");
       }
+
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const refreshRole = async () => {
-    if (user) await fetchRole(user.uid);
+  const refreshProfile = async () => {
+    if (firebaseUser?.uid) await fetchProfile(firebaseUser.uid);
   };
 
-  return (
-    <AuthContext.Provider value={{ user, role, loading, refreshRole }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const setUserRole = async (newRole: UserRole) => {
+    if (!firebaseUser || !canAccessRole("admin")) {
+      throw new Error("Insufficient permissions to change role");
+    }
+
+    await setDoc(
+      doc(db, "users", firebaseUser.uid),
+      { role: newRole, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+
+    await refreshProfile();
+  };
+
+  const value: RBACContextType = {
+    user: firebaseUser,
+    profile,
+    role: currentRole as UserRole,
+    loading,
+    isMasterAdmin,
+    hasPermission,
+    canAccessRole,
+    refreshProfile,
+    setUserRole,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useRBAC = () => useContext(AuthContext);
+export const useRBAC = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useRBAC must be used within an AuthProvider");
+  }
+  return context;
+};

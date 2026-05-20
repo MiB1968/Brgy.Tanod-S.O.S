@@ -5,6 +5,7 @@ interface IncidentState {
   alerts: Alert[];
   setAlerts: (alerts: Alert[]) => void;
   updateAlertStatus: (alertId: string, status: AlertStatus) => void;
+  updateAlert: (id: string, updatedAlert: Alert) => void;
   addAlert: (alert: Alert) => void;
   removeAlert: (alertId: string) => void;
 }
@@ -20,5 +21,8 @@ export const useIncidentStore = create<IncidentState>((set) => ({
   })),
   updateAlertStatus: (alertId, status) => set((state) => ({
     alerts: state.alerts.map((a) => a.id === alertId ? { ...a, status } : a)
+  })),
+  updateAlert: (id, updatedAlert) => set((state) => ({
+    alerts: state.alerts.map((a) => a.id === id ? updatedAlert : a)
   })),
 }));

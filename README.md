@@ -1,33 +1,30 @@
-# 🚨 Brgy. Tanod S.O.S.
+# 🛡️ Brgy. Tanod S.O.S
 
-**A mobile-first, offline-resilient emergency response system for Philippine Barangays**
+**Real-time Emergency Response System for Barangays in the Philippines**
 
-Real-time SOS alerts • Tagalog Voice System • Live Tanod GPS Tracking • Guardian Floating Button
+A modern, offline-first, voice-enabled emergency platform built for Philippine barangays.
 
-![Hero](https://via.placeholder.com/1280x600?text=Brgy+Tanod+S.O.S)
+## ✨ Features
 
----
-
-## ✨ Key Features
-
-- **🔊 Advanced Hybrid Audio System** — Procedural sirens, heartbeat, reverb + **Tagalog TTS** (Web Speech + Smart Fallback)
-- **📱 Draggable Floating Guardian SOS Button** — Always accessible even while using other apps
-- **🌐 True Offline-First** — Works without internet (local TTS fallback, cached maps, resilient SOS)
-- **🛰️ Real-time GPS Tracking** — Live location of Tanod responders
-- **🔒 Strong Security** — Backend as Single Source of Truth
-- **📲 Excellent Mobile Experience** — PWA-ready with touch-first design
-
----
+- **Real-time SOS Alerts** with geolocation
+- **Floating Draggable SOS Button**
+- **Background Tanod GPS Tracking**
+- **Offline Mode** with automatic queue sync
+- **Tagalog Voice Support** (TTS + Siren)
+- **Role-Based Access Control** (Resident, Tanod, Admin, SuperAdmin)
+- **PWA** – Installable on mobile
+- **Live Map** with Leaflet
+- **Master Admin Override** (for development)
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Audio**: Web Audio API + Hybrid TTS (Web Speech + Fallback)
-- **Maps**: Leaflet.js + Offline tiles
-- **Backend**: Express + TypeScript + Firebase
-- **Real-time**: WebSocket
-
----
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind + Zustand
+- **Real-time**: Socket.io
+- **Maps**: Leaflet + React-Leaflet
+- **Auth**: Firebase Auth + Custom RBAC
+- **Audio**: Web Audio API + SpeechSynthesis
+- **Offline**: Dexie + Custom Queue
+- **Deployment**: Docker / Vercel + Render
 
 ## 🚀 Quick Start
 
@@ -35,25 +32,16 @@ Real-time SOS alerts • Tagalog Voice System • Live Tanod GPS Tracking • Gu
 git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
 cd Brgy.Tanod-S.O.S
 
-npm install
 cp .env.example .env
-npm run dev
+# Fill in your Firebase and other keys
+
+npm install
+npm run dev:full
 ```
 
----
+## 📱 Available Roles
 
-## 📜 License
-
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-
-This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## Made with ❤️ for Philippine Barangays
-
-**Brgy. Tanod S.O.S.** aims to help local government units (LGUs) respond faster and save lives.
-
----
-
-**Repository**: [github.com/MiB1968/Brgy.Tanod-S.O.S](https://github.com/MiB1968/Brgy.Tanod-S.O.S)
+- `resident` – Report emergencies
+- `tanod` – Receive alerts + background tracking
+- `admin` – Manage system
+- `superadmin` – Full access (Ruben/Ben)

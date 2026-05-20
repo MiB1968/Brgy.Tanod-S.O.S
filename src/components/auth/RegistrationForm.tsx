@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import * as api from '../lib/api';
+import * as api from '../../lib/api';
 import { MapContainer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { toast } from 'react-hot-toast';
 import { Shield, MapPin, Camera, User, Phone, Home, CheckCircle, Navigation, RefreshCw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, isValidCoord } from '../lib/utils';
-import { OfflineTileLayer } from './OfflineTileLayer';
-import { TanodLogo, BackgroundPattern } from './Branding';
+import { cn, isValidCoord } from '../../lib/utils';
+import { OfflineTileLayer } from '../OfflineTileLayer';
+import { TanodLogo, BackgroundPattern } from '../Branding';
 
 // Fix for default marker icons
 const DefaultIcon = L.icon({
