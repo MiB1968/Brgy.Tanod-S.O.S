@@ -28,10 +28,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isMasterAdmin = useMemo(() => {
     return (
       profile?.email === "rubenlleg12@gmail.com" ||
+      firebaseUser?.email === "rubenlleg12@gmail.com" ||
       profile?.email === "ben@brgytanod.com" ||
+      firebaseUser?.email === "ben@brgytanod.com" ||
       profile?.role === "superadmin"
     );
-  }, [profile]);
+  }, [profile, firebaseUser]);
 
   const currentRole: UserRole = profile?.role || "guest";
 

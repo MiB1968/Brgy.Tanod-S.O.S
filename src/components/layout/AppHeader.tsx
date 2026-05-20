@@ -99,7 +99,8 @@ export default function AppHeader({
             <select
               value={viewOverride || ""}
               onChange={(e) => setViewOverride(e.target.value || null)}
-              className="bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:outline-none"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-2 sm:px-4 py-2 sm:py-2 text-[10px] sm:text-sm focus:outline-none"
+              style={{ maxWidth: '100px' }}
             >
               <option value="">Normal View</option>
               <option value="superadmin">Super Admin</option>
