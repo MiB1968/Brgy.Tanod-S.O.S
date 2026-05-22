@@ -75,7 +75,13 @@ export function initSocket(server: HttpServer): Server {
   // Global socket authentication
   io.use((socket, next) => {
     console.log(`[Socket] New connection attempt: ${socket.id} from ${socket.handshake.address}`);
-    socketAuthMiddleware(socket, next);
+    socketAuthMiddleware(socket, (err) => {
+      if (err) {
+        console.error(`[Socket] Authentication FAILED for ${socket.id}: ${err.message}`);
+        return next(err);
+      }
+      next();
+    });
   });
 
   io.on('connection', (socket: AuthenticatedSocket) => {

@@ -5,9 +5,11 @@ import * as safeStorage from './safeStorage';
 const token = safeStorage.getItem('token');
 const socket = io({
   autoConnect: true,
-  auth: () => ({
-    token: safeStorage.getItem('token')
-  }),
+  auth: () => {
+    const token = safeStorage.getItem('token');
+    console.log('[Socket] Auth token retrieved:', token ? 'exists' : 'missing');
+    return { token };
+  },
   rememberUpgrade: false,
   path: '/socket.io',
   transports: ['polling', 'websocket'],

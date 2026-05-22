@@ -11,8 +11,8 @@ const { Pool } = pg;
 export const pool = new Pool({
   connectionString: config.databaseUrl || undefined,
   ssl: (!config.databaseUrl || config.databaseUrl.includes('localhost') || config.databaseUrl.includes('127.0.0.1')) ? false : { rejectUnauthorized: false },
-  connectionTimeoutMillis: 5000,
-  query_timeout: 10000,
+  connectionTimeoutMillis: 10000,
+  query_timeout: 60000,
 });
 
 const originalQuery = pool.query.bind(pool);

@@ -26,6 +26,7 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
   }
 
   if (!token) {
+    console.warn(`[SocketAuth] Authentication FAILED for socket ${socket.id}: No token provided. Handshake auth keys: ${Object.keys(socket.handshake.auth || {}).join(', ')}`);
     return next(new Error("Authentication required"));
   }
 

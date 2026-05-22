@@ -62,63 +62,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentRole, isMasterAdmin]);
 
   const fetchProfile = async (uid: string) => {
+    const userRef = doc(db, "users", uid);
+    
+    // Attempt fetch with race for timeout
     try {
-      const userRef = doc(db, "users", uid);
-      let userDoc;
-
-      try {
-        // Attempt to fetch from server with a shorter timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('getDoc timeout')), 5000)
-        );
-        userDoc = (await Promise.race([
-          getDoc(userRef),
-          timeoutPromise
-        ])) as any;
-      } catch (e) {
-        console.warn("[AuthContext] Server fetch failed or timed out, trying cache...", e);
-        // Fallback to cache immediately if network fails
-        try {
-          userDoc = await getDocFromCache(userRef);
-        } catch (ce) {
-          console.warn("[AuthContext] Cache fetch also failed.", ce);
-          throw e; // Rethrow original server error
-        }
-      }
-
-      let userData: User;
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('timeout')), 7000)
+      );
+      
+      const userDoc = (await Promise.race([
+        getDoc(userRef),
+        timeoutPromise
+      ])) as any;
 
       if (userDoc.exists()) {
-        userData = userDoc.data() as User;
-      } else {
-        userData = {
-          id: uid,
-          uid,
-          name: firebaseUser?.displayName || "Barangay Resident",
-          email: firebaseUser?.email || "",
-          role: "resident",
-          status: "approved",
-          createdAt: new Date().toISOString(),
-        };
-
-        try {
-          await setDoc(doc(db, "users", uid), {
-            ...userData,
-            createdAt: serverTimestamp(),
-          });
-        } catch (e) {
-             console.warn('[AuthContext] Could not sync default profile to Firestore (offline).');
-        }
+        const userData = userDoc.data() as User;
+        setProfile(userData);
+        safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+        return;
       }
-
-      setProfile(userData);
-      safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
-    } catch (error) {
-      console.error("Failed to fetch profile:", error);
-      // Offline fallback
-      const cached = safeStorage.getItem("brgy_user_profile");
-      if (cached) setProfile(JSON.parse(cached));
+    } catch (e) {
+      console.warn("[AuthContext] Primary fetch failed:", e);
     }
+
+    // Fallback 1: Attempt cache directly
+    try {
+      console.log("[AuthContext] Trying cache fallback...");
+      const cachedDoc = await getDocFromCache(userRef);
+      if (cachedDoc.exists()) {
+        const userData = cachedDoc.data() as User;
+        setProfile(userData);
+        safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+        return;
+      }
+    } catch (ce) {
+      console.warn("[AuthContext] Cache fetch failed:", ce);
+    }
+
+    // Fallback 2: Local storage fallback
+    const local = safeStorage.getItem("brgy_user_profile");
+    if (local) {
+      console.log("[AuthContext] Using local storage fallback");
+      setProfile(JSON.parse(local));
+      return;
+    }
+
+    // Default: Setup new profile
+    console.log("[AuthContext] Setting up default profile");
+    const userData: User = {
+      id: uid,
+      uid,
+      name: firebaseUser?.displayName || "Barangay Resident",
+      email: firebaseUser?.email || "",
+      role: "resident",
+      status: "approved",
+      createdAt: new Date().toISOString(),
+    };
+    setProfile(userData);
   };
 
   useEffect(() => {

@@ -11,6 +11,7 @@ import { smsService } from './smsService';
 import { triggerQwenPawDispatcher, triggerQwenPawReporter } from './qwenpawService';
 import { config } from '../config/index';
 import { Alert } from '../../types';
+import { serverPushService } from './pushService'; // Added
 
 async function getTwilioConfig() {
   try {
@@ -162,6 +163,12 @@ export const incidentService = {
         getIO().to(`barangay_${barangayId}`).emit('alert_new', { alert: formattedAlert });
       }
     }
+    
+    // Trigger Push Notifications
+    serverPushService.sendSOSPushToNearbyTanods({
+        ...incident,
+        residentName
+    }).catch(e => console.error("SOS Push notification failed", e));
 
     // Auto-trigger QwenPaw Dispatcher
     triggerQwenPawDispatcher(incident).catch(e => console.error("QwenPaw trigger failed", e));
