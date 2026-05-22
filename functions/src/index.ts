@@ -341,3 +341,36 @@ async function sendEmergencySMS(sos: any) {
     console.error("Error dispatching backup emergency SMS through Twilio:", error);
   }
 }
+
+// 5. Set User Role (Custom Claims)
+export const setUserRole = onCall(async (request: any) => {
+  // Only superadmin can set roles
+  if (!request.auth || !["superadmin"].includes(request.auth.token.role)) {
+    throw new HttpsError('permission-denied', 'Only superadmins can assign roles');
+  }
+
+  const { uid, role, barangayId } = request.data || {};
+
+  if (!["resident", "tanod", "admin", "superadmin"].includes(role)) {
+    throw new HttpsError('invalid-argument', 'Invalid role');
+  }
+
+  try {
+    // Set custom claims
+    await admin.auth().setCustomUserClaims(uid, { 
+      role: role,
+      barangayId: barangayId || null 
+    });
+
+    // Also update user document
+    await admin.firestore().collection('users').doc(uid).update({
+      role: role,
+      barangayId: barangayId || null,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    throw new HttpsError('internal', error.message);
+  }
+});

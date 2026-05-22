@@ -2,43 +2,159 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users collection
+
+    // =============================================
+    // Helper Functions
+    // =============================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && request.auth.token.role in roles;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isOwnerOrHigher(userId) {
+      return isOwner(userId) || hasAnyRole(["admin", "superadmin"]);
+    }
+
+    function createdByMe() {
+      return request.resource.data.createdBy == request.auth.uid;
+    }
+
+    // =============================================
+    // Users
+    // =============================================
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow update: if request.auth != null && 
-                      (request.auth.uid == userId || 
-                       request.auth.token.role == "superadmin" ||
-                       request.auth.token.role == "admin");
-      allow create: if request.auth != null && request.auth.uid == userId;
+      allow create: if isOwner(userId);
+
+      allow read: if isOwner(userId) || hasAnyRole(["tanod", "admin", "superadmin"]);
+
+      allow update: if isOwnerOrHigher(userId) &&
+                     // Prevent role escalation
+                     (!("role" in request.resource.data) || 
+                      request.resource.data.role == resource.data.role ||
+                      isRole("superadmin")) &&
+                     // Restrict sensitive field changes
+                     (!("barangayId" in request.resource.data) || isRole("superadmin")) &&
+                     (!("email" in request.resource.data) || isOwner(userId));
+
+      allow delete: if isRole("superadmin");
     }
 
-    // Incidents / Alerts
+    // =============================================
+    // Alerts / SOS (Critical)
+    // =============================================
     match /alerts/{alertId} {
-      allow create: if request.auth != null;
-      allow read, update: if request.auth != null;
+      allow create: if isAuthenticated() && createdByMe() &&
+                    request.resource.data.keys().hasAll(["createdBy", "type", "location", "status", "timestamp"]) &&
+                    request.resource.data.status == "active";
+
+      allow read: if isAuthenticated() && (
+        (resource.data.createdBy == request.auth.uid) || 
+        hasAnyRole(["tanod", "admin", "superadmin"])
+      );
+
+      allow update: if hasAnyRole(["tanod", "admin", "superadmin"]) &&
+                    // Only allow specific status changes
+                    (!("status" in request.resource.data) || 
+                     request.resource.data.status in ["acknowledged", "responding", "resolved", "false_alarm"]);
+
+      allow delete: if isRole("superadmin") || (resource.data.createdBy == request.auth.uid);
     }
 
-    // Role-based operational data
-    match /patrols/{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    match /system_broadcasts/{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    match /tanod_logs/{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    match /sos_messages/{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    match /location_logs/{document=**} {
-      allow read, write: if request.auth != null;
+    // =============================================
+    // Location Data
+    // =============================================
+    match /location_logs/{logId} {
+      allow create: if isAuthenticated() &&
+                    request.resource.data.keys().hasAll(["userId", "location", "timestamp"]);
+
+      allow read: if hasAnyRole(["tanod", "admin", "superadmin"]);
+
+      allow update, delete: if false;
     }
 
-    // Default fallback - deny everything else
+    match /active_locations/{userId} {
+      allow read, write: if hasAnyRole(["tanod", "admin", "superadmin"]) || isOwner(userId);
+    }
+
+    // =============================================
+    // Patrols
+    // =============================================
+    match /patrols/{patrolId} {
+      allow create, update: if hasAnyRole(["tanod", "admin", "superadmin"]) &&
+                            request.resource.data.keys().hasAll(["tanodId", "startTime", "status"]);
+
+      allow read: if isAuthenticated();
+      allow delete: if hasAnyRole(["admin", "superadmin"]);
+    }
+
+    // =============================================
+    // System Broadcasts
+    // =============================================
+    match /system_broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if hasAnyRole(["admin", "superadmin"]);
+    }
+
+    // =============================================
+    // Tanod Logs
+    // =============================================
+    match /tanod_logs/{logId} {
+      allow create: if hasAnyRole(["tanod", "admin", "superadmin"]);
+      allow read: if hasAnyRole(["tanod", "admin", "superadmin"]);
+      allow update, delete: if isRole("superadmin");
+    }
+
+    // =============================================
+    // SOS Messages (Twilio logs)
+    // =============================================
+    match /sos_messages/{messageId} {
+      allow create: if isAuthenticated();
+      allow read: if hasAnyRole(["tanod", "admin", "superadmin"]);
+    }
+
+    // =============================================
+    // Reports / Witness
+    // =============================================
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && createdByMe();
+      allow read, update: if hasAnyRole(["tanod", "admin", "superadmin"]) ||
+                          (resource.data.createdBy == request.auth.uid);
+      allow delete: if isRole("superadmin");
+    }
+
+    // =============================================
+    // AI Conversations
+    // =============================================
+    match /ai_conversations/{conversationId} {
+      allow create, read, update: if isOwner(resource.data.userId) || 
+                                  hasAnyRole(["tanod", "admin", "superadmin"]);
+    }
+
+    // =============================================
+    // Analytics
+    // =============================================
+    match /analytics/{doc} {
+      allow read: if hasAnyRole(["admin", "superadmin"]);
+      allow write: if isRole("superadmin");
+    }
+
+    // =============================================
+    // Default Deny
+    // =============================================
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
