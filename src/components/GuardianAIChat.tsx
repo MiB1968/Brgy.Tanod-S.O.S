@@ -61,6 +61,20 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
     };
   }, []);
 
+  // Set up event listeners for Tactical Dock control
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    const handleClose = () => setIsOpen(false);
+    
+    window.addEventListener('open-guardian-chat', handleOpen);
+    window.addEventListener('close-guardian-chat', handleClose);
+    
+    return () => {
+      window.removeEventListener('open-guardian-chat', handleOpen);
+      window.removeEventListener('close-guardian-chat', handleClose);
+    };
+  }, []);
+
   // Enhanced Compatibility Check
   useEffect(() => {
     const checkCompatibility = async () => {
@@ -462,10 +476,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
     <>
       {isInline ? null : (
         <>
-          {/* Floating Action trigger button */}
+          {/* Floating Action trigger button (Hidden, operated via Tactical Dock) */}
           <button
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-40 right-6 bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-600 w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-2xl z-40 hover:scale-110 active:scale-95 transition-all border-4 border-white/20 hover:shadow-purple-500/20"
+            className="hidden bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-600 w-14 h-14 rounded-full items-center justify-center text-3xl shadow-2xl z-40 hover:scale-110 active:scale-95 transition-all border-4 border-white/20 hover:shadow-purple-500/20"
             title="Open Guardian AI Dialog"
             id="guardian-ai-floating-trigger"
           >

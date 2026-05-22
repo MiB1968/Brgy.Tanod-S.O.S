@@ -72,10 +72,10 @@ export function GuardianAILoader({ variant = "admin" }: GuardianAILoaderProps) {
       );
     }
     return (
-      <div className="flex items-center gap-3 text-cyan-400 text-[10px] font-mono font-black uppercase tracking-[0.2em] px-4 py-1.5 bg-cyan-950/40 border border-cyan-500/30 rounded-full shadow-glow-cyan">
-        <span className="relative flex h-2 w-2">
+      <div className="flex items-center gap-1.5 sm:gap-3 text-cyan-400 text-[8px] sm:text-[10px] font-mono font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] px-2.5 py-1 sm:px-4 sm:py-1.5 bg-cyan-950/40 border border-cyan-500/30 rounded-full shadow-glow-cyan whitespace-nowrap shrink-0 animate-in fade-in duration-300">
+        <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-cyan-500"></span>
         </span>
         GUARDIAN_CORE: ACTIVE
       </div>

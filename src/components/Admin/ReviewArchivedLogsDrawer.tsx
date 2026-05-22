@@ -47,12 +47,14 @@ export function ReviewArchivedLogsDrawer({ profile }: { profile: User | null }) 
       {/* TRIGGER BUTTON */}
       <button
         onClick={handleOpen}
-        className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] border border-amber-500
-                   text-amber-400 text-sm font-semibold rounded-lg
-                   hover:bg-amber-500 hover:text-[#0F172A] transition-all
-                   min-h-[48px] active:scale-95"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl sm:rounded-2xl 
+                   bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500 hover:text-black 
+                   text-amber-400 text-[9px] sm:text-[11px] font-black uppercase tracking-widest font-mono 
+                   transition-all active:scale-95 group shrink-0"
+        title="Check historical logs database"
       >
-        📁 Review Archived Logs
+        <span>📁</span>
+        <span>Archived <span className="hidden xs:inline">Logs</span></span>
       </button>
 
       {/* SLIDE-IN DRAWER */}

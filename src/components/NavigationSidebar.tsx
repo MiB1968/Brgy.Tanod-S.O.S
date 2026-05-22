@@ -38,7 +38,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
     if (effectiveRole === 'tanod') {
       return !['residents', 'settings', 'logs'].includes(item.id);
     }
-    return ['home', 'map', 'tracker', 'directory', 'settings', 'guardian'].includes(item.id);
+    return ['home', 'map', 'tracker', 'resident-map', 'schedule', 'directory', 'settings', 'guardian'].includes(item.id);
   });
 
   return (

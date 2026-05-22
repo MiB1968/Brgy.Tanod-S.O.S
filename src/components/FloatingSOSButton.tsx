@@ -17,6 +17,18 @@ export default function FloatingSOSButton({ onTrigger, role }: FloatingSOSButton
   const [isSliding, setIsSliding] = useState(false);
   const slideTrackRef = useRef<HTMLDivElement>(null);
 
+  // Monitor for SOS custom trigger event from Tactical Dock
+  useEffect(() => {
+    const handleOpen = () => {
+      setIsOpen(true);
+      if ('vibrate' in navigator) navigator.vibrate([50, 50]);
+    };
+    window.addEventListener('open-floating-sos', handleOpen);
+    return () => {
+      window.removeEventListener('open-floating-sos', handleOpen);
+    };
+  }, []);
+
   // Haptic feedback assist helper
   const triggerHaptic = (pattern: number | number[]) => {
     if ('vibrate' in navigator) {
@@ -113,8 +125,8 @@ export default function FloatingSOSButton({ onTrigger, role }: FloatingSOSButton
 
   return (
     <>
-      {/* Flashing Floating Widget */}
-      <div className="fixed bottom-20 md:bottom-6 right-6 z-[120]">
+      {/* Flashing Floating Widget (Hidden, operated via Tactical Dock) */}
+      <div className="hidden">
         <motion.button
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}

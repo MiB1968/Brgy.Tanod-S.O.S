@@ -1,0 +1,67 @@
+src/components/ResidentDashboard.tsx:383:                      key={idx}
+src/components/Admin/BroadcastReview.tsx:52:          <div key={b.id} className="bg-[#1A1D23] p-4 rounded-xl space-y-2">
+src/components/Admin/IncidentReportsSection.tsx:35:              key={incident.id || index}
+src/components/Admin/TanodUnitStatusList.tsx:36:              key={tanod.id}
+src/components/Admin/TanodUnitStatusList.tsx:73:                              <option key={status} value={status} className="bg-brand-bg text-black">{status}</option>
+src/components/Admin/PersonnelSidebar.tsx:36:                <div key={t.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/20 transition-all group">
+src/components/Admin/AdminAnalytics.tsx:119:                  {alertsByType.map((_: any, index: number) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+src/components/Admin/AdminAnalytics.tsx:130:              <div key={item.type} className="flex items-center gap-2">
+src/components/Admin/JarvisVoice.tsx:277:                key={idx}
+src/components/Admin/AlertsFeed.tsx:130:                key={alert.id}
+src/components/Admin/ReviewArchivedLogsDrawer.tsx:86:                    <div key={i} className="h-20 bg-white/5 rounded-xl animate-pulse" />
+src/components/Admin/ReviewArchivedLogsDrawer.tsx:99:                <div key={archive.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
+src/components/Admin/ReviewArchivedLogsDrawer.tsx:154:                <div key={entry.id} className="bg-white/5 border border-white/10 rounded-lg p-3 text-xs">
+src/components/Admin/TanodActivityLogs.tsx:156:            key={stat.label}
+src/components/Admin/TanodActivityLogs.tsx:194:                  key={d}
+src/components/Admin/TanodActivityLogs.tsx:223:              key={type.value}
+src/components/Admin/TanodActivityLogs.tsx:276:                <div key={date} className="relative">
+src/components/Admin/TanodActivityLogs.tsx:283:                      <div key={log.id} className="p-4 hover:bg-white/5 transition-all group flex items-start gap-4 h-[72px]">
+src/components/Admin/TanodActivityLogs.tsx:352:                          key={pageNum}
+src/components/Admin/TanodActivityLogs.tsx:400:                <div key={session.id} className="glass-panel border-white/5 rounded-[1.5rem] overflow-hidden group hover:border-info/30 transition-all duration-300">
+src/components/Admin/TanodActivityLogs.tsx:459:                                 <div key={idx} className="flex items-center gap-4 text-[9px] font-mono group/point">
+src/components/Admin/ResidentTacticalMap.tsx:186:                        key={resident.id} 
+src/components/Admin/ManageBroadcasts.tsx:87:          <div key={b.id} className="flex justify-between items-center bg-white/5 p-3 rounded-lg text-xs">
+src/components/FlameAnimation.tsx:31:          key={p.id}
+src/components/GuardianVoiceTacticalAssistant.tsx:137:                  key={v.id}
+src/components/ai/GuardianVoiceAssistant.tsx:188:                              key={i}
+src/components/Tanod/TanodAlertsFeed.tsx:108:                key={alert.id} 
+src/components/Tanod/TanodAlertsFeed.tsx:152:                 key={alert.id}
+src/components/AnimatedButton.tsx:61:            key="label"
+src/components/AnimatedButton.tsx:82:            key="loading"
+src/components/AnimatedButton.tsx:94:            key="success"
+src/components/WitnessOverlay.tsx:60:          key={invite.id}
+src/components/SOSChat.tsx:128:              key={msg.id}
+src/components/TanodRosterView.tsx:141:              key={t.id} 
+src/components/DirectoryView.tsx:17:          <div key={c.name} className="p-6 md:p-8 bg-[#16191F] border border-[#2D3139] rounded-[32px] md:rounded-[40px] flex flex-col md:flex-row justify-between items-center hover:border-white/20 transition-all shadow-xl group gap-6 md:gap-0">
+src/components/AuthViews.tsx:105:                key="auth-gateway"
+src/components/AuthViews.tsx:130:                key="secure-link"
+src/components/AuthViews.tsx:456:          <div key={i} className="w-6 h-1 bg-white" />
+src/components/AboutModal.tsx:167:                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-red/20 border border-brand-red/40" />
+src/components/ScheduleView.tsx:52:              <div key={s.id} className={cn(
+src/components/ActiveMap.tsx:305:          <React.Fragment key={alert.id}>
+src/components/ActiveMap.tsx:379:          <React.Fragment key={patrol.id}>
+src/components/CitizenReportTracker.tsx:60:            key={report.id}
+src/components/RegistrationForm.tsx:269:              key={i}
+src/components/ReportsView.tsx:114:          <div key={report.id} className="glass-panel border-white/5 rounded-[40px] p-8 md:p-10 space-y-8 shadow-command relative overflow-hidden group">
+src/components/AlertDetailsModal.tsx:229:                               <span key={i} className="px-2 py-1 bg-emergency/10 border border-emergency/20 text-emergency text-[10px] rounded uppercase font-mono">
+src/components/AlertDetailsModal.tsx:242:                               <span key={i} className="px-2 py-1 bg-info/10 border border-info/20 text-info text-[10px] rounded uppercase font-mono">
+src/components/AlertDetailsModal.tsx:255:                               <div key={i} className="flex items-center gap-2 text-[11px] text-white/70 italic bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+src/components/Branding.tsx:26:          <path key={`${r}-${c}`} d={`M${c * 36 + (r % 2 ? 18 : 0)} ${r * 32} l18 0 l9 15 l-9 15 l-18 0 l-9 -15 z`} fill="none" stroke="#ef4444" strokeWidth="0.5" />
+src/components/Branding.tsx:74:          <path key={i} d="M0 -36 L6 -26 L-6 -26 Z" fill="#fbbf24" transform={`rotate(${i * 45})`} />
+src/components/Branding.tsx:224:          <polygon key={h.id}
+src/components/Branding.tsx:237:          <line key={`h${i}`}
+src/components/Branding.tsx:246:          <line key={`v${i}`}
+src/components/Branding.tsx:254:        <circle key={`ring${i}`}
+src/components/DispatchModal.tsx:100:                key={tanod.id}
+src/components/AdminResidents.tsx:116:              key={f}
+src/components/AdminResidents.tsx:144:              key={resident.id}
+src/components/NavigationSidebar.tsx:68:              key={item.id}
+src/components/PatrolScheduler.tsx:149:            key={shift.id}
+src/components/PatrolScheduler.tsx:259:                        <option key={t.id} value={t.id}>{t.name}</option>
+src/hooks/useGuardian.ts:116:            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+src/App.tsx:836:                key={activeTab}
+src/LiveMap.tsx:203:            key={`rt-${a.id}`}
+src/LiveMap.tsx:497:            <div key={it.label} className="flex items-center gap-2.5 py-[4px]">
+src/LiveMap.tsx:546:          <Marker key={r.id} position={[r.gpsLat, r.gpsLng]} icon={makeResidentIcon()} zIndexOffset={50}>
+src/LiveMap.tsx:564:            <Marker key={p.id} position={[p.location.lat, p.location.lng]} icon={isHighlighted ? makeHighlightedOfficerIcon() : makeOfficerIcon()} zIndexOffset={isHighlighted ? 1000 : 100}>
+src/LiveMap.tsx:583:            <Marker key={a.id} position={[a.location.lat, a.location.lng]} icon={makeSosIcon(a.type)} zIndexOffset={200}>

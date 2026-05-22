@@ -2,7 +2,21 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "../lib/api";
 import { User, Alert, PatrolLocation, EmergencyType } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { Zap } from "lucide-react";
+import { 
+  Zap, 
+  Camera, 
+  Image as ImageIcon, 
+  X,
+  Map as MapIcon, 
+  Activity, 
+  Calendar, 
+  Cpu, 
+  Settings as SettingsIcon, 
+  PhoneCall, 
+  Shield,
+  Grid,
+  Eye
+} from "lucide-react";
 import { Howl } from "howler";
 import { toast } from "react-hot-toast";
 
@@ -25,8 +39,7 @@ import { useOfflineSOS } from "../hooks/useOfflineSOS";
 import { useTTS } from "../hooks/useTTS";
 import { useEmergencySound } from "../lib/EmergencySoundManager";
 import { photoService } from "../services/photoService";
-import { ResidentGuardianChat } from './Resident/ResidentGuardianChat';
-import { Camera, Image as ImageIcon, X } from "lucide-react";
+// Unified AI Chat accessible globally via Tactical Dock
 
 import { OfflineVoiceManager } from "./OfflineVoicePackManager";
 
@@ -438,6 +451,54 @@ export default function ResidentDashboard({
         </>
       )}
 
+      {/* ── CITIZEN CONSOLE GRID ────────── */}
+      {onTabChange && (
+        <motion.div className="tactical-panel border-tactical-cyan/40 p-5 md:p-6 rounded-[32px] bg-tactical-dark/95 shadow-[0_0_20px_rgba(0,240,255,0.1)] relative overflow-hidden mb-8 max-w-4xl mx-auto w-full">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-tactical-cyan/5 blur-[80px] rounded-full pointer-events-none" />
+          <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+            <div>
+              <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">GUARDIAN_PORTAL_MATRIX</span>
+              <h3 className="text-sm font-black uppercase tracking-wider font-display text-white mt-0.5 flex items-center gap-1.5">
+                <Grid className="w-4 h-4 text-tactical-cyan animate-pulse" />
+                CITIZEN GENERAL CONSOLE
+              </h3>
+            </div>
+            <span className="text-[8px] font-mono font-bold text-white/30 tracking-tight uppercase bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+              SECURE SHORTCUT INTERFACES
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { id: "map", label: "Incident Livemap", icon: MapIcon, desc: "Community Incidents", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40" },
+              { id: "tracker", label: "My Active SOS", icon: Activity, desc: "Personal Incident Tracker", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40" },
+              { id: "resident-map", label: "Locator Grid", icon: Eye, desc: "Resident GPS Maps", color: "text-purple-400 border-purple-400/10 hover:bg-purple-400/5 hover:border-purple-400/40" },
+              { id: "schedule", label: "Patrol Schedules", icon: Calendar, desc: "Tanod Shift Planners", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40" },
+              { id: "directory", label: "Emergency Contacts", icon: PhoneCall, desc: "SOS Telephone Directory", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40" },
+              { id: "guardian", label: "Guardian Sound AI", icon: Cpu, desc: "Aura Noise analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40" },
+              { id: "settings", label: "My Profile Set", icon: SettingsIcon, desc: "Profile & Configurations", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40" }
+            ].map((mod) => {
+              const Icon = mod.icon;
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => onTabChange(mod.id)}
+                  className={`flex flex-col text-left p-3 rounded-2xl border bg-black/40 transition-all active:scale-95 duration-300 hover:scale-[1.03] hover:shadow-md select-none group cursor-pointer ${mod.color}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="p-1.5 ml-0 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                      <Icon className="w-4 h-4 text-white/70 group-hover:text-white" />
+                    </div>
+                  </div>
+                  <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
+                  <p className="text-[7px] font-bold text-white/30 tracking-tight leading-normal mt-0.5 font-mono truncate">{mod.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-8">
           <h3 className="text-lg font-black italic tracking-tighter uppercase font-mono">
@@ -466,7 +527,7 @@ export default function ResidentDashboard({
         role={profile?.role}
       />
 
-      <ResidentGuardianChat />
+      {/* Unified AI Chat accessible globally via Tactical Dock */}
     </motion.div>
   );
 }

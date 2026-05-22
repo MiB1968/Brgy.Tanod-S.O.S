@@ -2,6 +2,18 @@ import { useState, useEffect } from "react";
 import * as api from "../lib/api";
 import socket from "../lib/socket";
 import { Alert, User, SystemBroadcast, RegistryStatus } from "../types";
+import { 
+  Shield, 
+  Map as MapIcon, 
+  Activity, 
+  Calendar, 
+  Cpu, 
+  Settings as SettingsIcon, 
+  PhoneCall, 
+  AlertOctagon,
+  Eye,
+  Grid
+} from 'lucide-react';
 import { motion, AnimatePresence } from "motion/react";
 import toast from "react-hot-toast";
 import LiveMap from "../LiveMap";
@@ -34,12 +46,14 @@ export default function TanodDashboard({
   onInstall,
   sirenActive,
   onToggleSiren,
+  onTabChange,
 }: {
   profile: User | null;
   deferredPrompt?: any;
   onInstall?: () => void;
   sirenActive: boolean;
   onToggleSiren: () => void;
+  onTabChange?: (tab: string) => void;
 }) {
   const { alerts } = useIncidentStore();
   const { patrols, updateTanodStatus } = useTanodStore();
@@ -159,6 +173,55 @@ export default function TanodDashboard({
         onToggleSiren={onToggleSiren}
         updateTanodStatus={updateTanodStatus}
       />
+
+      {/* ── TACTICAL CONSOLE GRID ────────── */}
+      {onTabChange && (
+        <motion.div className="tactical-panel border-tactical-cyan/40 p-5 md:p-6 rounded-[32px] bg-tactical-dark/95 shadow-[0_0_20px_rgba(0,240,255,0.1)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-tactical-cyan/5 blur-[80px] rounded-full pointer-events-none" />
+          <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+            <div>
+              <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">PATROL_HUD_MATRIX</span>
+              <h3 className="text-sm font-black uppercase tracking-wider font-display text-white mt-0.5 flex items-center gap-1.5">
+                <Grid className="w-4 h-4 text-tactical-cyan animate-pulse" />
+                TACTICAL RESPONDER GRID
+              </h3>
+            </div>
+            <span className="text-[8px] font-mono font-bold text-white/30 tracking-tight uppercase bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+              ACTIVE DESKTOP CONSOLE LINKED
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { id: "map", label: "Intel Livemap", icon: MapIcon, desc: "Community Grid", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40" },
+              { id: "tracker", label: "Tactical Tracker", icon: Activity, desc: "GPS Live Units", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40" },
+              { id: "roster", label: "Tanod Units", icon: Shield, desc: "Active Forces Roster", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/40" },
+              { id: "schedule", label: "Shift Schedule", icon: Calendar, desc: "Patrol Durations", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40" },
+              { id: "reports", label: "Threat Feeds", icon: AlertOctagon, desc: "Threat Broadcasts", color: "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/40" },
+              { id: "directory", label: "Emergency Directory", icon: PhoneCall, desc: "Hotline Channels", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40" },
+              { id: "guardian", label: "Guardian AI Chat", icon: Cpu, desc: "Microphone analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40" },
+              { id: "settings", label: "Configurations", icon: SettingsIcon, desc: "My Account Settings", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40" }
+            ].map((mod) => {
+              const Icon = mod.icon;
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => onTabChange(mod.id)}
+                  className={`flex flex-col text-left p-3 rounded-2xl border bg-black/40 transition-all active:scale-95 duration-300 hover:scale-[1.03] hover:shadow-md select-none group cursor-pointer ${mod.color}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="p-1.5 ml-0 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                      <Icon className="w-4 h-4 text-white/70 group-hover:text-white" />
+                    </div>
+                  </div>
+                  <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
+                  <p className="text-[7px] font-bold text-white/30 tracking-tight leading-normal mt-0.5 font-mono truncate">{mod.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">
         <LiveMap effectiveRole={profile?.role} />

@@ -61,7 +61,6 @@ export const navItems = [
   { id: 'logs', label: '📋 Activity Logs', icon: ClipboardList },
   { id: 'map', label: '🗺 Live Intel', icon: MapIcon },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
-  { id: 'residents', label: '👥 Residents', icon: IconApprovedResidents },
   { id: 'verification', label: '🛡 Verification', icon: UserCheck },
   { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },
   { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },

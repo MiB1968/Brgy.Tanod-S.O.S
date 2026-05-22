@@ -23,10 +23,10 @@ export function DashboardHeader({ profile, setIsAboutOpen, setIsFeatureMapOpen }
       <div className="tactical-bg-glow absolute inset-0 rounded-[32px] sm:rounded-[48px] pointer-events-none" />
       
       <div className="relative z-10 w-full flex flex-col items-start gap-4">
-        <div className="flex items-center justify-between w-full h-8">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
-            <span className="text-[8px] sm:text-[10px] font-mono text-emergency font-black uppercase tracking-[0.2em] sm:tracking-[0.4em]">Signal: Secure Encryption Active</span>
+        <div className="flex items-center justify-between w-full gap-2 min-h-8">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse shrink-0" />
+            <span className="text-[8px] sm:text-[10px] font-mono text-emergency font-black uppercase tracking-[0.1rem] sm:tracking-[0.4em] whitespace-nowrap">Signal: Secure Encryption Active</span>
           </div>
           <GuardianAILoader />
         </div>

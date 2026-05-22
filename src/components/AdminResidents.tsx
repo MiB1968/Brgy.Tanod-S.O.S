@@ -26,11 +26,40 @@ export default function AdminResidents({ profile }: { profile: any }) {
     const fetchResidents = async () => {
       try {
         const data = await api.residents.getAll();
-        const formatted = data.map((r: any) => ({ 
-          id: r.id, 
-          ...r, 
-          ...(r.details || {}) 
-        } as ResidentProfile));
+        const formatted = data.map((r: any) => {
+          const detailObj = r.details || {};
+          const nameValue = r.fullName || r.full_name || r.name || detailObj.fullName || detailObj.name || 'UNKNOWN RESIDENT';
+          const selfieValue = r.selfieUrl || r.selfie_url || detailObj.selfieUrl || detailObj.selfie_url || '';
+          const idPhotoValue = r.idPhotoUrl || r.id_photo_url || detailObj.idPhotoUrl || detailObj.id_photo_url || '';
+          const phoneValue = r.phone || r.mobileNumber || r.mobile_number || detailObj.phone || detailObj.mobileNumber || 'N/A';
+          const houseNo = r.houseNumber || r.house_number || detailObj.houseNumber || detailObj.house_number || 'N/A';
+          const idT = r.idType || r.id_type || detailObj.idType || 'BARANGAY VERIFIED';
+          const idNum = r.idNumber || r.id_number || detailObj.idNumber || 'N/A';
+          const bType = r.bloodType || r.blood_type || detailObj.bloodType || 'N/A';
+          const medConditions = r.medicalConditions || r.medical_conditions || detailObj.medicalConditions || [];
+          const eContactName = r.emergencyContactName || r.emergency_contact_name || detailObj.emergencyContactName || 'N/A';
+          const eContactPhone = r.emergencyContactPhone || r.emergency_contact_phone || detailObj.emergencyContactPhone || 'N/A';
+          
+          return {
+            ...r,
+            ...detailObj,
+            id: r.id,
+            fullName: nameValue,
+            selfieUrl: selfieValue,
+            idPhotoUrl: idPhotoValue,
+            mobileNumber: phoneValue,
+            houseNumber: houseNo,
+            street: r.address || r.street || detailObj.address || detailObj.street || 'N/A',
+            idType: idT,
+            idNumber: idNum,
+            bloodType: bType,
+            medicalConditions: typeof medConditions === 'string' ? [medConditions] : medConditions,
+            emergencyContactName: eContactName,
+            emergencyContactPhone: eContactPhone,
+            gpsLat: Number(r.gpsLat || r.gps_lat || detailObj.gpsLat || 13.0641),
+            gpsLng: Number(r.gpsLng || r.gps_lng || detailObj.gpsLng || 120.7303)
+          } as ResidentProfile;
+        });
         
         const filteredList = filter === 'all' 
           ? formatted 

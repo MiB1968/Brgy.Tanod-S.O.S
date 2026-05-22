@@ -2,7 +2,23 @@ import { useState, useEffect } from 'react';
 import * as api from '../lib/api';
 import socket from '../lib/socket';
 import { Alert, User, SystemBroadcast } from '../types';
-import { Shield } from 'lucide-react';
+import { 
+  Shield, 
+  Map as MapIcon, 
+  Activity, 
+  Users, 
+  UserCheck, 
+  Calendar, 
+  FileText, 
+  Cpu, 
+  Settings as SettingsIcon, 
+  PhoneCall, 
+  AlertOctagon,
+  Eye,
+  Terminal,
+  Grid,
+  History
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import LiveMap from '../LiveMap';
@@ -309,6 +325,59 @@ export default function AdminDashboard({
         onDutyTanods={onDutyTanods}
         onTabChange={onTabChange}
       />
+
+      {/* ── TACTICAL OPERATIONS MATRIX ────────── */}
+      <motion.div variants={itemVariants} className="tactical-panel border-tactical-cyan/40 p-6 md:p-8 rounded-[32px] bg-tactical-dark/95 shadow-[0_0_20px_rgba(0,240,255,0.1)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-tactical-cyan/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 border-b border-white/5 pb-4">
+          <div>
+            <span className="text-[9px] font-black tracking-widest text-tactical-cyan font-mono uppercase">SECURE_ROUTING_GRID</span>
+            <h2 className="text-xl md:text-2xl font-black italic tracking-tight font-display text-white mt-1 flex items-center gap-2">
+              <Grid className="w-5 h-5 text-tactical-cyan animate-pulse animate-glow" />
+              TACTICAL OPERATIONS CONSOLE
+            </h2>
+          </div>
+          <span className="text-[10px] font-mono font-bold text-white/30 tracking-wider uppercase bg-white/5 px-3 py-1 rounded-full border border-white/5 animate-pulse">
+            14 ACTIVE_MODULES
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4 relative z-10">
+          {[
+            { id: "map", label: "Live Intel Map", icon: MapIcon, desc: "Active Heatmaps", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/45 shadow-[0_0_15px_rgba(0,240,255,0.05)]" },
+            { id: "tracker", label: "GPS Dispatch", icon: Activity, desc: "Tanod Live Tracks", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/45" },
+            { id: "verification", label: "Verifications", icon: UserCheck, desc: "Access Clearances", color: "text-amber-400 border-amber-400/10 hover:bg-amber-400/5 hover:border-amber-400/45" },
+            { id: "resident-map", label: "Locator Grid", icon: Eye, desc: "Target Overcasts", color: "text-purple-400 border-purple-400/10 hover:bg-purple-400/5 hover:border-purple-400/45" },
+            { id: "roster", label: "Tanod Roster", icon: Shield, desc: "Unit Deployments", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/45" },
+            { id: "schedule", label: "Shift Planner", icon: Calendar, desc: "Patrol Schedules", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/45" },
+            { id: "reports", label: "Threat Feed", icon: AlertOctagon, desc: "SOS Threat Bulletins", color: "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/45" },
+            { id: "records", label: "Workspace Doc", icon: FileText, desc: "Barangay Records", color: "text-zinc-300 border-zinc-300/10 hover:bg-zinc-300/5 hover:border-zinc-300/45" },
+            { id: "directory", label: "SOS Directory", icon: PhoneCall, desc: "Secure Hotlines", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/45" },
+            { id: "guardian", label: "Guardian AI", icon: Cpu, desc: "Aura Sound Analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/45" },
+            { id: "ops", label: "Workspace Hub", icon: Terminal, desc: "Operations & API", color: "text-teal-400 border-teal-400/10 hover:bg-teal-400/5 hover:border-teal-400/45" },
+            { id: "logs", label: "Detailed Logs", icon: History, desc: "Raw Sys_Telemetry", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/45" },
+            { id: "settings", label: "Config Admin", icon: SettingsIcon, desc: "Engine Settings", color: "text-teal-400 border-teal-400/10 hover:bg-teal-400/5 hover:border-teal-400/45" }
+          ].map((mod) => {
+            const Icon = mod.icon;
+            return (
+              <button
+                key={mod.id}
+                onClick={() => onTabChange(mod.id)}
+                className={`flex flex-col text-left p-3.5 sm:p-4 rounded-2xl border bg-black/40 transition-all active:scale-95 duration-300 hover:scale-[1.03] hover:shadow-lg select-none group cursor-pointer ${mod.color}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 ml-0 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
+                    <Icon className="w-5 h-5 text-white/70 group-hover:text-white" />
+                  </div>
+                  <span className="text-[7px] font-mono text-white/20 font-black tracking-widest uppercase group-hover:text-white/40 transition-colors">LAUNCH</span>
+                </div>
+                <h4 className="text-[10px] sm:text-xs font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
+                <p className="text-[8px] font-bold text-white/30 tracking-tight leading-normal mt-1 font-mono truncate">{mod.desc}</p>
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

@@ -49,7 +49,7 @@ export function AdminStatsGrid({
         icon={IconApprovedResidents} 
         color="text-tactical-blue" 
         bg="bg-tactical-blue/10" 
-        onClick={() => onTabChange('residents')}
+        onClick={() => onTabChange('verification')}
       />
       <StatCard 
         label="Pending Registration" 
@@ -58,7 +58,7 @@ export function AdminStatsGrid({
         color="text-tactical-cyan" 
         bg="bg-tactical-cyan/10" 
         pulse={pendingRegCount > 0}
-        onClick={() => onTabChange('residents')}
+        onClick={() => onTabChange('verification')}
       />
       <StatCard 
         label="Active SOS Alerts" 

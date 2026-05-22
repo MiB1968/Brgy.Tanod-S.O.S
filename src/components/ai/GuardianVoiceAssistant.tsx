@@ -110,6 +110,21 @@ export const GuardianVoiceAssistant: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleToggle = () => {
+      audioUtils.kickstartAudio();
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    };
+    window.addEventListener('toggle-voice-assistant', handleToggle);
+    return () => {
+      window.removeEventListener('toggle-voice-assistant', handleToggle);
+    };
+  }, [isListening, startListening, stopListening]);
+
   return (
     <motion.div 
       drag
@@ -214,7 +229,8 @@ export const GuardianVoiceAssistant: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center gap-3">
+      {/* Redundant float buttons hidden since TacticalDock houses the trigger */}
+      <div className="hidden bg-slate-800">
         {/* Chat Toggle Button */}
         <motion.button
           whileHover={{ scale: 1.1 }}

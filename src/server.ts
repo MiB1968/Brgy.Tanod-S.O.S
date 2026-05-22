@@ -14,7 +14,11 @@ import { errorHandler, notFoundHandler } from "./server/middleware/error";
 // ── Path Helper for ESM/CJS compatibility ──────────────────────────────────
 const getDirname = () => {
   if (typeof __dirname !== "undefined") return __dirname;
-  return path.dirname(fileURLToPath(import.meta.url));
+  try {
+    return path.dirname(fileURLToPath((import.meta as any).url));
+  } catch {
+    return process.cwd();
+  }
 };
 
 async function startServer() {

@@ -2,6 +2,7 @@
 import React, { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import { AnimatePresence } from "motion/react";
+import * as api from "./lib/api";
 
 import { useAppLogic } from "./hooks/useAppLogic";
 import { useRBAC } from "./context/AuthContext";
@@ -31,7 +32,7 @@ import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 import GuardianAIChat from "./components/GuardianAIChat";
 import BroadcastOverlay from "./components/BroadcastOverlay";
 import BackgroundServices from "./components/BackgroundServices";
-import FloatingSOSButton from "./components/FloatingSOSButton";
+import TacticalDock from "./components/layout/TacticalDock";
 import PWAStatus from "./components/PWAStatus";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
@@ -43,6 +44,17 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+
+  // Listen to toggle-siren custom actions from TacticalDock
+  useEffect(() => {
+    const handleToggleSiren = () => {
+      logic.toggleGlobalSiren();
+    };
+    window.addEventListener('toggle-siren', handleToggleSiren);
+    return () => {
+      window.removeEventListener('toggle-siren', handleToggleSiren);
+    };
+  }, [logic.toggleGlobalSiren]);
 
   // ── Loading State ─────────────────────────────────────
   if (logic.loading || rbacLoading) {
@@ -59,7 +71,19 @@ export default function App() {
 
   // ── Registration Flow ─────────────────────────────────
   if (logic.isRegistering) {
-    return <RegistrationForm onCancel={() => logic.setIsRegistering(false)} onComplete={() => logic.setIsRegistering(false)} />;
+    return (
+      <RegistrationForm 
+        onCancel={() => logic.setIsRegistering(false)} 
+        onComplete={async (registrationData) => {
+          try {
+            await api.auth.register(registrationData);
+          } catch (err: any) {
+            console.error("App registration error:", err);
+            throw err;
+          }
+        }} 
+      />
+    );
   }
 
   // ── Login Screen ──────────────────────────────────────
@@ -94,11 +118,18 @@ export default function App() {
         isMobileMenuOpen={logic.isMobileMenuOpen}
         setIsMobileMenuOpen={logic.setIsMobileMenuOpen}
         effectiveRole={logic.effectiveRole}
+        user={logic.user}
+        profile={logic.effectiveProfile}
+        handleLogout={logic.handleLogout}
+        deferredPrompt={logic.deferredPrompt}
+        handleInstallApp={logic.handleInstallApp}
       >
         {/* Header */}
         <AppHeader
           activeTab={logic.activeTab}
           setActiveTab={logic.setActiveTab}
+          isMobileMenuOpen={logic.isMobileMenuOpen}
+          setIsMobileMenuOpen={logic.setIsMobileMenuOpen}
           effectiveRole={logic.effectiveRole}
           isMasterAdmin={logic.isMasterAdmin}
           viewOverride={logic.viewOverride}
@@ -122,6 +153,7 @@ export default function App() {
             onToggleSiren={logic.toggleGlobalSiren}
             activeBroadcast={logic.activeBroadcast}
             onTabChange={logic.setActiveTab}
+            visiblePatrols={logic.visiblePatrols}
           />
         </main>
 
@@ -165,10 +197,7 @@ export default function App() {
         <BackgroundServices />
 
         {/* Notifications & PWA */}
-        <FloatingSOSButton 
-          onTrigger={logic.sendSOS} 
-          role={logic.effectiveRole} 
-        />
+        <TacticalDock />
         <Toaster
           position="top-center"
           toastOptions={{
