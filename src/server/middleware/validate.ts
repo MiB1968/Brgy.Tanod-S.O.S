@@ -10,7 +10,7 @@ export const validate = (schema: z.ZodSchema<any>) => {
       if (error instanceof ZodError) {
         return res.status(400).json({
           error: "Validation failed",
-          details: (error as ZodError).errors,
+          details: (error as any).errors,
         });
       }
       next(error);

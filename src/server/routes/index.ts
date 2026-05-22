@@ -12,6 +12,7 @@ import storageRoutes from "./storageRoutes";
 import webhookRoutes from "./webhookRoutes";
 import smsRoutes from "./sms";
 import otpRoutes from "./otp";
+import scrapeRoutes from "./scrape";
 
 export const setupRoutes = (app: Express): void => {
   // Health check
@@ -41,6 +42,7 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/webhooks", webhookRoutes);
   app.use("/api/sms", smsRoutes);
   app.use("/api/otp", otpRoutes);
+  app.use("/api/scrape", scrapeRoutes);
 
   // 404 catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {

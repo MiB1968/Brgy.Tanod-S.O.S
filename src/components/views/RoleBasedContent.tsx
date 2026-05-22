@@ -2,6 +2,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import LiveMap from "../LiveMap";
+import NewsUpdates from "../NewsUpdates";
 
 interface Props {
   activeTab: string;
@@ -130,6 +131,9 @@ export function RoleBasedContent({
                   <p className="text-gray-500 text-center py-12">No active alerts at the moment</p>
                 )}
               </motion.div>
+
+              {/* News Updates via Firecrawl */}
+              <NewsUpdates />
             </div>
           )}
 
