@@ -43,8 +43,8 @@ app.use(
 
         styleSrc:
           config.nodeEnv === 'production'
-            ? ["'self'", 'https://fonts.googleapis.com']
-            : ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+            ? ["'self'", 'https://fonts.googleapis.com', 'https://unpkg.com']
+            : ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://unpkg.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: [
           "'self'",
@@ -67,7 +67,7 @@ app.use(
           "https://cdn-lfs.huggingface.co",
           "https://cdn-lfs-us-1.huggingface.co",
         ],
-        mediaSrc: ["'self'", 'blob:'],
+        mediaSrc: [ "'self'", 'blob:', 'https://assets.mixkit.co' ],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
