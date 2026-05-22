@@ -2,6 +2,7 @@ import ResidentDashboard from './ResidentDashboard';
 import TanodDashboard from './TanodDashboard';
 import AdminDashboard from './AdminDashboard';
 import { User, Alert, PatrolLocation, SystemBroadcast } from '../types';
+import * as safeStorage from '../lib/safeStorage';
 
 interface DashboardViewProps {
   profile?: User | null;
@@ -30,15 +31,27 @@ export default function DashboardView({
   onToggleSiren,
   activeBroadcast,
 }: DashboardViewProps) {
-  if (!profile) {
+  let activeProfile = profile;
+  if (!activeProfile) {
+    const cached = safeStorage.getItem("user");
+    if (cached) {
+      try {
+        activeProfile = JSON.parse(cached) as User;
+      } catch (err) {
+        console.error("Failed to parse cached user in DashboardView:", err);
+      }
+    }
+  }
+
+  if (!activeProfile) {
     return <div className="text-center p-12 text-[#8E9299]">Loading profile...</div>;
   }
   
-  console.log('[DEBUG] DashboardView rendered with profile role:', profile?.role);
-  if (profile?.role === 'resident') {
+  console.log('[DEBUG] DashboardView rendered with active profile role:', activeProfile?.role);
+  if (activeProfile?.role === 'resident') {
     return (
       <ResidentDashboard 
-        profile={profile} 
+        profile={activeProfile} 
         patrols={patrols} 
         visiblePatrols={visiblePatrols} 
         isOnline={isOnline} 
@@ -50,10 +63,10 @@ export default function DashboardView({
       />
     );
   }
-  if (profile?.role === 'tanod') {
+  if (activeProfile?.role === 'tanod') {
     return (
       <TanodDashboard 
-        profile={profile} 
+        profile={activeProfile} 
         deferredPrompt={deferredPrompt} 
         onInstall={onInstall} 
         sirenActive={sirenActive} 
@@ -61,10 +74,10 @@ export default function DashboardView({
       />
     );
   }
-  if (profile?.role === 'admin' || profile?.role === 'superadmin') {
+  if (activeProfile?.role === 'admin' || activeProfile?.role === 'superadmin') {
     return (
       <AdminDashboard 
-        profile={profile} 
+        profile={activeProfile} 
         onTabChange={onTabChange} 
         deferredPrompt={deferredPrompt} 
         onInstall={onInstall} 
