@@ -69,25 +69,21 @@ export const initDatabase = (): admin.firestore.Firestore | null => {
     if (!admin.apps.length) {
       admin.initializeApp({
         projectId: config.firebase.projectId,
-        // For production: use service account credentials
-        // credential: admin.credential.cert({...})
       });
       console.log('[DB] Firebase app initialized successfully');
     }
 
     if (!firebaseDb) {
-      // Use the databaseId provided by the config, fallback to default if not present
       const dbId = config.firebase.databaseId || '(default)';
       firebaseDb = getFirestore(admin.app(), dbId);
       firebaseDb.settings({
         ignoreUndefinedProperties: true,
       });
-      console.log(`[DB] Firebase Firestore initialized successfully (databaseId: ${dbId})`);
     }
     
     return firebaseDb;
   } catch (err) {
-    console.error('CRITICAL: Firebase admin initialization failed! Server will run, but Firebase features will break.', err);
+    console.error('CRITICAL: Firebase admin initialization failed!', err);
     return null as any;
   }
 };
@@ -96,11 +92,10 @@ export const getDb = (): admin.firestore.Firestore => {
   if (!firebaseDb) {
     const db = initDatabase();
     if (!db) {
-      // Return a proxy that logs errors instead of crashing if the dev forgot config
-      console.error('[DB] Firestore not initialized. API calls will fail.');
+      console.error('[DB] Firestore not initialized.');
       return {
-        collection: () => { throw new Error('Firestore not initialized. Check FIREBASE_PROJECT_ID.'); },
-        doc: () => { throw new Error('Firestore not initialized. Check FIREBASE_PROJECT_ID.'); },
+        collection: () => { throw new Error('Firestore not initialized.'); },
+        doc: () => { throw new Error('Firestore not initialized.'); },
       } as any;
     }
     firebaseDb = db;
@@ -108,5 +103,4 @@ export const getDb = (): admin.firestore.Firestore => {
   return firebaseDb;
 };
 
-// Export admin for advanced usage if needed
 export { admin };

@@ -2,19 +2,8 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import LiveMap from "../LiveMap";
-import { useTanodStore } from "../../store/useTanodStore";
 
-import AdminDashboard from "../AdminDashboard";
-import TanodDashboard from "../TanodDashboard";
-import ResidentDashboard from "../ResidentDashboard";
-
-import ResidentTacticalMap from "../Admin/ResidentTacticalMap";
-import { ResidentVerification } from "../Admin/ResidentVerification";
-import AdminResidents from "../AdminResidents";
-import OpsIntegrations from "../Admin/OpsIntegrations";
-import GuardianAIChat from "../GuardianAIChat";
-
-interface RoleBasedContentProps {
+interface Props {
   activeTab: string;
   effectiveRole: string;
   effectiveProfile: any;
@@ -34,168 +23,117 @@ export function RoleBasedContent({
   effectiveProfile,
   alerts,
   isOnline,
-  deferredPrompt,
-  onInstall,
-  sirenActive = false,
-  onToggleSiren = () => {},
-  activeBroadcast = null,
-  onTabChange = () => {},
-}: RoleBasedContentProps) {
-  const { patrols } = useTanodStore(); // Real-time patrol data
-
+}: Props) {
   return (
-    <div className="min-h-full p-4 pb-24">
+    <div className="p-4 pb-24 min-h-screen bg-gray-950">
       <AnimatePresence mode="wait">
-        <div className="bg-red-900 text-white p-2 text-xs">
-          DEBUG: {activeTab} | Role: {effectiveRole} | Email: {effectiveProfile?.email}
-        </div>
         <motion.div
           key={activeTab}
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -15 }}
-          transition={{ duration: 0.35 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ duration: 0.4 }}
         >
-          {/* ==================== HOME DASHBOARD ==================== */}
           {activeTab === "home" && (
-            effectiveRole === "superadmin" || effectiveRole === "admin" ? (
-              <AdminDashboard 
-                profile={effectiveProfile}
-                onTabChange={onTabChange}
-                deferredPrompt={deferredPrompt}
-                onInstall={onInstall}
-                sirenActive={sirenActive}
-                onToggleSiren={onToggleSiren}
-                activeBroadcast={activeBroadcast}
-              />
-            ) : effectiveRole === "tanod" ? (
-              <TanodDashboard 
-                profile={effectiveProfile}
-                deferredPrompt={deferredPrompt}
-                onInstall={onInstall}
-                sirenActive={sirenActive}
-                onToggleSiren={onToggleSiren}
-              />
-            ) : (
-              <ResidentDashboard 
-                profile={effectiveProfile}
-                patrols={patrols}
-                visiblePatrols={patrols}
-                isOnline={isOnline}
-                deferredPrompt={deferredPrompt}
-                onInstall={onInstall as any}
-                onTabChange={onTabChange}
-                sirenActive={sirenActive}
-                onToggleSiren={onToggleSiren}
-              />
-            )
-          )}
-
-          {/* ==================== LIVE MAP (Real-time) ==================== */}
-          {activeTab === "map" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Live Incident Map</h2>
-                <div className="text-sm px-4 py-1.5 bg-gray-800 rounded-full">
-                  {patrols.length} Tanod{patrols.length !== 1 ? "s" : ""} Online
-                </div>
+            <div className="space-y-8">
+              {/* Greeting */}
+              <div>
+                <h1 className="text-4xl font-bold text-white">
+                  Good day, {effectiveProfile?.name?.split(" ")[0] || "Kababayan"}!
+                </h1>
+                <p className="text-gray-400 mt-1">
+                  {isOnline ? "🟢 System Online" : "📴 Offline Mode"}
+                </p>
               </div>
-              <LiveMap />
-            </div>
-          )}
 
-          {/* ==================== TANOD TRACKER ==================== */}
-          {activeTab === "tracker" && (
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Tanod Live Tracker</h2>
-              <div className="space-y-3">
-                {patrols.length > 0 ? (
-                  patrols.map((patrol: any, i: number) => (
-                    <div
-                      key={patrol.tanodId || `patrol-${i}`}
-                      className="glass-panel rounded-3xl p-5 flex items-center justify-between"
+              {/* Animated Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="glass-panel rounded-3xl p-6 cursor-pointer"
+                >
+                  <div className="text-red-400 text-sm font-medium">ACTIVE ALERTS</div>
+                  <motion.div
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="text-6xl font-bold text-red-500 mt-4"
+                  >
+                    {alerts.length}
+                  </motion.div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="glass-panel rounded-3xl p-6 cursor-pointer"
+                >
+                  <div className="text-green-400 text-sm font-medium">TANOD ONLINE</div>
+                  <motion.div
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="text-6xl font-bold text-green-500 mt-4"
+                  >
+                    14
+                  </motion.div>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="glass-panel rounded-3xl p-6 cursor-pointer"
+                >
+                  <div className="text-amber-400 text-sm font-medium">AVG RESPONSE</div>
+                  <motion.div
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    className="text-6xl font-bold text-amber-500 mt-4"
+                  >
+                    3.8<span className="text-lg">min</span>
+                  </motion.div>
+                </motion.div>
+              </div>
+
+              {/* Recent Alerts */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="glass-panel rounded-3xl p-6"
+              >
+                <h3 className="font-semibold text-lg mb-5">Recent Alerts</h3>
+                {alerts.length > 0 ? (
+                  alerts.slice(0, 3).map((alert: any, index: number) => (
+                    <motion.div
+                      key={alert.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="border-b border-gray-700 py-4 last:border-none"
                     >
-                      <div>
-                        <p className="font-semibold">{patrol.tanodName || "Tanod"}</p>
-                        <p className="text-sm text-gray-400">
-                          Updated {new Date(patrol.lastUpdate).toLocaleTimeString()}
-                        </p>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-medium capitalize">{alert.type}</span>
+                          <p className="text-sm text-gray-400 line-clamp-1 mt-1">
+                            {alert.description}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          {new Date(alert.timestamp).toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-green-500 text-xl">●</div>
-                        <p className="text-xs text-gray-400">
-                          {patrol.speed ? `${patrol.speed} km/h` : ""}
-                        </p>
-                      </div>
-                    </div>
+                    </motion.div>
                   ))
                 ) : (
-                  <div className="glass-panel rounded-3xl p-12 text-center">
-                    <p className="text-gray-400">No Tanods currently online</p>
-                  </div>
+                  <p className="text-gray-500 text-center py-12">No active alerts at the moment</p>
                 )}
-              </div>
+              </motion.div>
             </div>
           )}
 
-          {/* ==================== SETTINGS ==================== */}
-          {activeTab === "settings" && (
-            <div className="max-w-md mx-auto glass-panel rounded-3xl p-8">
-              <h2 className="text-2xl font-bold mb-8">Account Settings</h2>
-              <div className="space-y-6">
-                <div>
-                  <p className="text-gray-400 text-sm">Full Name</p>
-                  <p className="font-medium text-lg">{effectiveProfile?.name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Role</p>
-                  <p className="font-medium capitalize text-red-400">{effectiveRole}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400 text-sm">Status</p>
-                  <p className="text-green-500 font-medium">Active • Verified</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ==================== ADDITIONAL ADMIN TABS ==================== */}
-          {activeTab === "verification" && (
-            <ResidentVerification />
-          )}
-
-          {activeTab === "residents" && (
-            <AdminResidents profile={effectiveProfile} />
-          )}
-
-          {activeTab === "resident-map" && (
-            <ResidentTacticalMap profile={effectiveProfile} />
-          )}
-
-          {activeTab === "ops" && (
-            <OpsIntegrations />
-          )}
-
-          {/* ==================== GUARDIAN AI ==================== */}
-          {activeTab === "guardian" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold font-sans tracking-tight text-white uppercase italic">Barangay Guardian AI Advisor</h2>
-              </div>
-              <GuardianAIChat isInline={true} />
-            </div>
-          )}
-
-          {/* Fallback for other tabs */}
-          {!["home", "map", "tracker", "settings", "verification", "residents", "resident-map", "ops", "guardian"].includes(activeTab) && (
-            <div className="h-[60vh] flex flex-col items-center justify-center text-center">
-              <div className="text-7xl mb-6">🛠️</div>
-              <h3 className="text-2xl font-bold mb-3">Coming Soon</h3>
-              <p className="text-gray-400 max-w-xs">
-                The {activeTab} module is under active development.
-              </p>
-            </div>
-          )}
+          {activeTab === "map" && <LiveMap />}
         </motion.div>
       </AnimatePresence>
     </div>

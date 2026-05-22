@@ -1,9 +1,9 @@
 // src/components/layout/AppHeader.tsx
 import React from "react";
-import { Menu, X, Bell, Plus, Siren, LogOut, User } from "lucide-react";
+import { Plus, Siren, Bell, Menu } from "lucide-react";
 import { TanodLogo } from "../Branding";
 
-interface AppHeaderProps {
+interface Props {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   effectiveRole: string;
@@ -25,100 +25,69 @@ export default function AppHeader({
   globalSirenActive,
   toggleGlobalSiren,
   onNewIncident,
-}: AppHeaderProps) {
-  const navItems = [
-    { key: "home", label: "Home", icon: "🏠" },
-    { key: "map", label: "Map", icon: "🗺️" },
-    { key: "tracker", label: "Tracker", icon: "🛡️" },
-    { key: "settings", label: "Settings", icon: "⚙️" },
-  ];
-
+}: Props) {
   return (
-    <header className="sticky top-0 z-50 bg-gray-950/95 backdrop-blur-lg border-b border-gray-800">
-      <div className="flex items-center justify-between px-4 py-3">
-        {/* Logo & Title */}
+    <header className="sticky top-0 z-50 bg-gray-950/95 backdrop-blur-2xl border-b border-gray-800 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        {/* Logo */}
         <div className="flex items-center gap-3">
-          <TanodLogo size={36} />
+          <TanodLogo size={42} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Brgy. Tanod</h1>
-            <p className="text-[10px] text-red-500 -mt-1 font-mono">S.O.S. SYSTEM</p>
+            <h1 className="text-2xl font-bold tracking-tighter text-white">Brgy. Tanod</h1>
+            <p className="text-[10px] text-red-500 font-mono -mt-1">S.O.S. SYSTEM</p>
           </div>
         </div>
 
-        {/* Role Indicator */}
-        <div className="hidden sm:flex items-center gap-2">
-          <div
-            className={`px-4 py-1.5 text-xs font-semibold rounded-full border capitalize transition-colors ${
-              effectiveRole === "superadmin"
-                ? "border-red-500 text-red-400 bg-red-500/10"
-                : effectiveRole === "admin"
-                ? "border-orange-500 text-orange-400 bg-orange-500/10"
-                : effectiveRole === "tanod"
-                ? "border-blue-500 text-blue-400 bg-blue-500/10"
-                : "border-green-500 text-green-400 bg-green-500/10"
-            }`}
-          >
+        {/* Role Badge */}
+        <div className="hidden md:flex items-center gap-2">
+          <div className={`px-5 py-1.5 text-xs font-semibold rounded-full border capitalize transition-colors ${
+            effectiveRole === "superadmin" ? "border-red-500 bg-red-500/10 text-red-400" :
+            effectiveRole === "admin" ? "border-orange-500 bg-orange-500/10 text-orange-400" :
+            effectiveRole === "tanod" ? "border-blue-500 bg-blue-500/10 text-blue-400" :
+            "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+          }`}>
             {effectiveRole}
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* New Incident Button */}
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
           <button
             onClick={onNewIncident}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 px-5 py-2.5 rounded-2xl font-semibold text-sm transition-all active:scale-95"
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 px-6 py-3 rounded-2xl font-semibold text-sm transition-all active:scale-95 shadow-lg shadow-red-600/30"
           >
             <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Report</span>
+            <span className="hidden sm:inline">New Incident</span>
           </button>
 
-          {/* Global Siren (Admin Only) */}
           {(effectiveRole === "admin" || effectiveRole === "superadmin") && (
             <button
               onClick={toggleGlobalSiren}
-              className={`p-3 rounded-2xl transition-all ${
-                globalSirenActive
-                  ? "bg-red-600 animate-pulse shadow-lg shadow-red-600/50"
-                  : "bg-gray-800 hover:bg-gray-700"
-              }`}
+              className={`p-3 rounded-2xl transition-all ${globalSirenActive ? "bg-red-600 animate-pulse shadow-red-600/50" : "bg-gray-800 hover:bg-gray-700"}`}
             >
               <Siren className="w-5 h-5" />
             </button>
           )}
 
-          {/* Notifications */}
           <button className="p-3 rounded-2xl bg-gray-800 hover:bg-gray-700 transition-all relative">
             <Bell className="w-5 h-5" />
-            {/* We will assume alerts are not passed as prop here based on the requested code, 
-                let's remove alerts count logic since it's not in props */}
           </button>
 
-          {/* Role Switcher - Always Visible for Debugging */}
-          <select
-            value={viewOverride || ""}
-            onChange={(e) => setViewOverride(e.target.value || null)}
-            className="bg-gray-900 border border-gray-700 rounded-lg px-2 sm:px-4 py-2 sm:py-2 text-[10px] sm:text-sm focus:outline-none"
-            style={{ maxWidth: '100px' }}
-          >
-            <option value="">Normal View</option>
-            <option value="superadmin">Super Admin</option>
-            <option value="admin">Admin</option>
-            <option value="tanod">Tanod</option>
-            <option value="resident">Resident</option>
-          </select>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-3 rounded-2xl bg-gray-800 hover:bg-gray-700"
-            onClick={() => {/* Mobile menu logic can be added in AppLayout */}}
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          {isMasterAdmin && (
+            <select
+              value={viewOverride || ""}
+              onChange={(e) => setViewOverride(e.target.value || null)}
+              className="bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3 text-sm focus:outline-none"
+            >
+              <option value="">Normal View</option>
+              <option value="superadmin">Super Admin</option>
+              <option value="admin">Admin</option>
+              <option value="tanod">Tanod</option>
+              <option value="resident">Resident</option>
+            </select>
+          )}
         </div>
       </div>
-
-      {/* Bottom Navigation (Mobile) */}
     </header>
   );
 }

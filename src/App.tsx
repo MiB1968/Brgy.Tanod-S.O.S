@@ -138,7 +138,6 @@ export default function App() {
 
           <SOSAlertSiren 
             key="sos-siren"
-            userRole={logic.effectiveRole} 
             onSOS={logic.sendSOS} 
           />
 

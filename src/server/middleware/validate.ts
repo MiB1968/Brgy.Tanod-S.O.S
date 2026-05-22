@@ -1,16 +1,16 @@
 import { z, ZodError } from "zod";
 import { Request, Response, NextFunction } from "express";
 
-export const validate = (schema: z.ZodSchema) => {
+export const validate = (schema: z.ZodSchema<any>) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       req.body = schema.parse(req.body);
       next();
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof ZodError) {
         return res.status(400).json({
           error: "Validation failed",
-          details: error.errors,
+          details: (error as ZodError).errors,
         });
       }
       next(error);
