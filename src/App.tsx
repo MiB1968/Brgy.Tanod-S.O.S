@@ -23,7 +23,7 @@ import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 
 // Components
-import { LoginView } from "./components/AuthViews";
+import { LoginView, RoleSelection } from "./components/AuthViews";
 import { NavigationSidebar } from "./components/NavigationSidebar";
 import SOSAlertSiren from "./components/SOSAlertSiren";
 import TanodCommandAlert from "./components/TanodCommandAlert";
@@ -31,7 +31,8 @@ import DashboardView from "./components/DashboardView";
 import LiveMap from "./LiveMap";
 
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth } from "./lib/firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "./lib/firebase";
 
 export default function App() {
   useAudioInitializer();
@@ -55,6 +56,7 @@ export default function App() {
   const [activeBroadcast, setActiveBroadcast] = useState<any>(null);
   const [globalSirenActive, setGlobalSirenActive] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
 
   // Socket listeners
   useSocketListeners({
@@ -95,14 +97,34 @@ export default function App() {
     return <div className="flex h-screen items-center justify-center bg-gray-950 text-white font-mono uppercase tracking-widest text-[11px] animate-pulse">Establishing Secure Link...</div>;
   }
 
-  if (!firebaseUser) {
+  if (showRoleSelection) {
+    return (
+      <RoleSelection 
+        onSelect={async (role) => {
+          if (firebaseUser) {
+             const userDocRef = doc(db, "users", firebaseUser.uid);
+             await setDoc(userDocRef, { role, updatedAt: serverTimestamp() }, { merge: true });
+             // Reload page to re-fetch context
+             window.location.reload();
+          } else {
+             setProfile({ id: "guest", uid: "guest", email: "guest@example.com", status: "Available", createdAt: new Date().toISOString(), name: "Guest", role } as any);
+             setShowRoleSelection(false);
+          }
+        }}
+        onRegister={() => setShowRoleSelection(false)}
+      />
+    );
+  }
+
+  // If we don't have a firebase user and we aren't bypassing via a mock profile
+  if (!firebaseUser && (!profile || profile.uid !== "guest")) {
     return (
       <LoginView 
         onLogin={(email, password) => email && password && signInWithEmailAndPassword(auth, email, password)}
         onRegister={() => {}}
         isLoggingIn={rbacLoading}
-        onDemoLogin={() => {}}
-        onDemoAdminLogin={() => {}}
+        onDemoLogin={() => setShowRoleSelection(true)}
+        onDemoAdminLogin={() => setShowRoleSelection(true)}
         onGoogleLogin={() => signInWithPopup(auth, new GoogleAuthProvider())}
         onResetSession={() => {}}
       />
@@ -122,13 +144,14 @@ export default function App() {
           profile={profile || {}}
           handleLogout={() => { /* implement proper logout later */ }}
           handleInstallApp={() => {}}
+          onSwitchRole={() => setShowRoleSelection(true)}
         />
 
         <main className="flex-1 overflow-auto">
           <AnimatePresence mode="wait">
             {activeTab === "home" && (
               <DashboardView 
-                profile={profile || { id: "guest", uid: "guest", email: "guest@example.com", status: "Available", createdAt: new Date().toISOString(), role: effectiveRole as UserRole, name: "Guest" }}
+                profile={{ ...(profile || { id: "guest", uid: "guest", email: "guest@example.com", status: "Available", createdAt: new Date().toISOString(), name: "Guest" }), role: effectiveRole as UserRole }}
                 alerts={alerts}
                 patrols={patrols}
                 visiblePatrols={patrols}
@@ -146,7 +169,7 @@ export default function App() {
         </main>
 
         <SOSAlertSiren userRole={effectiveRole} onSOS={handleSOS} />
-        <TanodCommandAlert profile={profile || { id: "guest", uid: "guest", email: "guest@example.com", status: "Available", createdAt: new Date().toISOString(), role: effectiveRole as UserRole, name: "Guest" }} />
+        <TanodCommandAlert profile={{ ...(profile || { id: "guest", uid: "guest", email: "guest@example.com", status: "Available", createdAt: new Date().toISOString(), name: "Guest" }), role: effectiveRole as UserRole }} />
         <GuardianVoiceAssistant />
 
         <Toaster position="top-center" />

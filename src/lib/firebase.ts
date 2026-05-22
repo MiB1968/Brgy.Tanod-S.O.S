@@ -13,8 +13,6 @@ import {
 } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 
-// import firebaseAppletConfig from '../../firebase-applet-config.json';
-
 // ── Config ────────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyFakeKeyForLocalDevelopmentAndPreview",

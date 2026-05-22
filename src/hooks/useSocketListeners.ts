@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "react-hot-toast";
+import { auth } from "../lib/firebase";
 
 import { useIncidentStore } from "../store/useIncidentStore";
 import { useTanodStore } from "../store/useTanodStore";
@@ -37,27 +38,44 @@ export function useSocketListeners({
   useEffect(() => {
     if (!effectiveProfile?.id) return;
 
-    // Initialize Socket.io
-    const socket = io(
-      import.meta.env.VITE_SOCKET_URL || window.location.origin,
-      {
-        auth: {
-          userId: effectiveProfile.id,
-          role: effectiveRole,
-          name: effectiveProfile.name,
-        },
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        path: "/socket.io",
-      },
-    );
+    let socket: Socket | null = null;
+    let isActive = true;
 
-    socketRef.current = socket;
+    const connectSocket = async () => {
+      let token = "";
+      if (auth.currentUser) {
+        try {
+          token = await auth.currentUser.getIdToken();
+        } catch (e) {
+          console.warn("Failed to get Firebase token for socket:", e);
+        }
+      } else {
+        token = localStorage.getItem('token') || ""; 
+      }
 
-    // ── Connection Events ─────────────────────────────────────
-    socket.on("connect", () => {
-      console.log("✅ Socket Connected:", socket.id);
+      if (!isActive) return;
+
+      socket = io(
+        import.meta.env.VITE_SOCKET_URL || window.location.origin,
+        {
+          auth: {
+            token,
+            userId: effectiveProfile.id,
+            role: effectiveRole,
+            name: effectiveProfile.name,
+          },
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          path: "/socket.io",
+        }
+      );
+
+      socketRef.current = socket;
+
+      // ── Connection Events ─────────────────────────────────────
+      socket.on("connect", () => {
+        console.log("✅ Socket Connected:", socket.id);
       setIsOnline(true);
       toast.success("Connected to Command Center", {
         icon: "🔗",
@@ -149,9 +167,15 @@ export function useSocketListeners({
       triggerSync();
       toast("🔄 Server requested full sync...");
     });
+    
+    // Call connect Socket inside useEffect
+    };
+    
+    connectSocket();
 
     // Cleanup on unmount
     return () => {
+      isActive = false;
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;

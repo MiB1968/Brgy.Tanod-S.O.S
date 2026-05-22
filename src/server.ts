@@ -60,6 +60,14 @@ async function startServer() {
     console.error("CRITICAL: UNHANDLED REJECTION:", reason);
   });
 
+  // Short-circuit Express for Socket.IO requests
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/socket.io")) {
+      return; 
+    }
+    next();
+  });
+
   initSocket(server);
 
   // Force production mode if we are running from dist/
@@ -115,8 +123,14 @@ async function startServer() {
 
     // SPA fallback
     app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
+      // Allow API routes to pass through to the 404 handler if they reach here
+      if (req.path.startsWith("/api")) {
         return next();
+      }
+      
+      // DO NOT pass /socket.io to the 404 handler, Socket.IO handles it
+      if (req.path.startsWith("/socket.io")) {
+        return;
       }
 
       res.sendFile(indexPath, (err) => {

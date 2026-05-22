@@ -17,6 +17,7 @@ interface NavigationSidebarProps {
   handleLogout: () => void;
   deferredPrompt?: any;
   handleInstallApp: () => void;
+  onSwitchRole?: () => void;
 }
 
 export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
@@ -30,6 +31,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   handleLogout,
   deferredPrompt,
   handleInstallApp,
+  onSwitchRole,
 }) => {
   const items = navItems.filter(item => {
     if (effectiveRole === 'admin' || effectiveRole === 'superadmin') {
@@ -112,8 +114,9 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
             <p className="text-[10px] sm:text-xs font-black truncate uppercase font-mono italic text-white leading-tight mb-0.5 sm:mb-1">
               {isRuben(user?.id, user?.email) ? 'System Admin' : profile?.name || 'Unit_Unknown'}
             </p>
-            <p className="text-[7px] sm:text-[8px] text-white/30 uppercase tracking-[0.2em] font-mono font-bold truncate">
+            <p className="text-[7px] sm:text-[8px] text-white/30 uppercase tracking-[0.2em] font-mono font-bold truncate cursor-pointer hover:text-white" onClick={onSwitchRole}>
               {isRuben(user?.id, user?.email) ? 'SYSTEM_PRIME' : profile?.role || 'INITIATING'}
+              <span className="ml-2 text-info opacity-50">[SWITCH]</span>
             </p>
           </div>
         </div>
