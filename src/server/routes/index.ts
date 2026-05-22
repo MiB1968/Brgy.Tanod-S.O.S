@@ -10,6 +10,8 @@ import adminRoutes from "./adminRoutes";
 import ttsRoutes from "./ttsRoutes";
 import storageRoutes from "./storageRoutes";
 import webhookRoutes from "./webhookRoutes";
+import smsRoutes from "./sms";
+import otpRoutes from "./otp";
 
 export const setupRoutes = (app: Express): void => {
   // Health check
@@ -37,6 +39,8 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/tts", ttsRoutes);
   app.use("/api/storage", storageRoutes);
   app.use("/api/webhooks", webhookRoutes);
+  app.use("/api/sms", smsRoutes);
+  app.use("/api/otp", otpRoutes);
 
   // 404 catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {
