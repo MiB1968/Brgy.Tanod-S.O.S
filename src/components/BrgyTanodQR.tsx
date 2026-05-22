@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import React from 'react';
 import { cn } from '../lib/utils';
 import { QrCode, Share2, Download } from 'lucide-react';
@@ -52,7 +53,7 @@ export function BrgyTanodQR({ className }: { className?: string }) {
             <button 
               onClick={() => {
                 navigator.clipboard.writeText(qrUrl);
-                alert("Link copied to clipboard!");
+                toast("Link copied to clipboard!");
               }}
               className="w-full py-4 px-6 bg-white/5 hover:bg-emergency hover:text-white text-white/60 transition-all rounded-2xl font-black text-[10px] uppercase tracking-widest border border-white/5 hover:border-emergency/50 flex items-center justify-center gap-2 italic"
             >

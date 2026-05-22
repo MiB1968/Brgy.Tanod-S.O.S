@@ -91,10 +91,7 @@ export default defineConfig(({ mode }) => {
       // production. In dev, Vite's own HTTP server handles requests, so we
       // must also set them here — otherwise SharedArrayBuffer is unavailable
       // during `npm run dev`.
-      headers: {
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Embedder-Policy': 'require-corp',
-      },
+      
     },
 
     // ── Bug 3 Fix ────────────────────────────────────────────────────────────

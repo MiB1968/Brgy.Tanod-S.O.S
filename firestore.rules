@@ -2,70 +2,41 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isSuperAdmin() {
-      return request.auth.token.role == "superadmin";
-    }
-
-    function hasRole(role) {
-      return isAuthenticated() && 
-             (request.auth.token.role == role || isSuperAdmin());
-    }
-
+    
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if request.auth.uid == userId || hasRole("admin") || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow read: if request.auth != null;
+      allow update: if request.auth != null && 
+                      (request.auth.uid == userId || 
+                       request.auth.token.role == "superadmin" ||
+                       request.auth.token.role == "admin");
+      allow create: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Alerts / SOS (core emergency data)
+    // Incidents / Alerts
     match /alerts/{alertId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();  // Residents create their own
-      allow update: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null;
     }
 
-    // Incidents, responses, etc.
-    match /incidents/{incidentId} {
-      allow read, create, update: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
-    }
-
-    // Audit logs - write only by system
-    match /audit_logs/{logId} {
-      allow read: if hasRole("admin") || isSuperAdmin();
-      allow create: if isAuthenticated();  // System writes
-      allow update, delete: if isSuperAdmin();
-    }
-    
-    // Other collections (patrols, broadcasts, etc.)
+    // Role-based operational data
     match /patrols/{document=**} {
-      allow read, write: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
+      allow read, write: if request.auth != null;
     }
     match /system_broadcasts/{document=**} {
-      allow read: if isAuthenticated();
-      allow write: if hasRole("admin") || isSuperAdmin();
+      allow read, write: if request.auth != null;
     }
     match /tanod_logs/{document=**} {
-        allow read: if hasRole("admin") || isSuperAdmin();
-        allow write: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
+      allow read, write: if request.auth != null;
     }
     match /sos_messages/{document=**} {
-        allow read, write: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
+      allow read, write: if request.auth != null;
     }
     match /location_logs/{document=**} {
-        allow read: if hasRole("admin") || isSuperAdmin();
-        allow write: if hasRole("tanod") || hasRole("admin") || isSuperAdmin();
+      allow read, write: if request.auth != null;
     }
 
-    // Catch-all - deny by default
+    // Default fallback - deny everything else
     match /{document=**} {
       allow read, write: if false;
     }

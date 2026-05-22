@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { useState, useEffect } from 'react';
 import socket from '../lib/socket';
 import * as api from '../lib/api';
@@ -64,7 +65,7 @@ export const useEmergencySystem = (isResponding: boolean) => {
       const pending = JSON.parse(localStorage.getItem('offline_sos_queue') || '[]');
       pending.push(sosData);
       localStorage.setItem('offline_sos_queue', JSON.stringify(pending));
-      alert("⚠️ Weak signal. SOS saved and will be sent automatically once online.");
+      toast("⚠️ Weak signal. SOS saved and will be sent automatically once online.");
       return { success: false, status: 'QUEUED' };
     }
   };
@@ -78,7 +79,7 @@ export const useEmergencySystem = (isResponding: boolean) => {
       await sendSOSToServer(report);
     }
     localStorage.removeItem('offline_sos_queue');
-    alert("✅ All offline SOS reports have been synced!");
+    toast("✅ All offline SOS reports have been synced!");
   };
 
   return { location, isOnline, triggerSOS };

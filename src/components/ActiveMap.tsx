@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
@@ -135,7 +136,7 @@ function MyLocationButton({ onLocated }: { onLocated: (lat: number, lng: number)
 
   const locateMe = () => {
     if (!('geolocation' in navigator)) {
-      alert("Geolocation is not supported by your browser");
+      toast("Geolocation is not supported by your browser");
       return;
     }
     setLocating(true);

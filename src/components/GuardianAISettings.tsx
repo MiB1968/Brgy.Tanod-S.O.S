@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 // src/components/GuardianAISettings.tsx
 import { useState, useEffect } from 'react';
 import { guardianAI } from '../services/guardianAI';
@@ -43,7 +44,7 @@ export default function GuardianAISettings({ isOpen, onClose }: { isOpen: boolea
     if (confirm("Burahin lahat ng pending reports sa pila?")) {
       await syncService.clearAllPending();
       setPendingReports([]);
-      alert("✅ All pending reports cleared.");
+      toast("✅ All pending reports cleared.");
     }
   };
 
@@ -68,9 +69,9 @@ export default function GuardianAISettings({ isOpen, onClose }: { isOpen: boolea
 
     try {
       await guardianAI.loadModel(modelId, (prog) => setProgress(prog));
-      alert(`✅ ${models.find(m => m.id === modelId)?.name} is ready for offline safety duty!`);
+      toast(`✅ ${models.find(m => m.id === modelId)?.name} is ready for offline safety duty!`);
     } catch (err) {
-      alert("Fail loading model. Make sure WebGPU is enabled, and your browser supports offline caches.");
+      toast("Fail loading model. Make sure WebGPU is enabled, and your browser supports offline caches.");
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +81,7 @@ export default function GuardianAISettings({ isOpen, onClose }: { isOpen: boolea
     if (confirm("Clear AI model cache? This will clean up storage but requires downloading files again upon restart.")) {
       guardianAI.clearCache();
       setProgress(0);
-      alert("🧹 Guardian AI model storage cache cleared.");
+      toast("🧹 Guardian AI model storage cache cleared.");
     }
   };
 

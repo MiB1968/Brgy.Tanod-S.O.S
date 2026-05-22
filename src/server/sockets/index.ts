@@ -61,9 +61,9 @@ export function initSocket(server: HttpServer): Server {
 
     // Send COEP headers to appease Vite COEP requirements
     io.engine.on('headers', (headers, req) => {
-      headers['Cross-Origin-Resource-Policy'] = 'cross-origin';
-      headers['Cross-Origin-Opener-Policy'] = 'same-origin';
-      headers['Cross-Origin-Embedder-Policy'] = 'require-corp';
+      
+      
+      
     });
 
     console.log('[Socket] Server instance created.');

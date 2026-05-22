@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 // src/components/SOSAlertSiren.tsx
 import React from "react";
 
@@ -10,7 +11,7 @@ export default function SOSAlertSiren({ userRole, onSOS }: { userRole: string; o
           if (onSOS) {
             onSOS({ type: "emergency", description: "Quick SOS Alert" });
           } else {
-            alert("🚨 SOS ACTIVATED!");
+            toast("🚨 SOS ACTIVATED!");
           }
         }}
         className="w-16 h-16 bg-red-600 hover:bg-red-700 rounded-full shadow-2xl flex items-center justify-center text-3xl active:scale-95 transition-all"

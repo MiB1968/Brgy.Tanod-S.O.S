@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import React, { useEffect, useState } from "react";
 import type { UserRole } from "./types";
 import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
@@ -254,7 +255,7 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
 
   const go = () => {
     if (!('geolocation' in navigator)) {
-      alert("Geolocation is not supported by your browser");
+      toast("Geolocation is not supported by your browser");
       return;
     }
     setBusy(true);
@@ -264,7 +265,7 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
         onLocated({ lat, lng, accuracy });
         setBusy(false); setDone(true);
       },
-      (err) => { console.error("GPS",err); setBusy(false); alert("Unable to fetch location"); },
+      (err) => { console.error("GPS",err); setBusy(false); toast("Unable to fetch location"); },
       { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
     );
   };
@@ -314,10 +315,10 @@ function MapDownloadControl() {
       await downloadRegion(bounds, [14, 15, 16], (current, total) => {
         setProgress({ current, total });
       });
-      alert(`Success! Cached ${progress.total} map tiles for offline use.`);
+      toast(`Success! Cached ${progress.total} map tiles for offline use.`);
     } catch (err) {
       console.error("Download failed", err);
-      alert("Map download interrupted. Please check connection.");
+      toast("Map download interrupted. Please check connection.");
     } finally {
       setDownloading(false);
       setProgress({ current: 0, total: 0 });

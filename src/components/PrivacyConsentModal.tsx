@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -27,7 +28,7 @@ export default function PrivacyConsentModal({ onAccept }: PrivacyConsentModalPro
   const handleDecline = () => {
     setIsOpen(false);
     // Optionally alert the user that tracking maintains inactive until they accept
-    alert("Location tracking is required for active Tanod/responder duty. Real-time dispatch and patrol history features will remain disabled on this device until consent is granted.");
+    toast("Location tracking is required for active Tanod/responder duty. Real-time dispatch and patrol history features will remain disabled on this device until consent is granted.");
   };
 
   if (!isOpen) return null;
