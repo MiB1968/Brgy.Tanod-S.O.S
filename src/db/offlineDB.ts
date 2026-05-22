@@ -36,10 +36,19 @@ export interface PendingLocation {
   status: 'pending' | 'synced';
 }
 
+export interface AIChatMessage {
+  id?: number;
+  sessionId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
 export class SOSDatabase extends Dexie {
   outbox!: Table<QueuedSOS>;
   synced!: Table<SyncedReport>;
   pendingLocations!: Table<PendingLocation>;
+  aiChatHistory!: Table<AIChatMessage>;
 
   constructor() {
     super('BrgyTanodSOS_DB');
@@ -71,6 +80,14 @@ export class SOSDatabase extends Dexie {
       synced: 'id, localId, userId, syncedAt',
       pendingLocations: 'id, userId, timestamp, status'
     });
+
+    // SCHEMA VERSION 5: Persistent AI Chat History (Dexie)
+    this.version(5).stores({
+      outbox: '++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]',
+      synced: 'id, localId, userId, syncedAt',
+      pendingLocations: 'id, userId, timestamp, status',
+      aiChatHistory: '++id, sessionId, timestamp'
+    });
   }
 }
 
@@ -89,6 +106,11 @@ class MockSOSDatabase {
     add: async () => 1,
     where: () => ({ equals: () => ({ toArray: async () => [] }) }),
     update: async () => 1,
+    delete: async () => 1
+  };
+  aiChatHistory = {
+    add: async () => 1,
+    where: () => ({ equals: () => ({ sortBy: async () => [] }), anyOf: () => ({ toArray: async () => [] }) }),
     delete: async () => 1
   };
   transaction = async (mode: any, tables: any, cb: any) => await cb();

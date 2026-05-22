@@ -1,7 +1,7 @@
 import toast from "react-hot-toast";
 import React, { useEffect, useState } from "react";
 import type { UserRole } from "./types";
-import { MapContainer, Marker, Popup, Polyline, Circle, useMap } from "react-leaflet";
+import { MapContainer, Marker, Popup, Polyline, Circle, useMap, Rectangle, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import { cn, isValidCoord } from "./lib/utils";
 import { OfflineTileLayer } from "./components/OfflineTileLayer";
@@ -10,6 +10,7 @@ import { useTanodStore } from "./store/useTanodStore";
 import * as api from "./lib/api";
 import socket from "./lib/socket";
 import { fetchRoute } from "./lib/ors";
+import { offlineTileService } from "./services";
 
 // ─── Map center ───────────────────────────────────────────────────────────────
 const CENTER: [number, number] = [13.2236, 120.596]; // Mamburao
@@ -152,7 +153,7 @@ function dist(lat1:number, lng1:number, lat2:number, lng2:number): number {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-// ─── MapController: resize fix + auto-fit bounds ──────────────────────────────
+// ─── MapController: resize fix + auto-fit bounds + listener for custom offline area focus ───
 function MapController({ patrols, alerts, showP, showS }: any) {
   const map = useMap();
 
@@ -181,6 +182,28 @@ function MapController({ patrols, alerts, showP, showS }: any) {
       }
     }
   }, [map, patrols, alerts, showP, showS]);
+
+  useEffect(() => {
+    if (!map) return;
+    const handleLoadSavedArea = (e: any) => {
+      const { bounds } = e.detail;
+      if (bounds && (map as any)._mapPane) {
+        try {
+          map.flyToBounds([
+            [bounds.south, bounds.west],
+            [bounds.north, bounds.east]
+          ], { padding: [40, 40], maxZoom: 16, animate: true, duration: 1.5 });
+        } catch (err) {
+          console.warn("[MapController] flyToBounds event error:", err);
+        }
+      }
+    };
+
+    window.addEventListener('load-saved-area', handleLoadSavedArea);
+    return () => {
+      window.removeEventListener('load-saved-area', handleLoadSavedArea);
+    };
+  }, [map]);
 
   return null;
 }
@@ -290,35 +313,142 @@ function LocateBtn({ onLocated }: { onLocated:(p:UserPos)=>void }) {
   );
 }
 
-import { downloadRegion, Bounds } from "./lib/mapDownloader";
-import { Download, HardDrive, ShieldCheck } from "lucide-react";
+import { Download, HardDrive, ShieldCheck, Square, Play, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-function MapDownloadControl() {
-  const map = useMap();
-  const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+function AreaSelector({ active, onSelected }: { active: boolean; onSelected: (bounds: any) => void }) {
+  const [firstPoint, setFirstPoint] = useState<L.LatLng | null>(null);
+  const [currentPoint, setCurrentPoint] = useState<L.LatLng | null>(null);
 
-  const handleDownload = async () => {
+  useMapEvents({
+    click(e) {
+      if (!active) return;
+      if (!firstPoint) {
+        setFirstPoint(e.latlng);
+        setCurrentPoint(e.latlng);
+        toast("📍 PIN SET! Click opposing corner of your offline box.");
+      } else {
+        const bounds = L.latLngBounds(firstPoint, e.latlng);
+        onSelected({
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        });
+        setFirstPoint(null);
+        setCurrentPoint(null);
+      }
+    },
+    mousemove(e) {
+      if (!active || !firstPoint) return;
+      setCurrentPoint(e.latlng);
+    }
+  });
+
+  useEffect(() => {
+    if (!active) {
+      setFirstPoint(null);
+      setCurrentPoint(null);
+    }
+  }, [active]);
+
+  if (!active || !firstPoint || !currentPoint) return null;
+
+  return (
+    <Rectangle
+      bounds={[[firstPoint.lat, firstPoint.lng], [currentPoint.lat, currentPoint.lng]]}
+      pathOptions={{ color: '#00F0FF', fillColor: '#00F0FF', fillOpacity: 0.18, weight: 2, dashArray: '6, 6' }}
+    />
+  );
+}
+
+function MapOfflineControl({ 
+  downloading, 
+  setDownloading, 
+  progress, 
+  setProgress,
+  isDrawing,
+  setIsDrawing
+}: { 
+  downloading: boolean; 
+  setDownloading: (v: boolean) => void; 
+  progress: { current: number; total: number }; 
+  setProgress: (p: { current: number; total: number }) => void;
+  isDrawing: boolean;
+  setIsDrawing: (v: boolean) => void;
+}) {
+  const map = useMap();
+
+  const handleDownloadViewport = async () => {
     if (downloading) return;
-    
+    setIsDrawing(false);
+
     const b = map.getBounds();
-    const bounds: Bounds = {
-      minLat: b.getSouth(),
-      maxLat: b.getNorth(),
-      minLng: b.getWest(),
-      maxLng: b.getEast()
+    const bounds = {
+      north: b.getNorth(),
+      south: b.getSouth(),
+      east: b.getEast(),
+      west: b.getWest()
     };
 
+    const label = window.prompt(
+      "🏷️ ENTER SECTOR LABEL FOR PORTABLE OFFLINE CACHE:", 
+      `Mamburao Center (${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+    );
+    if (label === null) return; // User cancelled prompt
+
+    const areaName = label.trim() || `Viewport Area [${new Date().toLocaleDateString()}]`;
+
     setDownloading(true);
+    setProgress({ current: 0, total: 1 });
+
     try {
-      await downloadRegion(bounds, [14, 15, 16], (current, total) => {
-        setProgress({ current, total });
-      });
-      toast(`Success! Cached ${progress.total} map tiles for offline use.`);
+      const success = await offlineTileService.downloadArea(bounds, 13, 16, (statusEv) => {
+        setProgress({ current: statusEv.downloaded, total: statusEv.total });
+      }, areaName);
+
+      if (success) {
+        toast.success(`Success! Offline cache built for: ${areaName}`);
+        window.dispatchEvent(new CustomEvent('offline-area-downloaded'));
+      } else {
+        toast.error("Offline sync suspended or partial download errors.");
+      }
     } catch (err) {
-      console.error("Download failed", err);
-      toast("Map download interrupted. Please check connection.");
+      console.error(err);
+      toast.error("Offline tile builder error.");
+    } finally {
+      setDownloading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
+
+  const handleAreaSelected = async (bounds: any) => {
+    setIsDrawing(false);
+    const label = window.prompt(
+      "🏷️ ENTER SECTOR LABEL FOR CUSTOM DRAWN OFFLINE CACHE:", 
+      `Sector Area (${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
+    );
+    if (label === null) return; // User cancelled prompt
+
+    const areaName = label.trim() || `Sectored Zone [${new Date().toLocaleDateString()}]`;
+
+    setDownloading(true);
+    setProgress({ current: 0, total: 1 });
+
+    try {
+      const success = await offlineTileService.downloadArea(bounds, 13, 16, (statusEv) => {
+        setProgress({ current: statusEv.downloaded, total: statusEv.total });
+      }, areaName);
+
+      if (success) {
+        toast.success(`Success! Offline cache built for: ${areaName}`);
+        window.dispatchEvent(new CustomEvent('offline-area-downloaded'));
+      } else {
+        toast.error("Offline sync suspended or partial download errors.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Offline tile builder error.");
     } finally {
       setDownloading(false);
       setProgress({ current: 0, total: 0 });
@@ -326,56 +456,89 @@ function MapDownloadControl() {
   };
 
   return (
-    <div className="absolute z-[401] flex flex-col items-end gap-2" style={{ top: '0.75rem', right: '0.75rem' }}>
-      <button
-        onClick={handleDownload}
-        disabled={downloading}
-        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-        className={cn(
-          "flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border transition-all shadow-lg",
-          downloading 
-            ? "bg-amber-500/20 border-amber-400/40 text-amber-300"
-            : "bg-black/65 border-white/10 text-white hover:bg-white/10"
-        )}
-      >
-        {downloading ? (
-          <div className="flex items-center gap-3">
-             <div className="w-4 h-4 border-2 border-amber-400/20 border-t-amber-400 rounded-full animate-spin" />
-             <span className="text-[11px] font-black font-mono">
-               CACHING: {Math.round((progress.current / Math.max(progress.total, 1)) * 100)}%
-             </span>
-          </div>
-        ) : (
-          <>
-            <HardDrive size={14} className="text-info" />
-            <span className="text-[11px] font-black font-mono uppercase tracking-widest">Cache Region</span>
-          </>
-        )}
-      </button>
-      
-      <AnimatePresence>
-        {downloading && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-black/80 backdrop-blur-xl border border-white/5 p-4 rounded-2xl w-48 shadow-2xl"
+    <>
+      <AreaSelector active={isDrawing} onSelected={handleAreaSelected} />
+
+      <div className="absolute z-[401] flex flex-col items-end gap-2" style={{ top: '0.75rem', right: '0.75rem' }}>
+        <div className="flex gap-2 backdrop-blur-md bg-black/65 border border-white/5 p-1.5 rounded-full shadow-lg">
+          {/* Viewport preloader */}
+          <button
+            onClick={handleDownloadViewport}
+            disabled={downloading}
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            title="Download exactly what is on your screen"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black font-mono uppercase tracking-wider transition-all",
+              downloading
+                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                : "text-white/80 hover:text-white hover:bg-white/10"
+            )}
           >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Mission Progress</span>
-              <span className="text-[10px] font-mono text-amber-400">{progress.current}/{progress.total}</span>
-            </div>
-            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-              <motion.div 
-                className="h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"
-                initial={{ width: 0 }}
-                animate={{ width: `${(progress.current / progress.total) * 100}%` }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            <HardDrive size={12} className="text-secondary" />
+            <span>Cache Screen</span>
+          </button>
+
+          {/* Draw and select bounds offline preloader */}
+          <button
+            onClick={() => {
+              if (isDrawing) {
+                setIsDrawing(false);
+                toast("Interactive sector drawing cancelled.");
+              } else {
+                setIsDrawing(true);
+                toast.success("🟦 Drawing Mode: Click opposite corners of the map sector to cache.");
+              }
+            }}
+            disabled={downloading}
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            title="Click A and click B to capture custom zoom scope"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black font-mono uppercase tracking-wider transition-all border",
+              isDrawing
+                ? "bg-tactical-cyan/20 border-tactical-cyan text-tactical-cyan shadow-[0_0_8px_rgba(0,240,255,0.3)] animate-pulse"
+                : "border-transparent text-white/80 hover:text-white hover:bg-white/10"
+            )}
+          >
+            <Square size={12} className={isDrawing ? "text-tactical-cyan" : "text-white/40"} />
+            <span>Draw Zone</span>
+          </button>
+        </div>
+
+        {/* Progress Alert Panel */}
+        <AnimatePresence>
+          {downloading && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              className="bg-black/95 backdrop-blur-xl border border-white/10 p-5 rounded-2xl w-56 shadow-2xl relative"
+            >
+              <div className="flex justify-between items-center mb-2.5">
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block font-mono">
+                  Syncing Tiles
+                </span>
+                <span className="text-[10px] font-mono font-bold text-amber-400">
+                  {progress.current}/{progress.total}
+                </span>
+              </div>
+              
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 mb-3">
+                <motion.div
+                  className="h-full bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.65)]"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(progress.current / Math.max(progress.total, 1)) * 100}%` }}
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-[8px] font-mono text-white/30 uppercase">
+                <span>Concurr: 6 Slots</span>
+                <span>{Math.round((progress.current / Math.max(progress.total, 1)) * 100)}% complete</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }
 
@@ -389,8 +552,106 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
   const [showResidents, setShowResidents] = useState(false);
   const [showLegend,  setShowLegend]  = useState(false);
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
+
+  const [downloading, setDownloading] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 1 });
   
   const [residents, setResidents] = useState<any[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  const [customRoute, setCustomRoute] = useState<{ path: [number, number][]; label: string; distance: string; time: string } | null>(null);
+
+  const handleOfflineRouteClick = async () => {
+    if (customRoute) {
+      setCustomRoute(null);
+      toast.success("Offline emergency route cleared.");
+      return;
+    }
+
+    let startCoord: [number, number] = [13.2208, 120.5891]; // Terminal
+    let endCoord: [number, number] = [13.2236, 120.596];     // Barangay Hall
+    let description = "Terminal to Barangay Hall";
+
+    // Dynamic selection: check if there is an active alert and patrol on the map
+    const activeSosAlerts = alerts.filter(a => a.status !== 'resolved' && a.status !== 'cancelled' && isValidCoord(a.location?.lat, a.location?.lng));
+    const activePatrolUnits = patrols.filter(p => p.isActive && isValidCoord(p.location?.lat, p.location?.lng));
+
+    if (activeSosAlerts.length > 0 && activePatrolUnits.length > 0) {
+      const alertLoc = activeSosAlerts[0].location;
+      const patrolLoc = activePatrolUnits[0].location;
+      startCoord = [patrolLoc.lat, patrolLoc.lng];
+      endCoord = [alertLoc.lat, alertLoc.lng];
+      description = `Patrol Unit (${activePatrolUnits[0].tanodName}) to Emergency (${activeSosAlerts[0].residentName})`;
+    } else if (userPos && isValidCoord(userPos.lat, userPos.lng)) {
+      startCoord = [userPos.lat, userPos.lng];
+      description = "Your Position to Barangay Hall";
+    }
+
+    const loadToastId = toast.loading("Calculating offline emergency route...");
+
+    try {
+      const route = await offlineTileService.getOfflineRoute(startCoord, endCoord, 'driving');
+      toast.dismiss(loadToastId);
+
+      setCustomRoute({
+        path: route.path,
+        label: description,
+        distance: route.distance,
+        time: route.estimatedTime
+      });
+
+      toast.success(`🛣️ Offline Route Connected:\n${route.distance} • ~${route.estimatedTime}\nRoute: ${description}`, {
+        duration: 5000,
+        icon: '🛣️'
+      });
+
+      if (route.warning) {
+        toast(route.warning, { icon: '⚠️', duration: 4000 });
+      }
+    } catch (err) {
+      toast.dismiss(loadToastId);
+      console.error("Offline route calculation failed:", err);
+      toast.error("Failed to calculate offline route.");
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Auto map preloading around user's GPS locator pin
+  useEffect(() => {
+    if (userPos && isOnline) {
+      console.log('[AutoPreload] Triggering map preloading around coordinate:', userPos.lat, userPos.lng);
+      offlineTileService.autoPreloadAroundLocation(userPos.lat, userPos.lng, 1.5).then(success => {
+        if (success) {
+          console.log('[AutoPreload] GPS local map precaching successful:', userPos.lat, userPos.lng);
+        }
+      });
+    }
+  }, [userPos?.lat, userPos?.lng, isOnline]);
+
+  // Implicit background pre-loading of central Mamburao area on initial dashboard load
+  useEffect(() => {
+    if (isOnline) {
+      console.log('[AutoPreload] Pre-caching Core Mamburao area tiles to MapDatabase as an automatic safety fallback...');
+      offlineTileService.autoPreloadAroundLocation(CENTER[0], CENTER[1], 1.2).then(success => {
+        if (success) {
+          console.log('[AutoPreload] Mamburao town center buffer cached.');
+        }
+      });
+    }
+  }, [isOnline]);
 
   const activePatrols = patrols.filter(p => p.isActive && p.location?.lat && p.location?.lng).length;
   const activeSOS     = alerts.filter(a=>a.status !== 'resolved' && a.status !== 'cancelled' && a.location?.lat&&a.location?.lng).length;
@@ -458,6 +719,18 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
             </span>
           </div>
         )}
+        {/* Connection & cache status badge */}
+        {!isOnline ? (
+          <div className="flex items-center gap-1.5 bg-red-950/85 backdrop-blur-md border border-red-500/30 rounded-full px-3 py-1.5 animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
+            <span className="text-[11px] font-bold font-mono text-red-300">OFFLINE • CACHED MAPS</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 bg-emerald-950/60 backdrop-blur-md border border-emerald-500/30 rounded-full px-3 py-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)] animate-pulse" />
+            <span className="text-[11px] font-bold font-mono text-emerald-300">ONLINE • AUTO-PRELOADED</span>
+          </div>
+        )}
       </div>
 
       {/* ── Filter toolbar (left-bottom) ── */}
@@ -514,6 +787,20 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
               ? "bg-amber-500/20 border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.25)]"
               : "bg-black/50 border-white/10 opacity-40 hover:opacity-70"}`}
         >🔗</button>
+
+        {/* Offline routing toggle */}
+        <button
+          onClick={handleOfflineRouteClick}
+          title={customRoute ? "Clear Offline Route" : "Calculate Offline Route"}
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all ${
+            customRoute
+              ? "bg-[#FF3B30]/30 border-[#FF3B30]/60 shadow-[0_0_10px_rgba(255,59,48,0.45)] animate-pulse"
+              : "bg-black/50 border-white/10 hover:bg-white/10"
+          }`}
+        >
+          🛣️
+        </button>
       </div>
 
       {/* ── Legend panel ── */}
@@ -631,8 +918,22 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
           );
         })}
 
+        {customRoute && (
+          <Polyline 
+            positions={customRoute.path} 
+            pathOptions={{ color: '#FF3B30', weight: 6, opacity: 0.85, dashArray: '8, 8', lineCap: 'round', lineJoin: 'round' }}
+          />
+        )}
+
         <LocateBtn onLocated={setUserPos} />
-        <MapDownloadControl />
+        <MapOfflineControl 
+          downloading={downloading}
+          setDownloading={setDownloading}
+          progress={progress}
+          setProgress={setProgress}
+          isDrawing={isDrawing}
+          setIsDrawing={setIsDrawing}
+        />
       </MapContainer>
     </div>
   );

@@ -13,15 +13,38 @@ export interface OfflineAlert {
   timestamp: number;
 }
 
+export interface LocalKnowledge {
+  id?: number;
+  source: string;
+  title: string;
+  content: string;
+  url: string;
+  scrapedAt: string;
+  category: 'disaster' | 'procedure' | 'announcement' | 'contact';
+}
+
 export class MapDatabase extends Dexie {
   tiles!: Table<MapTile>;
   pendingAlerts!: Table<OfflineAlert>;
+  downloadedAreas!: Table<any>;
+  localKnowledge!: Table<LocalKnowledge>;
 
   constructor() {
     super('TanodNetCache');
     this.version(2).stores({
       tiles: '++id, url',
       pendingAlerts: '++id, timestamp'
+    });
+    this.version(3).stores({
+      tiles: '++id, url',
+      pendingAlerts: '++id, timestamp',
+      downloadedAreas: '++id, name, downloadedAt'
+    });
+    this.version(4).stores({
+      tiles: '++id, url',
+      pendingAlerts: '++id, timestamp',
+      downloadedAreas: '++id, name, downloadedAt',
+      localKnowledge: '++id, source, category, scrapedAt'
     });
   }
 }

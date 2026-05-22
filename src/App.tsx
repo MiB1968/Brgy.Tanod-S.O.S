@@ -6,6 +6,7 @@ import * as api from "./lib/api";
 
 import { useAppLogic } from "./hooks/useAppLogic";
 import { useRBAC } from "./context/AuthContext";
+import { knowledgeService } from "./services/knowledgeService";
 
 import AppLayout from "./components/layout/AppLayout";
 import AppHeader from "./components/layout/AppHeader";
@@ -45,6 +46,17 @@ export default function App() {
     document.documentElement.classList.add("dark");
   }, []);
 
+  // Manage knowledge scraping service
+  useEffect(() => {
+    if (logic.effectiveRole === 'tanod') {
+      knowledgeService.startScheduledScraping();
+      knowledgeService.preloadMamburaoKnowledge();
+    }
+    return () => {
+      knowledgeService.stopScheduledScraping();
+    };
+  }, [logic.effectiveRole]);
+
   // Listen to toggle-siren custom actions from TacticalDock
   useEffect(() => {
     const handleToggleSiren = () => {
@@ -55,6 +67,19 @@ export default function App() {
       window.removeEventListener('toggle-siren', handleToggleSiren);
     };
   }, [logic.toggleGlobalSiren]);
+
+  // Listen for set-active-tab triggers
+  useEffect(() => {
+    const handleSetTab = (e: any) => {
+      if (e.detail) {
+        logic.setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener('set-active-tab', handleSetTab);
+    return () => {
+      window.removeEventListener('set-active-tab', handleSetTab);
+    };
+  }, [logic.setActiveTab]);
 
   // ── Loading State ─────────────────────────────────────
   if (logic.loading || rbacLoading) {

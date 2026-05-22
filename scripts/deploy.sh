@@ -1,29 +1,27 @@
 #!/bin/bash
-echo "🚀 Deploying Brgy. Tanod S.O.S..."
+echo "🚀 Deploying Brgy Tanod S.O.S. for Mamburao, Occidental Mindoro..."
 
-# Build Frontend
-echo "Building Frontend..."
+# Make sure scripts are executable
+chmod +x ./scripts/*.sh
+
+# Cleanup before build
+if [ -f "./scripts/cleanup.sh" ]; then
+  bash ./scripts/cleanup.sh
+fi
+
+echo "📦 Running build..."
 npm run build
 
-# Build Backend
-echo "Building Backend..."
-npx tsc --project tsconfig.server.json
+echo "☁️ Deploying to Firebase..."
+# Assuming Firebase is initialized and configured
+# firebase deploy --only hosting,functions,firestore:rules
 
-echo "✅ Build Complete!"
+echo "📱 Syncing Capacitor..."
+# This assumes npx is available and project is set up for Capacitor
+# npx cap sync android
 
-echo "
-Deployment Options:
-
-1. Docker (Recommended):
-   docker-compose up -d --build
-
-2. Vercel (Frontend) + Render (Backend):
-   - Frontend: vercel --prod
-   - Backend: Deploy src/server/index.ts on Render.com
-
-3. Manual:
-   - Frontend: npm run preview
-   - Backend: npm run server
-"
-
-echo "Don't forget to set environment variables!"
+echo ""
+echo "✅ DEPLOYMENT PREPARATION COMPLETE!"
+echo "🌐 Next: Manually run firebase deploy and cap sync if needed."
+echo ""
+echo "Mabuhay ang ating mga Tanod sa Mamburao! 🇵🇭🚨"

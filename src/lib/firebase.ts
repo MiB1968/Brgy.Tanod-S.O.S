@@ -33,7 +33,17 @@ const firebaseApp: FirebaseApp =
 
 export const auth: Auth = getAuth(firebaseApp);
 export const db: Firestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
-export const messaging = typeof window !== "undefined" && firebaseConfig.messagingSenderId ? getMessaging(firebaseApp) : null;
+
+let messagingInstance: Messaging | null = null;
+if (typeof window !== "undefined" && firebaseConfig.messagingSenderId) {
+  try {
+    messagingInstance = getMessaging(firebaseApp);
+  } catch (err) {
+    console.warn('[Firebase] Messaging is not supported or failed to initialize:', err);
+  }
+}
+
+export const messaging = messagingInstance;
 export { firebaseApp, getToken, onMessage };
 
 // ── Offline persistence (client-only) ────────────────────────────────────────

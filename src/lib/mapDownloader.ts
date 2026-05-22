@@ -35,9 +35,16 @@ export async function downloadRegion(
     const startY = lat2tile(bounds.maxLat, zoom);
     const endY = lat2tile(bounds.minLat, zoom);
 
-    for (let x = startX; x <= endX; x++) {
-      for (let y = startY; y <= endY; y++) {
-        tasks.push({ url: `https://tile.openstreetmap.org/${zoom}/${x}/${y}.png` });
+    const xStartIdx = Math.min(startX, endX);
+    const xEndIdx = Math.max(startX, endX);
+    const yStartIdx = Math.min(startY, endY);
+    const yEndIdx = Math.max(startY, endY);
+
+    for (let x = xStartIdx; x <= xEndIdx; x++) {
+      for (let y = yStartIdx; y <= yEndIdx; y++) {
+        tasks.push({ url: `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}.png` });
+        // Also support @2x variant in case high-density screens trigger high-dpi requests
+        tasks.push({ url: `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png` });
       }
     }
   }
@@ -46,17 +53,23 @@ export async function downloadRegion(
   let current = 0;
 
   // Process in smaller batches
-  const batchSize = 5;
+  const batchSize = 6;
+  const subdomains = ['a', 'b', 'c', 'd', '{s}'];
+  
   for (let i = 0; i < tasks.length; i += batchSize) {
     const batch = tasks.slice(i, i + batchSize);
     await Promise.all(batch.map(async (task) => {
-      let retries = 5;
+      let retries = 3;
       while (retries > 0) {
         try {
           const response = await fetch(task.url, { mode: 'cors' });
           if (response.ok) {
             const blob = await response.blob();
-            await cacheTile(task.url, blob);
+            // Store under all possible Leaflet subdomains to guarantee offline hits
+            for (const s of subdomains) {
+              const mappedUrl = task.url.replace(/a\.basemaps/, `${s}.basemaps`);
+              await cacheTile(mappedUrl, blob);
+            }
             break; // Success, exit retry loop
           } else {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -64,10 +77,10 @@ export async function downloadRegion(
         } catch (e) {
           retries--;
           if (retries === 0) {
-            console.error('Failed to download tile', task.url, e);
+            console.error('Failed to download tile:', task.url, e);
           } else {
-            // Wait before retrying (exponential backoff with jitter)
-            const delay = Math.pow(2, 5 - retries) * 1000 + Math.random() * 2000;
+            // Wait before retrying (exponential backoff)
+            const delay = Math.pow(2, 3 - retries) * 500 + Math.random() * 500;
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }

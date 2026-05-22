@@ -17,9 +17,39 @@ const emergencyTemplates = [
   { label: "⚡ Kuryente", prompt: "May bumagsak na kable ng kuryente sa kalsada at kumikislap. Ano ang tamang safety protocol?" },
 ];
 
+const QUICK_ACTIONS = [
+  { label: "🚨 SOS Emergency", action: "sos" },
+  { label: "🔥 May Sunog", action: "fire" },
+  { label: "🚑 May Sugatan", action: "medical" },
+  { label: "📍 Lokasyon Ko", action: "location" },
+  { label: "🗣️ Voice Navigation", action: "voice_nav" },
+];
+
 export default function GuardianAIChat({ isInline = false }: { isInline?: boolean }) {
   const { messages, sendMessage, clearConversation, isThinking } = useGuardianChat();
   const { profile } = useRBAC();
+
+  const handleQuickAction = (action: string) => {
+    let prompt = "";
+    switch (action) {
+      case "sos": 
+        prompt = "SOS! May aktwal na emergency dito. Mangyaring abisuhan ang pinakamalapit na Barangay Tanod patrol at i-record ito bilang priority dispatch alert ng Command Center."; 
+        break;
+      case "fire": 
+        prompt = "May sunog sa ating barangay! Ano ang agarang fire first aid at evacuations protocols, at paano abisuhan ang BFP hotlines?"; 
+        break;
+      case "medical": 
+        prompt = "May nangangailangan ng medical assistance at rescue. Anong first aid o CPR techniques ang kailangang ilapat at tawagan ang aming emergency responders?"; 
+        break;
+      case "location": 
+        prompt = `Ipadala ang aking kasalukuyang lokasyon (${profile?.name || 'User'}) sa Command Center at abisuhan ang pinakamalapit na Tanod Patrol para sa security duty dispatch.`; 
+        break;
+      case "voice_nav":
+        prompt = "Guide me with voice navigation to the nearest command center or safe area in Mamburao, Occidental Mindoro.";
+        break;
+    }
+    sendMessage(prompt);
+  };
   
   const [isOpen, setIsOpen] = useState(isInline);
   const [showSettings, setShowSettings] = useState(false);
@@ -677,6 +707,25 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                   </div>
                 )}
 
+                {/* Emergency Quick Actions */}
+                <div className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
+                  isDark ? 'border-white/5 bg-red-950/20' : 'bg-red-50/40 border-gray-100'
+                }`}>
+                  {QUICK_ACTIONS.map((qa, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleQuickAction(qa.action)}
+                      className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer ${
+                        isDark 
+                          ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10' 
+                          : 'bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm'
+                      }`}
+                    >
+                      {qa.label}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Quick Emergency Templates List */}
                 <div className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${
                   isDark ? 'border-white/5 bg-slate-950/45' : 'border-gray-100 bg-gray-50/80'
@@ -984,6 +1033,25 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
               </div>
             </div>
           )}
+
+          {/* Emergency Quick Actions */}
+          <div className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
+            isDark ? 'border-white/5 bg-red-950/20' : 'bg-red-50/40 border-gray-100'
+          }`}>
+            {QUICK_ACTIONS.map((qa, i) => (
+              <button
+                key={i}
+                onClick={() => handleQuickAction(qa.action)}
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer ${
+                  isDark 
+                    ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10' 
+                    : 'bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm'
+                }`}
+              >
+                {qa.label}
+              </button>
+            ))}
+          </div>
 
           {/* Quick Emergency Templates List */}
           <div className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${

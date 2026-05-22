@@ -1,5 +1,6 @@
 // src/services/guardianAI.ts
 import { fetchAPI } from './apiBase';
+import { db } from '../db/offlineDB';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -15,6 +16,7 @@ export class GuardianAI {
   private messageHandlers = new Map<string, (type: string, payload: any) => void>();
   private loadPromise: Promise<boolean> | null = null;
   private useBackendFallback = false;
+  private currentSessionId = `session_${Date.now()}`;
 
   get isLoaded(): boolean {
     return this.isInitialized;
@@ -25,6 +27,41 @@ export class GuardianAI {
     return GuardianAI.instance;
   }
   private static instance: GuardianAI;
+
+  async saveMessage(role: 'user' | 'assistant', content: string) {
+    try {
+      await db.aiChatHistory.add({
+        sessionId: this.currentSessionId,
+        role,
+        content,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[GuardianAI] Failed to save message to Dexie history:', err);
+    }
+  }
+
+  async loadHistory(): Promise<any[]> {
+    try {
+      return await db.aiChatHistory
+        .where('sessionId')
+        .equals(this.currentSessionId)
+        .sortBy('timestamp');
+    } catch (err) {
+      console.error('[GuardianAI] Failed to load message history from Dexie:', err);
+      return [];
+    }
+  }
+
+  async clearCurrentSession() {
+    try {
+      const sessionId = this.currentSessionId;
+      await db.aiChatHistory.where('sessionId').equals(sessionId).delete();
+      this.currentSessionId = `session_${Date.now()}`;
+    } catch (err) {
+      console.error('[GuardianAI] Failed to clear current AI session:', err);
+    }
+  }
 
   private checkWebGPUSupport(): boolean {
     if (typeof window === 'undefined') return false;

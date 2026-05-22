@@ -16,7 +16,8 @@ import {
   MapPin, 
   Navigation,
   UserCheck,
-  Bot
+  Bot,
+  HardDrive
 } from 'lucide-react';
 
 export const SOS_SUGGESTIONS: Record<string, string[]> = {
@@ -60,6 +61,7 @@ export const navItems = [
   { id: 'home', label: '📡 Command', icon: IconRadar },
   { id: 'logs', label: '📋 Activity Logs', icon: ClipboardList },
   { id: 'map', label: '🗺 Live Intel', icon: MapIcon },
+  { id: 'areas', label: '📥 Offline Cache', icon: HardDrive },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
   { id: 'verification', label: '🛡 Verification', icon: UserCheck },
   { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },

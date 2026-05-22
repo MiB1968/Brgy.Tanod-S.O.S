@@ -2,65 +2,33 @@
 import { useState, useEffect } from 'react';
 import { guardianAI, type ChatMessage } from '../services/guardianAI';
 
-const DB_NAME = "GuardianAI_ChatHistory_DB";
-const STORE_NAME = "chatMessagesHistory";
-
 export function useGuardianChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [db, setDb] = useState<IDBDatabase | null>(null);
 
-  // Initialize DB and load history
+  // Initialize and load history from Dexie database
   useEffect(() => {
-    try {
-      const request = indexedDB.open(DB_NAME, 1);
-      
-      request.onupgradeneeded = (e: any) => {
-        const database = e.target.result;
-        if (!database.objectStoreNames.contains(STORE_NAME)) {
-          database.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+    const loadInitialHistory = async () => {
+      try {
+        const history = await guardianAI.loadHistory();
+        if (history && history.length > 0) {
+          setMessages(history.map(m => ({
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.timestamp)
+          })));
+        } else {
+          // Seed welcome message
+          const welcome: ChatMessage = {
+            role: 'assistant',
+            content: "Kumusta! Ako si **Guardian AI** — iyong offline emergency assistant. Paano kita matutulungan ngayon?",
+            timestamp: new Date()
+          };
+          setMessages([welcome]);
+          await guardianAI.saveMessage(welcome.role, welcome.content);
         }
-      };
-
-      request.onsuccess = (e: any) => {
-        const database = e.target.result;
-        setDb(database);
-        
-        const transaction = database.transaction(STORE_NAME, "readonly");
-        const store = transaction.objectStore(STORE_NAME);
-        const getAllRequest = store.getAll();
-
-        getAllRequest.onsuccess = () => {
-          const loadedMessages = getAllRequest.result || [];
-          if (loadedMessages.length > 0) {
-            setMessages(loadedMessages.map((m: any) => ({
-              role: m.role,
-              content: m.content,
-              timestamp: new Date(m.timestamp)
-            })));
-          } else {
-            // Seed welcome message
-            const welcome: ChatMessage = {
-              role: 'assistant',
-              content: "Kumusta! Ako si **Guardian AI** — iyong offline emergency assistant. Paano kita matutulungan ngayon?",
-              timestamp: new Date()
-            };
-            setMessages([welcome]);
-            
-            // Save welcome
-            const tx = database.transaction(STORE_NAME, "readwrite");
-            tx.objectStore(STORE_NAME).add({
-              role: welcome.role,
-              content: welcome.content,
-              timestamp: welcome.timestamp.toISOString()
-            });
-          }
-        };
-      };
-
-      request.onerror = (e) => {
-        console.error("Failed to open IndexedDB for GuardianAI chat history:", e);
-        // Fallback to memory
+      } catch (err) {
+        console.error("Failed to load Dexie chat history in hook:", err);
         setMessages([
           {
             role: 'assistant',
@@ -68,32 +36,11 @@ export function useGuardianChat() {
             timestamp: new Date()
           }
         ]);
-      };
-    } catch (err) {
-      console.error("IndexedDB open error catches:", err);
-      setMessages([
-        {
-          role: 'assistant',
-          content: "Kumusta! Ako si **Guardian AI** — iyong offline emergency assistant. Paano kita matutulungan ngayon?",
-          timestamp: new Date()
-        }
-      ]);
-    }
-  }, []);
+      }
+    };
 
-  const saveMessageToDB = (msg: ChatMessage) => {
-    if (!db) return;
-    try {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      tx.objectStore(STORE_NAME).add({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp.toISOString()
-      });
-    } catch (e) {
-      console.error("Could not append msg to IndexedDB:", e);
-    }
-  };
+    loadInitialHistory();
+  }, []);
 
   const sendMessage = async (input: string, shouldSpeak: boolean = true) => {
     if (!input.trim() || isThinking) return;
@@ -105,7 +52,7 @@ export function useGuardianChat() {
     };
     
     setMessages(prev => [...prev, userMsg]);
-    saveMessageToDB(userMsg);
+    await guardianAI.saveMessage('user', input);
 
     setIsThinking(true);
     const currentInput = input;
@@ -124,13 +71,7 @@ export function useGuardianChat() {
         });
       });
 
-      const assistantMsg: ChatMessage = { 
-        role: 'assistant', 
-        content: response, 
-        timestamp: new Date() 
-      };
-      
-      saveMessageToDB(assistantMsg);
+      await guardianAI.saveMessage('assistant', response);
       
       if (shouldSpeak) {
         guardianAI.speak(response);
@@ -143,23 +84,16 @@ export function useGuardianChat() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errMsg]);
-      saveMessageToDB(errMsg);
+      await guardianAI.saveMessage('assistant', errMsg.content);
     } finally {
       setIsThinking(false);
     }
   };
 
-  const clearConversation = () => {
+  const clearConversation = async () => {
     if (!confirm("Gusto mo bang burahin ang lahat ng chat history?")) return;
     
-    if (db) {
-      try {
-        const tx = db.transaction(STORE_NAME, "readwrite");
-        tx.objectStore(STORE_NAME).clear();
-      } catch (e) {
-        console.error("Failed to clear store", e);
-      }
-    }
+    await guardianAI.clearCurrentSession();
     
     const clearedMsg: ChatMessage = {
       role: 'assistant',
@@ -167,7 +101,7 @@ export function useGuardianChat() {
       timestamp: new Date()
     };
     setMessages([clearedMsg]);
-    saveMessageToDB(clearedMsg);
+    await guardianAI.saveMessage('assistant', clearedMsg.content);
   };
 
   return { messages, sendMessage, clearConversation, isThinking };

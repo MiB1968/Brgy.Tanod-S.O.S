@@ -23,6 +23,7 @@ const GuardianAIChat = lazy(() => import("../GuardianAIChat"));
 const SettingsView = lazy(() => import("../SettingsView"));
 const OpsIntegrations = lazy(() => import("../Admin/OpsIntegrations"));
 const TanodActivityLogs = lazy(() => import("../Admin/TanodActivityLogs").then(m => ({ default: m.TanodActivityLogs })));
+const SavedAreasManager = lazy(() => import("../SavedAreasManager"));
 
 interface Props {
   activeTab: string;
@@ -70,6 +71,14 @@ export function RoleBasedContent({
     switch (activeTab) {
       case "map":
         return <LiveMap />;
+
+      case "areas":
+        return (
+          <div className="p-4 md:p-8 space-y-6">
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Offline Cache Index</h1>
+            <SavedAreasManager />
+          </div>
+        );
       
       case "logs":
         return (
