@@ -6,9 +6,18 @@ interface Props {
 }
 
 export default function SOSAlertSiren({ onSOS }: Props) {
-  const [position, setPosition] = useState({ x: 24, y: 140 });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setPosition({
+      x: window.innerWidth - 100,
+      y: window.innerHeight - 160
+    });
+    setMounted(true);
+  }, []);
   const buttonRef = useRef<HTMLDivElement>(null);
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -82,7 +91,7 @@ export default function SOSAlertSiren({ onSOS }: Props) {
   return (
     <div
       ref={buttonRef}
-      className={`fixed z-[150] transition-all duration-200 ${isDragging ? "scale-110" : ""}`}
+      className={`fixed z-[150] transition-all duration-200 ${isDragging ? "scale-110" : ""} ${!mounted ? "opacity-0" : "opacity-100"}`}
       style={{ left: position.x, top: position.y }}
       onMouseDown={(e) => {
         setIsDragging(true);

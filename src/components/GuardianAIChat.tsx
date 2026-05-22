@@ -465,7 +465,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           {/* Floating Action trigger button */}
           <button
             onClick={() => setIsOpen(true)}
-            className="fixed bottom-36 right-6 bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-600 w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-2xl z-40 hover:scale-110 active:scale-95 transition-all border-4 border-white/20 hover:shadow-purple-500/20"
+            className="fixed bottom-40 right-6 bg-gradient-to-br from-purple-600 via-indigo-600 to-purple-600 w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-2xl z-40 hover:scale-110 active:scale-95 transition-all border-4 border-white/20 hover:shadow-purple-500/20"
             title="Open Guardian AI Dialog"
             id="guardian-ai-floating-trigger"
           >

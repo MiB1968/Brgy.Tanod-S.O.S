@@ -25,6 +25,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Failsafe timeout for rbac loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const isMasterAdmin = useMemo(() => {
     const pEmail = profile?.email?.toLowerCase();
     const fEmail = firebaseUser?.email?.toLowerCase();
@@ -55,7 +63,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (uid: string) => {
     try {
-      const userDoc = await getDoc(doc(db, "users", uid));
+      // Add a 5 second timeout to getDoc so it doesn't hang indefinitely
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getDoc timeout')), 5000)
+      );
+      
+      const userDoc = (await Promise.race([
+        getDoc(doc(db, "users", uid)),
+        timeoutPromise
+      ])) as any;
+
       let userData: User;
 
       if (userDoc.exists()) {

@@ -114,7 +114,7 @@ export default function FloatingSOSButton({ onTrigger, role }: FloatingSOSButton
   return (
     <>
       {/* Flashing Floating Widget */}
-      <div className="fixed bottom-6 right-6 z-[120]">
+      <div className="fixed bottom-20 md:bottom-6 right-6 z-[120]">
         <motion.button
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}

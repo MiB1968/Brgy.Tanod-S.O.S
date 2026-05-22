@@ -1,56 +1,62 @@
-# 🛡️ Brgy. Tanod S.O.S
+# Brgy Tanod S.O.S. — Tanza, Calabarzon
 
-**Real-time Emergency Response System for Barangays in the Philippines**
+**Real-time Emergency Response System for Barangay Tanods**
 
-A modern, offline-first, voice-enabled emergency platform built for Philippine barangays.
+A modern, offline-first PWA designed for Philippine barangays to improve emergency response time and coordination.
 
-## ✨ Features
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) 
+![PWA](https://img.shields.io/badge/PWA-Installable-blue)
+![Offline](https://img.shields.io/badge/Offline-First-orange)
 
-- **Real-time SOS Alerts** with geolocation
-- **Floating Draggable SOS Button**
-- **Twilio SMS Fallback** (Auto-SMS if alerts unacknowledged or offline synced)
-- **Background Tanod GPS Tracking**
-- **Offline Mode** with automatic queue sync
-- **Tagalog Voice Support** (TTS + Siren)
-- **Role-Based Access Control** (Resident, Tanod, Admin, SuperAdmin)
-- **PWA** – Installable on mobile
-- **Live Map** with Leaflet
-- **Master Admin Override** (for development)
+## ✨ Key Features
 
-## 📡 Twilio SMS Fallback (NEW)
-
-The app features an integrated Twilio SMS engine for critical life-safety scenarios:
-- Triggers **automatically after 5 minutes** if an emergency is unassigned.
-- **Offline-recovery**: Resends SOS directly via SMS right after the device regains internet connection.
-- **Cost**: Outbound SMS to mobile numbers in PH (Globe, Smart) is ~$0.024–$0.241 per segment.
-- **Setup**: Alphanumeric Sender IDs (e.g. `BRGYTANOD`) are highly recommended in the Philippines and must be pre-registered via Twilio's portal.
-
-## 🛠 Tech Stack
-
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind + Zustand
-- **Real-time**: Socket.io
-- **Maps**: Leaflet + React-Leaflet
-- **Auth**: Firebase Auth + Custom RBAC
-- **Audio**: Web Audio API + SpeechSynthesis
-- **Offline**: Dexie + Custom Queue
-- **Deployment**: Docker / Vercel + Render
+- **Real-time Tanod Tracking** (Background + Visibility API)
+- **Offline SOS Reporting** with photo support + auto-sync
+- **Aggressive Offline Map Tiles** (OpenStreetMap)
+- **Guardian AI** — Fully offline WebLLM assistant (Tagalog + English)
+- **Smart Dispatch** — Auto-assign nearest Tanod via Cloud Functions
+- **FCM Push Notifications** + Voice Commands
+- **PWA + Capacitor** ready for Play Store
+- **Role-based Dashboards** (Tanod / Admin)
 
 ## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
 cd Brgy.Tanod-S.O.S
-
-cp .env.example .env
-# Fill in your Firebase and other keys
-
 npm install
-npm run dev:full
+npm run dev
 ```
 
-## 📱 Available Roles
+## Tech Stack
 
-- `resident` – Report emergencies
-- `tanod` – Receive alerts + background tracking
-- `admin` – Manage system
-- `superadmin` – Full access (Ruben/Ben)
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind
+- **Maps**: Leaflet + Offline Caching
+- **Backend**: Firebase (Firestore, Functions, Auth, FCM)
+- **Offline**: Dexie.js + Workbox + WebLLM
+- **Mobile**: Capacitor (Android/iOS ready)
+- **AI**: WebLLM (Phi-3.5, Llama-3.2) running locally
+
+## Folder Structure
+
+See `docs/STRUCTURE.md` for details.
+
+## Deployment
+
+```bash
+./scripts/deploy.sh
+```
+
+## Screenshots
+
+*(Add screenshots here once available)*
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first.
+
+## License
+
+MIT © 2026 Brgy Tanod S.O.S. Team
+
+**Made with ❤️ for Philippine Barangays**

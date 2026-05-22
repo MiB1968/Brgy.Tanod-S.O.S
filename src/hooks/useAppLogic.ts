@@ -273,7 +273,7 @@ export function useAppLogic() {
     const timer = setTimeout(() => {
       setLoading(false);
       loadingFailsafeTriggered.current = true;
-    }, 8000);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [setLoading]);
 
