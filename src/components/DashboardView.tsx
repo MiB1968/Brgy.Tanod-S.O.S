@@ -2,10 +2,9 @@ import ResidentDashboard from './ResidentDashboard';
 import TanodDashboard from './TanodDashboard';
 import AdminDashboard from './AdminDashboard';
 import { User, Alert, PatrolLocation, SystemBroadcast } from '../types';
-import * as safeStorage from '../lib/safeStorage';
 
 interface DashboardViewProps {
-  profile?: User | null;
+  profile: User;
   alerts: Alert[];
   patrols: PatrolLocation[];
   onTabChange: (tab: string) => void;
@@ -31,27 +30,11 @@ export default function DashboardView({
   onToggleSiren,
   activeBroadcast,
 }: DashboardViewProps) {
-  let activeProfile = profile;
-  if (!activeProfile) {
-    const cached = safeStorage.getItem("user");
-    if (cached) {
-      try {
-        activeProfile = JSON.parse(cached) as User;
-      } catch (err) {
-        console.error("Failed to parse cached user in DashboardView:", err);
-      }
-    }
-  }
-
-  if (!activeProfile) {
-    return <div className="text-center p-12 text-[#8E9299]">Loading profile...</div>;
-  }
-  
-  console.log('[DEBUG] DashboardView rendered with active profile role:', activeProfile?.role);
-  if (activeProfile?.role === 'resident') {
+  console.log('[DEBUG] DashboardView rendered with profile role:', profile.role);
+  if (profile.role === 'resident') {
     return (
       <ResidentDashboard 
-        profile={activeProfile} 
+        profile={profile} 
         patrols={patrols} 
         visiblePatrols={visiblePatrols} 
         isOnline={isOnline} 
@@ -63,10 +46,10 @@ export default function DashboardView({
       />
     );
   }
-  if (activeProfile?.role === 'tanod') {
+  if (profile.role === 'tanod') {
     return (
       <TanodDashboard 
-        profile={activeProfile} 
+        profile={profile} 
         deferredPrompt={deferredPrompt} 
         onInstall={onInstall} 
         sirenActive={sirenActive} 
@@ -74,10 +57,10 @@ export default function DashboardView({
       />
     );
   }
-  if (activeProfile?.role === 'admin' || activeProfile?.role === 'superadmin') {
+  if (profile.role === 'admin' || profile.role === 'superadmin') {
     return (
       <AdminDashboard 
-        profile={activeProfile} 
+        profile={profile} 
         onTabChange={onTabChange} 
         deferredPrompt={deferredPrompt} 
         onInstall={onInstall} 
