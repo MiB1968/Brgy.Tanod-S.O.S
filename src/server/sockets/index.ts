@@ -4,7 +4,7 @@ import { AuthenticatedSocket } from '../types';
 import { socketAuthMiddleware } from '../middleware/socketAuth';
 import { voiceAssistantService } from '../services/voiceAssistantService';
 import { VoicePermissionLevel } from '../services/voiceAssistantService.types';
-import { setupLocationHandlers, startLocationExpiryTask, startLocationBatchingTask, getActiveLocations } from './handlers/location.handler';
+import { setupLocationHandlers, startLocationExpiryTask, getActiveLocations } from './handlers/location.handler';
 import { setupIncidentHandlers } from './handlers/incident.handler';
 import { setupJarvisHandler } from './handlers/jarvis.handler';
 import { setupGuardianHandler } from './handlers/guardian.handler';
@@ -225,7 +225,6 @@ export function initSocket(server: HttpServer): Server {
 
   // Start background tasks
   startLocationExpiryTask(io);
-  startLocationBatchingTask(io);
 
   console.log('[Socket] Socket.IO initialized successfully');
   return io;

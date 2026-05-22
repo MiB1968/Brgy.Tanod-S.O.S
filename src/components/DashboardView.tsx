@@ -4,7 +4,7 @@ import AdminDashboard from './AdminDashboard';
 import { User, Alert, PatrolLocation, SystemBroadcast } from '../types';
 
 interface DashboardViewProps {
-  profile: User;
+  profile?: User | null;
   alerts: Alert[];
   patrols: PatrolLocation[];
   onTabChange: (tab: string) => void;
@@ -30,8 +30,12 @@ export default function DashboardView({
   onToggleSiren,
   activeBroadcast,
 }: DashboardViewProps) {
-  console.log('[DEBUG] DashboardView rendered with profile role:', profile.role);
-  if (profile.role === 'resident') {
+  if (!profile) {
+    return <div className="text-center p-12 text-[#8E9299]">Loading profile...</div>;
+  }
+  
+  console.log('[DEBUG] DashboardView rendered with profile role:', profile?.role);
+  if (profile?.role === 'resident') {
     return (
       <ResidentDashboard 
         profile={profile} 
@@ -46,7 +50,7 @@ export default function DashboardView({
       />
     );
   }
-  if (profile.role === 'tanod') {
+  if (profile?.role === 'tanod') {
     return (
       <TanodDashboard 
         profile={profile} 
@@ -57,7 +61,7 @@ export default function DashboardView({
       />
     );
   }
-  if (profile.role === 'admin' || profile.role === 'superadmin') {
+  if (profile?.role === 'admin' || profile?.role === 'superadmin') {
     return (
       <AdminDashboard 
         profile={profile} 

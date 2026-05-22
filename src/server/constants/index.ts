@@ -26,7 +26,6 @@ export const SOCKET_EVENTS = {
   // Location
   LOCATION_UPDATE: "location_update",
   LOCATION_UPDATE_DELTA: "location_update_delta",
-  LOCATION_UPDATE_BATCH: "location_update_batch",
   LOCATION_REMOVE_DELTA: "location_remove_delta",
 
   // Incidents

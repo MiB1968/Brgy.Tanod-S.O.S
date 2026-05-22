@@ -101,7 +101,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-card overflow-hidden flex items-center justify-center border border-white/5 shrink-0 shadow-lg relative">
             {isRuben(user?.id, user?.email) ? (
               <img src="/ruben_avatar.jpg" referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
-            ) : user.photoURL ? (
+            ) : user?.photoURL ? (
               <img src={user.photoURL} referrerPolicy="no-referrer" alt="Profile" className="w-full h-full object-cover" />
             ) : (
                 <div className="w-6 h-6 bg-white/10 rounded-full" />

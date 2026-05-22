@@ -15,7 +15,7 @@ const siren = new Howl({
 
 import { useTanodStore } from '../store/useTanodStore';
 
-export default function TanodCommandAlert({ profile, isTestMode }: { profile: User, isTestMode?: boolean }) {
+export default function TanodCommandAlert({ profile, isTestMode }: { profile?: User | null, isTestMode?: boolean }) {
   const { shifts } = useTanodStore();
   const [activeAlert, setActiveAlert] = useState<Shift | null>(null);
   const [pendingResponse, setPendingResponse] = useState<'accepted' | 'rejected' | null>(null);
@@ -23,11 +23,12 @@ export default function TanodCommandAlert({ profile, isTestMode }: { profile: Us
   // ⚡ Bolt Optimization: Memoize the filtered shifts calculation
   // Prevents re-filtering the entire array on every render
   const pendingShifts = useMemo(() => {
+    if (!profile) return [];
     return shifts.filter(s => {
       const isTarget = isTestMode || s.tanodId === profile.id;
       return isTarget && s.tanodResponse === 'pending';
     });
-  }, [shifts, isTestMode, profile.id]);
+  }, [shifts, isTestMode, profile]);
 
   useEffect(() => {
     if (pendingShifts.length > 0 && !activeAlert) {
