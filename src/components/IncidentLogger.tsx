@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useSystemStore } from '@/store/useSystemStore';
-import { db } from '@/lib/firebase';
+import { useAuthStore } from '../store/useAuthStore';
+import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const IncidentLogger: React.FC = () => {
+  const { profile: user } = useAuthStore();
   const [type, setType] = useState('');
   const [description, setDescription] = useState('');
   const [isLogging, setIsLogging] = useState(false);
@@ -20,9 +21,8 @@ const IncidentLogger: React.FC = () => {
         type,
         description: description.trim(),
         timestamp: serverTimestamp(),
-        reportedBy: useSystemStore.getState().user?.uid,
+        reportedBy: user?.id,
         status: 'reported',
-        location: useSystemStore.getState().userLocation
       });
 
       alert("✅ Incident successfully logged.");

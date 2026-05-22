@@ -1,6 +1,6 @@
 import { getToken, onMessage } from 'firebase/messaging';
-import { messaging } from '@/lib/firebase';
-import { useSystemStore } from '@/store/useSystemStore';
+import { messaging } from '../lib/firebase';
+import { useSystemStore } from '../store/useSystemStore';
 
 export class PushNotificationService {
   private static instance: PushNotificationService;

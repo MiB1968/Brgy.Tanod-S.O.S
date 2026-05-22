@@ -1,4 +1,4 @@
-import { db } from '@/lib/mapDb';
+import { db } from '../lib/mapDb';
 import { guardianAI } from './guardianAI';
 
 export interface LocalKnowledge {

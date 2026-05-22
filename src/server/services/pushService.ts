@@ -8,6 +8,8 @@ if (!admin.apps.length) {
   });
 }
 
+const firestore = admin.firestore();
+
 export class ServerPushService {
   private static instance: ServerPushService;
 
@@ -51,7 +53,7 @@ export class ServerPushService {
       const tokens = nearbyTanods.map(t => t.pushToken).filter(Boolean);
 
       if (tokens.length > 0) {
-        const response = await admin.messaging().sendMulticast({
+        const response = await admin.messaging().sendEachForMulticast({
           tokens,
           ...message
         });
@@ -64,7 +66,7 @@ export class ServerPushService {
   }
 
   private async getNearbyTanodsWithTokens(center: { lat: number; lng: number }, radiusMeters: number) {
-    const snapshot = await db.collection('users')
+    const snapshot = await firestore.collection('users')
       .where('role', 'in', ['tanod', 'admin'])
       .get();
 

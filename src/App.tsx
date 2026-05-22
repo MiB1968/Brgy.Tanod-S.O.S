@@ -6,7 +6,6 @@ import * as api from "./lib/api";
 
 import { useAppLogic } from "./hooks/useAppLogic";
 import { useRBAC } from "./context/AuthContext";
-import { knowledgeService } from "./services/knowledgeService";
 import { tanodLocationService } from './services/tanodLocationService';
 import { pushService } from './services/pushNotificationService';
 
@@ -30,6 +29,7 @@ import IncidentForm from "./components/IncidentForm";
 import SOSAlertSiren from "./components/SOSAlertSiren";
 import SirenController from "./components/SirenController";
 import TanodCommandAlert from "./components/TanodCommandAlert";
+import BroadcastOverlay from "./components/BroadcastOverlay";
 import KeepAppOpenBanner from './components/KeepAppOpenBanner';
 import TrackingStatusPanel from './components/TrackingStatusPanel';
 import NotificationPermission from './components/NotificationPermission';
@@ -223,7 +223,6 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* System Components */}
         <SirenController 
           globalSirenActive={logic.globalSirenActive}
           profile={logic.effectiveProfile}
@@ -232,15 +231,7 @@ export default function App() {
         {logic.effectiveProfile && logic.effectiveRole === "tanod" && (
           <TanodCommandAlert profile={logic.effectiveProfile} />
         )}
-        <GuardianGreeting />
-        <GuardianVoiceAssistant />
-        <Suspense fallback={null}>
-          <GuardianAIChat />
-        </Suspense>
-        <BackgroundServices />
-
-        {/* Notifications & PWA */}
-        <TacticalDock />
+        
         <Toaster
           position="top-center"
           toastOptions={{
@@ -251,8 +242,6 @@ export default function App() {
             },
           }}
         />
-        <PWAStatus />
-        <PWAInstallPrompt />
       </AppLayout>
     </GlobalErrorBoundary>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useGuardianAI } from '@/hooks/useGuardianAI';
+import { useGuardianAI } from '../hooks/useGuardianAI';
 import IncidentLogger from './IncidentLogger';
 import { Mic, MicOff, Volume2 } from 'lucide-react';
 

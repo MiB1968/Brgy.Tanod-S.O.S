@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSystemStore } from '@/store/useSystemStore';
-import { tanodLocationService } from '@/services/tanodLocationService';
+import { useAuthStore } from '../store/useAuthStore';
+import { useTanodStore } from '../store/useTanodStore';
+import { tanodLocationService } from '../services/tanodLocationService';
 
 const TrackingStatusPanel: React.FC = () => {
-  const { user, tanods } = useSystemStore();
+  const { profile: user } = useAuthStore();
+  const { patrols: tanods } = useTanodStore();
   const [status, setStatus] = useState<'active' | 'weak' | 'inactive'>('inactive');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -11,11 +13,12 @@ const TrackingStatusPanel: React.FC = () => {
   useEffect(() => {
     if (user?.role !== 'tanod') return;
     const interval = setInterval(() => {
-      const myLocation = tanods.find(t => t.id === user.uid);
+      const myLocation = tanods.find(t => t.tanodId === user.uid);
       if (myLocation) {
-        const age = Date.now() - myLocation.timestamp;
-        const acc = myLocation.accuracy || 999;
-        setLastUpdate(new Date(myLocation.timestamp));
+        const lastUpdate = new Date(myLocation.lastUpdate).getTime();
+        const age = Date.now() - lastUpdate;
+        const acc = myLocation.location.accuracy || 999;
+        setLastUpdate(new Date(lastUpdate));
         setAccuracy(acc);
         if (age < 15000 && acc < 50) setStatus('active');
         else if (age < 45000 && acc < 100) setStatus('weak');
