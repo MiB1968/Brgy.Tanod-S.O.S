@@ -126,58 +126,31 @@
   }
 }
 
-/* ====================== CUSTOM SCROLLBAR ====================== */
-
-/* For Webkit browsers (Chrome, Edge, Safari, etc.) */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Global Emergency Theme */
+:root {
+  --emergency-red: #ef4444;
+  --success-green: #22c55e;
+  --warning-amber: #eab308;
+  --dark-bg: #09090b;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+body {
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.4); /* Tactical cyan theme */
-  border-radius: 10px;
-  transition: all 0.2s ease;
+.emergency-btn {
+  @apply bg-red-600 hover:bg-red-700 active:scale-[0.97] transition-all font-semibold shadow-lg;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.7);
+.card {
+  @apply bg-zinc-900 border border-zinc-700 rounded-3xl p-6 shadow-xl;
 }
 
-/* For horizontal scroll */
-.custom-scrollbar::-webkit-scrollbar-horizontal {
-  height: 6px;
-}
+.status-active { @apply text-green-400; }
+.status-weak   { @apply text-yellow-400; }
+.status-inactive { @apply text-red-400; }
 
-/* Firefox Support */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 240, 255, 0.4) rgba(255, 255, 255, 0.05);
-}
-
-/* Custom Leaflet Marker and Popup styles */
-.custom-popup .leaflet-popup-content-wrapper {
-  border-radius: 16px !important;
-  background-color: rgba(10, 15, 30, 0.95) !important;
-  color: #f1f5f9 !important;
-  border: 1px solid rgba(0, 240, 255, 0.2) !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
-}
-
-.custom-popup .leaflet-popup-tip {
-  background-color: rgba(10, 15, 30, 0.95) !important;
-  border: 1px solid rgba(0, 240, 255, 0.2) !important;
-}
-
-.custom-tanod-marker {
-  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.45));
-}
-
-.custom-sos-marker {
-  filter: drop-shadow(0 12px 20px rgba(239, 68, 68, 0.4));
+/* Smooth animations */
+button, .card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

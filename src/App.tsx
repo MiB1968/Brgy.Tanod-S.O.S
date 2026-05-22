@@ -7,6 +7,8 @@ import * as api from "./lib/api";
 import { useAppLogic } from "./hooks/useAppLogic";
 import { useRBAC } from "./context/AuthContext";
 import { knowledgeService } from "./services/knowledgeService";
+import { tanodLocationService } from './services/tanodLocationService';
+import { pushService } from './services/pushNotificationService';
 
 import AppLayout from "./components/layout/AppLayout";
 import AppHeader from "./components/layout/AppHeader";
@@ -28,15 +30,11 @@ import IncidentForm from "./components/IncidentForm";
 import SOSAlertSiren from "./components/SOSAlertSiren";
 import SirenController from "./components/SirenController";
 import TanodCommandAlert from "./components/TanodCommandAlert";
-import { GuardianGreeting } from "./components/ai/GuardianGreeting";
-import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
-import { lazy, Suspense } from 'react';
-const GuardianAIChat = lazy(() => import('./components/GuardianAIChat'));
-import BroadcastOverlay from "./components/BroadcastOverlay";
-import BackgroundServices from "./components/BackgroundServices";
-import TacticalDock from "./components/layout/TacticalDock";
-import PWAStatus from "./components/PWAStatus";
-import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import KeepAppOpenBanner from './components/KeepAppOpenBanner';
+import TrackingStatusPanel from './components/TrackingStatusPanel';
+import NotificationPermission from './components/NotificationPermission';
+import GuardianAssistant from './components/GuardianAssistant';
+import LiveMap from './components/LiveMap';
 
 export default function App() {
   const logic = useAppLogic();
@@ -47,14 +45,21 @@ export default function App() {
     document.documentElement.classList.add("dark");
   }, []);
 
-  // Manage knowledge scraping service
+  // Initialize services
   useEffect(() => {
+    // Push Notifications
+    pushService.initialize();
+    pushService.listenForMessages();
+
+    // Tanod GPS Tracking
     if (logic.effectiveRole === 'tanod') {
-      knowledgeService.startScheduledScraping();
-      knowledgeService.preloadMamburaoKnowledge();
+      tanodLocationService.startTracking();
     }
+
     return () => {
-      knowledgeService.stopScheduledScraping();
+      if (logic.effectiveRole === 'tanod') {
+        tanodLocationService.stopTracking();
+      }
     };
   }, [logic.effectiveRole]);
 
@@ -150,6 +155,11 @@ export default function App() {
         deferredPrompt={logic.deferredPrompt}
         handleInstallApp={logic.handleInstallApp}
       >
+        {/* Persistent Banners & Panels */}
+        <KeepAppOpenBanner />
+        <NotificationPermission />
+        <TrackingStatusPanel />
+
         {/* Header */}
         <AppHeader
           activeTab={logic.activeTab}
@@ -182,6 +192,11 @@ export default function App() {
             visiblePatrols={logic.visiblePatrols}
           />
         </main>
+
+        {/* Guardian AI Assistant */}
+        <div className="absolute bottom-6 left-4 right-4 z-50">
+          <GuardianAssistant />
+        </div>
 
         {/* Global Overlays */}
         <AnimatePresence>
