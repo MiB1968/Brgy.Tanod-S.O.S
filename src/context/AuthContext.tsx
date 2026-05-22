@@ -63,9 +63,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (uid: string) => {
     try {
-      // Add a 5 second timeout to getDoc so it doesn't hang indefinitely
+      // Add a 10 second timeout to getDoc so it doesn't hang indefinitely
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('getDoc timeout')), 5000)
+        setTimeout(() => reject(new Error('getDoc timeout')), 10000)
       );
       
       const userDoc = (await Promise.race([

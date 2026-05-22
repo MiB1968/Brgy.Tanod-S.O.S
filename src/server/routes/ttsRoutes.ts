@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
+const ttsCache = new Map<string, Buffer>(); // Cache audio buffers
 
 // Lazy initialization of TTS clients to avoid startup errors if keys are missing
 let ttsClient: TextToSpeechClient | null = null;
@@ -25,6 +26,12 @@ const getTtsClient = () => {
 
 router.post('/speak', async (req, res) => {
   const { text, ssml, language = 'fil', style = 'calm', priority = 'normal', voice = 'fil-PH-Wavenet-A' } = req.body;
+  const cacheKey = `${text || ssml}-${voice}`;
+  
+  if (ttsCache.has(cacheKey)) {
+    res.set('Content-Type', 'audio/mpeg');
+    return res.send(ttsCache.get(cacheKey));
+  }
 
   if (!text && !ssml) {
     return res.status(400).json({ error: 'Text or SSML is required' });
@@ -59,6 +66,7 @@ router.post('/speak', async (req, res) => {
           audioData = Buffer.from(audioData);
         }
         
+        ttsCache.set(cacheKey, audioData as Buffer);
         return res.send(audioData);
     } 
 
@@ -78,6 +86,7 @@ router.post('/speak', async (req, res) => {
     });
     const audioBuffer = edgeTtsClient.toBuffer();
     
+    ttsCache.set(cacheKey, audioBuffer);
     res.set('Content-Type', 'audio/mpeg');
     return res.send(audioBuffer);
 

@@ -36,42 +36,61 @@ export class KnowledgeService {
     }
   }
 
+  // Helper for delay
+  private delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   // Scrape using Firecrawl API
-  async scrapeSource(url: string, category: LocalKnowledge['category']) {
-    try {
-      // In a real environment, this might proxy through a backend route
-      const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_FIRECRAWL_API_KEY}`,
-        },
-        body: JSON.stringify({
+  async scrapeSource(url: string, category: LocalKnowledge['category'], retries = 3) {
+    let attempt = 0;
+    
+    while (attempt < retries) {
+      try {
+        // In a real environment, this might proxy through a backend route
+        const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_FIRECRAWL_API_KEY}`,
+          },
+          body: JSON.stringify({
+            url,
+            formats: ['markdown'],
+            onlyMainContent: true,
+          }),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const data = await response.json();
+
+        const knowledge: LocalKnowledge = {
+          source: new URL(url).hostname,
+          title: data.metadata?.title || 'Untitled',
+          content: data.markdown || data.content,
           url,
-          formats: ['markdown'],
-          onlyMainContent: true,
-        }),
-      });
+          scrapedAt: new Date().toISOString(),
+          category,
+        };
 
-      const data = await response.json();
+        await db.localKnowledge.add(knowledge);
+        console.log(`✅ Scraped and cached: ${knowledge.title}`);
 
-      const knowledge: LocalKnowledge = {
-        source: new URL(url).hostname,
-        title: data.metadata?.title || 'Untitled',
-        content: data.markdown || data.content,
-        url,
-        scrapedAt: new Date().toISOString(),
-        category,
-      };
-
-      await db.localKnowledge.add(knowledge);
-      console.log(`✅ Scraped and cached: ${knowledge.title}`);
-
-      return knowledge;
-    } catch (error) {
-      console.error("Firecrawl scrape failed:", error);
-      return null;
+        return knowledge;
+      } catch (error) {
+        attempt++;
+        if (attempt >= retries) {
+          console.error(`❌ Firecrawl scrape failed after ${retries} attempts:`, url, error);
+          return null;
+        }
+        
+        const delayMs = Math.pow(2, attempt) * 1000;
+        console.warn(`⚠️ Scraping failed for ${url}. Retrying in ${delayMs}ms (attempt ${attempt}/${retries})...`);
+        await this.delay(delayMs);
+      }
     }
+    return null;
   }
 
   async getRelevantKnowledge(query: string, limit = 3): Promise<string> {
