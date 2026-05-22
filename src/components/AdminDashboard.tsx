@@ -36,8 +36,7 @@ import { TanodUnitStatusList } from './Admin/TanodUnitStatusList';
 import { SOSBroadcastPanel } from './Admin/SOSBroadcastPanel';
 import { BroadcastReview } from './Admin/BroadcastReview';
 import { EmergencyAlertBanner } from './Admin/EmergencyAlertBanner';
-import { GuardianVoiceAssistant } from './ai/GuardianVoiceAssistant';
-import { GuardianGreeting } from './ai/GuardianGreeting';
+
 import { PoliceLights } from './PoliceLights';
 import AboutModal from './AboutModal';
 import DispatchModal from './DispatchModal';

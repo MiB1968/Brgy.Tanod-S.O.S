@@ -30,7 +30,8 @@ import SirenController from "./components/SirenController";
 import TanodCommandAlert from "./components/TanodCommandAlert";
 import { GuardianGreeting } from "./components/ai/GuardianGreeting";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
-import GuardianAIChat from "./components/GuardianAIChat";
+import { lazy, Suspense } from 'react';
+const GuardianAIChat = lazy(() => import('./components/GuardianAIChat'));
 import BroadcastOverlay from "./components/BroadcastOverlay";
 import BackgroundServices from "./components/BackgroundServices";
 import TacticalDock from "./components/layout/TacticalDock";
@@ -218,7 +219,9 @@ export default function App() {
         )}
         <GuardianGreeting />
         <GuardianVoiceAssistant />
-        <GuardianAIChat />
+        <Suspense fallback={null}>
+          <GuardianAIChat />
+        </Suspense>
         <BackgroundServices />
 
         {/* Notifications & PWA */}

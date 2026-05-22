@@ -6,9 +6,9 @@ import AboutModal from '../AboutModal';
 import { CitizenReportTracker } from '../CitizenReportTracker';
 import { UserRole, PatrolLocation } from "../../types";
 
-const AdminDashboard = lazy(() => import("../AdminDashboard"));
-const TanodDashboard = lazy(() => import("../TanodDashboard"));
-const ResidentDashboard = lazy(() => import("../ResidentDashboard"));
+const AdminDashboard = lazy(() => import("../AdminDashboard").then(m => ({ default: m.default })));
+const TanodDashboard = lazy(() => import("../TanodDashboard").then(m => ({ default: m.default })));
+const ResidentDashboard = lazy(() => import("../ResidentDashboard").then(m => ({ default: m.default })));
 
 // Dynamic sub-views for sidebar navigation tabs
 const AdminResidents = lazy(() => import("../AdminResidents"));

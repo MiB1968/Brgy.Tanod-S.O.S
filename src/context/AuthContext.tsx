@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, getDocFromCache, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import * as safeStorage from '../lib/safeStorage';
 import type { User, UserRole } from '../types';
@@ -63,15 +63,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (uid: string) => {
     try {
-      // Add a 10 second timeout to getDoc so it doesn't hang indefinitely
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('getDoc timeout')), 10000)
-      );
-      
-      const userDoc = (await Promise.race([
-        getDoc(doc(db, "users", uid)),
-        timeoutPromise
-      ])) as any;
+      const userRef = doc(db, "users", uid);
+      let userDoc;
+
+      try {
+        // Attempt to fetch from server with a shorter timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getDoc timeout')), 5000)
+        );
+        userDoc = (await Promise.race([
+          getDoc(userRef),
+          timeoutPromise
+        ])) as any;
+      } catch (e) {
+        console.warn("[AuthContext] Server fetch failed or timed out, trying cache...", e);
+        // Fallback to cache immediately if network fails
+        try {
+          userDoc = await getDocFromCache(userRef);
+        } catch (ce) {
+          console.warn("[AuthContext] Cache fetch also failed.", ce);
+          throw e; // Rethrow original server error
+        }
+      }
 
       let userData: User;
 
@@ -113,6 +126,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setFirebaseUser(fbUser);
 
       if (fbUser) {
+        // Small delay to ensure Firestore is initialized
+        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchProfile(fbUser.uid);
       } else {
         setProfile(null);

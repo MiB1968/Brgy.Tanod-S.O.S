@@ -1,62 +1,44 @@
-# Brgy Tanod S.O.S. — Tanza, Calabarzon
+# Brgy.Tanod-S.O.S 🚨🇵🇭
 
-**Real-time Emergency Response System for Barangay Tanods**
+**Real-time Emergency Response System for Philippine Barangays**
 
-A modern, offline-first PWA designed for Philippine barangays to improve emergency response time and coordination.
+A responsive, offline-first SOS alert system with Tanod tracking, Twilio SMS fallback, and local AI voice assistance.
 
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) 
-![PWA](https://img.shields.io/badge/PWA-Installable-blue)
-![Offline](https://img.shields.io/badge/Offline-First-orange)
+## Features
+- Floating SOS Button (long press)
+- Real-time Tanod tracking with direction + heatmap
+- Offline SOS queuing + auto-sync
+- Twilio SMS fallback during network outages
+- Hybrid TTS (Tagalog support)
+- PWA + aggressive offline map tiles
 
-## ✨ Key Features
+## Tech Stack
+- Frontend: React 19 + TypeScript + Vite + Tailwind
+- Maps: Leaflet + Heatmap + Offline Tiles
+- Backend: Firebase (Auth, Firestore, Functions)
+- Real-time: Socket.io
+- SMS: Twilio
+- AI: WebLLM (local)
 
-- **Real-time Tanod Tracking** (Background + Visibility API)
-- **Offline SOS Reporting** with photo support + auto-sync
-- **Aggressive Offline Map Tiles** (OpenStreetMap)
-- **Guardian AI** — Fully offline WebLLM assistant (Tagalog + English)
-- **Smart Dispatch** — Auto-assign nearest Tanod via Cloud Functions
-- **FCM Push Notifications** + Voice Commands
-- **PWA + Capacitor** ready for Play Store
-- **Role-based Dashboards** (Tanod / Admin)
-
-## 🚀 Quick Start
-
+## Quick Start
 ```bash
 git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
 cd Brgy.Tanod-S.O.S
 npm install
+cp .env.example .env
 npm run dev
 ```
 
-## Tech Stack
-
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind
-- **Maps**: Leaflet + Offline Caching
-- **Backend**: Firebase (Firestore, Functions, Auth, FCM)
-- **Offline**: Dexie.js + Workbox + WebLLM
-- **Mobile**: Capacitor (Android/iOS ready)
-- **AI**: WebLLM (Phi-3.5, Llama-3.2) running locally
-
-## Folder Structure
-
-See `docs/STRUCTURE.md` for details.
-
 ## Deployment
+- Firebase Hosting + Functions
+- Docker + Nginx (included)
+- Android/iOS via Capacitor (recommended for background tracking)
 
-```bash
-./scripts/deploy.sh
-```
+## Security
+Firestore rules are **granular and role-based**. Never use open rules in production.
 
-## Screenshots
-
-*(Add screenshots here once available)*
-
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first.
-
-## License
-
-MIT © 2026 Brgy Tanod S.O.S. Team
+## Cost Estimates
+- Firebase: Free tier sufficient for small barangays
+- Twilio SMS: ~₱1.30–₱12 per message (PH rates)
 
 **Made with ❤️ for Philippine Barangays**
