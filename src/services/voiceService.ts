@@ -27,6 +27,11 @@ class VoiceService {
   }
 
   async speak(text: string, options: VoiceOptions = {}, audioBase64?: string): Promise<void> {
+    // Atomic queue clearing - cancels any previous speech lines instantly
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
     if (this.isSpeaking) return;
     this.isSpeaking = true;
 

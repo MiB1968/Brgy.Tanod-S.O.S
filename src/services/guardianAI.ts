@@ -1,7 +1,6 @@
 // src/services/guardianAI.ts
 import { fetchAPI } from './apiBase';
 import { db } from '../db/offlineDB';
-
 import { BARANGAY_PROTOCOLS } from '../data/barangayProtocols';
 
 export interface ChatMessage {
@@ -9,6 +8,8 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
 }
+
+export type GuardianState = 'IDLE' | 'LOADING' | 'READY' | 'PROCESSING' | 'FALLBACK' | 'ERROR';
 
 export class GuardianAI {
   private worker: Worker | null = null;
@@ -19,9 +20,14 @@ export class GuardianAI {
   private loadPromise: Promise<boolean> | null = null;
   private useBackendFallback = false;
   private currentSessionId = `session_${Date.now()}`;
+  private currentState: GuardianState = 'IDLE';
 
   get isLoaded(): boolean {
     return this.isInitialized;
+  }
+
+  get state(): GuardianState {
+    return this.currentState;
   }
 
   static getInstance() {
@@ -67,7 +73,7 @@ export class GuardianAI {
 
   private checkWebGPUSupport(): boolean {
     if (typeof window === 'undefined') return false;
-    return !!(navigator as any).gpu;
+    return !!(navigator as any).gpu && 'gpu' in navigator;
   }
 
   init() {
@@ -78,6 +84,7 @@ export class GuardianAI {
       console.warn("⚠️ WebGPU is not supported in this browser. Activating server-side Guardian AI backend proxy fallback.");
       this.useBackendFallback = true;
       this.isInitialized = true;
+      this.setState('FALLBACK');
       return;
     }
 
@@ -89,6 +96,7 @@ export class GuardianAI {
         const { type, payload } = e.data;
         if (type === 'ready') {
           this.isInitialized = true;
+          this.setState('READY');
         }
         
         // Notify components listening to raw events
@@ -106,15 +114,18 @@ export class GuardianAI {
         console.error("⚠️ Guardian AI Worker error:", e);
         this.useBackendFallback = true;
         this.isInitialized = true;
+        this.setState('FALLBACK');
       };
     } catch (err) {
       console.error("⚠️ Failed to initialize Web Worker for Guardian AI. Using backend fallback:", err);
       this.useBackendFallback = true;
       this.isInitialized = true;
+      this.setState('FALLBACK');
     }
   }
 
   async loadModel(modelId?: string, onProgress?: (progress: number, text?: string) => void): Promise<boolean> {
+    this.setState('LOADING');
     this.init();
 
     if (this.useBackendFallback) {
@@ -123,6 +134,7 @@ export class GuardianAI {
         onProgress(0.6, "Establishing link with server-side tactical AI...");
         onProgress(1.0, "Tactical AI Server Link Online");
       }
+      this.setState('READY');
       return true;
     }
     
@@ -136,6 +148,7 @@ export class GuardianAI {
     }
 
     if (this.isInitialized && targetModel === this.currentModel) {
+      this.setState('READY');
       return true;
     }
 
@@ -166,6 +179,7 @@ export class GuardianAI {
           this.messageHandlers.delete(uniqueId);
           this.progressHandlers.delete(progressListener);
           this.isInitialized = true;
+          this.setState('READY');
           resolve(true);
         }
         if (type === 'error') {
@@ -176,6 +190,7 @@ export class GuardianAI {
           console.warn("⚠️ Local model load encountered an error. Seamlessly switching to server-side AI proxy fallback:", payload);
           this.useBackendFallback = true;
           this.isInitialized = true;
+          this.setState('FALLBACK');
           resolve(true); // Resolve as true so app can proceed with backend fallback
         }
       };
@@ -207,6 +222,7 @@ export class GuardianAI {
 
   async generateResponse(prompt: string, onToken?: (token: string) => void): Promise<string> {
     this.init();
+    this.setState('PROCESSING');
     
     // Crisis Detection (Zero-Latency Regex)
     const lower = prompt.toLowerCase();
@@ -238,6 +254,8 @@ export class GuardianAI {
       ? `User Command/Question: "${prompt}"\n\nOfficial Barangay Protocol to use for response:\n${context}\n\nTask: Sumagot sa natural na Tagalog/English batay sa opisyal na protokol na ito. Maging maikli, malinaw, at de-kalidad.`
       : prompt;
 
+    await this.saveMessage('user', prompt);
+
     if (this.useBackendFallback) {
       try {
         console.log("⚡ Routing prompt via server-side Express Gemini service...");
@@ -258,11 +276,14 @@ export class GuardianAI {
             await new Promise(r => setTimeout(r, Math.random() * 20 + 5));
           }
         }
+        await this.saveMessage('assistant', finalAns);
+        this.setState('READY');
         return finalAns;
       } catch (err) {
         console.error("🚨 Server-side fallback also failed:", err);
         const fallbackMsg = "Paumanhin, hindi maabot ang tactical server sa ngayon. Siguraduhing may internet connection.";
         if (onToken) onToken(fallbackMsg);
+        this.setState('READY');
         return fallbackMsg;
       }
     }
@@ -278,6 +299,8 @@ export class GuardianAI {
         }
         if (type === 'complete') {
           this.messageHandlers.delete(uniqueId);
+          this.saveMessage('assistant', payload.response);
+          this.setState('READY');
           resolve(payload.response);
         }
         if (type === 'error') {
@@ -285,7 +308,7 @@ export class GuardianAI {
           console.warn("⚠️ Local model execution failed during generation. Falling back to backend:", payload);
           // Fallback on the fly
           this.useBackendFallback = true;
-          this.isInitialized = true;
+          this.setState('FALLBACK');
           this.generateResponse(prompt, onToken).then(resolve).catch(reject);
         }
       };
@@ -302,6 +325,7 @@ export class GuardianAI {
     this.worker = null;
     this.isInitialized = false;
     this.loadPromise = null;
+    this.setState('IDLE');
     console.log("🧹 Guardian AI Worker terminated and cache handler closed");
   }
 
@@ -313,6 +337,10 @@ export class GuardianAI {
       utterance.lang = 'tl-PH'; // Native Filipino synthesis support
       speechSynthesis.speak(utterance);
     }
+  }
+
+  private setState(newState: GuardianState) {
+    this.currentState = newState;
   }
 }
 
