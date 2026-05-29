@@ -325,6 +325,19 @@ export default function AdminDashboard(props: {
         </motion.button>
       )}
 
+      <DashboardHeader 
+        profile={profile} 
+        setIsAboutOpen={setIsAboutOpen} 
+        setIsFeatureMapOpen={setIsFeatureMapOpen}
+        layout={layout}
+        setLayout={(l) => {
+          setLayout(l);
+          localStorage.setItem('brgy_admin_layout', l);
+        }}
+        viewOverride={viewOverride}
+        setViewOverride={setViewOverride}
+      />
+
       <div className="flex flex-col xl:flex-row gap-6 items-start h-full">
         {/* LEFT PANEL - UNIT STATUS & FEEDS */}
         {(layout === 'panoramic' || layout === 'standard') && (
@@ -355,19 +368,6 @@ export default function AdminDashboard(props: {
                 const first = alerts.filter(isActiveAlert)[0];
                 if(first) setSelectedAlertForDetails(first);
             }}
-          />
-          
-          <DashboardHeader 
-            profile={profile} 
-            setIsAboutOpen={setIsAboutOpen} 
-            setIsFeatureMapOpen={setIsFeatureMapOpen}
-            layout={layout}
-            setLayout={(l) => {
-              setLayout(l);
-              localStorage.setItem('brgy_admin_layout', l);
-            }}
-            viewOverride={viewOverride}
-            setViewOverride={setViewOverride}
           />
 
           <motion.div variants={itemVariants} className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">

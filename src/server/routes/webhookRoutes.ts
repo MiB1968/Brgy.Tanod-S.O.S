@@ -24,11 +24,14 @@ router.post('/fcm/subscribe', async (req, res) => {
       errMsg.includes('PERMISSION_DENIED') ||
       errMsg.includes('disabled')
     ) {
-      console.warn('[Webhook] FCM admin is offline, disabled, or unauthorized in sandbox environment (allowing graceful fallback):', err.message || err);
+      // Prevent verbose raw HTML dumps from GSE 401 error pages by truncating or omitting the HTML segment
+      const cleanMsg = err.message ? err.message.split('<')[0].trim() : 'Authentication failure (likely unconfigured in sandbox)';
+      console.warn('[Webhook] FCM admin is offline, disabled, or unauthorized in sandbox environment (allowing graceful fallback):', cleanMsg);
       // Suppress unhandled crash or 500, respond with mock success to keep client happy
       res.status(200).send('MOCK_OK');
     } else {
-      console.error('[Webhook] FCM admin error:', err);
+      const cleanMsg = err.message ? err.message.split('<')[0].trim() : String(err);
+      console.error('[Webhook] FCM admin error:', cleanMsg);
       res.status(500).send('Error');
     }
   }

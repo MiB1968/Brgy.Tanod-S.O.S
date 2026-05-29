@@ -82,8 +82,10 @@ export const initDatabase = (): admin.firestore.Firestore | null => {
     }
     
     return firebaseDb;
-  } catch (err) {
-    console.error('CRITICAL: Firebase admin initialization failed!', err);
+  } catch (err: any) {
+    const rawMsg = err?.message || String(err);
+    const cleanMsg = rawMsg.includes('<') ? rawMsg.split('<')[0].trim() : rawMsg;
+    console.error('CRITICAL: Firebase admin initialization failed!', cleanMsg);
     return null as any;
   }
 };
