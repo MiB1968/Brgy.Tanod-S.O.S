@@ -85,11 +85,15 @@ export default function LoginView({
           </div>
 
           <button
-            onClick={onGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 border border-gray-700 hover:border-gray-600 py-4 rounded-2xl transition-all"
+            onClick={() => {
+              console.log("Google login button clicked");
+              onGoogleLogin();
+            }}
+            disabled={isLoggingIn}
+            className="w-full flex items-center justify-center gap-3 border border-gray-700 hover:border-gray-600 py-4 rounded-2xl transition-all disabled:opacity-70"
           >
             <Globe className="w-5 h-5" />
-            Continue with Google Workspace
+            {isLoggingIn ? "AUTHENTICATING..." : "Continue with Google Workspace"}
           </button>
 
           <button

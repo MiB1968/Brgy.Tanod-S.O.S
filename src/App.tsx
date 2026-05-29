@@ -33,36 +33,6 @@ const App: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { patrols } = useTanodStore();
 
-  useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        const { getRedirectResult } = await import('firebase/auth');
-        const result = await getRedirectResult(auth);
-        if (result) {
-          setIsLoggingIn(true);
-          const idToken = await result.user.getIdToken();
-          const loginResponse = await api.auth.login({ 
-            email: result.user.email,
-            isGoogle: true,
-            firebaseIdToken: idToken
-          });
-          
-          if (loginResponse?.success && loginResponse.data?.token) {
-            safeStorage.setItem('token', loginResponse.data.token);
-            toast.success("Google Tactical Link Active.");
-          }
-          setIsLoggingIn(false);
-        }
-      } catch (err: any) {
-        console.error("Redirect login error details:", err);
-        const errorMessage = err.message || "Failed to complete Google sign-in.";
-        toast.error(errorMessage);
-        setIsLoggingIn(false);
-      }
-    };
-    handleRedirect();
-  }, []);
-
   const [sirenActive, setSirenActive] = useState(false);
   const { startSiren, stopSiren } = useEmergencyAudio();
 
@@ -120,6 +90,30 @@ const App: React.FC = () => {
       toast.success("Security profile established. Awaiting tactical link...");
     } catch (err: any) {
       toast.error(err.message || "Registration sequence interrupted.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleDirectBackendLogin = async (email: string, password: string) => {
+    try {
+      setIsLoggingIn(true);
+      const loginResponse = await api.auth.login({ 
+        email, 
+        password,
+        isGoogle: false
+      });
+      
+      if (loginResponse?.success && loginResponse.data?.token) {
+        safeStorage.setItem('token', loginResponse.data.token);
+        
+        // Force reload to trigger RBAC/AuthContext to pick up the new token
+        window.location.reload();
+      } else {
+        toast.error(loginResponse?.error?.message || "Login failed.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to establish secure link.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -245,17 +239,45 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         onRegister={() => setActiveTab('register')}
         isLoggingIn={isLoggingIn}
-        onDemoLogin={() => handleLogin('resident@brgytanod.com', 'tanod123')}
-        onDemoAdminLogin={() => handleLogin('admin@brgytanod.com', 'tanod123')}
+        onDemoLogin={() => handleDirectBackendLogin('resident@brgytanod.com', 'tanod123')}
+        onDemoAdminLogin={() => handleDirectBackendLogin('admin@brgytanod.com', 'tanod123')}
         onGoogleLogin={async () => {
           try {
             setIsLoggingIn(true);
-            const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
+            const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
             const provider = new GoogleAuthProvider();
-            await signInWithRedirect(auth, provider);
+            
+            // Note: In shared app (iframe/PWA) environments, popups can be blocked by third-party cookie/storage security settings.
+            const userCred = await signInWithPopup(auth, provider);
+            
+            console.log("Popup login success, user:", userCred.user.email);
+            const idToken = await userCred.user.getIdToken();
+            
+            const loginResponse = await api.auth.login({ 
+              email: userCred.user.email,
+              isGoogle: true,
+              firebaseIdToken: idToken
+            });
+            
+            console.log("Popup loginResponse:", loginResponse);
+            
+            if (loginResponse?.success && loginResponse.data?.token) {
+              safeStorage.setItem('token', loginResponse.data.token);
+              toast.success("Google Tactical Link Active.");
+            } else {
+              const backendError = loginResponse?.error?.message || "Login with backend failed.";
+              throw new Error(backendError);
+            }
           } catch (err: any) {
-            console.error("Initial Google login error details:", err);
-            toast.error(err.message || "Failed to initiate Google sign-in.");
+            console.error("Popup Google login error details:", err);
+            
+            // Specifically detect popup/storage blocking errors
+            if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+                toast.error("Auth popup was blocked by browser. Please use 'OPEN NEW TAB' above.");
+            } else {
+                toast.error(`Login failed: ${err.message || 'Check browser security settings.'}`);
+            }
+          } finally {
             setIsLoggingIn(false);
           }
         }}

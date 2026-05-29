@@ -154,12 +154,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      console.log("[AuthContext] onAuthStateChanged called, fbUser:", fbUser ? fbUser.email : "null");
       setFirebaseUser(fbUser);
 
       if (fbUser) {
         // Update socket token
         try {
-          const token = await fbUser.getIdToken(); // Removed true (force refresh) to use cache
+          console.log("[AuthContext] Getting ID Token...");
+          const token = await fbUser.getIdToken();
+          console.log("[AuthContext] ID Token obtained, setting storage...");
           safeStorage.setItem('token', token);
           
           // Force socket update if it's already attempting or disconnected

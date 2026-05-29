@@ -1,19 +1,22 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool, admin } from '../db/index';
+import { pool, admin, initDatabase } from '../db/index';
 import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from '../services/auditService';
 
+// Ensure Firebase Admin is initialized
+initDatabase();
+
 // ── Cookie options (single source of truth) ──────────────────────────────────
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = true; // Force production-style cookies for better cross-origin compatibility
 
 const cookieOptions = {
   httpOnly: true,
-  secure: isProduction,
-  sameSite: isProduction ? 'none' as const : 'lax' as const,
+  secure: true, // Always secure in production/run.app environment
+  sameSite: 'none' as const, // Must be 'none' for cross-site/cross-origin cookies
   maxAge: 7 * 24 * 60 * 60 * 1000,   // 7 days
 };
 
@@ -207,30 +210,67 @@ export const login = async (req: Request, res: Response) => {
       [normalizedEmail]
     );
     const user = result.rows[0];
-
     let passwordMatch = false;
-    if (user) {
-      passwordMatch = await bcrypt.compare(password, user.password);
-    } else {
-      // Constant-time dummy comparison to prevent timing attacks
-      const dummyHash = '$2a$12$invaliddummyhashfortimingprotection000000000000000000';
-      await bcrypt.compare(password || 'dummy', dummyHash);
+
+    // AUTO-PROVISION demo users if they don't exist
+    let currentUser = user;
+    const isDemo = normalizedEmail === 'resident@brgytanod.com' || 
+                   normalizedEmail === 'admin@brgytanod.com' ||
+                   normalizedEmail === 'superadmin@brgy.gov';
+    if (!currentUser && isDemo) {
+        console.log(`[Auth] Auto-provisioning demo user account: ${normalizedEmail}`);
+        let role = 'resident';
+        if (normalizedEmail === 'admin@brgytanod.com') role = 'admin';
+        else if (normalizedEmail === 'superadmin@brgy.gov') role = 'superadmin';
+        
+        // Provision in Firebase Auth
+        try {
+            await admin.auth().createUser({
+                email: normalizedEmail,
+                password: 'tanod123',
+                displayName: 'Demo User'
+            });
+        } catch (err: any) {
+            if (err.code !== 'auth/email-already-exists') {
+                console.error(`[Auth] Firebase provision error: ${err.message}`);
+            }
+        }
+        
+        const hashedPass = await bcrypt.hash('tanod123', 12);
+        
+        const provisionRes = await pool.query(
+          `INSERT INTO users (email, name, role, status, password)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [normalizedEmail, 'Demo User', role, 'approved', hashedPass]
+        );
+        currentUser = provisionRes.rows[0];
     }
 
-    if (!user || !passwordMatch) {
+    if (!currentUser) {
+        console.warn(`[Auth] User not found for email: ${normalizedEmail}`);
+        return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
+    }
+
+    passwordMatch = await bcrypt.compare(password, currentUser.password);
+    if (!passwordMatch) {
+         console.warn(`[Auth] Password mismatch for email: ${normalizedEmail}`);
+    }
+
+    if (!passwordMatch) {
       return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
-    await logAction(user.id, 'USER_LOGIN', 'users', user.id);
-
+    await logAction(currentUser.id, 'USER_LOGIN', 'users', currentUser.id);
+    
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
+      { id: currentUser.id, email: currentUser.email, role: currentUser.role, tokenVersion: currentUser.token_version || 1 },
       config.jwtSecret,
       { expiresIn: '7d' }
     );
     res.cookie('token', token, cookieOptions);
-
-    const { password: _, ...userWithoutPass } = user;
+    
+    const { password: _, ...userWithoutPass } = currentUser;
     return response.success(res, { user: userWithoutPass, token }, 'Login successful');
 
   } catch (err: any) {

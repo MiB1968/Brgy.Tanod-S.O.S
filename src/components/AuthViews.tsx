@@ -214,13 +214,14 @@ export function LoginView({
               </button>
             </div>
             
+            <button
+               onClick={() => window.open(window.location.href, '_blank')}
+               className="w-full flex items-center justify-center gap-2 bg-emergency/10 border border-emergency/20 text-emergency font-black py-4 rounded-[20px] hover:bg-emergency/20 active:scale-95 transition-all text-[11px] uppercase tracking-widest font-mono italic"
+            >
+                <div className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
+                OPEN IN NEW TAB TO LOGIN
+            </button>
             <div className="flex justify-center gap-4 pt-2">
-               <button 
-                 onClick={() => window.open(window.location.href, '_blank')}
-                 className="text-[8px] font-mono text-white/10 uppercase tracking-widest hover:text-white/30 transition-colors"
-               >
-                 [ OPEN NEW TAB ]
-               </button>
                <button 
                  onClick={onResetSession}
                  className="text-[8px] font-mono text-white/10 uppercase tracking-widest hover:text-white/30 transition-colors"
