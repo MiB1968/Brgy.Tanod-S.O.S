@@ -14,4 +14,5 @@ export const authService = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+  me: () => fetchAPI('/auth/me'),
 };
