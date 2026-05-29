@@ -45,6 +45,14 @@ export interface AIChatMessage {
   timestamp: string;
 }
 
+export interface QueuedAction {
+  id?: number;
+  type: 'sos' | 'location' | 'status_update';
+  payload: any;
+  timestamp: number;
+  retryCount: number;
+}
+
 export class SOSDatabase extends Dexie {
   outbox!: Table<QueuedSOS>;
   synced!: Table<SyncedReport>;
@@ -52,6 +60,7 @@ export class SOSDatabase extends Dexie {
   aiChatHistory!: Table<AIChatMessage>;
   protocols!: Table<Protocol>;
   audioCache!: Table<CachedAudio>;
+  queuedActions!: Table<QueuedAction>;
 
   constructor() {
     super('BrgyTanodSOS_DB');
@@ -101,6 +110,17 @@ export class SOSDatabase extends Dexie {
       protocols: 'id, type, keywords',
       audioCache: 'key, timestamp'
     });
+
+    // SCHEMA VERSION 7: Added queuedActions for Background Sync API
+    this.version(7).stores({
+      outbox: '++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]',
+      synced: 'id, localId, userId, syncedAt',
+      pendingLocations: 'id, userId, timestamp, status',
+      aiChatHistory: '++id, sessionId, timestamp',
+      protocols: 'id, type, keywords',
+      audioCache: 'key, timestamp',
+      queuedActions: '++id, type, timestamp, retryCount'
+    });
   }
 }
 
@@ -126,6 +146,13 @@ class MockSOSDatabase {
     where: () => ({ equals: () => ({ sortBy: async () => [] }), anyOf: () => ({ toArray: async () => [] }) }),
     delete: async () => 1
   };
+  queuedActions = {
+    add: async () => 1,
+    where: () => ({ below: () => ({ delete: async () => 1 }) }),
+    update: async () => 1,
+    delete: async () => 1,
+    orderBy: () => ({ toArray: async () => [] })
+  };
   transaction = async (mode: any, tables: any, cb: any) => await cb();
 }
 
@@ -138,3 +165,12 @@ try {
 }
 
 export const db = safeDb as SOSDatabase;
+
+export const cleanupOldQueues = async () => {
+  try {
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    await db.queuedActions.where('timestamp').below(threeDaysAgo).delete();
+  } catch (err) {
+    console.warn("Could not cleanup old queues", err);
+  }
+};

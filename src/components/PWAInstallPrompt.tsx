@@ -1,58 +1,93 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { X, Download } from 'lucide-react';
 
-export default function PWAInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
+export const PWAInstallPrompt = () => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    const handler = (e: any) => {
+    const handler = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowPrompt(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
-    
-    // Check if running as PWA already
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setShowPrompt(false);
-    }
+    window.addEventListener('beforeinstallprompt', handler as EventListener);
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    // Auto-hide after 30 seconds if not interacted
+    const timeout = setTimeout(() => setShowPrompt(false), 30000);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler as EventListener);
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
+
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+
     if (outcome === 'accepted') {
-      setShowPrompt(false);
+      console.log('✅ User accepted PWA install');
+    } else {
+      console.log('❌ User dismissed install');
     }
+
     setDeferredPrompt(null);
+    setShowPrompt(false);
+  };
+
+  const dismiss = () => {
+    setShowPrompt(false);
+    // Optional: Remember dismissal in localStorage
+    localStorage.setItem('pwa_prompt_dismissed', 'true');
   };
 
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-6 left-6 bg-[#0a1428] border border-white/20 rounded-2xl p-5 max-w-xs z-50 shadow-2xl" id="pwa-install-prompt">
-      <p className="font-semibold mb-2 flex items-center gap-2">📱 Install Brgy. Tanod S.O.S.</p>
-      <p className="text-sm text-gray-300 mb-4">Add to your home screen for faster response, lightweight storage, and full offline rescue capabilities.</p>
-      <div className="flex gap-3">
-        <button 
-          onClick={() => setShowPrompt(false)} 
-          className="flex-1 py-2 border border-gray-600 hover:bg-white/5 rounded-xl text-sm transition"
-          id="pwa-later-btn"
-        >
-          Later
-        </button>
-        <button 
-          onClick={handleInstall} 
-          className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm transition"
-          id="pwa-install-btn"
-        >
-          Install Now
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-zinc-900 border border-green-600 text-white rounded-3xl shadow-2xl max-w-[360px] w-full mx-4 overflow-hidden">
+      <div className="p-5 flex items-start gap-4">
+        <div className="w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1">
+          🚨
+        </div>
+
+        <div className="flex-1">
+          <h3 className="font-semibold text-lg">Install Tanod SOS</h3>
+          <p className="text-sm text-zinc-400 mt-1 leading-tight">
+            Add to home screen for quick SOS access, offline mode, and faster response even without browser tabs.
+          </p>
+
+          <div className="flex gap-3 mt-5">
+            <button
+              onClick={handleInstall}
+              className="flex-1 bg-green-600 hover:bg-green-700 transition-colors text-white font-medium py-3.5 rounded-2xl flex items-center justify-center gap-2"
+            >
+              <Download size={18} />
+              Install App
+            </button>
+
+            <button
+              onClick={dismiss}
+              className="flex-1 border border-zinc-700 hover:bg-zinc-800 transition-colors font-medium py-3.5 rounded-2xl"
+            >
+              Maybe Later
+            </button>
+          </div>
+        </div>
+
+        <button onClick={dismiss} className="text-zinc-500 hover:text-zinc-400 -mt-1 -mr-1 p-2">
+          <X size={20} />
         </button>
       </div>
     </div>
   );
-}
+};
+

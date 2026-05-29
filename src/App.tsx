@@ -19,6 +19,8 @@ import { LoginView } from './components/AuthViews';
 import RegistrationForm from './components/auth/RegistrationForm';
 import GuardianAIChat from './components/GuardianAIChat';
 import { useEmergencyAudio } from './hooks/useEmergencyAudio';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import BrgyGuardian from './features/guardian/components/BrgyGuardian';
 
 import * as api from './lib/api';
 
@@ -323,6 +325,8 @@ const App: React.FC = () => {
         <TacticalDock />
         <GuardianVoiceAssistant />
         <GuardianAIChat isInline={false} />
+        <BrgyGuardian />
+        <PWAInstallPrompt />
       </div>
     </AppLayout>
   );

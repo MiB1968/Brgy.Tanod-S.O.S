@@ -3,7 +3,7 @@ export { default as AdminDashboard } from './AdminDashboard';
 export { default as GuardianAIChat } from './GuardianAIChat';
 export { default as GuardianAISettings } from './GuardianAISettings';
 export { default as LiveMap } from './LiveMap';
-export { default as PWAInstallPrompt } from './PWAInstallPrompt';
+export { PWAInstallPrompt } from './PWAInstallPrompt';
 export { default as PWAStatus } from './PWAStatus';
 export { default as PrivacyConsentModal } from './PrivacyConsentModal';
 export { default as IncidentForm } from './IncidentForm';
