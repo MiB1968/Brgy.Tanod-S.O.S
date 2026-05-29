@@ -3,7 +3,7 @@
 ## 1. Initial Setup (One-time)
 
 ```bash
-npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios
+npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/ios @capgo/background-geolocation @capacitor/background-runner
 
 npx cap init --web-dir dist
 
@@ -55,14 +55,19 @@ npx cap open android
 
 ## 4. iOS Build (Detailed)
 
+### Permissions (`ios/App/App/Info.plist`)
 In `ios/App/App/Info.plist`:
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
 <string>Kinakailangan para ma-detect ang lokasyon mo kapag may emergency SOS.</string>
 <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-<string>Upang makapagpadala ng SOS kahit naka-background ang application.</string>
+<string>Upang makapagpadala ng SOS kahit naka-background ang application para sa Tanod Tracking.</string>
 <key>NSMicrophoneUsageDescription</key>
 <string>Para magamit ang boses sa Guardian AI voice assistant.</string>
+<key>UIBackgroundModes</key>
+<array>
+    <string>location</string>
+</array>
 ```
 
 Build in Xcode → **Product → Archive**

@@ -13,40 +13,49 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: false, // We register manually in main.tsx
+        injectRegister: 'auto',
         includeAssets: ['favicon.ico', 'icons/*', 'firebase-messaging-sw.js'],
         manifest: {
-          short_name: "TanodSOS",
-          name: "Barangay Tanod S.O.S.",
-          icons: [
-            { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-            { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
-          ],
-          start_url: "/",
+          name: "Brgy Tanod S.O.S.",
+          short_name: "Tanod SOS",
+          description: "Real-time emergency response for Philippine Barangays",
+          start_url: "/?source=pwa",
           display: "standalone",
-          theme_color: "#ef4444",
+          display_override: ["standalone", "minimal-ui"],
           background_color: "#040b1a",
-          description: "Real-time Emergency Response System for Barangays",
-          orientation: "portrait-primary"
+          theme_color: "#15803d",
+          orientation: "portrait-primary",
+          icons: [
+            { src: "/icons/icon-192.webp", sizes: "192x192", type: "image/webp" },
+            { src: "/icons/icon-512.webp", sizes: "512x512", type: "image/webp" },
+            { src: "/icons/icon-512.webp", sizes: "512x512", type: "image/webp", purpose: "any maskable" }
+          ],
+          shortcuts: [
+            {
+              name: "Send SOS",
+              url: "/sos",
+              description: "Emergency Alert"
+            }
+          ]
         },
         workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,webp}'],
           navigateFallbackDenylist: [/^\/api/, /^\/firebase-messaging-sw.js/],
           maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
           runtimeCaching: [
-            // Map tiles (aggressive caching)
             {
-              urlPattern: /https?:\/\/.*\.(tile\.openstreetmap\.org|tiles\.).*/i,
-              handler: 'StaleWhileRevalidate',
-              options: {
-                cacheName: 'map-tiles-v2',
-                expiration: { maxEntries: 2000, maxAgeSeconds: 60 * 24 * 60 * 60 }
-              }
-            },
-            // Static assets
-            {
-              urlPattern: /\.(js|css|png|jpg|jpeg|svg|ico|json|webmanifest)$/,
+              urlPattern: /^https:\/\/.*\.tile\.openstreetmap\.org/,
               handler: 'CacheFirst',
-              options: { cacheName: 'static-assets' }
+              options: { cacheName: 'osm-tiles', expiration: { maxEntries: 1000 } }
+            },
+            {
+              urlPattern: /.*\.(png|jpg|jpeg|svg|gif|webp)/,
+              handler: 'StaleWhileRevalidate'
+            },
+            {
+              urlPattern: /^https:\/\/.*firebase/,
+              handler: 'NetworkFirst',
+              options: { networkTimeoutSeconds: 10 }
             }
           ],
         },

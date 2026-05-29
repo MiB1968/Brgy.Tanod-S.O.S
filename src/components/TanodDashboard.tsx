@@ -29,6 +29,7 @@ import TanodPerformance from "./TanodPerformance";
 import AboutModal from "./AboutModal";
 import { AlertDetailsModal } from "./AlertDetailsModal";
 import IncidentForm from "./IncidentForm";
+import { usePWA } from "../hooks/usePWA";
 
 // Stores & Hooks
 import { useIncidentStore } from "../store/useIncidentStore";
@@ -63,6 +64,8 @@ export default function TanodDashboard({
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
 
+  const { isInstallable, installPWA, requestWakeLock, releaseWakeLock } = usePWA();
+
   useEffect(() => {
     if (!profile) return;
     
@@ -80,6 +83,15 @@ export default function TanodDashboard({
     );
     setIsFlashing(hasActive || sirenActive);
   }, [alerts, profile, sirenActive]);
+
+  const isOnDuty = profile?.status === "On Patrol" || profile?.status === "Responding" || profile?.status === "Available";
+
+  useEffect(() => {
+    if (isOnDuty) {
+      requestWakeLock();
+    }
+    return () => releaseWakeLock();
+  }, [isOnDuty]);
 
   const handleUpdateStatus = async (alert: Alert, status: Alert["status"]) => {
     try {
@@ -294,6 +306,14 @@ export default function TanodDashboard({
           alert={selectedAlertForDetails}
           onClose={() => setSelectedAlertForDetails(null)}
         />
+      )}
+      {isInstallable && (
+        <button
+          onClick={installPWA}
+          className="fixed bottom-4 right-4 bg-green-600 text-white px-5 py-3 rounded-2xl shadow-xl z-50 animate-bounce cursor-pointer flex items-center justify-center gap-2 hover:bg-green-500 font-bold"
+        >
+          📲 Install Tanod SOS App
+        </button>
       )}
     </motion.div>
   );

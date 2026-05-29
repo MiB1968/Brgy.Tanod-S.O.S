@@ -4,6 +4,8 @@ import socket from '../lib/socket';
 import { generic as api } from '../lib/api';
 import { db } from '../db/offlineDB';
 import { offlineService } from './offlineService';
+import { Capacitor } from '@capacitor/core';
+import { BackgroundGeolocation } from '@capgo/background-geolocation';
 
 export class TanodLocationService {
   private watchId: number | null = null;
@@ -24,37 +26,86 @@ export class TanodLocationService {
 
     if (this.isTracking) return; // Already tracking
 
-    // Permission check
-    if ('permissions' in navigator) {
-      try {
-        const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        if (perm.state === 'denied') {
-          console.warn('📍 Geolocation permission denied');
-          return;
+    // High accuracy tracking options
+    const distanceFilter = 30; // meters - to save battery on patrol
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // Use Capacitor Background Geolocation
+        console.log('📱 Starting native background geolocation tracking...');
+        await BackgroundGeolocation.start(
+          {
+            backgroundMessage: "Tanod tracking active for community safety.",
+            backgroundTitle: "Brgy Tanod SOS Background Protocol",
+            requestPermissions: true,
+            stale: false,
+            distanceFilter: distanceFilter,
+          },
+          async (location, error) => {
+            if (error) {
+              if ((error as any).code === "NOT_AUTHORIZED") {
+                console.warn("📍 Background location not authorized. Prompting settings.");
+                if (window.confirm("Location is required for tracking. Open Settings?")) {
+                  BackgroundGeolocation.openSettings();
+                }
+              }
+              console.error('[TanodTracking] Native Error:', error);
+              return;
+            }
+            if (location) {
+              // Convert to the fallback Position format to pass to our handler
+              const syntheticPosition = {
+                coords: {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  accuracy: location.accuracy,
+                  speed: location.speed || 0,
+                  heading: location.bearing || 0,
+                  altitude: location.altitude || null,
+                  altitudeAccuracy: location.altitudeAccuracy || null
+                },
+                timestamp: location.time || Date.now()
+              } as GeolocationPosition;
+              
+              await this.handlePosition(syntheticPosition);
+            }
+          }
+        );
+      } else {
+        // Fallback to standard web API
+        if ('permissions' in navigator) {
+          try {
+            const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+            if (perm.state === 'denied') {
+              console.warn('📍 Web Geolocation permission denied');
+              return;
+            }
+          } catch (e) { /* ignore */ }
         }
-      } catch (e) { /* ignore */ }
+
+        const options: PositionOptions = {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          timeout: 10000,
+        };
+
+        this.watchId = navigator.geolocation.watchPosition(
+          (position) => this.handlePosition(position),
+          (error) => {
+            console.error('[TanodTracking] Web Error:', error);
+          },
+          options
+        );
+      }
+
+      this.isTracking = true;
+      console.log('✅ Tanod background tracking started');
+
+      // Sync any leftover offline coordinates immediately upon track launch
+      this.syncOfflineData();
+    } catch (err) {
+      console.error('⚠️ Failed to start tracking:', err);
     }
-
-    // High accuracy tracking
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 10000,
-    };
-
-    this.watchId = navigator.geolocation.watchPosition(
-      (position) => this.handlePosition(position),
-      (error) => {
-        console.error('[TanodTracking] Error:', error);
-      },
-      options
-    );
-
-    this.isTracking = true;
-    console.log('✅ Tanod background tracking started');
-
-    // Sync any leftover offline coordinates immediately upon track launch
-    this.syncOfflineData();
   }
 
   private async handlePosition(position: GeolocationPosition) {
@@ -128,11 +179,14 @@ export class TanodLocationService {
     this.lastSent = now;
   }
 
-  stopTracking() {
-    if (this.watchId !== null) {
-      navigator.geolocation.clearWatch(this.watchId);
-      this.watchId = null;
+  async stopTracking() {
+    if (Capacitor.isNativePlatform()) {
+      await BackgroundGeolocation.stop();
     }
+    if (typeof this.watchId === 'number') {
+      navigator.geolocation.clearWatch(this.watchId);
+    }
+    this.watchId = null;
     this.isTracking = false;
     console.log('⏹️ Tanod background tracking stopped');
   }
@@ -140,11 +194,14 @@ export class TanodLocationService {
   // Background behavior (when tab is hidden/re-opened)
   setupVisibilityHandler() {
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && !this.isTracking) {
-        this.startTracking();
-      } else {
-        // Continue with lower frequency when backgrounded
-        console.log('[TanodTracking] App backgrounded - continuing tracking');
+      // In native apps, BackgroundGeolocation handles this. Only needed for web.
+      if (!Capacitor.isNativePlatform()) {
+        if (document.visibilityState === 'visible' && !this.isTracking) {
+          this.startTracking();
+        } else {
+          // Continue with lower frequency when backgrounded
+          console.log('[TanodTracking] Web App backgrounded');
+        }
       }
     });
 
@@ -152,6 +209,41 @@ export class TanodLocationService {
       console.log('🌐 Connection restored - syncing offline location reports');
       this.syncOfflineData();
     });
+  }
+
+  async setupGeofencing(hotspots: Array<{ id: string; lat: number; lng: number; radius: number }>) {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    try {
+      const { profile } = useAuthStore.getState();
+      
+      // We don't currently have a geofence webhook, skipping the main geofencing setup but adding circular spots
+      try {
+        await BackgroundGeolocation.setupGeofencing({
+          notifyOnEntry: true,
+          notifyOnExit: true,
+          payload: { tanodId: profile?.id || profile?.uid }
+        });
+      } catch (e: any) {
+        if (e.message !== "Not implemented on web.") {
+          console.warn("Geofence base setup warning:", e);
+        }
+      }
+
+      // Add individual circular geofences (e.g., barangay hotspots)
+      for (const spot of hotspots) {
+        await BackgroundGeolocation.addGeofence({
+          identifier: spot.id,
+          latitude: spot.lat,
+          longitude: spot.lng,
+          radius: spot.radius, // meters
+          notifyOnEntry: true,
+          notifyOnExit: false
+        });
+      }
+    } catch (e) {
+      console.error('Geofence setup failed', e);
+    }
   }
 
   async syncOfflineData() {

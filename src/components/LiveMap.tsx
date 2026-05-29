@@ -86,6 +86,9 @@ export default function LiveMap() {
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; OpenStreetMap contributors'
+          maxZoom={19}
+          crossOrigin={true}
+          bounds={L.latLngBounds(L.latLng(4.0, 116.0), L.latLng(21.0, 127.0))}
         />
 
         <MapUpdater patrols={patrols} resizeTrigger={mapKey} />

@@ -29,20 +29,13 @@ async function initializeServices() {
 
 initializeServices().catch(console.error);
 
-// Register Service Worker for offline emergency capability & map caching
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('🛡️ [SW] Service Worker registered successfully:', reg.scope);
-      })
-      .catch((err) => {
-        console.error('⚠️ [SW] Service Worker registration failed:', err);
-      });
-  });
-}
+// Service Worker registration is now handled by vite-plugin-pwa (injectRegister: 'auto')
+
+
+import { registerBackgroundSync } from './sw/backgroundSync';
 
 console.log('Mounting React Application...');
+registerBackgroundSync();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <GlobalErrorBoundary>
