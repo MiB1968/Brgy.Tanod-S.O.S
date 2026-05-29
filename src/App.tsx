@@ -33,6 +33,36 @@ const App: React.FC = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { patrols } = useTanodStore();
 
+  useEffect(() => {
+    const handleRedirect = async () => {
+      try {
+        const { getRedirectResult } = await import('firebase/auth');
+        const result = await getRedirectResult(auth);
+        if (result) {
+          setIsLoggingIn(true);
+          const idToken = await result.user.getIdToken();
+          const loginResponse = await api.auth.login({ 
+            email: result.user.email,
+            isGoogle: true,
+            firebaseIdToken: idToken
+          });
+          
+          if (loginResponse?.success && loginResponse.data?.token) {
+            safeStorage.setItem('token', loginResponse.data.token);
+            toast.success("Google Tactical Link Active.");
+          }
+          setIsLoggingIn(false);
+        }
+      } catch (err: any) {
+        console.error("Redirect login error details:", err);
+        const errorMessage = err.message || "Failed to complete Google sign-in.";
+        toast.error(errorMessage);
+        setIsLoggingIn(false);
+      }
+    };
+    handleRedirect();
+  }, []);
+
   const [sirenActive, setSirenActive] = useState(false);
   const { startSiren, stopSiren } = useEmergencyAudio();
 
@@ -220,24 +250,12 @@ const App: React.FC = () => {
         onGoogleLogin={async () => {
           try {
             setIsLoggingIn(true);
-            const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+            const { GoogleAuthProvider, signInWithRedirect } = await import('firebase/auth');
             const provider = new GoogleAuthProvider();
-            const userCred = await signInWithPopup(auth, provider);
-            const idToken = await userCred.user.getIdToken();
-            const loginResponse = await api.auth.login({ 
-              email: userCred.user.email,
-              isGoogle: true,
-              firebaseIdToken: idToken
-            });
-            
-            if (loginResponse?.success && loginResponse.data?.token) {
-              safeStorage.setItem('token', loginResponse.data.token);
-            }
-            
-            toast.success("Google Tactical Link Active.");
+            await signInWithRedirect(auth, provider);
           } catch (err: any) {
-            toast.error(err.message);
-          } finally {
+            console.error("Initial Google login error details:", err);
+            toast.error(err.message || "Failed to initiate Google sign-in.");
             setIsLoggingIn(false);
           }
         }}
