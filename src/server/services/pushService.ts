@@ -1,5 +1,4 @@
-import * as admin from 'firebase-admin';
-import { db } from '../db'; 
+import admin from 'firebase-admin';
 
 // Initialize Firebase Admin 
 if (!admin.apps.length) {
@@ -20,82 +19,78 @@ export class ServerPushService {
 
   async sendSOSPushToNearbyTanods(alert: any) {
     try {
-      const nearbyTanods = await this.getNearbyTanodsWithTokens(alert.location, 5000); 
+      console.log("DEBUG: sendSOSPushToNearbyTanods called with alert:", JSON.stringify(alert));
+      
+      if (!alert) {
+        console.log("⚠️ No alert data");
+        return;
+      }
 
-      if (nearbyTanods.length === 0) return;
+      // Safe Firestore query
+      const db = admin.firestore();
+      console.log("DEBUG: admin.firestore initialized");
+      
+      const snapshot = await db
+        .collection('users')
+        .where('role', 'in', ['tanod', 'admin'])
+        .get();
+
+      console.log("DEBUG: Firestore snapshot retrieved");
+
+      // Defensive token collection
+      const tokens: string[] = [];
+
+      if (snapshot && snapshot.forEach) {
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          // Support both pushToken and fcmToken for backward compatibility
+          const token = data?.fcmToken || data?.pushToken;
+          if (token && typeof token === 'string' && token.length > 10) {
+            tokens.push(token);
+          }
+        });
+      }
+      
+      console.log("DEBUG: tokens collected:", tokens.length);
+
+      if (tokens.length === 0) {
+        console.log("ℹ️ No valid push tokens found");
+        return;
+      }
 
       const message = {
         notification: {
-          title: `🚨 SOS ALERT - ${alert.type}`,
-          body: `${alert.residentName || 'A resident'} needs help at ${alert.location.lat.toFixed(5)}, ${alert.location.lng.toFixed(5)}`,
+          title: `🚨 SOS - ${alert.type || 'Emergency'}`,
+          body: `Help needed`,
         },
-        data: {
-          alertId: alert.id,
-          type: alert.type || 'unknown',
-          lat: alert.location.lat.toString(),
-          lng: alert.location.lng.toString(),
-          timestamp: Date.now().toString()
-        },
-        webpush: {
-            fcmOptions: {
-                link: '/'
-            },
-            notification: {
-                icon: '/icon-192.png',
-                badge: '/badge.png',
-                vibrate: [200, 100, 200, 100, 200]
-            }
-        }
+        data: { alertId: String(alert.id || '') },
+        tokens: tokens
       };
 
-      const tokens = nearbyTanods.map(t => t.pushToken).filter(Boolean);
+      console.log("DEBUG: message prepared, sending...");
+      
+      const response = await admin.messaging().sendEachForMulticast({
+        ...message,
+        tokens: tokens
+      });
+      console.log(`✅ Push sent to ${response.successCount}/${tokens.length} devices`);
 
-      if (tokens.length > 0) {
-        const response = await admin.messaging().sendMulticast({
-          tokens,
-          ...message
-        });
-
-        console.log(`✅ SOS Push sent to ${response.successCount}/${tokens.length} Tanods`);
+    } catch (error: any) {
+      const errMsg = String(error);
+      if (
+        errMsg.includes('authenticate') ||
+        errMsg.includes('401') ||
+        errMsg.includes('credential') ||
+        errMsg.includes('Messaging') ||
+        errMsg.includes('PERMISSION_DENIED') ||
+        errMsg.includes('Firestore API') ||
+        errMsg.includes('disabled')
+      ) {
+        console.warn("⚠️ Push Service Firestore/FCM is offline, disabled, or unconfigured in sandbox environment (allowing graceful fallback).");
+      } else {
+        console.error("❌ Push Service Error:", error.message, error.stack);
       }
-    } catch (error) {
-      console.error('❌ Failed to send push notifications:', error);
     }
-  }
-
-  private async getNearbyTanodsWithTokens(center: { lat: number; lng: number }, radiusMeters: number) {
-    const snapshot = await db.collection('users')
-      .where('role', 'in', ['tanod', 'admin'])
-      .get();
-
-    const tanods: any[] = [];
-
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      if (!data.pushToken || !data.location) return;
-
-      const distance = this.calculateDistance(
-        center.lat, center.lng,
-        data.location.lat, data.location.lng
-      );
-
-      if (distance <= radiusMeters) {
-        tanods.push({
-          id: doc.id,
-          pushToken: data.pushToken
-        });
-      }
-    });
-
-    return tanods;
-  }
-
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371000;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 }
 

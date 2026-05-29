@@ -131,6 +131,25 @@ export function initSocket(server: HttpServer): Server {
     setupJarvisHandler(io, socket);
     setupGuardianHandler(io, socket);
 
+    // Support dynamic client-side role override for seamless sandbox multi-panel simulations
+    socket.on('register', (data: { userId: string; role: string }) => {
+      if (!data) return;
+      const normalizedRole = normalizeRole(data.role || '');
+      const bId = barangayId || 'default';
+      console.log(`[Socket] Client ${socket.id} dynamic register event → simulated role: ${normalizedRole} | user: ${data.userId}`);
+      
+      if (isTanodOrAbove(normalizedRole)) {
+        socket.join('responders');
+        socket.join(`barangay_${bId}`);
+        console.log(`[Socket] Client ${socket.id} joined 'responders' and 'barangay_${bId}' rooms`);
+      } else {
+        socket.leave('responders');
+        socket.join(`citizen_${id}`);
+        socket.join(`barangay_${bId}`);
+        console.log(`[Socket] Client ${socket.id} left 'responders' room`);
+      }
+    });
+
     // Map normalized role to VoicePermissionLevel
     const getPermissionLevel = (r: string): VoicePermissionLevel => {
       const normalized = normalizeRole(r);
@@ -181,7 +200,8 @@ export function initSocket(server: HttpServer): Server {
             transcript: data.transcript.trim(),
             language: data.language || 'fil',
           },
-          getPermissionLevel(role)
+          getPermissionLevel(role),
+          barangayId
         );
         if (callback) callback({ success: true, data: response });
       } catch (error: any) {

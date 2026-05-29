@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { useSystemStore } from '@/store/useSystemStore';
-import { db } from '@/lib/firebase';
+import { useAuthStore } from '../store/useAuthStore';
+import { db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-const IncidentLogger: React.FC = () => {
+const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
+  const { profile: user } = useAuthStore();
   const [type, setType] = useState('');
   const [description, setDescription] = useState('');
   const [isLogging, setIsLogging] = useState(false);
 
   const saveIncident = async () => {
-    if (!type || !description.trim()) {
-      alert("Please fill in both type and description.");
-      return;
-    }
+    if (!type || !description.trim()) return;
 
     setIsLogging(true);
     try {
@@ -20,17 +18,16 @@ const IncidentLogger: React.FC = () => {
         type,
         description: description.trim(),
         timestamp: serverTimestamp(),
-        reportedBy: useSystemStore.getState().user?.uid,
+        reportedBy: user?.id,
         status: 'reported',
-        location: useSystemStore.getState().userLocation
       });
 
-      alert("✅ Incident successfully logged.");
+      console.log("✅ Incident successfully logged.");
       setDescription('');
       setType('');
+      if (onComplete) onComplete();
     } catch (err) {
       console.error(err);
-      alert("❌ Failed to save incident.");
     } finally {
       setIsLogging(false);
     }

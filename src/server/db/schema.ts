@@ -17,6 +17,7 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   role: text('role').notNull().default('resident'),
   status: text('status').notNull().default('pending'),
+  barangayId: text('barangay_id').default('default'),
   tokenVersion: integer('token_version').default(1).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastActive: timestamp('last_active', { withTimezone: true }).defaultNow()
@@ -46,6 +47,7 @@ export const alerts = pgTable('alerts', {
   residentId: uuid('resident_id').references(() => users.id),
   type: text('type').notNull(),
   status: text('status').notNull().default('active'),
+  barangayId: text('barangay_id').default('default'),
   location: jsonb('location').notNull(),
   description: text('description'),
   severityScore: integer('severity_score'),
@@ -65,7 +67,7 @@ export const alerts = pgTable('alerts', {
 });
 
 export const patrols = pgTable('patrols', {
-  tanodId: uuid('tanod_id').primaryKey().references(() => users.id),
+  tanodId: uuid('tanod_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   tanodName: text('tanod_name'),
   isActive: boolean('is_active').default(false),
   location: jsonb('location'),
@@ -112,7 +114,7 @@ export const witnessInvites = pgTable('witness_invites', {
 
 export const shifts = pgTable('shifts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tanodId: uuid('tanod_id').references(() => users.id),
+  tanodId: uuid('tanod_id').references(() => users.id, { onDelete: 'cascade' }),
   tanodName: text('tanod_name'),
   startTime: timestamp('start_time', { withTimezone: true }),
   endTime: timestamp('end_time', { withTimezone: true }),
@@ -151,7 +153,7 @@ export const auditLogArchives = pgTable('audit_log_archives', {
 
 export const tanodActivityLogs = pgTable('tanod_activity_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tanodId: uuid('tanod_id').references(() => users.id),
+  tanodId: uuid('tanod_id').references(() => users.id, { onDelete: 'cascade' }),
   tanodName: text('tanod_name'),
   type: text('type'),
   timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
@@ -161,8 +163,8 @@ export const tanodActivityLogs = pgTable('tanod_activity_logs', {
 
 export const incidents = pgTable('incidents', {
   id: uuid('id').primaryKey().defaultRandom(),
-  alertId: uuid('alert_id').references(() => alerts.id),
-  tanodId: uuid('tanod_id').references(() => users.id),
+  alertId: uuid('alert_id').references(() => alerts.id, { onDelete: 'set null' }),
+  tanodId: uuid('tanod_id').references(() => users.id, { onDelete: 'set null' }),
   tanodName: text('tanod_name'),
   timestamp: timestamp('timestamp', { withTimezone: true }),
   type: text('type'),
@@ -173,6 +175,7 @@ export const incidents = pgTable('incidents', {
   actionsTaken: text('actions_taken'),
   status: text('status'),
   citizenName: text('citizen_name'), // Added column
+  barangayId: text('barangay_id').default('default'),
   assignedTo: uuid('assigned_to'),
   assignedToName: text('assigned_to_name'),
   respondedBy: uuid('responded_by'),
@@ -186,7 +189,7 @@ export const incidents = pgTable('incidents', {
 
 export const patrolSessions = pgTable('patrol_sessions', {
   id: text('id').primaryKey(),
-  tanodId: uuid('tanod_id').references(() => users.id),
+  tanodId: uuid('tanod_id').references(() => users.id, { onDelete: 'cascade' }),
   tanodName: text('tanod_name'),
   startTime: timestamp('start_time', { withTimezone: true }).defaultNow(),
   endTime: timestamp('end_time', { withTimezone: true }),

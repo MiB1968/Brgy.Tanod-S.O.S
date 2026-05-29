@@ -3,26 +3,32 @@ import * as safeStorage from './safeStorage';
 
 // The server runs on the same port as the client in AI Studio
 const token = safeStorage.getItem('token');
-const socket = io({
-  autoConnect: true,
-  auth: () => {
-    const token = safeStorage.getItem('token');
-    console.log('[Socket] Auth token retrieved:', token ? 'exists' : 'missing');
-    return { token };
-  },
-  rememberUpgrade: false,
+const socketUrl = typeof window !== 'undefined' ? window.location.origin : '';
+const socket = io(socketUrl, {
+  autoConnect: false,
+  auth: { token: safeStorage.getItem('token') },
+  rememberUpgrade: true,
   path: '/socket.io',
-  transports: ['polling', 'websocket'],
-  timeout: 60000, 
-  withCredentials: true
+  transports: ['websocket'], // For serverless environments like Cloud Run, forcing websocket immediately avoids session stickiness polling timeouts.
+  timeout: 45000, 
+  withCredentials: true,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 2000,
+  reconnectionDelayMax: 10000
 });
 
-// Refresh token on every reconnection attempt
-socket.io.on('reconnect_attempt', () => {
+// Update auth token before any connection or reconnection
+const updateSocketAuth = () => {
   const token = safeStorage.getItem('token');
-  console.log('[Socket] Reconnection attempt with token:', token ? 'exists' : 'missing');
-  socket.auth = { token };
-});
+  if (token) {
+    socket.auth = { token };
+  } else {
+    socket.auth = {};
+  }
+};
+
+socket.on('reconnect_attempt', updateSocketAuth);
 
 // Logging for debug
 socket.on('connect', () => {
@@ -40,20 +46,23 @@ socket.on('disconnect', (reason) => {
 });
 
 socket.on('connect_error', (err) => {
-  console.error('[Socket] Connection Error Type:', err.name, 'Message:', err.message);
+  // Log as warning rather than error to avoid showing disruptive red overlays in sandbox previews
+  console.warn('[Socket] Connection warning (auto-reconnecting):', err.message);
   
-  if (err.message === 'Authentication error' || err.message === 'Authentication required' || err.message === 'Invalid token') {
+  if (err.message === 'Authentication error' || err.message === 'Authentication required' || err.message === 'Invalid token' || err.message === 'No token provided') {
     console.warn('[Socket] Auth error detected. Attempting to refresh context...');
+    updateSocketAuth();
+    
     const freshToken = safeStorage.getItem('token');
     if (freshToken) {
-      socket.auth = { token: freshToken };
-      // Delay reconnect slightly
-      setTimeout(() => socket.connect(), 500);
+      // Delay reconnect to avoid hammering
+      setTimeout(() => {
+        if (!socket.connected) socket.connect();
+      }, 5000);
     }
   }
   
   // If websocket fails repeatedly, the engine handles the transport fallback 
-  // but if we get a persistent 'websocket error', it might be the proxy blocking upgrades
   if (err.message === 'websocket error') {
     console.warn('[Socket] Low-level websocket failure. Socket.IO should fallback to polling automatically.');
   }

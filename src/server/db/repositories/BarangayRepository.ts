@@ -1,47 +1,36 @@
 // src/server/db/repositories/BarangayRepository.ts
-import { BaseRepository } from './BaseRepository';
-import { Barangay } from '../../types';
+import { pool } from '../index';
+import { AppError } from '../../middleware/error';
 
-export class BarangayRepository extends BaseRepository<Barangay> {
-  constructor() {
-    super('barangays');
+export class BarangayRepository {
+  async getById(id: string) {
+    try {
+      const key = id.startsWith('barangay_') ? id : `barangay_${id}`;
+      const result = await pool.query(
+        'SELECT data FROM system_config WHERE key = $1',
+        [key]
+      );
+      if (result.rows.length === 0) return null;
+      return result.rows[0].data;
+    } catch (error) {
+      console.error('[BarangayRepository] Get failed', error);
+      throw new AppError('Failed to fetch barangay config', 500);
+    }
   }
 
-  async findByCode(code: string): Promise<Barangay | null> {
-    const snapshot = await this.getCollection()
-      .where('code', '==', code)
-      .limit(1)
-      .get();
-
-    if (snapshot.empty) return null;
-
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as Barangay;
-  }
-
-  async findAllActive(): Promise<Barangay[]> {
-    const snapshot = await this.getCollection()
-      .where('isActive', '==', true)
-      .orderBy('name')
-      .get();
-
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Barangay));
-  }
-
-  async getStats(barangayId: string) {
-    // You can expand this later with aggregation queries
-    const incidentsSnapshot = await this.getCollection().doc(barangayId)
-      .collection('incidents') // subcollection if you use it
-      .count()
-      .get();
-
-    return {
-      totalIncidents: incidentsSnapshot.data().count || 0,
-      // Add more stats as needed
-    };
+  async getAll() {
+    try {
+      const result = await pool.query(
+        "SELECT key, data FROM system_config WHERE key LIKE 'barangay_%'"
+      );
+      return result.rows.map(r => ({
+        id: r.key.replace('barangay_', ''),
+        ...r.data
+      }));
+    } catch (error) {
+      console.error('[BarangayRepository] GetAll failed', error);
+      throw new AppError('Failed to fetch barangays', 500);
+    }
   }
 }
 

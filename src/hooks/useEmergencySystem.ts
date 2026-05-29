@@ -90,5 +90,5 @@ async function sendLocationToServer(coords: any) {
     socket.emit('location_update', coords);
 }
 async function sendSOSToServer(data: any) { 
-    return await api.generic.create('incidents', data);
+    return await api.alerts.create(data);
 }

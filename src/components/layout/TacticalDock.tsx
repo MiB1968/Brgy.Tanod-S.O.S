@@ -7,6 +7,7 @@ export default function TacticalDock() {
   const { role } = useRBAC();
   const [isOpen, setIsOpen] = useState(true);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [isSirenActive, setIsSirenActive] = useState(false);
 
   // Vibe haptic trigger helper
   const triggerHaptic = (pattern: number | number[]) => {
@@ -28,6 +29,20 @@ export default function TacticalDock() {
     window.addEventListener('voice-assistant-change', handleVoiceChange);
     return () => {
       window.removeEventListener('voice-assistant-change', handleVoiceChange);
+    };
+  }, []);
+
+  // Monitor for global siren activation state
+  useEffect(() => {
+    const handleSirenChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent && customEvent.detail) {
+        setIsSirenActive(!!customEvent.detail.active);
+      }
+    };
+    window.addEventListener('siren-state-change', handleSirenChange);
+    return () => {
+      window.removeEventListener('siren-state-change', handleSirenChange);
     };
   }, []);
 
@@ -173,16 +188,28 @@ export default function TacticalDock() {
                   whileHover={{ scale: 1.15 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={handleToggleSiren}
-                  className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-600 via-orange-500 to-amber-700 
-                             flex items-center justify-center text-white shadow-[0_0_15px_rgba(245,158,11,0.3)] 
-                             border border-white/20 overflow-hidden"
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden transition-all duration-300
+                    ${isSirenActive 
+                      ? 'bg-gradient-to-br from-red-600 via-rose-500 to-red-800 text-white shadow-[0_0_20px_rgba(239,68,68,0.7)]' 
+                      : 'bg-gradient-to-br from-amber-600 via-orange-500 to-amber-700 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                    }
+                  `}
                   title="Toggle Siren Alarm"
                   id="tactical-dock-siren-btn"
                 >
-                  <Volume2 size={22} className="group-hover:animate-bounce" />
+                  {isSirenActive ? (
+                    <motion.div
+                      animate={{ scale: [1, 1.25, 1], rotate: [0, -10, 10, -10, 10, 0] }}
+                      transition={{ repeat: Infinity, duration: 1 }}
+                    >
+                      <Volume2 size={22} />
+                    </motion.div>
+                  ) : (
+                    <Volume2 size={22} className="group-hover:animate-bounce" />
+                  )}
                 </motion.button>
-                <span className="text-[8px] font-black font-mono tracking-widest text-amber-400 uppercase select-none">
-                  SIREN
+                <span className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${isSirenActive ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>
+                  {isSirenActive ? 'SIREN_ON' : 'SIREN'}
                 </span>
               </div>
 

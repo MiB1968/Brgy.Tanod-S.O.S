@@ -6,6 +6,7 @@ export type EmergencyType = 'sos' | 'medical' | 'fire' | 'crime';
 export const useEmergencyAudio = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sirenOscRef = useRef<OscillatorNode | null>(null);
+  const sirenLfoRef = useRef<OscillatorNode | null>(null);
   const reverbRef = useRef<ConvolverNode | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const isInitializedRef = useRef(false);
@@ -82,10 +83,24 @@ export const useEmergencyAudio = () => {
     setTimeout(() => osc.stop(), duration);
   }, [initAudio]);
 
-  // Siren with Reverb + Spatial Audio
+  // Siren with Reverb + Spatial Audio (Continuous realistic synthesized wail)
   const startSiren = useCallback(async (type: 'wail' | 'yelp' = 'wail', pan = 0) => {
     await initAudio();
     const ctx = getContext();
+
+    // Clean up any existing siren first to prevent duplicates
+    if (sirenOscRef.current) {
+      try {
+        sirenOscRef.current.stop();
+        sirenOscRef.current.disconnect();
+      } catch (e) {}
+    }
+    if (sirenLfoRef.current) {
+      try {
+        sirenLfoRef.current.stop();
+        sirenLfoRef.current.disconnect();
+      } catch (e) {}
+    }
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -114,24 +129,48 @@ export const useEmergencyAudio = () => {
 
     sirenOscRef.current = osc;
 
+    // Continuous wailing using LFO (Low-Frequency Oscillator) to modulate pitch
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+
     if (type === 'wail') {
-      osc.frequency.setValueAtTime(520, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(1480, ctx.currentTime + 1.6);
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.35; // 0.35 Hz (peaks once every ~3 seconds)
+      lfoGain.gain.value = 450;    // pitch swings +/- 450 Hz
+      osc.frequency.setValueAtTime(800, ctx.currentTime); // Base 800 Hz => Range [350 Hz to 1250 Hz]
     } else {
-      osc.frequency.value = 980;
+      // Yelp (faster siren cycle)
+      lfo.type = 'sine';
+      lfo.frequency.value = 2.4;  // 2.4 Hz (much faster pulsation)
+      lfoGain.gain.value = 280;   // pitch swings +/- 280 Hz
+      osc.frequency.setValueAtTime(950, ctx.currentTime); // Base 950 Hz => Range [670 Hz to 1230 Hz]
     }
 
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    
+    lfo.start();
+    sirenLfoRef.current = lfo;
+
     osc.start();
-  }, [initAudio]);
+  }, [initAudio, getContext]);
 
   const stopSiren = useCallback(() => {
     if (sirenOscRef.current) {
-      const ctx = getContext();
-      const now = ctx.currentTime;
-      sirenOscRef.current.stop(now + 1.2);
+      try {
+        sirenOscRef.current.stop();
+        sirenOscRef.current.disconnect();
+      } catch (e) {}
       sirenOscRef.current = null;
     }
-  }, [getContext]);
+    if (sirenLfoRef.current) {
+      try {
+        sirenLfoRef.current.stop();
+        sirenLfoRef.current.disconnect();
+      } catch (e) {}
+      sirenLfoRef.current = null;
+    }
+  }, []);
 
   const playBeep = useCallback((freq = 900, duration = 150, volume = 0.5, pan = 0) => {
     const ctx = getContext();

@@ -1,259 +1,331 @@
-// src/App.tsx
-import React, { useEffect } from "react";
-import { Toaster } from "react-hot-toast";
-import { AnimatePresence } from "motion/react";
-import * as api from "./lib/api";
-
-import { useAppLogic } from "./hooks/useAppLogic";
-import { useRBAC } from "./context/AuthContext";
-import { knowledgeService } from "./services/knowledgeService";
-import { tanodLocationService } from './services/tanodLocationService';
-import { pushService } from './services/pushNotificationService';
-
-import AppLayout from "./components/layout/AppLayout";
-import AppHeader from "./components/layout/AppHeader";
-import AdminDashboard from "./components/AdminDashboard";
-import TanodDashboard from "./components/TanodDashboard";
-import ResidentDashboard from "./components/ResidentDashboard";
-import { RoleBasedContent } from "./components/views/RoleBasedContent";
-
-import LoginView from "./components/auth/LoginView";
-import RegistrationForm from "./components/auth/RegistrationForm";
-import RoleSelection from "./components/auth/RoleSelection";
-import PendingApproval from "./components/auth/PendingApproval";
-import RejectedScreen from "./components/auth/RejectedScreen";
-
-import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
-
-// Overlays & Components
-import IncidentForm from "./components/IncidentForm";
-import SOSAlertSiren from "./components/SOSAlertSiren";
-import SirenController from "./components/SirenController";
-import TanodCommandAlert from "./components/TanodCommandAlert";
+import React, { useEffect, useState, Suspense } from 'react';
+import { useRBAC } from './context/AuthContext';
 import KeepAppOpenBanner from './components/KeepAppOpenBanner';
 import TrackingStatusPanel from './components/TrackingStatusPanel';
 import NotificationPermission from './components/NotificationPermission';
-import GuardianAssistant from './components/GuardianAssistant';
+import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
+import TacticalDock from './components/layout/TacticalDock';
 import LiveMap from './components/LiveMap';
+import AppLayout from './components/layout/AppLayout';
+import { RoleBasedContent } from './components/views/RoleBasedContent';
+import { useTanodStore } from './store/useTanodStore';
+import { tanodLocationService } from './services/tanodLocationService';
+import { pushService } from './services/pushNotificationService';
+import { auth } from './lib/firebase';
+import { signOut } from 'firebase/auth';
+import { toast } from 'react-hot-toast';
+import * as safeStorage from './lib/safeStorage';
+import { LoginView } from './components/AuthViews';
+import RegistrationForm from './components/auth/RegistrationForm';
+import GuardianAIChat from './components/GuardianAIChat';
+import { useEmergencyAudio } from './hooks/useEmergencyAudio';
 
-export default function App() {
-  const logic = useAppLogic();
-  const { loading: rbacLoading } = useRBAC();
+import * as api from './lib/api';
 
-  // Initialize dark mode
+const App: React.FC = () => {
+  const { profile: user, user: firebaseUser, loading } = useRBAC();
+  const [activeTab, setActiveTab] = useState('home');
+  const [viewOverride, setViewOverride] = useState<string | null>(localStorage.getItem('brgy_view_override'));
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const { patrols } = useTanodStore();
+
+  const [sirenActive, setSirenActive] = useState(false);
+  const { startSiren, stopSiren } = useEmergencyAudio();
+
+  const handleToggleSiren = () => {
+    setSirenActive(prev => {
+      const next = !prev;
+      if (next) {
+        toast.success("🚨 SIREN ACTIVATED", { id: 'siren' });
+      } else {
+        toast.success("Siren Deactivated", { id: 'siren' });
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
-    document.documentElement.classList.add("dark");
+    if (sirenActive) {
+      startSiren('wail');
+    } else {
+      stopSiren();
+    }
+    return () => {
+      stopSiren();
+    };
+  }, [sirenActive, startSiren, stopSiren]);
+
+  useEffect(() => {
+    const handleSirenEvent = () => {
+      handleToggleSiren();
+    };
+    window.addEventListener('toggle-siren', handleSirenEvent);
+    return () => {
+      window.removeEventListener('toggle-siren', handleSirenEvent);
+    };
   }, []);
 
-  // Initialize services
   useEffect(() => {
-    // Push Notifications
-    pushService.initialize();
-    pushService.listenForMessages();
+    window.dispatchEvent(new CustomEvent('siren-state-change', {
+      detail: { active: sirenActive }
+    }));
+  }, [sirenActive]);
 
-    // Tanod GPS Tracking
-    if (logic.effectiveRole === 'tanod') {
-      tanodLocationService.startTracking();
+  const handleRegistrationComplete = async (regData: any) => {
+    try {
+      setIsLoggingIn(true);
+      // 1. Backend Registration (SQL)
+      await api.auth.register(regData);
+      
+      // 2. Firebase Registration (for RBAC/Firestore)
+      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+      const userCred = await createUserWithEmailAndPassword(auth, regData.email, regData.password);
+      await updateProfile(userCred.user, { displayName: regData.name });
+      
+      setActiveTab('home');
+      toast.success("Security profile established. Awaiting tactical link...");
+    } catch (err: any) {
+      toast.error(err.message || "Registration sequence interrupted.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogin = async (email?: string, password?: string) => {
+    if (!email || !password) return;
+    
+    try {
+      setIsLoggingIn(true);
+      // 1. Firebase Auth
+      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      
+      // 2. Backend Handshake (JWT Cookie)
+      const idToken = await userCred.user.getIdToken();
+      const loginResponse = await api.auth.login({ 
+        email, 
+        password,
+        isGoogle: false,
+        firebaseIdToken: idToken
+      });
+      
+      // If our backend returned a custom JWT, we prefer that for local storage 'token'
+      // as it matches our CockroachDB/SQL structure perfectly.
+      if (loginResponse?.success && loginResponse.data?.token) {
+        safeStorage.setItem('token', loginResponse.data.token);
+      }
+      
+      toast.success("Tactical link established.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to establish secure link.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // Clear all local state
+      safeStorage.removeItem('token');
+      safeStorage.removeItem('brgy_user_profile');
+      localStorage.removeItem('brgy_view_override');
+      window.location.reload();
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Reset initialization if user logs out
+    if (!firebaseUser) {
+      setIsInitialized(false);
+      return;
     }
 
+    const initializeApp = async () => {
+      try {
+        console.log("🚀 Initializing Brgy Tanod Tactical Link...");
+
+        // Initialize Push Notifications
+        await pushService.initialize();
+        pushService.listenForMessages();
+
+        // Start location tracking for Tanod users
+        if (user?.role === 'tanod') {
+          tanodLocationService.startTracking();
+        }
+
+        if (isMounted) {
+          setIsInitialized(true);
+          console.log("✅ Tactical Link Initialized Successfully");
+        }
+      } catch (error: any) {
+        console.error("❌ App Initialization Failed:", error);
+        if (isMounted) {
+          setError(error.message || "Failed to initialize application");
+        }
+      }
+    };
+
+    initializeApp();
+
     return () => {
-      if (logic.effectiveRole === 'tanod') {
+      isMounted = false;
+      if (user?.role === 'tanod') {
         tanodLocationService.stopTracking();
       }
     };
-  }, [logic.effectiveRole]);
+  }, [firebaseUser, user?.role]);
 
-  // Listen to toggle-siren custom actions from TacticalDock
-  useEffect(() => {
-    const handleToggleSiren = () => {
-      logic.toggleGlobalSiren();
-    };
-    window.addEventListener('toggle-siren', handleToggleSiren);
-    return () => {
-      window.removeEventListener('toggle-siren', handleToggleSiren);
-    };
-  }, [logic.toggleGlobalSiren]);
-
-  // Listen for set-active-tab triggers
-  useEffect(() => {
-    const handleSetTab = (e: any) => {
-      if (e.detail) {
-        logic.setActiveTab(e.detail);
-      }
-    };
-    window.addEventListener('set-active-tab', handleSetTab);
-    return () => {
-      window.removeEventListener('set-active-tab', handleSetTab);
-    };
-  }, [logic.setActiveTab]);
-
-  // ── Loading State ─────────────────────────────────────
-  if (logic.loading || rbacLoading) {
+  // Loading Screen for Auth State
+  if (loading && !isInitialized) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-red-600 border-t-transparent animate-spin rounded-full mx-auto mb-6" />
-          <p className="text-xl font-medium">Initializing Brgy. Tanod S.O.S...</p>
-          <p className="text-sm text-gray-500 mt-2">Setting up secure connection</p>
+      <div className="min-h-screen bg-[#050508] flex items-center justify-center p-6 text-center">
+        <div className="relative">
+          <div className="absolute inset-0 bg-emergency/20 blur-[80px] rounded-full animate-pulse" />
+          <div className="w-16 h-16 border-t-2 border-r-2 border-emergency rounded-full animate-spin relative z-10" />
+          <p className="mt-8 text-[10px] font-mono font-black text-emergency uppercase tracking-[0.5em] animate-pulse">
+            Establishing Secure Link...
+          </p>
         </div>
       </div>
     );
   }
 
-  // ── Registration Flow ─────────────────────────────────
-  if (logic.isRegistering) {
+  // Auth Screen if not logged in
+  if (!firebaseUser) {
+    if (activeTab === 'register') {
+      return (
+        <RegistrationForm 
+          onComplete={handleRegistrationComplete}
+          onCancel={() => setActiveTab('home')}
+        />
+      );
+    }
+
     return (
-      <RegistrationForm 
-        onCancel={() => logic.setIsRegistering(false)} 
-        onComplete={async (registrationData) => {
+      <LoginView 
+        onLogin={handleLogin}
+        onRegister={() => setActiveTab('register')}
+        isLoggingIn={isLoggingIn}
+        onDemoLogin={() => handleLogin('resident@brgytanod.com', 'tanod123')}
+        onDemoAdminLogin={() => handleLogin('admin@brgytanod.com', 'tanod123')}
+        onGoogleLogin={async () => {
           try {
-            await api.auth.register(registrationData);
+            setIsLoggingIn(true);
+            const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+            const provider = new GoogleAuthProvider();
+            const userCred = await signInWithPopup(auth, provider);
+            const idToken = await userCred.user.getIdToken();
+            const loginResponse = await api.auth.login({ 
+              email: userCred.user.email,
+              isGoogle: true,
+              firebaseIdToken: idToken
+            });
+            
+            if (loginResponse?.success && loginResponse.data?.token) {
+              safeStorage.setItem('token', loginResponse.data.token);
+            }
+            
+            toast.success("Google Tactical Link Active.");
           } catch (err: any) {
-            console.error("App registration error:", err);
-            throw err;
+            toast.error(err.message);
+          } finally {
+            setIsLoggingIn(false);
           }
-        }} 
+        }}
+        onResetSession={() => {
+          safeStorage.clear();
+          window.location.reload();
+        }}
       />
     );
   }
 
-  // ── Login Screen ──────────────────────────────────────
-  if (!logic.user) {
+  if (error) {
     return (
-      <LoginView
-        onLogin={logic.handleLogin}
-        onGoogleLogin={logic.handleGoogleLogin}
-        onRegister={() => logic.setIsRegistering(true)}
-        isLoggingIn={logic.isLoggingIn}
-      />
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center text-white">
+        <div>
+          <div className="text-6xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-500">Initialization Failed</h2>
+          <p className="text-zinc-400 mt-2">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-6 px-8 py-3 bg-red-600 rounded-xl"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
   }
 
-  // ── Role Selection ────────────────────────────────────
-  if (!logic.profile) {
-    return <RoleSelection onSelectRole={logic.handleSetRole} />;
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-zinc-400 font-mono tracking-widest uppercase">Initializing Central Command...</p>
+        </div>
+      </div>
+    );
   }
 
-  // ── Pending / Rejected ────────────────────────────────
-  if (logic.effectiveRole === "resident") {
-    if (logic.profile.status === "pending") return <PendingApproval />;
-    if (logic.profile.status === "rejected") return <RejectedScreen />;
-  }
+  const isMasterAdmin = user?.email === 'rubenlleg12@gmail.com' || user?.email === 'ben@brgytanod.com';
+  const effectiveRole = (isMasterAdmin && viewOverride) || user?.role || 'resident';
 
-  // ── Main Application ──────────────────────────────────
   return (
-    <GlobalErrorBoundary>
-      <AppLayout
-        activeTab={logic.activeTab}
-        setActiveTab={logic.setActiveTab}
-        isMobileMenuOpen={logic.isMobileMenuOpen}
-        setIsMobileMenuOpen={logic.setIsMobileMenuOpen}
-        effectiveRole={logic.effectiveRole}
-        user={logic.user}
-        profile={logic.effectiveProfile}
-        handleLogout={logic.handleLogout}
-        deferredPrompt={logic.deferredPrompt}
-        handleInstallApp={logic.handleInstallApp}
-      >
-        {/* Persistent Banners & Panels */}
+    <AppLayout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      isMobileMenuOpen={isMobileMenuOpen}
+      setIsMobileMenuOpen={setIsMobileMenuOpen}
+      effectiveRole={effectiveRole}
+      user={firebaseUser}
+      profile={user}
+      handleLogout={handleLogout}
+      viewOverride={viewOverride}
+      setViewOverride={(role) => {
+        setViewOverride(role);
+        if (role) localStorage.setItem('brgy_view_override', role);
+        else localStorage.removeItem('brgy_view_override');
+      }}
+    >
+      <div className="flex-1 overflow-y-auto relative h-full">
         <KeepAppOpenBanner />
         <NotificationPermission />
         <TrackingStatusPanel />
 
-        {/* Header */}
-        <AppHeader
-          activeTab={logic.activeTab}
-          setActiveTab={logic.setActiveTab}
-          isMobileMenuOpen={logic.isMobileMenuOpen}
-          setIsMobileMenuOpen={logic.setIsMobileMenuOpen}
-          effectiveRole={logic.effectiveRole}
-          isMasterAdmin={logic.isMasterAdmin}
-          viewOverride={logic.viewOverride}
-          setViewOverride={logic.setViewOverride}
-          globalSirenActive={logic.globalSirenActive}
-          toggleGlobalSiren={logic.toggleGlobalSiren}
-          onNewIncident={() => logic.setIsIncidentFormOpen(true)}
-        />
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-950 pb-20">
-          <RoleBasedContent
-            activeTab={logic.activeTab}
-            effectiveRole={logic.effectiveRole}
-            effectiveProfile={logic.effectiveProfile}
-            alerts={logic.alerts}
-            isOnline={logic.isOnline}
-            deferredPrompt={logic.deferredPrompt}
-            onInstall={logic.handleInstallApp}
-            sirenActive={logic.globalSirenActive}
-            onToggleSiren={logic.toggleGlobalSiren}
-            activeBroadcast={logic.activeBroadcast}
-            onTabChange={logic.setActiveTab}
-            visiblePatrols={logic.visiblePatrols}
-          />
-        </main>
-
-        {/* Guardian AI Assistant */}
-        <div className="absolute bottom-6 left-4 right-4 z-50">
-          <GuardianAssistant />
-        </div>
-
-        {/* Global Overlays */}
-        <AnimatePresence>
-          {logic.isIncidentFormOpen && (
-            <IncidentForm
-              key="incident-form"
-              onClose={() => logic.setIsIncidentFormOpen(false)}
-              userRole={logic.effectiveRole}
-              onSubmit={logic.sendSOS}
-            />
-          )}
-
-          <SOSAlertSiren 
-            key="sos-siren"
-            onSOS={logic.sendSOS} 
-          />
-
-          {logic.activeBroadcast && (
-            <BroadcastOverlay
-              key="broadcast-overlay"
-              broadcast={logic.activeBroadcast}
-              onClose={() => logic.setActiveBroadcast(null)}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* System Components */}
-        <SirenController 
-          globalSirenActive={logic.globalSirenActive}
-          profile={logic.effectiveProfile}
-          alerts={logic.alerts}
-        />
-        {logic.effectiveProfile && logic.effectiveRole === "tanod" && (
-          <TanodCommandAlert profile={logic.effectiveProfile} />
-        )}
-        <GuardianGreeting />
-        <GuardianVoiceAssistant />
-        <Suspense fallback={null}>
-          <GuardianAIChat />
-        </Suspense>
-        <BackgroundServices />
-
-        {/* Notifications & PWA */}
-        <TacticalDock />
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: "#1f2937",
-              color: "#fff",
-              border: "1px solid #374151",
-            },
+        <RoleBasedContent
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          effectiveRole={effectiveRole}
+          effectiveProfile={user}
+          alerts={[]}
+          isOnline={true}
+          visiblePatrols={patrols}
+          viewOverride={viewOverride}
+          setViewOverride={(role) => {
+            setViewOverride(role);
+            if (role) localStorage.setItem('brgy_view_override', role);
+            else localStorage.removeItem('brgy_view_override');
           }}
+          sirenActive={sirenActive}
+          onToggleSiren={handleToggleSiren}
         />
-        <PWAStatus />
-        <PWAInstallPrompt />
-      </AppLayout>
-    </GlobalErrorBoundary>
+
+        <TacticalDock />
+        <GuardianVoiceAssistant />
+        <GuardianAIChat isInline={false} />
+      </div>
+    </AppLayout>
   );
-}
+};
+
+export default App;

@@ -1,10 +1,29 @@
 // src/hooks/useGuardianChat.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { guardianAI, type ChatMessage } from '../services/guardianAI';
+import socket from '../lib/socket';
+import { soundService } from '../services/soundService';
 
 export function useGuardianChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+
+  // Crisis detection listener
+  useEffect(() => {
+    const handleCrisis = (e: any) => {
+      const { type, level, transcript } = e.detail;
+      console.log(`[GuardianChat] Crisis detected: ${type} (${level})`);
+      
+      // Auto-emit spike via socket
+      socket.emit('guardian:priority_spike', { type, level, transcript });
+      
+      // Visual/Audio feedback
+      soundService.play('alert_emergency');
+    };
+
+    window.addEventListener('guardian-crisis-detected', handleCrisis);
+    return () => window.removeEventListener('guardian-crisis-detected', handleCrisis);
+  }, []);
 
   // Initialize and load history from Dexie database
   useEffect(() => {

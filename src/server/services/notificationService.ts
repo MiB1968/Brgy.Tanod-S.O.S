@@ -9,7 +9,7 @@ export class NotificationService {
     if (!token) return;
 
     try {
-      const response = await getMessaging().send({
+       const response = await getMessaging().send({
         notification: {
           title,
           body,
@@ -36,6 +36,11 @@ export class NotificationService {
       console.log(`[Notification] Successfully sent push to device: ${response}`);
       return response;
     } catch (error: any) {
+      const errMsg = String(error);
+      if (errMsg.includes('authenticate') || errMsg.includes('401') || errMsg.includes('credential') || errMsg.includes('Messaging')) {
+        console.warn(`[Notification] FCM Messaging is offline/unauthorized in sandbox environment.`);
+        return null;
+      }
       logger.error("FCM Send Error", { token, error: error.message });
       throw error;
     }
@@ -57,6 +62,11 @@ export class NotificationService {
       console.log(`[Notification] Broadcast sent to topic 'responders': ${response}`);
       return response;
     } catch (error: any) {
+      const errMsg = String(error);
+      if (errMsg.includes('authenticate') || errMsg.includes('401') || errMsg.includes('credential') || errMsg.includes('Messaging')) {
+        console.warn(`[Notification] FCM Broadcast offline due to sandbox restrictions.`);
+        return null;
+      }
       logger.error("FCM Broadcast Error", { error: error.message });
       throw error;
     }
@@ -77,6 +87,11 @@ export class NotificationService {
       console.log(`[Notification] Multicast result: ${response.successCount} success, ${response.failureCount} failed`);
       return response;
     } catch (error: any) {
+      const errMsg = String(error);
+      if (errMsg.includes('authenticate') || errMsg.includes('401') || errMsg.includes('credential') || errMsg.includes('Messaging')) {
+        console.warn(`[Notification] FCM Multicast offline due to sandbox restrictions.`);
+        return null;
+      }
       logger.error("FCM Multicast Error", { error: error.message });
       throw error;
     }

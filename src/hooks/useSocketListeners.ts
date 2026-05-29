@@ -1,7 +1,7 @@
 // src/hooks/useSocketListeners.ts
-import { useEffect, useRef } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect } from "react";
 import { toast } from "react-hot-toast";
+import socket from "../lib/socket";
 
 import { useIncidentStore } from "../store/useIncidentStore";
 import { useTanodStore } from "../store/useTanodStore";
@@ -27,37 +27,19 @@ export function useSocketListeners({
   setIsShaking,
   setActiveTab,
 }: UseSocketListenersProps) {
-  const socketRef = useRef<Socket | null>(null);
-
-  const { addAlert, updateAlert, setAlerts } = useIncidentStore();
-  const { updatePatrol, setPatrols } = useTanodStore();
+  const { addAlert, updateAlert } = useIncidentStore();
+  const { updatePatrol } = useTanodStore();
   const { setIsOnline, triggerSync } = useSystemStore();
-  // const { addUserAlert } = useSOSStore(); // Assuming this store doesn't exist based on earlier code, safely ignoring unless needed
 
   useEffect(() => {
     if (!effectiveProfile?.id) return;
 
-    // Initialize Socket.io
-    const socket = io(
-      import.meta.env.VITE_SOCKET_URL || window.location.origin,
-      {
-        auth: {
-          userId: effectiveProfile.id,
-          role: effectiveRole,
-          name: effectiveProfile.name,
-        },
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        path: "/socket.io",
-      },
-    );
-
-    socketRef.current = socket;
-
+    // Use shared singleton socket
+    // Auth is already handled by AuthContext and socket.ts (setting token)
+    
     // ── Connection Events ─────────────────────────────────────
     socket.on("connect", () => {
-      console.log("✅ Socket Connected:", socket.id);
+      console.log("✅ Socket Connected with ID:", socket.id);
       setIsOnline(true);
       toast.success("Connected to Command Center", {
         icon: "🔗",
@@ -69,33 +51,86 @@ export function useSocketListeners({
       });
     });
 
+    if (socket.connected) {
+      console.log("✅ Socket Already Connected, Registering:", socket.id, "with role", effectiveRole);
+      socket.emit("register", {
+        userId: effectiveProfile.id,
+        role: effectiveRole,
+      });
+    }
+
     socket.on("disconnect", () => {
       console.log("❌ Socket Disconnected");
       setIsOnline(false);
     });
 
-    // ── Real-time Alerts ─────────────────────────────────────
-    socket.on("new_alert", (alert: Alert) => {
-      addAlert(alert);
+    // Helper to sanitize and normalize payload fields to fit frontend types (e.g. residentId, parsed location object)
+    const normalizeAlert = (rawAlert: any): Alert => {
+      if (!rawAlert) return rawAlert;
+      return {
+        ...rawAlert,
+        id: rawAlert.id,
+        status: (rawAlert.status || "").toLowerCase() as any,
+        residentId: rawAlert.resident_id || rawAlert.residentId,
+        residentName: rawAlert.residentName || "Resident",
+        location:
+          typeof rawAlert.location === "string"
+            ? JSON.parse(rawAlert.location)
+            : rawAlert.location,
+        timestamp: rawAlert.created_at || rawAlert.timestamp || new Date().toISOString(),
+      };
+    };
 
+    // ── Real-time Alerts ─────────────────────────────────────
+    socket.on("alert_update", (payload: any) => {
+      const rawAlert = payload?.alert || payload;
+      if (!rawAlert) return;
+      const alert = normalizeAlert(rawAlert);
+      const type = payload?.type || 'new';
+
+      if (type === 'new' || !payload.type) {
+        addAlert(alert);
+
+        if (["admin", "superadmin", "tanod"].includes(effectiveRole)) {
+          setActiveTab("home");
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 2000);
+
+          toast.error(`🚨 New SOS Alert: ${alert.type}`, {
+            duration: 8000,
+            position: "top-center",
+          });
+        }
+      } else if (type === 'update') {
+        updateAlert(alert.id, alert);
+
+        if (alert.residentId === effectiveProfile.id) {
+          toast.success(`Alert Status: ${alert.status}`, {
+            icon: alert.status === "resolved" ? "✅" : "🚨",
+          });
+        }
+      }
+    });
+
+    socket.on("new_alert", (rawAlert: any) => {
+      if (!rawAlert) return;
+      const alert = normalizeAlert(rawAlert);
+      addAlert(alert);
       if (["admin", "superadmin", "tanod"].includes(effectiveRole)) {
         setActiveTab("home");
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 2000);
-
-        toast.error(`🚨 New SOS Alert: ${alert.type}`, {
-          duration: 8000,
-          position: "top-center",
-        });
+        toast.error(`🚨 New SOS Alert: ${alert.type}`, { duration: 8000, position: "top-center" });
       }
     });
 
-    socket.on("alert_updated", (updatedAlert: Alert) => {
-      updateAlert(updatedAlert.id, updatedAlert);
-
-      if (updatedAlert.residentId === effectiveProfile.id) {
-        toast.success(`Alert Status: ${updatedAlert.status}`, {
-          icon: updatedAlert.status === "resolved" ? "✅" : "🚨",
+    socket.on("alert_updated", (rawAlert: any) => {
+      if (!rawAlert) return;
+      const alert = normalizeAlert(rawAlert);
+      updateAlert(alert.id, alert);
+      if (alert.residentId === effectiveProfile.id) {
+        toast.success(`Alert Status: ${alert.status}`, {
+          icon: alert.status === "resolved" ? "✅" : "🚨",
         });
       }
     });
@@ -150,12 +185,19 @@ export function useSocketListeners({
       toast("🔄 Server requested full sync...");
     });
 
-    // Cleanup on unmount
+    // Cleanup listeners on unmount (but don't disconnect singleton!)
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("alert_update");
+      socket.off("new_alert");
+      socket.off("alert_updated");
+      socket.off("patrol_update");
+      socket.off("tanod_status");
+      socket.off("broadcast");
+      socket.off("global_siren");
+      socket.off("system_message");
+      socket.off("force_sync");
     };
   }, [
     effectiveProfile?.id,
@@ -171,10 +213,10 @@ export function useSocketListeners({
     setActiveTab,
   ]);
 
-  // Manual emit helpers (optional but useful)
+  // Manual emit helpers
   const emitSOS = (alertData: Partial<Alert>) => {
-    if (socketRef.current) {
-      socketRef.current.emit("send_sos", alertData);
+    if (socket.connected) {
+      socket.emit("send_sos", alertData);
     }
   };
 
@@ -188,13 +230,13 @@ export function useSocketListeners({
     isActive: boolean;
     batteryLevel?: number;
   }) => {
-    if (socketRef.current && (effectiveRole === "tanod" || effectiveRole === "superadmin")) {
-      socketRef.current.emit("location_update", locationData);
+    if (socket.connected && (effectiveRole === "tanod" || effectiveRole === "superadmin")) {
+      socket.emit("location_update", locationData);
     }
   };
 
   return {
-    socket: socketRef.current,
+    socket,
     emitSOS,
     emitLocationUpdate,
   };

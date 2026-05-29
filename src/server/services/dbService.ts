@@ -36,6 +36,13 @@ export async function initDb(retries = 3) {
         ON CONFLICT DO NOTHING
       `);
 
+      // Initialize Barangay config (default geofence)
+      await client.query(`
+        INSERT INTO system_config (key, data) 
+        VALUES ('barangay_default', '{"center": {"lat": 14.5995, "lng": 120.9842}, "radiusKm": 10, "name": "Default Barangay"}') 
+        ON CONFLICT DO NOTHING
+      `);
+
       // Apply necessary schema migrations manually
       const runQuerySilently = async (sql: string, desc: string) => {
         try {
@@ -54,8 +61,27 @@ export async function initDb(retries = 3) {
       };
 
       await runQuerySilently("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1", "Added token_version to users");
+      await runQuerySilently("ALTER TABLE users ADD COLUMN barangay_id TEXT DEFAULT 'default'", "Added barangay_id to users");
       await runQuerySilently("ALTER TABLE users ADD CONSTRAINT check_token_version CHECK (token_version > 0)", "Added check_token_version to users");
       await runQuerySilently("CREATE INDEX idx_users_token_version ON users(id, token_version)", "Created idx_users_token_version index");
+
+      // Alerts migrations
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN barangay_id TEXT DEFAULT 'default'", "Added barangay_id to alerts");
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN assigned_to UUID", "Added assigned_to to alerts");
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN assigned_to_name TEXT", "Added assigned_to_name to alerts");
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN responded_by UUID", "Added responded_by to alerts");
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN responded_by_name TEXT", "Added responded_by_name to alerts");
+      await runQuerySilently("ALTER TABLE alerts ADD COLUMN responded_at TIMESTAMP WITH TIME ZONE", "Added responded_at to alerts");
+
+      // Incidents migrations
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN barangay_id TEXT DEFAULT 'default'", "Added barangay_id to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN assigned_to UUID", "Added assigned_to to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN assigned_to_name TEXT", "Added assigned_to_name to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN responded_by UUID", "Added responded_by to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN responded_by_name TEXT", "Added responded_by_name to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN responded_at TIMESTAMP WITH TIME ZONE", "Added responded_at to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN resolution_notes TEXT", "Added resolution_notes to incidents");
+      await runQuerySilently("ALTER TABLE incidents ADD COLUMN responder_notes TEXT", "Added responder_notes to incidents");
 
       // system_broadcasts migrations (0004_mature_green_goblin.sql)
       await runQuerySilently("ALTER TABLE system_broadcasts ALTER COLUMN isactive SET DEFAULT false", "Set system_broadcasts.isactive default false");

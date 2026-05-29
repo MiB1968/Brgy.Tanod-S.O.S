@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
+import { fetchAPI } from './apiBase';
+
 const DB_NAME = "TanodReports_Sync";
 const STORE_NAME = "pendingReports";
 
@@ -95,9 +97,8 @@ export const syncService = {
     }
 
     try {
-      const response = await fetch('/api/tanod/reports', {
+      const response = await fetchAPI('/tanod/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...report.data,
           syncedAt: new Date().toISOString(),
@@ -105,12 +106,9 @@ export const syncService = {
         }),
       });
 
-      if (response.ok) {
-        console.log(`✅ Successfully synced report: ${report.id}`);
-        await this.deleteFromStore(report.id);
-      } else {
-        throw new Error(`Server responded with HTTP status ${response.status}`);
-      }
+      // fetchAPI throws if response is not ok, so if we reach here it was successful
+      console.log(`✅ Successfully synced report: ${report.id}`);
+      await this.deleteFromStore(report.id);
     } catch (error: any) {
       const retryCount = report.retryCount + 1;
       const errorMsg = error.message || "Unknown synchronization interface error";

@@ -14,15 +14,19 @@ const tanodIcon = new L.Icon({
   popupAnchor: [0, -35],
 });
 
-function MapUpdater({ patrols }: { patrols: any[] }) {
+function MapUpdater({ patrols, resizeTrigger }: { patrols: any[], resizeTrigger: number }) {
   const map = useMap();
+
+  useEffect(() => {
+    map.invalidateSize();
+  }, [map, resizeTrigger]);
 
   useEffect(() => {
     if (patrols.length > 0) {
       const bounds = patrols.map(p => [p.location.lat, p.location.lng] as [number, number]);
       if (bounds.length > 1) {
         map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
-      } else {
+      } else if (bounds[0][0] && bounds[0][1]) {
         map.flyTo(bounds[0], 15, { duration: 1.5 });
       }
     }
@@ -32,14 +36,51 @@ function MapUpdater({ patrols }: { patrols: any[] }) {
 }
 
 export default function LiveMap() {
-  const { patrols } = useTanodStore();
+  const { patrols, updatePatrol } = useTanodStore();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [mapKey, setMapKey] = React.useState(0);
+  const lastSize = React.useRef({ width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      
+      const { width, height } = entry.contentRect;
+      // Only refresh trigger if the size actually changed more than a threshold to avoid oscillating loops
+      if (Math.abs(width - lastSize.current.width) > 2 || Math.abs(height - lastSize.current.height) > 2) {
+        lastSize.current = { width, height };
+        setMapKey(prev => prev + 1);
+      }
+    });
+    
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    // Inject a demo patrol if none exists so the user isn't stuck with an empty map
+    if (patrols.length === 0) {
+      updatePatrol({
+        id: 'demo-tanod-1',
+        tanodId: 'demo-tanod-1',
+        tanodName: 'Bgy. Patrol 01',
+        location: { lat: 14.5760, lng: 121.0850 },
+        isActive: true,
+        status: 'patrolling',
+        lastUpdate: new Date().toISOString()
+      });
+    }
+  }, []);
 
   return (
-    <div className="rounded-3xl overflow-hidden border border-gray-700 shadow-2xl bg-gray-950">
+    <div ref={containerRef} className="relative w-full h-[70vh] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950">
       <MapContainer
-        center={[14.5760, 121.0850]} // Default to Tanza / Cavite area
+        center={[14.5760, 121.0850]}
         zoom={13}
-        className="h-[65vh] w-full"
+        className="h-full w-full"
         zoomControl={false}
       >
         <TileLayer
@@ -47,7 +88,7 @@ export default function LiveMap() {
           attribution='&copy; OpenStreetMap contributors'
         />
 
-        <MapUpdater patrols={patrols} />
+        <MapUpdater patrols={patrols} resizeTrigger={mapKey} />
 
         {patrols.map((patrol: any) => (
           <Marker

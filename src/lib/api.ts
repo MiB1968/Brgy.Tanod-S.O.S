@@ -24,6 +24,15 @@ export const residents = {
   }),
 };
 
+export const intelligence = {
+  getDashboard: () => fetchAPI('/intelligence/dashboard'),
+  getBriefing: (stats: any) => fetchAPI('/intelligence/briefing', {
+    method: 'POST',
+    body: JSON.stringify({ stats })
+  }),
+  getHeatmap: () => fetchAPI('/intelligence/heatmap'),
+};
+
 export const generic = {
   get: (path: string) => fetchAPI(`/sync?path=${path}`),
   update: (path: string, data: any) => fetchAPI('/sync', {

@@ -32,5 +32,11 @@ router.post(
   sosController.findNearest
 );
 
+router.patch(
+  '/alert/:id',
+  authenticate,
+  sosController.updateSOS
+);
+
 export default router;
 

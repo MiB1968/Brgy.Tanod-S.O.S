@@ -43,8 +43,8 @@ export const config = {
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   geminiModel: (() => {
-    let m = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    if (m.startsWith('AIza')) m = 'gemini-2.5-flash';
+    let m = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+    if (m.startsWith('AIza')) m = 'gemini-3.5-flash';
     return m.replace(/^models\//, '');
   })(),
 

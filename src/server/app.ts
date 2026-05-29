@@ -28,23 +28,21 @@ app.use((_req, res, next) => {
 
 app.use(
   helmet({
-    contentSecurityPolicy: {
+    contentSecurityPolicy: config.nodeEnv === 'production' ? {
       directives: {
         defaultSrc: ["'self'"],
-
-        // ── Bug 2a Fix: 'wasm-unsafe-eval' ──────────────────────────────────
-        // Without this, browsers refuse to JIT-compile the WebLLM WASM module.
-        // 'blob:' is needed for WebLLM's dynamically created worker scripts.
+        frameAncestors: ["*"],
         scriptSrc: [
           "'self'",
-          "'wasm-unsafe-eval'", // Required for WebLLM WASM JIT compilation
-          "blob:",              // Required for WebLLM dynamic worker scripts
+          "'unsafe-inline'",
+          "'unsafe-eval'", 
+          "'wasm-unsafe-eval'", 
+          "blob:",              
+          "https://www.gstatic.com",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
         ],
-
-        styleSrc:
-          config.nodeEnv === 'production'
-            ? ["'self'", 'https://fonts.googleapis.com']
-            : ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         imgSrc: [
           "'self'",
@@ -61,31 +59,22 @@ app.use(
           "https://*.googleapis.com",
           "https://*.firebaseio.com",
           "https://api.elevenlabs.io",
-          // WebLLM downloads the Qwen2 model from HuggingFace CDN
           "https://huggingface.co",
           "https://*.huggingface.co",
           "https://cdn-lfs.huggingface.co",
           "https://cdn-lfs-us-1.huggingface.co",
+          "https://unpkg.com",
+          "https://cdn.jsdelivr.net",
         ],
-        mediaSrc: ["'self'", 'blob:'],
-        frameSrc: ["'none'"],
+        mediaSrc: ["'self'", 'blob:', 'https://assets.mixkit.co'],
+        frameSrc: ["'self'", "https:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         formAction: ["'self'"],
-
-        // ── Bug 2b Fix: worker-src blob: ────────────────────────────────────
-        // WebLLM spawns Web Workers from blob: URLs at runtime.
-        // Without this directive the browser silently blocks all WebLLM workers
-        // and the engine never initialises.
         workerSrc: ["'self'", "blob:"],
       }
-    },
+    } : false, // Disable CSP in dev for easier debugging
     frameguard: false,
-
-    // ── Bug 1 Fix (continued) ────────────────────────────────────────────────
-    // crossOriginEmbedderPolicy was false, which disabled the COEP header that
-    // helmet would otherwise set. We now set it manually above, so we still
-    // disable helmet's version here to avoid a duplicate/conflicting header.
     crossOriginEmbedderPolicy: false,
   })
 );
@@ -95,7 +84,7 @@ app.use(
     origin: (origin, callback) => {
       const isStudioPreview =
         !!origin &&
-        (origin.endsWith('.run.app') || origin.startsWith('http://localhost:3000'));
+        (origin.includes('.run.app') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('google.com'));
 
       const isDevFallback =
         allowedOrigins.length === 0 && config.nodeEnv !== 'production';

@@ -46,13 +46,19 @@ export function isWebLLMReady(): boolean {
 }
 
 export async function promptWebLLM(systemPrompt: string, userText: string, temperature = 0.7): Promise<string> {
-  const engine = await getWebLLMEngine();
-  const response = await engine.chat.completions.create({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userText },
-    ],
-    temperature,
-  });
-  return response.choices[0]?.message?.content ?? "";
+  try {
+    const engine = await getWebLLMEngine();
+    const response = await engine.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userText },
+      ],
+      temperature,
+    });
+    return response.choices[0]?.message?.content ?? "";
+  } catch (error: any) {
+    console.warn("[WebLLM] Runtime prompt failure, resetting engine reference:", error);
+    _engine = null;
+    throw error;
+  }
 }

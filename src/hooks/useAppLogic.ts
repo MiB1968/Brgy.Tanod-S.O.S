@@ -5,6 +5,7 @@ import { useIncidentStore } from "../store/useIncidentStore";
 import { useTanodStore } from "../store/useTanodStore";
 import { useSystemStore } from "../store/useSystemStore";
 import { useSOSStore } from "../store/useSOSStore";
+import * as api from "../lib/api";
 
 import { useRBAC } from "../context/AuthContext";
 import * as safeStorage from "../lib/safeStorage";
@@ -248,6 +249,36 @@ export function useAppLogic() {
       return () => unsubscribe?.();
     }
   }, [user?.id, effectiveRole, subscribeToUserAlerts]);
+
+  // Active Alerts Fetch for Responders (Admin, Tanod) inside sandbox simulation
+  useEffect(() => {
+    if (!profile || !isOnline) return;
+    if (!["tanod", "admin", "superadmin", "captain"].includes(effectiveRole)) return;
+
+    const loadActiveAlerts = async () => {
+      try {
+        const res = await api.alerts.getActiveAlerts();
+        const rawAlerts = res.data || res || [];
+        const normalized = rawAlerts.map((rawAlert: any) => ({
+          ...rawAlert,
+          id: rawAlert.id,
+          status: (rawAlert.status || "").toLowerCase() as any,
+          residentId: rawAlert.resident_id || rawAlert.residentId,
+          residentName: rawAlert.residentName || rawAlert.resident_name || "Resident",
+          location:
+            typeof rawAlert.location === "string"
+              ? JSON.parse(rawAlert.location)
+              : rawAlert.location,
+          timestamp: rawAlert.created_at || rawAlert.timestamp,
+        }));
+        setAlerts(normalized);
+      } catch (err) {
+        console.warn("Failed to load active alerts:", err);
+      }
+    };
+
+    loadActiveAlerts();
+  }, [profile?.id, effectiveRole, isOnline, setAlerts]);
 
   // Online / Offline Handling
   useEffect(() => {

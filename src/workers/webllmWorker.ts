@@ -3,6 +3,22 @@ import { CreateMLCEngine } from "@mlc-ai/web-llm";
 
 let engine: any = null;
 
+// Global error handler for catching async WebGPU device / worker issues compiles
+self.onerror = (message, source, lineno, colno, error) => {
+  self.postMessage({
+    type: 'error',
+    payload: error?.message || String(message) || 'WebWorker Unhandled Error'
+  });
+  return true;
+};
+
+self.onunhandledrejection = (event) => {
+  self.postMessage({
+    type: 'error',
+    payload: event.reason?.message || String(event.reason) || 'WebWorker Unhandled Promise Rejection'
+  });
+};
+
 self.onmessage = async (event) => {
   const { type, payload } = event.data;
 

@@ -15,23 +15,33 @@ import otpRoutes from "./otp";
 import scrapeRoutes from "./scrape";
 
 export const setupRoutes = (app: Express): void => {
-  // Health check
+  // Health check - Detailed for System Audit
   app.get("/api/health", async (req, res) => {
     const { checkConnection } = await import('../db/index');
+    const { backgroundTasksService } = await import('../services/backgroundTasksService');
     const dbConnected = await checkConnection();
+    
     res.json({
       success: true,
       status: dbConnected ? 'operational' : 'degraded',
-      db: dbConnected ? 'connected' : 'disconnected',
+      services: {
+        database: dbConnected ? 'connected' : 'disconnected',
+        backgroundTasks: backgroundTasksService.getStatus().isRunning ? 'active' : 'inactive',
+      },
+      system: {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        nodeEnv: process.env.NODE_ENV || 'development',
+      },
       timestamp: new Date().toISOString(),
-      message: "Brgy. Tanod S.O.S. API is running",
+      message: "Brgy. Tanod S.O.S. Operations Center Backend",
     });
   });
 
   // Feature routes
   app.use("/api/auth", authRoutes);
   app.use("/api/sos", sosRoutes);
-  app.use("/api/data", intelligenceRoutes);
+  app.use("/api/intelligence", intelligenceRoutes);
   app.use("/api/sync", syncRoutes);
   app.use("/api/system", systemRoutes);
   app.use("/api/voice", voiceRoutes);

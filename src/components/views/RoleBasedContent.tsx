@@ -38,6 +38,8 @@ interface Props {
   activeBroadcast?: any;
   onTabChange?: (tab: string) => void;
   visiblePatrols: PatrolLocation[];
+  viewOverride?: string | null;
+  setViewOverride?: (role: string | null) => void;
 }
 
 export function RoleBasedContent({
@@ -53,6 +55,8 @@ export function RoleBasedContent({
   activeBroadcast,
   onTabChange,
   visiblePatrols,
+  viewOverride,
+  setViewOverride,
 }: Props) {
   const { patrols } = useTanodStore();
 
@@ -207,6 +211,8 @@ export function RoleBasedContent({
               sirenActive={sirenActive || false}
               onToggleSiren={onToggleSiren || (() => {})}
               activeBroadcast={activeBroadcast}
+              viewOverride={viewOverride}
+              setViewOverride={setViewOverride}
             />
           );
         } else if (effectiveRole === "tanod") {

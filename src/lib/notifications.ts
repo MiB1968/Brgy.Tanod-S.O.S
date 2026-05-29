@@ -1,4 +1,5 @@
-import { messaging, getToken, db } from './firebase';
+import { messaging, db } from './firebase';
+import { getToken } from 'firebase/messaging';
 import { doc, updateDoc } from 'firebase/firestore';
 
 export const subscribeToTanodTopic = async (userId: string) => {

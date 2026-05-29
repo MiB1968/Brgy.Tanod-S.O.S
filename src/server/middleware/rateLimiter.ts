@@ -19,7 +19,7 @@ export const globalLimiter = rateLimit({
     success: false,
     error: {
       code: "TOO_MANY_REQUESTS",
-      message: "Too many requests. Please slow down.",
+      message: "BrgyTanod: API RATE LIMIT EXCEEDED. Please wait.",
     },
   },
 });
@@ -72,7 +72,7 @@ export const sosRateLimiter = sosLimiter;
 
 export const strictRateLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 10,
+  limit: 100, // Increased for smoother dev and heavy interactive use
   standardHeaders: true,
   legacyHeaders: false,
   message: {

@@ -93,3 +93,17 @@ export const findNearest = async (req: AuthRequest, res: Response) => {
   });
 };
 
+export const updateSOS = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { status, notes, assignedTo } = req.body;
+  const user = req.user!;
+
+  const updated = await incidentService.updateSOSStatus(id, status, notes, assignedTo);
+
+  return res.json({
+    success: true,
+    data: updated,
+    message: "SOS alert updated"
+  });
+};
+

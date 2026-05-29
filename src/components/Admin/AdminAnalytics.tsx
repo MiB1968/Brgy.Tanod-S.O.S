@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BarChart as ChartIcon, Zap, Shield, Users, Activity, Bot } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { User } from '../../types';
-import { promptWebLLM, setWebLLMProgressCallback } from '../../lib/webllm';
 import { LiveHeatmap } from './LiveHeatmap';
 import * as api from '../../lib/api';
 
@@ -18,57 +17,21 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
 
   const [aiBriefing, setAIBriefing] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [aiProgress, setAiProgress] = useState(0);
 
   const fetchAnalytics = async (silent = false) => {
     if (!profile || !['admin', 'superadmin', 'tanod'].includes(profile.role)) return;
     
     if (!silent) setLoading(true);
     try {
-      // Fetch residents list
-      const residentsList = await api.residents.getAll().catch(() => []);
-      let verified_residents = Array.isArray(residentsList) 
-        ? residentsList.filter((r: any) => r && r.status === 'approved').length 
-        : 0;
-
-      // Fetch on-duty tanods list
-      const tanodsList = await api.generic.list('users?role=tanod').catch(() => []);
-      let total_tanods = Array.isArray(tanodsList) ? tanodsList.length : 0;
-
-      // Fetch alerts list
-      const alertsList = await api.alerts.getAll().catch(() => []);
-      let active_alerts = 0;
-      const alertsByTypeMap: Record<string, number> = {};
-      const alertsHistoryMap: Record<string, number> = {};
+      // Fetch unified analytics from the new dashboard endpoint
+      const response = await api.intelligence.getDashboard();
       
-      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-
-      if (Array.isArray(alertsList)) {
-        alertsList.forEach((d: any) => {
-          if (!d) return;
-          if (['pending', 'active', 'responding'].includes(d.status)) active_alerts++;
-          if (d.type) alertsByTypeMap[d.type] = (alertsByTypeMap[d.type] || 0) + 1;
-          
-          let ts = 0;
-          if (d.created_at) ts = typeof d.created_at === 'string' ? new Date(d.created_at).getTime() : d.created_at;
-          else if (d.timestamp) ts = typeof d.timestamp === 'string' ? new Date(d.timestamp).getTime() : d.timestamp;
-          
-          if (ts && ts >= sevenDaysAgo) {
-            const dateStr = new Date(ts).toISOString().split('T')[0];
-            alertsHistoryMap[dateStr] = (alertsHistoryMap[dateStr] || 0) + 1;
-          }
-        });
-      }
-
-      // Ensure some counts are shown even if initial DB is perfectly clean
-      if (verified_residents === 0 && total_tanods === 0 && Object.keys(alertsByTypeMap).length === 0) {
-        throw new Error('Database returned empty or unreachable datasets');
+      if (!response || !response.success || !response.data) {
+         throw new Error('Intelligence link failure');
       }
 
       const payload = {
-        overview: { verified_residents, total_tanods, active_alerts },
-        alertsByType: Object.keys(alertsByTypeMap).map(type => ({ type, count: alertsByTypeMap[type] })).sort((a, b) => b.count - a.count),
-        alertsHistory: Object.keys(alertsHistoryMap).map(day => ({ day, count: alertsHistoryMap[day] })).sort((a, b) => a.day.localeCompare(b.day)),
+        ...response.data,
         isStandby: false
       };
       
@@ -76,7 +39,11 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
       setData(payload);
       setError(null);
     } catch (err: any) {
-      console.error("Failed to fetch analytics directly from CockroachDB/Firestore:", err);
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('network') || String(err).includes('Failed to fetch')) {
+        console.warn("[Analytics] Tactical Intelligence Link offline (serving from local cache or standby):", err.message || err);
+      } else {
+        console.error("Failed to fetch analytics from Tactical Intelligence API:", err);
+      }
       
       // Fallback state
       const cached = localStorage.getItem('brgy_cached_analytics');
@@ -87,7 +54,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
           setData(parsed);
           setError(null);
           if (!silent) {
-            toast('Loaded database from local cache standby', { icon: '💾' });
+            toast('Intelligence Link offline. Serving from local cache.', { icon: '💾' });
           }
         } catch (e) {
           loadOfflineStandby();
@@ -141,16 +108,22 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
   const generateAIBriefing = async () => {
     if (!data) return;
     setIsGeneratingAI(true);
-    setAiProgress(0);
-    setWebLLMProgressCallback((pct) => setAiProgress(pct));
 
     try {
-      const systemPrompt = "You are the AI Intelligence Analyst for a Philippine Barangay. Analyze the provided statistical data. Provide a short, written intelligence briefing to the Captain in Tagalog/English. Identify the most common incident type and any increasing trends. Keep it strictly under 3 sentences.";
-      const brief = await promptWebLLM(systemPrompt, `Data: ${JSON.stringify({ alertsByType: data.alertsByType, history: data.alertsHistory })}`);
-      setAIBriefing(brief);
+      const response = await api.intelligence.getBriefing({
+        alertsByType: data.alertsByType,
+        history: data.alertsHistory,
+        overview: data.overview
+      });
+
+      if (response && response.success && response.data?.brief) {
+        setAIBriefing(response.data.brief);
+      } else {
+        throw new Error("Empty briefing from server");
+      }
     } catch (e) {
       console.error(e);
-      toast.error('Failed to generate AI brief');
+      toast.error('Tactical briefing failed');
     } finally {
       setIsGeneratingAI(false);
     }
@@ -215,7 +188,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
           >
             <Bot className="w-4 h-4" />
             <span className="text-[10px] font-black uppercase tracking-widest font-mono">
-              {isGeneratingAI ? `Analyzing ${aiProgress}%` : 'AI Briefing'}
+              {isGeneratingAI ? 'Analyzing...' : 'AI Briefing'}
             </span>
           </button>
           <MetricSmall label="Verified Residents" value={overview.verified_residents} icon={Shield} color="text-success" />
@@ -261,7 +234,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
             <Activity className="w-3 h-3 text-emergency" /> Emergency Distribution
           </p>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie 
                   data={alertsByType} 
@@ -304,7 +277,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
             <ChartIcon className="w-3 h-3 text-info" /> Incident Response Timeline
           </p>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={alertsHistory.map((h: any) => ({ ...h, day: new Date(h.day).toLocaleDateString('en-US', { weekday: 'short' }) }))}>
                 <defs>
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">

@@ -95,77 +95,86 @@ export class EmergencySoundManager {
     const volume = this.getMasterVolume();
     this.gainNode.gain.value = volume * 0.95;
 
-    const oscillator = this.audioContext.createOscillator();
+    const mainOsc = this.audioContext.createOscillator();
+    const lfoOsc = this.audioContext.createOscillator();
+    const lfoGain = this.audioContext.createGain();
     const secondOsc = this.audioContext.createOscillator();
     const filter = this.audioContext.createBiquadFilter();
 
-    // Polished siren configuration - Triangle is smoother than sawtooth but still cuts through
-    oscillator.type = 'triangle';
-    secondOsc.type = 'sine'; // Add some sub-bass body
+    // Polished siren configuration
+    mainOsc.type = 'triangle';
+    secondOsc.type = 'sine'; // Sub-bass body
     
     filter.type = 'lowpass';
     filter.frequency.value = 1800;
-
-    oscillator.frequency.setValueAtTime(400, this.audioContext.currentTime);
-    secondOsc.frequency.setValueAtTime(200, this.audioContext.currentTime);
 
     const normalizedType = String(type).toLowerCase();
 
     if (normalizedType === 'medical') {
       // Heartbeat style
       this.playHeartbeat();
+      // We don't start the main oscillators for medical
+      return;
+    } else if (normalizedType === 'fire') {
+      mainOsc.frequency.value = 900;
+      secondOsc.frequency.value = 450;
+      lfoOsc.frequency.value = 4; // Fast Yelp
+      lfoGain.gain.value = 200;
     } else {
       // Wailing siren
-      oscillator.frequency.exponentialRampToValueAtTime(
-        1200,
-        this.audioContext.currentTime + 1.2
-      );
+      mainOsc.frequency.value = 700;
+      secondOsc.frequency.value = 350;
+      lfoOsc.frequency.value = 0.5; // Slow wail
+      lfoGain.gain.value = 400;
     }
 
+    // Connect LFO to Main Oscillator frequency
+    lfoOsc.connect(lfoGain);
+    lfoGain.connect(mainOsc.frequency);
+    lfoGain.connect(secondOsc.frequency);
+
     // Connect nodes
-    oscillator.connect(filter);
+    mainOsc.connect(filter);
     secondOsc.connect(filter);
     filter.connect(this.gainNode);
 
-    oscillator.start();
+    mainOsc.start();
     secondOsc.start();
-    this.animationFrame = requestAnimationFrame(() => this.updateSiren(oscillator, filter, secondOsc));
+    lfoOsc.start();
+
+    // Store references to stop them later
+    this.audioNodes = { mainOsc, secondOsc, lfoOsc, filter, lfoGain };
 
     // Haptics
-    if (normalizedType === 'medical') emergencyHaptics.heartbeat();
-    else emergencyHaptics.sirenPulse();
+    emergencyHaptics.sirenPulse();
   }
 
-  private updateSiren(osc: OscillatorNode, filter: BiquadFilterNode, secondOsc?: OscillatorNode) {
-    if (!this.isPlaying) return;
-
-    // Modulate frequency for wail effect
-    const time = this.audioContext!.currentTime;
-    const wailFreq = 500 + Math.sin(time * 2.5) * 400; // Smoother wail
-    osc.frequency.setTargetAtTime(wailFreq, time, 0.1);
-    
-    if (secondOsc) {
-      secondOsc.frequency.setTargetAtTime(wailFreq / 2, time, 0.1);
-    }
-
-    this.animationFrame = requestAnimationFrame(() => this.updateSiren(osc, filter, secondOsc));
-  }
+  private audioNodes: any = null;
 
   private playHeartbeat() {
     // Additional low sine for heartbeat feel
     if (!this.audioContext) return;
-    const heartbeatOsc = this.audioContext.createOscillator();
-    const heartbeatGain = this.audioContext.createGain();
+    const mainOsc = this.audioContext.createOscillator();
+    const lfoOsc = this.audioContext.createOscillator();
+    const lfoGain = this.audioContext.createGain();
 
-    heartbeatOsc.type = 'sine';
-    heartbeatOsc.frequency.value = 55;
-    heartbeatGain.gain.value = this.getMasterVolume() * 0.45;
+    mainOsc.type = 'sine';
+    mainOsc.frequency.value = 55; // Low frequency thud
 
-    heartbeatOsc.connect(heartbeatGain);
-    heartbeatGain.connect(this.gainNode!);
+    lfoOsc.type = 'square';
+    lfoOsc.frequency.value = 1.2; // roughly 72 BPM heartbeat
 
-    heartbeatOsc.start();
-    // Pulse logic can be added with setInterval if needed
+    lfoGain.gain.value = 50; 
+    
+    lfoOsc.connect(lfoGain);
+    lfoGain.connect(mainOsc.frequency);
+
+    mainOsc.connect(this.gainNode!);
+
+    mainOsc.start();
+    lfoOsc.start();
+    
+    this.audioNodes = { mainOsc, lfoOsc, lfoGain };
   }
 
   public stop() {
@@ -174,6 +183,17 @@ export class EmergencySoundManager {
 
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
+    }
+
+    if (this.audioNodes) {
+      try {
+        if (this.audioNodes.mainOsc) this.audioNodes.mainOsc.stop();
+        if (this.audioNodes.secondOsc) this.audioNodes.secondOsc.stop();
+        if (this.audioNodes.lfoOsc) this.audioNodes.lfoOsc.stop();
+      } catch (e) {
+         // ignore already stopped errors
+      }
+      this.audioNodes = null;
     }
 
     if (this.fallbackAudio) {

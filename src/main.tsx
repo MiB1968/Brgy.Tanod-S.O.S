@@ -1,8 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
+import "@fontsource/orbitron";
+import "@fontsource/rajdhani";
+import App from './App';
 import './index.css';
-import { AuthProvider } from './context/AuthContext.tsx';
+import { AuthProvider } from './context/AuthContext';
 
 // Register Service Worker for offline emergency capability & map caching
 if ('serviceWorker' in navigator) {
@@ -17,10 +19,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+
+console.log('Mounting React Application...');
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <GlobalErrorBoundary>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </GlobalErrorBoundary>
   </React.StrictMode>
 );

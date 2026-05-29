@@ -35,7 +35,11 @@ export function setupGuardianHandler(io: Server, socket: AuthenticatedSocket) {
       });
 
     } catch (err: any) {
-      console.error('[GUARDIAN] Spike processing failed:', err);
+      if (err.code === "RATE_LIMITED" || err.message?.includes("System busy")) {
+        console.warn(`[GUARDIAN] Spike rate limited gracefully for user ${user.id}: ${err.message}`);
+      } else {
+        console.error('[GUARDIAN] Spike processing failed:', err);
+      }
     }
   });
 

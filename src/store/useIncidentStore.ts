@@ -23,6 +23,6 @@ export const useIncidentStore = create<IncidentState>((set) => ({
     alerts: state.alerts.map((a) => a.id === alertId ? { ...a, status } : a)
   })),
   updateAlert: (id, updatedAlert) => set((state) => ({
-    alerts: state.alerts.map((a) => a.id === id ? updatedAlert : a)
+    alerts: state.alerts.map((a) => a.id === id ? { ...a, ...updatedAlert } : a)
   })),
 }));

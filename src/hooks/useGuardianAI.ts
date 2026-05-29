@@ -6,7 +6,7 @@ export const useGuardianAI = () => {
   const { speak, playSiren } = useAudioSystem();
 
   const startVoiceRecognition = useCallback(() => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) {
       speak("Voice recognition is not supported.");
       return;

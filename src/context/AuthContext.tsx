@@ -3,8 +3,11 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, getDocFromCache, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import * as safeStorage from '../lib/safeStorage';
+import socket from '../lib/socket';
+import { pushService } from '../services/pushNotificationService';
 import type { User, UserRole } from '../types';
 import { RoleHierarchy, RolePermissions } from '../types';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface RBACContextType {
   user: FirebaseUser | null;
@@ -24,12 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const setStoreProfile = useAuthStore((state) => state.setProfile);
+  const setStoreLoading = useAuthStore((state) => state.setIsLoading);
 
   // Failsafe timeout for rbac loading
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 3000);
+      setStoreLoading(false);
+    }, 15000); // 15 seconds failsafe is safer for multi-step firestore init
     return () => clearTimeout(timer);
   }, []);
 
@@ -78,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
         setProfile(userData);
+        setStoreProfile(userData);
         safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
         return;
       }
@@ -92,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (cachedDoc.exists()) {
         const userData = cachedDoc.data() as User;
         setProfile(userData);
+        setStoreProfile(userData);
         safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
         return;
       }
@@ -103,7 +111,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const local = safeStorage.getItem("brgy_user_profile");
     if (local) {
       console.log("[AuthContext] Using local storage fallback");
-      setProfile(JSON.parse(local));
+      const saved = JSON.parse(local);
+      setProfile(saved);
+      setStoreProfile(saved);
       return;
     }
 
@@ -119,22 +129,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString(),
     };
     setProfile(userData);
+    setStoreProfile(userData);
   };
+
+  useEffect(() => {
+    const handleAuthExpired = async () => {
+      if (auth.currentUser) {
+        try {
+          console.warn("[AuthContext] Token expired event detected. Attempting force refresh...");
+          const token = await auth.currentUser.getIdToken(true);
+          safeStorage.setItem('token', token);
+          socket.auth = { token };
+          if (!socket.connected) socket.connect();
+        } catch (e) {
+          console.error("[AuthContext] Force refresh failed. Signing out.", e);
+          auth.signOut();
+        }
+      }
+    };
+
+    window.addEventListener('auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('auth-expired', handleAuthExpired);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
 
       if (fbUser) {
+        // Update socket token
+        try {
+          const token = await fbUser.getIdToken(); // Removed true (force refresh) to use cache
+          safeStorage.setItem('token', token);
+          
+          // Force socket update if it's already attempting or disconnected
+          socket.auth = { token };
+          if (!socket.connected) {
+            socket.connect();
+          }
+        } catch (tokenErr) {
+          console.warn("[AuthContext] Failed to get ID token:", tokenErr);
+        }
+
         // Small delay to ensure Firestore is initialized
         await new Promise(resolve => setTimeout(resolve, 500));
         await fetchProfile(fbUser.uid);
+
+        // Register FCM token
+        pushService.initialize().then(async (token) => {
+          if (token) {
+            await setDoc(doc(db, 'users', fbUser.uid), {
+              fcmToken: token,
+              lastActive: serverTimestamp()
+            }, { merge: true });
+          }
+        });
       } else {
         setProfile(null);
+        setStoreProfile(null);
         safeStorage.removeItem("brgy_user_profile");
+        safeStorage.removeItem("token");
+        if (socket.connected) {
+          socket.disconnect();
+        }
       }
 
       setLoading(false);
+      setStoreLoading(false);
     });
 
     return () => unsubscribe();

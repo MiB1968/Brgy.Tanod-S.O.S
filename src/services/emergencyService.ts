@@ -11,9 +11,9 @@ export const emergencyService = {
   cancelAlert: (id: string) => fetchAPI(`/sos/alert/${id}/cancel`, {
     method: 'POST'
   }),
-  updateAlert: (id: string, data: any) => fetchAPI(`/sync`, {
-    method: 'POST',
-    body: JSON.stringify({ path: `alerts/${id}`, data, options: { merge: true } }),
+  updateAlert: (id: string, data: any) => fetchAPI(`/sos/alert/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   }),
   getAll: () => fetchAPI('/sync?path=alerts'),
 };

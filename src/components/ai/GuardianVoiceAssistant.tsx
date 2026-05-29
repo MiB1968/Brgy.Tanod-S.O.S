@@ -125,6 +125,12 @@ export const GuardianVoiceAssistant: React.FC = () => {
     };
   }, [isListening, startListening, stopListening]);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('voice-assistant-change', {
+      detail: { isListening }
+    }));
+  }, [isListening]);
+
   return (
     <motion.div 
       drag
@@ -171,12 +177,25 @@ export const GuardianVoiceAssistant: React.FC = () => {
                 >
                   <Bot size={18} />
                 </button>
-                <p className="text-[9px] text-blue-400/50 mt-2 font-mono uppercase tracking-widest">Text Terminal Active</p>
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-[9px] text-blue-400/50 font-mono uppercase tracking-widest">Text Terminal Active</p>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowChat(false)}
+                    className="text-[9px] text-zinc-500 hover:text-zinc-400 font-mono underline"
+                  >
+                    Back to Voice
+                  </button>
+                </div>
               </form>
             ) : (
-              <div className="flex items-center gap-3">
+              <div 
+                onClick={() => setShowChat(true)}
+                className="flex items-center gap-3 cursor-pointer select-none active:opacity-85 group w-full"
+                title="Click here to type your command instead"
+              >
                 <div className="relative">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-blue-600/20 text-blue-400 ${isSpeaking ? 'animate-pulse' : ''}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-blue-600/20 text-blue-400 ${isSpeaking ? 'animate-pulse' : ''} group-hover:bg-blue-600/35 transition-colors`}>
                     <Bot size={20} />
                   </div>
                   {isSpeaking && (
@@ -187,7 +206,7 @@ export const GuardianVoiceAssistant: React.FC = () => {
                     />
                   )}
                 </div>
-                <div className="min-w-[120px]">
+                <div className="min-w-[120px] flex-1">
                   <p className="text-xs font-mono text-blue-400 uppercase tracking-tighter">
                     {status === 'LISTENING' ? 'Listening...' : status === 'PROCESSING' ? 'Thinking...' : 'Guardian Assistant'}
                   </p>
@@ -206,9 +225,10 @@ export const GuardianVoiceAssistant: React.FC = () => {
                             />
                           ))}
                         </div>
+                        <p className="text-[8px] text-blue-400/40 font-mono uppercase tracking-wider mt-1 group-hover:text-blue-400/70 transition-colors">Tap, Click o Uriin dito</p>
                       </div>
                     ) : (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col w-full">
                         <p className="text-sm font-medium text-white truncate">Responding...</p>
                         {isSpeaking && (
                            <motion.p 
@@ -219,6 +239,7 @@ export const GuardianVoiceAssistant: React.FC = () => {
                              "Try asking: Summarize incidents"
                            </motion.p>
                         )}
+                        <p className="text-[8px] text-blue-400/40 font-mono uppercase tracking-wider mt-1 group-hover:text-blue-400/70 transition-colors">Tap, Click o Uriin dito</p>
                       </div>
                     )}
                   </div>

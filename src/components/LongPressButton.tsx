@@ -41,6 +41,11 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
     setIsPressing(true);
     startTimeRef.current = Date.now();
     setProgress(0);
+    const spokenSecondsRef = { current: -1 };
+    
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     
     controls.start({
       scale: 0.95,
@@ -52,6 +57,21 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
       const elapsed = Date.now() - startTimeRef.current;
       const currentProgress = Math.min((elapsed / duration) * 100, 100);
       setProgress(currentProgress);
+
+      const totalSeconds = Math.floor(duration / 1000);
+      const currentSecond = Math.floor(elapsed / 1000); 
+      
+      if (currentSecond > spokenSecondsRef.current && currentSecond < totalSeconds) {
+        spokenSecondsRef.current = currentSecond;
+        const remaining = totalSeconds - currentSecond;
+        
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(remaining.toString());
+          utterance.rate = 1.5;
+          utterance.pitch = 1.1;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
 
       if (currentProgress < 100) {
         timerRef.current = setTimeout(step, 50);
@@ -69,6 +89,10 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
     setIsPressing(false);
     setProgress(0);
     startTimeRef.current = 0;
+    
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     
     controls.start({
       scale: 1,

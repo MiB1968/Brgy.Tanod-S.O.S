@@ -9,6 +9,8 @@ import {
   type ModelConfig,
 } from '../config/aiModels';
 
+import { BARANGAY_PROTOCOLS } from "../../data/barangayProtocols";
+
 let ai: GoogleGenAI | null = null;
 
 function getAIClient(): GoogleGenAI {
@@ -54,6 +56,21 @@ const log = {
   error: (msg: string, meta?: any) => console.error(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
   warn:  (msg: string, meta?: any) => console.warn(`[AI_SERVICE] ${msg}`, meta ? JSON.stringify(meta) : ''),
 };
+
+function logAIError(contextMsg: string, err: any, meta: any = {}) {
+  const errMsg = err.message || String(err);
+  if (errMsg.includes('API key expired') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key') || errMsg.includes('INVALID_ARGUMENT')) {
+    log.warn(`${contextMsg} (Gemini API key is unconfigured, invalid, or expired. Please check or renew the key in Settings.)`, {
+      ...meta,
+      errorSnippet: errMsg.substring(0, 200)
+    });
+  } else {
+    log.error(`${contextMsg} failed`, {
+      ...meta,
+      error: errMsg
+    });
+  }
+}
 
 // =============================================================================
 // Fallback
@@ -195,11 +212,10 @@ export async function analyzeIncident(
     return { ...result, _modelUsed: usedModel.name, _tier: usedModel.tier };
 
   } catch (err: any) {
-    log.error("AI analysis failed", {
+    logAIError("AI analysis failed", err, {
       requestId,
       incidentId,
       model: usedModel.name,
-      error: err.message,
       durationMs: Date.now() - startTime,
     });
 
@@ -227,12 +243,26 @@ export async function getGuardianResponse(userText: string): Promise<string> {
   if (!userText?.trim()) return "Nakinig ako. May maibibigay ba akong tulong sa inyo?";
 
   try {
-    const finalModelName = config.geminiModel || "gemini-2.5-flash";
+    const finalModelName = config.geminiModel || AI_MODELS.flash.name;
     
+    // RAG context retrieval
+    const lowerQuery = userText.toLowerCase();
+    const matches: string[] = [];
+    for (const item of BARANGAY_PROTOCOLS) {
+      const isMatch = item.keywords.some(keyword => lowerQuery.includes(keyword)) ||
+                      item.title.toLowerCase().includes(lowerQuery);
+      if (isMatch) {
+         matches.push(`[${item.title.toUpperCase()}]\n${item.content}`);
+      }
+    }
+    const context = matches.length > 0 ? `Official Barangay Protocols:\n${matches.join("\n\n")}` : "";
+
     const prompt = `Act as Brgy SOS Guardian, a helpful emergency coordinator for a Philippine Barangay. 
     User says (in Tagalog/English): "${userText}"
     
-    Give a CALM, EMPOWERING, 1-sentence response. 
+    ${context ? `Use the following official protocols to guide your answer accurately:\n${context}` : 'Answer based on general emergency coordination best practices.'}
+    
+    Give a CALM, EMPOWERING, 1-to-2 sentence response. 
     If they are reporting an emergency, confirm alert is processed. 
     If they are asking for status, say the team is coordinating. 
     Use a mix of Tagalog and English (Taglish) if appropriate for a local feel.
@@ -244,7 +274,7 @@ export async function getGuardianResponse(userText: string): Promise<string> {
     });
     return result.text?.trim() || "";
   } catch (err: any) {
-    log.error("Guardian AI response failed", { requestId, error: err.message });
+    logAIError("Guardian AI response failed", err, { requestId });
     return "Nakatanggap ako ng ulat. Huwag mag-alala, nakikipag-ugnayan na ang ating patrol unit. Stay safe.";
   }
 }
@@ -263,13 +293,19 @@ Incident:
 ${incidentNotes}`;
 
     const result = await getAIClient().models.generateContent({
-      model: config.geminiModel || "gemini-3-flash-preview",
+      model: config.geminiModel || AI_MODELS.flash.name,
       contents: prompt
     });
     return result.text?.trim() || "Summary unavailable.";
   } catch (err: any) {
-    log.error("AI Summarization failed", { error: err.message });
-    return "Failed to generate summary.";
+    logAIError("AI Summarization failed, falling back to programmatic snippet", err);
+    // Smart fallback: Extract the first few logical phrases as a summary
+    const cleanNotes = incidentNotes.replace(/[\r\n]+/g, ' ').trim();
+    const sentences = cleanNotes.split(/[.!?]\s+/).filter(Boolean);
+    if (sentences.length > 0) {
+      return sentences.slice(0, 3).join('. ') + (sentences.length > 3 ? '...' : '.');
+    }
+    return "Sumasailalim sa pagsusuri ang ulat tungkol sa emergency incident na ito.";
   }
 }
 
@@ -291,13 +327,31 @@ ${roughNotes}
 Output the draft report below:`;
 
     const result = await getAIClient().models.generateContent({
-      model: config.geminiModel || "gemini-3-flash-preview",
+      model: config.geminiModel || AI_MODELS.flash.name,
       contents: prompt
     });
     return result.text?.trim() || "Drafting unavailable.";
   } catch (err: any) {
-    log.error("AI Report Drafting failed", { error: err.message });
-    return "Failed to draft report.";
+    logAIError("AI Report Drafting failed, falling back to report template", err);
+    // Programmatic template fallback
+    return `========================================
+BARANGAY TACTICAL SPOT REPORT
+========================================
+Petsa ng Ulat: ${date}
+Sektor: Barangay Emergency Response Unit (Brgy SOS)
+Katayuan: Opisyal na Draft ng Tactical Unit
+
+MGA AKTWAL NA DETALYE AT NOTA:
+----------------------------------------
+${roughNotes}
+----------------------------------------
+
+MGA INIREREKOMENDANG SUSUNOD NA HAKBANG:
+1. Ipaalam ang mga konkretong detalye sa Barangay Captain o Officer of the Day.
+2. I-archive ang ulat sa lokal na database ng Barangay Tanod Command.
+3. Panatilihin ang monitoring sa kinaroroonan ng insidente para sa kaligtasan ng publiko.
+
+Iniulat ni: Duty Incident Responder, Brgy SOS`;
   }
 }
 
@@ -316,12 +370,12 @@ Text:
 "${text}"`;
 
     const result = await getAIClient().models.generateContent({
-      model: config.geminiModel || "gemini-3-flash-preview",
+      model: config.geminiModel || AI_MODELS.flash.name,
       contents: prompt
     });
     return result.text?.trim() || text; // Fallback to original text if translation fails to return anything
   } catch (err: any) {
-    log.error("AI Translation failed", { error: err.message });
+    logAIError("AI Translation failed, keeping original", err);
     return text;
   }
 }
@@ -348,7 +402,7 @@ User Query:
 "${query}"`;
 
     const result = await getAIClient().models.generateContent({
-      model: config.geminiModel || "gemini-2.5-flash",
+      model: config.geminiModel || AI_MODELS.flash.name,
       contents: prompt,
       config: {
         responseMimeType: "application/json"
@@ -365,10 +419,125 @@ User Query:
       needsEscalation: !!parsed.needsEscalation
     };
   } catch (err: any) {
-    log.error("AI Assistant failed", { error: err.message });
-    return { answer: "I'm sorry, my answering capability is temporarily offline.", needsEscalation: false };
+    logAIError("AI Assistant failed, activating smart local rule-engine", err);
+    
+    // Provide an exceptionally smart, helpful fallback answer based on Philippines barangay context keywords
+    let answer = "Naka-offline po ang ating advanced AI answering module sa ngayon dahil sa system update. Mangyaring sumangguni sa opisyal ng barangay para sa direktang tulong.";
+    let needsEscalation = false;
+    const lowerQ = query.toLowerCase();
+    
+    if (lowerQ.includes("sunog") || lowerQ.includes("fire") || lowerQ.includes("saksak") || lowerQ.includes("nakaw") || lowerQ.includes("tulong") || lowerQ.includes("emergency") || lowerQ.includes("hospital") || lowerQ.includes("medical") || lowerQ.includes("atake")) {
+      answer = "Ulat ng Emergency: Naka-detect kami ng emergency keyword sa inyong mensahe. Mangyaring lumikas sa ligtas na lugar kagyat o gumamit ng Emergency Alarm sa inyong dashboard upang mapa-dispatch agad ang aming Barangay Tanod Crew.";
+      needsEscalation = true;
+    } else if (lowerQ.includes("permit") || lowerQ.includes("clearance") || lowerQ.includes("id") || lowerQ.includes("dokumento")) {
+      answer = "Para sa Barangay Clearance, Barangay ID, o Resident Permit, ikaw ay malugod na inaanyayahang pumunta sa ating Barangay Hall mula Lunes hanggang Biyernes, 8:00 AM hanggang 5:00 PM. Magdala lamang ng Proof of Residency (gaya ng utility bill) at valid identification card.";
+    } else if (lowerQ.includes("evac") || lowerQ.includes("baha") || lowerQ.includes("bagyo") || lowerQ.includes("ulan") || lowerQ.includes("evacuation") || lowerQ.includes("lilikas")) {
+      answer = "Kaugnay ng evac at banta ng kalamidad: Ang opisyal na evacuation centers ng ating Barangay ay nakatalaga sa Barangay Gym at sa High School covered court. Siguraduhing dala ninyo ang inyong emergency kit o E-Go Bag.";
+    } else if (lowerQ.includes("hotline") || lowerQ.includes("numero") || lowerQ.includes("telepono") || lowerQ.includes("number") || lowerQ.includes("tawag")) {
+      answer = "Maaari po ninyong tawagan ang national emergencies sa 911 (Police/BFP) o gamitin ang ating Barangay Directory tab upang tawagan ang direktang duty patrol line ng Barangay Tanod Command Post.";
+    } else if (lowerQ.includes("bata") || lowerQ.includes("kurba") || lowerQ.includes("curfew") || lowerQ.includes("oras")) {
+      answer = "Ang curfew hours para sa mga kabataan o menor de edad sa ating Barangay ay nagsisimula mula 10:00 PM hanggang 4:00 AM kinabukasan alinsunod sa umiiral na ordinansa, upang mapanatiling payapa at ligtas ang ating kalsada.";
+    }
+
+    return { answer, needsEscalation };
   }
 }
+
+// =============================================================================
+// Rules-Based fallback for Tactical Briefing (when API key is expired or inactive)
+// =============================================================================
+export function generateRuleBasedIntelligenceBrief(stats: any): string {
+  const overview = stats?.overview || {};
+  const alertsByType = stats?.alertsByType || [];
+
+  const activeAlerts = overview.active_alerts ?? 0;
+  const totalTanods = overview.total_tanods ?? 0;
+  
+  // Calculate total alerts and find top type
+  let totalAlerts = 0;
+  let topType = 'OTHER';
+  let topCount = 0;
+  
+  if (Array.isArray(alertsByType) && alertsByType.length > 0) {
+    alertsByType.forEach((item: any) => {
+      const cnt = Number(item.count || 0);
+      totalAlerts += cnt;
+      if (cnt > topCount) {
+        topCount = cnt;
+        topType = item.type || 'OTHER';
+      }
+    });
+  }
+
+  // Type translation map to taglish terms
+  const typeMap: Record<string, string> = {
+    'MEDICAL': 'medical emergencies',
+    'FIRE': 'insidente ng sunog',
+    'CRIME': 'krimen o paglabag sa batas',
+    'DISTURBANCE': 'bulao, ingay o public disturbance',
+    'NATURAL_DISASTER': 'sakuna o kalamidad dulot ng panahon',
+    'OTHER': 'iba pang munting suliranin sa barangay'
+  };
+
+  const friendlyType = typeMap[topType.toUpperCase()] || 'mga insidente';
+
+  let alertSummary = "";
+  if (totalAlerts > 0) {
+    alertSummary = `nakapagtala ang ating tactical systems ng kabuuang ${totalAlerts} na insidente, kung saan ang pinaka-laganap ay ${friendlyType} na may ${topCount} na ulat.`;
+  } else {
+    alertSummary = `nananatiling tahimik at payapa ang ating nasasakupan dahil walang naitalang ulat sa nakalipas na mga araw.`;
+  }
+
+  const activeStatus = activeAlerts > 0 
+    ? `Sa kasalukuyan, mayroon tayong ${activeAlerts} aktibong emergency alert na inaasikaso ng ating ${totalTanods} active Tanod responders.` 
+    : `Lahat ng patrol sectors ay clear, at ang ating ${totalTanods} Tanod personnel ay patuloy sa regular na pagbabantay.`;
+
+  const recommendation = topType === 'CRIME' || topType === 'DISTURBANCE'
+    ? "Iminumungkahi nating dagdagan ang nagpapatrolyang kawani sa mga pampublikong eskinita lalo na kapag sasapit ang gabi."
+    : topType === 'MEDICAL'
+    ? "Inirerekomenda ang pag-antabay ng ating first-aid responders at pag-inspeksyon sa mga medical emergency kits kagyat sa command post."
+    : topType === 'FIRE'
+    ? "Dapat pong paigtingin ang kampanya laban sa sunog at i-verify ang fire hydrant accessibility sa barangay."
+    : "Ipagpatuloy ang mapagmatyag na pamumuno upang mapanatili ang kaayusan sa bawat nasasakupang dako.";
+
+  return `Magandang araw, Kapitan. Para sa nakaraang pitong araw, ${alertSummary} ${activeStatus} ${recommendation}`;
+}
+
+// =============================================================================
+// Intelligence Briefing
+// =============================================================================
+export async function generateIntelligenceBrief(stats: any): Promise<string> {
+  try {
+    const prompt = `Act as Brgy SOS Intelligence Analyst. Analyze this tactical data for the past 7 days:
+${JSON.stringify(stats, null, 2)}
+
+Provide a concise, professional intelligence briefing for the Barangay Captain in Tagalog/English (Taglish). 
+Identify the most common incident type and any notable trends or risks. 
+Keep the response to exactly 1 short paragraph (max 3 sentences). 
+Focus on actionable security insights.`;
+
+    const result = await getAIClient().models.generateContent({
+      model: AI_MODELS.pro.name,
+      contents: prompt
+    });
+    return result.text?.trim() || generateRuleBasedIntelligenceBrief(stats);
+  } catch (err: any) {
+    logAIError("Intelligence Briefing failed, falling back to programmatic summary", err);
+    return generateRuleBasedIntelligenceBrief(stats);
+  }
+}
+
+// =============================================================================
+// Main aiService Export
+// =============================================================================
+export const aiService = {
+  analyzeIncident,
+  summarizeIncident,
+  draftReport,
+  translateText,
+  askAssistant,
+  generateIntelligenceBrief
+};
 
 // =============================================================================
 // Prompt builder (separated for clarity)

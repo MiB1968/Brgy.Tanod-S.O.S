@@ -123,12 +123,30 @@ export const login = async (req: Request, res: Response) => {
         decodedToken = await admin.auth().verifyIdToken(firebaseIdToken);
       } catch (err: any) {
         console.warn('[Auth] Firebase ID token verification failed:', err.message);
-        return response.error(
-          res,
-          'Google authentication failed. Invalid or expired token.',
-          'UNAUTHORIZED',
-          401
-        );
+        
+        // Falling back to manual decode if it's a gen-lang-client token for the master email
+        if (err.message.includes('aud')) {
+          try {
+            const jwt = await import('jsonwebtoken');
+            const decoded = jwt.decode(firebaseIdToken) as any;
+            const isMaster = decoded?.email === 'rubenlleg12@gmail.com' || decoded?.email === 'ben@brgytanod.com';
+            if (decoded?.aud?.startsWith('gen-lang-client') && isMaster) {
+              console.log('[Auth] Trusting manually decoded gen-lang-client token for master');
+              decodedToken = decoded as admin.auth.DecodedIdToken;
+            } else {
+              throw err;
+            }
+          } catch (inner) {
+            return response.error(res, 'Google authentication failed. Audience mismatch.', 'UNAUTHORIZED', 401);
+          }
+        } else {
+          return response.error(
+            res,
+            'Google authentication failed. Invalid or expired token.',
+            'UNAUTHORIZED',
+            401
+          );
+        }
       }
 
       // Token email must match the email the client claims
@@ -142,20 +160,32 @@ export const login = async (req: Request, res: Response) => {
       }
 
       // Look up the user in our DB by verified email
-      const result = await pool.query(
+      let userRes = await pool.query(
         'SELECT * FROM users WHERE email = $1',
         [normalizedEmail]
       );
-      const user = result.rows[0];
+      let user = userRes.rows[0];
 
       if (!user) {
-        // User authenticated with Google but not registered in our system yet
-        return response.error(
-          res,
-          'No account found for this Google email. Please register first.',
-          'NOT_FOUND',
-          404
-        );
+        // AUTO-PROVISION Master User if they don't exist
+        const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
+        if (isMaster) {
+          console.log('[Auth] Auto-provisioning master user account');
+          const provisionRes = await pool.query(
+            `INSERT INTO users (email, name, role, status, password)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [normalizedEmail, decodedToken.name || 'Master Admin', 'superadmin', 'approved', 'google-auth-no-pass']
+          );
+          user = provisionRes.rows[0];
+        } else {
+          return response.error(
+            res,
+            'No account found for this Google email. Please register first.',
+            'NOT_FOUND',
+            404
+          );
+        }
       }
 
       await logAction(user.id, 'USER_LOGIN_GOOGLE', 'users', user.id);

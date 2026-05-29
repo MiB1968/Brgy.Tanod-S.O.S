@@ -9,6 +9,7 @@ import { initDatabase } from "./server/db/index";
 import { initSocket } from "./server/sockets/index";
 import { config } from "./server/config/index";
 import { telegramService } from "./server/services/telegramService";
+import { backgroundTasksService } from "./server/services/backgroundTasksService";
 import { errorHandler, notFoundHandler } from "./server/middleware/error";
 
 // ── Path Helper for ESM/CJS compatibility ──────────────────────────────────
@@ -23,139 +24,171 @@ const getDirname = () => {
 
 async function startServer() {
   const PORT = 3000;
-  console.log(`[Server] Booting Brgy. Tanod S.O.S...`);
-  console.log(
-    `[Server] PID: ${process.pid} | Port: ${PORT} | Mode: ${config.nodeEnv}`,
-  );
-  console.log(`[Server] Database URL present: ${!!config.databaseUrl}`);
-  console.log(`[Server] Gemini API Key present: ${!!config.geminiApiKey}`);
-
-  try {
-    console.log("[Server] Connecting to Tactical Persistence Layer...");
-    initDatabase(); // Firebase
-
-    if (config.databaseUrl) {
-      // Connect to SQL DB with a reasonable timeout
-      await Promise.race([
-        initDb().catch((e) =>
-          console.warn("DB connect failed, assuming degraded mode:", e.message),
-        ),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("DB connection timed out")), 15000),
-        ),
-      ]).catch((e) => console.warn("DB race timeout:", e.message));
-    } else {
-      console.warn(
-        "WARNING: DATABASE_URL not set. Running in degraded mode. (SQL endpoints will return dummy data or 500)",
-      );
-    }
-  } catch (err) {
-    console.error("ERROR: Initialization sequence failure:", err);
-    // We continue booting so the container stays alive and serves the "Build broken" message
-  }
-
-  const server = http.createServer(app);
-
-  process.on("uncaughtException", (err) => {
-    console.error("CRITICAL: UNCAUGHT EXCEPTION:", err);
-  });
-
-  process.on("unhandledRejection", (reason) => {
-    console.error("CRITICAL: UNHANDLED REJECTION:", reason);
-  });
-
-  initSocket(server);
-
-  // Force production mode if we are running from dist/
   const currentDir = getDirname();
-  const isRunningFromDist = currentDir.includes("dist");
-  const isProd =
-    process.env.NODE_ENV === "production" ||
-    isRunningFromDist ||
-    fs.existsSync(path.join(currentDir, "index.html"));
+  const rootDir = process.cwd();
+  
+  // Create a new master Express app to properly orchestrate Vite and the backend app
+  const masterApp = express();
 
+  // Robust production detection
+  const isRunningFromDist = currentDir.includes("dist");
+  const isProd = process.env.NODE_ENV === "production" || isRunningFromDist;
+  
+  console.log(`[Server] Booting Brgy. Tanod S.O.S...`);
+  console.log(`[Server] PID: ${process.pid} | Port: ${PORT} | Mode: ${isProd ? "production" : "development"}`);
+  
+  // API and backend app setup
+  // We initialize Firebase early as it's fast, but defer migrations until port is open
+  initDatabase();
+
+  // Health checks and other routes that should be FAST can go here
+  masterApp.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      mode: isProd ? "production" : "development",
+      timestamp: new Date().toISOString()
+    });
+  });
+  masterApp.get("/ping", (req, res) => res.send(`PONG - ${new Date().toISOString()}`));
+
+  // MOUNT THE BACKEND APP FIRST (SO /api ENDPOINTS ARE INTERCEPTED FIRST)
+  // Only apply helmet in production to avoid blocking dev resources or causing CSP issues in iframe
+  masterApp.use(app);
+
+  let vite: any;
   if (!isProd) {
     console.log("[Server] Starting in DEVELOPMENT mode (Vite middleware)");
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+    
+    // Request logging for dev (Master App level) - Skip source files noise
+    masterApp.use((req, res, next) => {
+      if (!req.url.includes('node_modules') && !req.url.includes('@vite') && !req.url.startsWith('/src/')) {
+        console.log(`[Dev Request] ${req.method} ${req.url}`);
+      }
+      next();
     });
 
-    app.use(vite.middlewares);
-  } else {
-    // Production Mode: Serve static files from /dist
-    const distPath = getDirname();
-    const indexPath = path.join(distPath, "index.html");
+    const { createServer: createViteServer } = await import("vite");
+    vite = await createViteServer({
+      root: rootDir,
+      logLevel: "silent",
+      server: { middlewareMode: true, hmr: false },
+      appType: "custom", // Changed from spa to custom for better control in middleware mode
+    });
 
-    console.log(`[Production] Assets Root: ${distPath}`);
-    console.log(`[Production] Index HTML: ${indexPath}`);
+    // VITE MIDDLEWARE SECOND
+    masterApp.use(vite.middlewares);
+  }
 
-    if (!fs.existsSync(indexPath)) {
-      console.error(
-        `[Production] ERROR: index.html not found! Static serving may fail.`,
-      );
-    }
+  if (!isProd) {
+    // Explicitly serve service workers in dev
+    masterApp.get("/sw.js", (req, res) => {
+      const swPath = path.join(rootDir, "public", "sw.js");
+      if (fs.existsSync(swPath)) {
+        res.setHeader("Content-Type", "application/javascript");
+        res.setHeader("Service-Worker-Allowed", "/");
+        res.sendFile(swPath);
+      } else {
+        res.status(404).send("sw.js not found");
+      }
+    });
 
-    app.use(
-      express.static(distPath, {
-        index: false,
-        setHeaders: (res, filePath) => {
-          if (filePath.endsWith(".js") || filePath.endsWith(".css")) {
-            res.setHeader("Cache-Control", "public, max-age=31536000");
-          }
-          if (filePath.endsWith(".wasm")) {
-            res.setHeader("Content-Type", "application/wasm");
-          }
-        },
-      }),
-    );
+    masterApp.get("/firebase-messaging-sw.js", (req, res) => {
+      const swPath = path.join(rootDir, "public", "firebase-messaging-sw.js");
+      if (fs.existsSync(swPath)) {
+        res.setHeader("Content-Type", "application/javascript");
+        res.sendFile(swPath);
+      } else {
+        res.status(404).send("firebase-messaging-sw.js not found");
+      }
+    });
 
-    // Serve /public as fallback if present in root
-    const publicPath = path.resolve(process.cwd(), "public");
-    if (fs.existsSync(publicPath)) {
-      app.use(express.static(publicPath));
-    }
-
-    // SPA fallback
-    app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
+    // SPA Fallback for Development
+    masterApp.use('*', async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/socket.io')) {
+        return next();
+      }
+      
+      const pathname = new URL(req.originalUrl, `http://${req.headers.host}`).pathname;
+      if (path.extname(pathname).length > 0) {
         return next();
       }
 
+      try {
+        const template = fs.readFileSync(path.join(rootDir, "index.html"), "utf-8");
+        const html = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
+  } else {
+    // Production Mode: Serve static files
+    const distPath = isRunningFromDist ? currentDir : path.join(rootDir, "dist");
+    const indexPath = path.join(distPath, "index.html");
+
+    masterApp.use(express.static(distPath, { index: false }));
+    const publicPath = path.join(rootDir, "public");
+    if (fs.existsSync(publicPath)) {
+      masterApp.use(express.static(publicPath));
+    }
+
+    masterApp.get("/firebase-messaging-sw.js", (req, res) => {
+      const swPath = path.join(distPath, "firebase-messaging-sw.js");
+      if (fs.existsSync(swPath)) {
+        res.setHeader("Content-Type", "application/javascript");
+        res.sendFile(swPath);
+      } else {
+        res.status(404).send("Service Worker not found");
+      }
+    });
+
+    masterApp.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
+        return next();
+      }
       res.sendFile(indexPath, (err) => {
-        if (err) {
-          console.error(`[Production] SPA Route Error (${req.path}):`, err);
-          res
-            .status(500)
-            .send(
-              "Tactical Command Console Offline. Please refresh or contact support.",
-            );
-        }
+        if (err) res.status(500).send("Tactical Command Console Offline.");
       });
     });
   }
 
-  app.use(notFoundHandler);
-  app.use(errorHandler);
+  const server = http.createServer(masterApp);
+  initSocket(server);
 
   server.listen(PORT, "0.0.0.0", async () => {
+    console.log(`[Server] Port ${PORT} is open. Finalizing tactical initialization...`);
+
+    // Run heavy initialization after port is open to satisfy Cloud Run startup probes
+    try {
+      if (config.databaseUrl) {
+        console.log("[Server] Syncing SQL Persistence...");
+        await initDb().catch(e => console.warn("SQL Sync warning:", e.message));
+      }
+      
+      // Initialize Webhooks if on live URL
+      const appUrl = process.env.APP_URL;
+      if (appUrl && process.env.TELEGRAM_BOT_TOKEN) {
+        console.log("[Server] Registering Telegram Command Webhook...");
+        await telegramService.setWebhook(appUrl);
+      }
+      
+      // Initialize Multi-service Background Daemons
+      backgroundTasksService.initialize();
+    } catch (err) {
+      console.error("Initialization warning:", err);
+    }
+
     console.log(`
   ==================================================
   BRGY. TANOD S.O.S. - BATTLE-READY
   ==================================================
   Status: ONLINE
   Address: http://0.0.0.0:${PORT}
-  Mode: ${config.nodeEnv}
+  Mode: ${isProd ? 'Production' : 'Development'}
   Timestamp: ${new Date().toISOString()}
   ==================================================
     `);
-
-    // Initialize Webhooks if on live URL
-    const appUrl = process.env.APP_URL;
-    if (appUrl && process.env.TELEGRAM_BOT_TOKEN) {
-      await telegramService.setWebhook(appUrl);
-    }
   });
 }
 

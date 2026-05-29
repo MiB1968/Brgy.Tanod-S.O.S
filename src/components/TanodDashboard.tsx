@@ -143,6 +143,17 @@ export default function TanodDashboard({
     }
   };
 
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen p-8 text-zinc-400 bg-tactical-dark">
+        <div className="text-center">
+          <div className="animate-pulse w-12 h-12 border-2 border-tactical-cyan/20 rounded-full mx-auto mb-4" />
+          <p className="text-[10px] font-mono uppercase tracking-widest text-tactical-cyan">Synchronizing Responder Uplink...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -174,99 +185,92 @@ export default function TanodDashboard({
         updateTanodStatus={updateTanodStatus}
       />
 
-      {/* ── TACTICAL CONSOLE GRID ────────── */}
-      {onTabChange && (
-        <motion.div className="tactical-panel border-tactical-cyan/40 p-5 md:p-6 rounded-[32px] bg-tactical-dark/95 shadow-[0_0_20px_rgba(0,240,255,0.1)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-tactical-cyan/5 blur-[80px] rounded-full pointer-events-none" />
-          <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
-            <div>
-              <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">PATROL_HUD_MATRIX</span>
-              <h3 className="text-sm font-black uppercase tracking-wider font-display text-white mt-0.5 flex items-center gap-1.5">
-                <Grid className="w-4 h-4 text-tactical-cyan animate-pulse" />
-                TACTICAL RESPONDER GRID
-              </h3>
-            </div>
-            <span className="text-[8px] font-mono font-bold text-white/30 tracking-tight uppercase bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
-              ACTIVE DESKTOP CONSOLE LINKED
-            </span>
-          </div>
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* LEFT COMPONENT - ALERTS FEED */}
+        <div className="w-full lg:w-96 flex-shrink-0">
+          <TanodAlertsFeed
+            alerts={alerts}
+            profile={profile}
+            onUpdateStatus={handleUpdateStatus}
+            onDetails={setSelectedAlertForDetails}
+          />
+        </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { id: "map", label: "Intel Livemap", icon: MapIcon, desc: "Community Grid", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40" },
-              { id: "tracker", label: "Tactical Tracker", icon: Activity, desc: "GPS Live Units", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40" },
-              { id: "roster", label: "Tanod Units", icon: Shield, desc: "Active Forces Roster", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/40" },
-              { id: "schedule", label: "Shift Schedule", icon: Calendar, desc: "Patrol Durations", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40" },
-              { id: "reports", label: "Threat Feeds", icon: AlertOctagon, desc: "Threat Broadcasts", color: "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/40" },
-              { id: "directory", label: "Emergency Directory", icon: PhoneCall, desc: "Hotline Channels", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40" },
-              { id: "guardian", label: "Guardian AI Chat", icon: Cpu, desc: "Microphone analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40" },
-              { id: "settings", label: "Configurations", icon: SettingsIcon, desc: "My Account Settings", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40" }
-            ].map((mod) => {
-              const Icon = mod.icon;
-              return (
-                <button
-                  key={mod.id}
-                  onClick={() => onTabChange(mod.id)}
-                  className={`flex flex-col text-left p-3 rounded-2xl border bg-black/40 transition-all active:scale-95 duration-300 hover:scale-[1.03] hover:shadow-md select-none group cursor-pointer ${mod.color}`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="p-1.5 ml-0 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
-                      <Icon className="w-4 h-4 text-white/70 group-hover:text-white" />
-                    </div>
-                  </div>
-                  <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
-                  <p className="text-[7px] font-bold text-white/30 tracking-tight leading-normal mt-0.5 font-mono truncate">{mod.desc}</p>
-                </button>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
+        {/* CENTER COMPONENT - MAP HUB */}
+        <div className="flex-1 w-full space-y-6">
+          <motion.div className="w-full h-[600px] rounded-[32px] border border-tactical-cyan/10 overflow-hidden relative shadow-2xl">
+            <LiveMap effectiveRole={profile?.role} />
+          </motion.div>
 
-      <motion.div className="w-full h-[600px] rounded-[32px] overflow-hidden tactical-panel border border-tactical-cyan/25 relative shadow-2xl">
-        <LiveMap effectiveRole={profile?.role} />
-      </motion.div>
+          {/* ── TACTICAL CONSOLE GRID ────────── */}
+          {onTabChange && (
+            <motion.div className="tactical-panel border-tactical-cyan/20 p-5 md:p-6 rounded-[32px] bg-tactical-dark/95 shadow-[0_0_20px_rgba(0,240,255,0.05)] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-tactical-cyan/5 blur-[80px] rounded-full pointer-events-none" />
+              <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                <div>
+                  <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">PATROL_HUD_MATRIX</span>
+                  <h3 className="text-sm font-black uppercase tracking-wider font-display text-white mt-0.5 flex items-center gap-1.5">
+                    <Grid className="w-4 h-4 text-tactical-cyan animate-pulse" />
+                    TACTICAL RESPONDER GRID
+                  </h3>
+                </div>
+              </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <TanodAlertsFeed
-          alerts={alerts}
-          profile={profile}
-          onUpdateStatus={handleUpdateStatus}
-          onDetails={setSelectedAlertForDetails}
-        />
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                {[
+                  { id: "map", label: "Intel Livemap", icon: MapIcon, desc: "Community Grid", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40" },
+                  { id: "tracker", label: "Tactical Tracker", icon: Activity, desc: "GPS Live Units", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40" },
+                  { id: "roster", label: "Tanod Units", icon: Shield, desc: "Active Forces", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/40" },
+                  { id: "schedule", label: "Shift Schedule", icon: Calendar, desc: "Planning", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40" },
+                  { id: "reports", label: "Threat Feeds", icon: AlertOctagon, desc: "Broadcasts", color: "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/40" },
+                  { id: "directory", label: "Hotlines", icon: PhoneCall, desc: "Channels", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40" },
+                  { id: "guardian", label: "Guardian AI", icon: Cpu, desc: "Sound analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40" },
+                  { id: "settings", label: "Profile", icon: SettingsIcon, desc: "Configs", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40" }
+                ].map((mod) => {
+                  const Icon = mod.icon;
+                  return (
+                    <button
+                      key={mod.id}
+                      onClick={() => onTabChange(mod.id)}
+                      className={`flex flex-col text-left p-3 rounded-2xl border bg-black/40 transition-all active:scale-95 duration-300 hover:scale-[1.03] hover:shadow-md select-none group cursor-pointer ${mod.color}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="p-1.5 ml-0 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                          <Icon className="w-4 h-4 text-white/70 group-hover:text-white" />
+                        </div>
+                      </div>
+                      <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </div>
 
-        <div className="lg:col-span-1 space-y-6 md:space-y-8">
-          {/* Units Summary */}
-          <TacticalCard title="Force Status Summary">
+        {/* RIGHT COMPONENT - PERFORMANCE & SUMMARY */}
+        <div className="w-full lg:w-80 space-y-6 flex-shrink-0">
+          <TacticalCard title="Unit Force Stats">
             <div className="space-y-4">
               <div className="flex justify-between items-center p-4 bg-tactical-dark rounded-2xl border border-tactical-cyan/20">
                 <span className="text-[11px] font-bold text-white/60 font-mono">
-                  ON_PATROL
+                  ACTIVE_PATROL
                 </span>
                 <span className="text-xl font-black text-tactical-cyan font-mono">
-                  {
-                    patrols.filter(
-                      (p) => p.isActive && p.status === "patrolling",
-                    ).length
-                  }
+                  {patrols.filter((p) => p.isActive && p.status === "patrolling").length}
                 </span>
               </div>
               <div className="flex justify-between items-center p-4 bg-tactical-dark rounded-2xl border border-tactical-cyan/20">
                 <span className="text-[11px] font-bold text-white/60 font-mono">
-                  RESPONDING
+                  ACTIVE_RESPONSE
                 </span>
                 <span className="text-xl font-black text-tactical-red font-mono">
-                  {
-                    patrols.filter(
-                      (p) => p.isActive && p.status === "responding",
-                    ).length
-                  }
+                  {patrols.filter((p) => p.isActive && p.status === "responding").length}
                 </span>
               </div>
             </div>
           </TacticalCard>
 
-          {/* Performance Standings */}
           <TanodPerformance />
         </div>
       </div>

@@ -10,7 +10,7 @@ export class ReportRepository {
         COUNT(CASE WHEN status = 'in-progress' THEN 1 END) as in_progress,
         COUNT(CASE WHEN type = 'CRIME' THEN 1 END) as crime_count,
         COUNT(CASE WHEN type = 'MEDICAL' THEN 1 END) as medical_count
-      FROM incidents
+      FROM alerts
       WHERE created_at BETWEEN $1 AND $2
     `, [startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), endDate || new Date()]);
     
@@ -20,16 +20,16 @@ export class ReportRepository {
   async getResponseTimeAverage() {
     const result = await pool.query(`
       SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))) as avg_response_time_seconds
-      FROM incidents 
+      FROM alerts 
       WHERE status = 'resolved'
     `);
     return result.rows[0];
   }
 
-  async getIncidentsByBarangay(barangay: string, limit = 50) {
+  async getIncidentsByBarangay(barangayId: string, limit = 50) {
     const result = await pool.query(
-      'SELECT * FROM incidents WHERE barangay = $1 ORDER BY created_at DESC LIMIT $2',
-      [barangay, limit]
+      'SELECT * FROM alerts WHERE barangay_id = $1 ORDER BY created_at DESC LIMIT $2',
+      [barangayId, limit]
     );
     return result.rows;
   }

@@ -4,7 +4,14 @@ import twilio from "twilio";
 import { logger } from "../utils/logger.js";
 
 const router = express.Router();
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const getTwilioClient = () => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    throw new Error("Phone integrations are not configured. TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables are required.");
+  }
+  return twilio(sid, token);
+};
 
 const otpStore = new Map(); // In production, use Redis
 
@@ -20,6 +27,7 @@ router.post("/send", async (req, res) => {
 
     otpStore.set(phone, { otp, expires: Date.now() + 5 * 60 * 1000 });
 
+    const client = getTwilioClient();
     await client.messages.create({
       body: `Your Brgy Tanod SOS verification code is: ${otp}. Valid for 5 minutes.`,
       from: process.env.TWILIO_PHONE_NUMBER,

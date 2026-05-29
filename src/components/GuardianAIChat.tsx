@@ -66,7 +66,19 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
   const [showFirstTimeSetup, setShowFirstTimeSetup] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [recentCrisis, setRecentCrisis] = useState<{ type: string; level: string } | null>(null);
   const hasShownSetup = useRef(false);
+
+  // Listen for crisis events in UI
+  useEffect(() => {
+    const handler = (e: any) => {
+      setRecentCrisis(e.detail);
+      const timer = setTimeout(() => setRecentCrisis(null), 8000);
+      return () => clearTimeout(timer);
+    };
+    window.addEventListener('guardian-crisis-detected', handler);
+    return () => window.removeEventListener('guardian-crisis-detected', handler);
+  }, []);
 
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
   const toastTimerRef = useRef<any>(null);
@@ -518,17 +530,27 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
           <AnimatePresence>
             {isOpen && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className={`fixed bottom-24 right-6 w-96 h-[580px] rounded-3xl shadow-2xl flex flex-col z-[80] overflow-hidden font-sans border transition-all relative ${
-                  isDark 
-                    ? 'bg-[#0a1428] border-purple-500/30 text-white' 
-                    : 'bg-white border-gray-200 text-gray-900 shadow-xl'
-                }`}
-              >
+              <>
+                {/* Backdrop Overlay with smooth transition */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.4 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsOpen(false)}
+                  className="fixed inset-0 bg-black z-[70] backdrop-blur-sm cursor-pointer"
+                />
+
+                <motion.div 
+                  initial={{ x: "100%", opacity: 0.9 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: "100%", opacity: 0.9 }}
+                  transition={{ type: "spring", damping: 26, stiffness: 280 }}
+                  className={`fixed top-0 right-0 w-full sm:w-[420px] h-full shadow-2xl flex flex-col z-[80] overflow-hidden font-sans border-l transition-all ${
+                    isDark 
+                      ? 'bg-[#060b14] border-purple-500/20 text-white animate-fade-in' 
+                      : 'bg-white border-gray-200 text-gray-900 shadow-xl'
+                  }`}
+                >
                 {/* First Time Setup Modal - Pure Tagalog */}
                 {showFirstTimeSetup && (
                   <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
@@ -752,8 +774,35 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                     isDark ? 'bg-[#070e1c]' : 'bg-gray-50/40'
                   }`}
                 >
+                  {/* Tactical Crisis Banner */}
+                  <AnimatePresence>
+                    {recentCrisis && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="bg-red-600 text-white px-4 py-2 flex items-center justify-between z-10 sticky top-0 shadow-lg"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 animate-bounce" />
+                          <div className="text-[10px] font-bold leading-tight">
+                            <p className="uppercase tracking-widest">{recentCrisis.level} ALERT: {recentCrisis.type}</p>
+                            <p className="opacity-90 font-normal">Command Center notified automatically.</p>
+                          </div>
+                        </div>
+                        <CheckCircle size={14} className="opacity-50" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {messages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <motion.div 
+                      key={i} 
+                      initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20, y: 10 }}
+                      animate={{ opacity: 1, x: 0, y: 0 }}
+                      transition={{ duration: 0.3, delay: i % 5 * 0.05 }}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
                       <div 
                         className={`max-w-[85%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm transition-all ${
                           msg.role === 'user' 
@@ -765,7 +814,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                       >
                         {msg.content}
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
 
                   {isThinking && (
@@ -849,6 +898,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                   </div>
                 </div>
               </motion.div>
+              </>
             )}
           </AnimatePresence>
         </>
@@ -1079,8 +1129,35 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
               isDark ? 'bg-[#070e1c]' : 'bg-gray-50/40'
             }`}
           >
+            {/* Tactical Crisis Banner */}
+            <AnimatePresence>
+              {recentCrisis && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-red-600 text-white px-4 py-2 flex items-center justify-between z-10 sticky top-0 shadow-lg rounded-xl mb-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 animate-bounce" />
+                    <div className="text-[10px] font-bold leading-tight">
+                      <p className="uppercase tracking-widest">{recentCrisis.level} ALERT: {recentCrisis.type}</p>
+                      <p className="opacity-90 font-normal">Command Center notified automatically.</p>
+                    </div>
+                  </div>
+                  <CheckCircle size={14} className="opacity-50" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20, y: 10 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                transition={{ duration: 0.3, delay: i % 5 * 0.05 }}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
                 <div 
                   className={`max-w-[85%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm transition-all ${
                     msg.role === 'user' 
@@ -1092,7 +1169,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                 >
                   {msg.content}
                 </div>
-              </div>
+              </motion.div>
             ))}
 
             {isThinking && (

@@ -1,13 +1,46 @@
+# Dependencies
 node_modules/
+**/node_modules/
+package-lock.json.log
+
+# Build outputs and compilation folders
+dist/
+**/dist/
+functions/lib/
+.firebase/
+.ready/
+.next/
+.cache/
+.parcel-cache/
+
+# Heavily weighted assets and local media (should never be committed to Git)
+public/onnx/
+public/uploads/
+**/uploads/
+*.onnx
+*.wasm
+
+# Host Environment and Secrets
 .env
 .env.local
 .env.production
 .env.development
+.env.test
 !.env.example
-logs
+
+# Service Account and firebase configs
+*service-account*.json
+.runtimeconfig.json
+
+# Local telemetry, IDE configs and OS logs
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .vscode/
+.idea/
 .DS_Store
-.firebase/
+Thumbs.db
+
 

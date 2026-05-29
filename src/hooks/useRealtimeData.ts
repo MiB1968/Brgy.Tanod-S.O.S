@@ -19,8 +19,9 @@ export const useRealtimeData = (
       setGlobalSirenActive(data?.sirenActive || false);
     };
 
-    const handleAlert = ({ type, alert }: { type: string; alert: Alert }) => {
-      if (type === "new") {
+    const handleAlert = (payload: any) => {
+      const alert = payload?.alert || payload;
+      if (alert && alert.id) {
         addAlert(alert);
       }
     };

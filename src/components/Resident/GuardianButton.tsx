@@ -7,7 +7,7 @@ import './GuardianButton.css';
 
 type ButtonState = 'idle' | 'pressing' | 'activated';
 
-const HOLD_DURATION = 900; // milliseconds
+const HOLD_DURATION = 3000; // milliseconds
 
 interface GuardianButtonProps {
   onInitiateSOS?: () => void;
@@ -29,6 +29,11 @@ export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS, g
     if (timerRef.current) clearTimeout(timerRef.current);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     
+    // Stop any in-progress browser TTS counting
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    
     setButtonState('idle');
     setProgress(0);
   }, []);
@@ -38,12 +43,30 @@ export const GuardianButton: React.FC<GuardianButtonProps> = ({ onInitiateSOS, g
     setProgress(0);
 
     const startTime = Date.now();
+    let spokenSeconds = -1;
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
 
     // Progress ring animation
     progressIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const newProgress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
       setProgress(newProgress);
+
+      const currentSecond = Math.floor(elapsed / 1000); 
+      if (currentSecond > spokenSeconds && currentSecond < 3) {
+        spokenSeconds = currentSecond;
+        const remaining = 3 - currentSecond;
+        
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(remaining.toString());
+          utterance.rate = 1.5; // Slightly faster for urgency
+          utterance.pitch = 1.1;
+          window.speechSynthesis.speak(utterance);
+        }
+      }
     }, 16);
 
     // Hold timer

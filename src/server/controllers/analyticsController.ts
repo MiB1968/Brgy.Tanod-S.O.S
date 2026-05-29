@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { getDb } from '../db/index';
+import { pool } from '../db/index';
 import * as response from '../utils/response';
+import { aiService } from '../services/aiService';
 
 export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => {
   try {
@@ -10,8 +11,6 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       return response.error(res, "Administrative clearance required", "FORBIDDEN", 403);
     }
 
-    const db = getDb();
-    
     let verified_residents = 0;
     let total_tanods = 0;
     let active_alerts = 0;
@@ -19,48 +18,41 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
     const alertsHistoryMap: Record<string, number> = {};
 
     try {
-      // 1. Users overview
-      const usersSnap = await db.collection('users').get();
-      usersSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.role === 'resident' && data.status === 'approved') verified_residents++;
-        if (data.role === 'tanod') total_tanods++;
+      // 1. Users overview from SQL
+      const usersResult = await pool.query("SELECT role, status FROM users");
+      usersResult.rows.forEach(row => {
+        if (row.role === 'resident' && row.status === 'approved') verified_residents++;
+        if (row.role === 'tanod') total_tanods++;
       });
       
-      // 2. Alerts overview, types and history
-      const alertsSnap = await db.collection('alerts').get();
-      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      // 2. Alerts overview, types and history from SQL
+      const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+      const alertsResult = await pool.query("SELECT id, status, type, location, created_at FROM alerts");
       
-      alertsSnap.forEach(doc => {
-        const data = doc.data();
-        
+      alertsResult.rows.forEach(row => {
         // Active alerts
-        if (['pending', 'active', 'responding'].includes(data.status)) {
+        const status = (row.status || '').toLowerCase();
+        if (['pending', 'active', 'responding'].includes(status)) {
           active_alerts++;
         }
         
         // Alert types
-        if (data.type) {
-          alertsByTypeMap[data.type] = (alertsByTypeMap[data.type] || 0) + 1;
+        if (row.type) {
+          alertsByTypeMap[row.type] = (alertsByTypeMap[row.type] || 0) + 1;
         }
         
         // History (last 7 days by date)
-        let ts = 0;
-        if (data.created_at) {
-          // Could be ISO string or timestamp number
-          ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
-        } else if (data.timestamp) {
-          ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
-        }
+        const createdAt = row.created_at;
+        const ts = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime();
         
-        if (ts && ts >= sevenDaysAgo) {
+        if (ts && ts >= sevenDaysAgo.getTime()) {
           const dateStr = new Date(ts).toISOString().split('T')[0];
           alertsHistoryMap[dateStr] = (alertsHistoryMap[dateStr] || 0) + 1;
         }
       });
       
     } catch (dbErr) {
-      console.error("Firestore Analytics Fetch Error:", dbErr);
+      console.error("SQL Analytics Fetch Error:", dbErr);
     }
 
     const alertsByTypeRows = Object.keys(alertsByTypeMap).map(type => ({
@@ -73,8 +65,6 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
       count: alertsHistoryMap[day]
     })).sort((a, b) => a.day.localeCompare(b.day));
 
-    console.log(`[Analytics] Serving dashboard data. Alerts: ${alertsByTypeRows.length}, History: ${alertsHistoryRows.length}`);
-
     return response.success(res, {
       overview: { verified_residents, total_tanods, active_alerts },
       alertsByType: alertsByTypeRows,
@@ -83,46 +73,51 @@ export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => 
 
   } catch (err: any) {
     console.error("Analytics Dashboard Error:", err);
-    return response.error(res, "Failed to compile tactical analytics. Data link unstable.", "SERVER_ERROR", 500);
+    return response.error(res, "Failed to compile tactical analytics.", "SERVER_ERROR", 500);
+  }
+};
+
+export const getIntelligenceBriefing = async (req: AuthRequest, res: Response) => {
+  try {
+    const { stats } = req.body;
+    if (!stats) return response.error(res, "Stats data required for briefing");
+
+    const brief = await aiService.generateIntelligenceBrief(stats);
+    return response.success(res, { brief });
+  } catch (err: any) {
+    return response.error(res, err.message);
   }
 };
 
 export const getHeatmapData = async (req: AuthRequest, res: Response) => {
   try {
-    const db = getDb();
     const heatmap: any[] = [];
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
     
-    try {
-      const alertsSnap = await db.collection('alerts').get();
-      alertsSnap.forEach(doc => {
-        const data = doc.data();
-        let ts = 0;
-        if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
-        else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
-        
-        if (ts && Math.abs(ts - Date.now()) < 5 * 365 * 24 * 60 * 60 * 1000) { // arbitrary validation
-          if (ts >= thirtyDaysAgo) {
-            let lat, lng;
-            if (data.location?.lat) { lat = data.location.lat; lng = data.location.lng; }
-            else if (data.lat) { lat = data.lat; lng = data.lng; }
-            else if (data.latitude) { lat = data.latitude; lng = data.longitude; }
-            
-            if (Number.isFinite(lat) && Number.isFinite(lng)) {
-              heatmap.push({
-                id: doc.id,
-                type: data.type || 'UNKNOWN',
-                lat: parseFloat(lat),
-                lng: parseFloat(lng),
-                timestamp: ts
-              });
-            }
-          }
+    const alertsResult = await pool.query(
+      "SELECT id, type, location, created_at FROM alerts WHERE created_at >= $1", 
+      [thirtyDaysAgo]
+    );
+
+    alertsResult.rows.forEach(row => {
+      let loc = row.location;
+      if (typeof loc === 'string') {
+        try {
+          loc = JSON.parse(loc);
+        } catch (e) {
+          loc = null;
         }
-      });
-    } catch (e) {
-      console.error("Heatmap query error:", e);
-    }
+      }
+      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+        heatmap.push({
+          id: row.id,
+          type: row.type || 'UNKNOWN',
+          lat: Number(loc.lat),
+          lng: Number(loc.lng),
+          timestamp: row.created_at
+        });
+      }
+    });
 
     return res.json(heatmap);
   } catch (err: any) {
