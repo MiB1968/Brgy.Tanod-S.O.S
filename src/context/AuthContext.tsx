@@ -4,6 +4,7 @@ import { doc, getDoc, getDocFromCache, setDoc, serverTimestamp } from 'firebase/
 import { auth, db } from '../lib/firebase';
 import * as safeStorage from '../lib/safeStorage';
 import socket from '../lib/socket';
+import * as api from '../lib/api';
 import { pushService } from '../services/pushNotificationService';
 import type { User, UserRole } from '../types';
 import { RoleHierarchy, RolePermissions } from '../types';
@@ -67,69 +68,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (RoleHierarchy[currentRole] || 0) >= RoleHierarchy[requiredRole];
   }, [currentRole, isMasterAdmin]);
 
-  const fetchProfile = async (uid: string) => {
-    const userRef = doc(db, "users", uid);
-    
-    // Attempt fetch with race for timeout
+  const fetchProfile = async (uid?: string) => {
+    // 1. Primary Source of Truth: Backend SQL API
     try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('timeout')), 7000)
-      );
-      
-      const userDoc = (await Promise.race([
-        getDoc(userRef),
-        timeoutPromise
-      ])) as any;
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data() as User;
+      const meResponse = await api.auth.me();
+      if (meResponse?.success && meResponse.data) {
+        console.log("[AuthContext] Profile loaded from Backend API");
+        const userData = meResponse.data as User;
         setProfile(userData);
         setStoreProfile(userData);
         safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
         return;
       }
     } catch (e) {
-      console.warn("[AuthContext] Primary fetch failed:", e);
+      console.warn("[AuthContext] Backend profile fetch failed:", e);
     }
 
-    // Fallback 1: Attempt cache directly
-    try {
-      console.log("[AuthContext] Trying cache fallback...");
-      const cachedDoc = await getDocFromCache(userRef);
-      if (cachedDoc.exists()) {
-        const userData = cachedDoc.data() as User;
-        setProfile(userData);
-        setStoreProfile(userData);
-        safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
-        return;
+    // 2. Fallback: Firebase Firestore (if uid is provided)
+    if (uid) {
+      const userRef = doc(db, "users", uid);
+      try {
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
+          console.log("[AuthContext] Profile loaded from Firestore fallback");
+          const userData = userDoc.data() as User;
+          setProfile(userData);
+          setStoreProfile(userData);
+          safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+          return;
+        }
+      } catch (e) {
+        console.warn("[AuthContext] Firestore fetch failed:", e);
       }
-    } catch (ce) {
-      console.warn("[AuthContext] Cache fetch failed:", ce);
     }
 
-    // Fallback 2: Local storage fallback
+    // 3. Fallback: Local storage
     const local = safeStorage.getItem("brgy_user_profile");
     if (local) {
-      console.log("[AuthContext] Using local storage fallback");
-      const saved = JSON.parse(local);
-      setProfile(saved);
-      setStoreProfile(saved);
-      return;
+      try {
+        console.log("[AuthContext] Using local storage fallback");
+        const saved = JSON.parse(local);
+        setProfile(saved);
+        setStoreProfile(saved);
+        return;
+      } catch (e) {}
     }
 
-    // Default: Setup new profile
-    console.log("[AuthContext] Setting up default profile");
-    const userData: User = {
-      id: uid,
-      uid,
-      name: firebaseUser?.displayName || "Barangay Resident",
-      email: firebaseUser?.email || "",
-      role: "resident",
-      status: "approved",
-      createdAt: new Date().toISOString(),
-    };
-    setProfile(userData);
-    setStoreProfile(userData);
+    // 4. Default for new Firebase users if all above failed
+    if (firebaseUser) {
+      console.log("[AuthContext] Setting up default profile for Firebase user");
+      const userData: User = {
+        id: firebaseUser.uid,
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || "Barangay Resident",
+        email: firebaseUser.email || "",
+        role: "resident",
+        status: "approved",
+        createdAt: new Date().toISOString(),
+      };
+      setProfile(userData);
+      setStoreProfile(userData);
+    }
   };
 
   useEffect(() => {
@@ -160,22 +159,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fbUser) {
         // Update socket token
         try {
-          console.log("[AuthContext] Getting ID Token...");
           const token = await fbUser.getIdToken();
-          console.log("[AuthContext] ID Token obtained, setting storage...");
           safeStorage.setItem('token', token);
           
-          // Force socket update if it's already attempting or disconnected
           socket.auth = { token };
-          if (!socket.connected) {
-            socket.connect();
-          }
+          if (!socket.connected) socket.connect();
         } catch (tokenErr) {
           console.warn("[AuthContext] Failed to get ID token:", tokenErr);
         }
 
-        // Small delay to ensure Firestore is initialized
-        await new Promise(resolve => setTimeout(resolve, 500));
         await fetchProfile(fbUser.uid);
 
         // Register FCM token
@@ -188,12 +180,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
       } else {
-        setProfile(null);
-        setStoreProfile(null);
-        safeStorage.removeItem("brgy_user_profile");
-        safeStorage.removeItem("token");
-        if (socket.connected) {
-          socket.disconnect();
+        // IMPORTANT: If we have a backend token already, DO NOT clear everything.
+        // This allows backend-only/demo logins to survive page refreshes.
+        const existingToken = safeStorage.getItem('token');
+        const hasBackendToken = existingToken && existingToken.split('.').length === 3; // Basic JWT check
+
+        if (!hasBackendToken) {
+          console.log("[AuthContext] No Firebase user and no Backend token. Clearing state.");
+          setProfile(null);
+          setStoreProfile(null);
+          safeStorage.removeItem("brgy_user_profile");
+          safeStorage.removeItem("token");
+          if (socket.connected) socket.disconnect();
+        } else {
+          console.log("[AuthContext] No Firebase user but Backend token found. Retaining session.");
+          // Still try to fetch profile from backend
+          await fetchProfile();
         }
       }
 
@@ -205,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const refreshProfile = async () => {
-    if (firebaseUser?.uid) await fetchProfile(firebaseUser.uid);
+    await fetchProfile(firebaseUser?.uid);
   };
 
   const setUserRole = async (newRole: UserRole) => {

@@ -24,7 +24,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import * as api from './lib/api';
 
 const App: React.FC = () => {
-  const { profile: user, user: firebaseUser, loading } = useRBAC();
+  const { profile: user, user: firebaseUser, loading, refreshProfile } = useRBAC();
   const [activeTab, setActiveTab] = useState('home');
   const [viewOverride, setViewOverride] = useState<string | null>(localStorage.getItem('brgy_view_override'));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -106,9 +106,8 @@ const App: React.FC = () => {
       
       if (loginResponse?.success && loginResponse.data?.token) {
         safeStorage.setItem('token', loginResponse.data.token);
-        
-        // Force reload to trigger RBAC/AuthContext to pick up the new token
-        window.location.reload();
+        await refreshProfile();
+        toast.success("Demo link established.");
       } else {
         toast.error(loginResponse?.error?.message || "Login failed.");
       }
@@ -137,13 +136,10 @@ const App: React.FC = () => {
         firebaseIdToken: idToken
       });
       
-      // If our backend returned a custom JWT, we prefer that for local storage 'token'
-      // as it matches our CockroachDB/SQL structure perfectly.
       if (loginResponse?.success && loginResponse.data?.token) {
         safeStorage.setItem('token', loginResponse.data.token);
+        toast.success("Tactical link established.");
       }
-      
-      toast.success("Tactical link established.");
     } catch (err: any) {
       toast.error(err.message || "Failed to establish secure link.");
     } finally {
@@ -167,8 +163,8 @@ const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Reset initialization if user logs out
-    if (!firebaseUser) {
+    // Reset initialization if user logs out (Firebase OR Backend)
+    if (!firebaseUser && !user) {
       setIsInitialized(false);
       return;
     }
@@ -223,8 +219,8 @@ const App: React.FC = () => {
     );
   }
 
-  // Auth Screen if not logged in
-  if (!firebaseUser) {
+  // Auth Screen if not logged in via Firebase OR Backend
+  if (!firebaseUser && !user) {
     if (activeTab === 'register') {
       return (
         <RegistrationForm 
