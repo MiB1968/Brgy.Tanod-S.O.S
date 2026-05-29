@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732" viewBox="0 0 2732 2732">
+  <rect width="2732" height="2732" fill="#0f172a"/>
+  <circle cx="1366" cy="1366" r="400" fill="#3b82f6"/>
+  <path d="M1366 1100 L1600 1600 L1132 1600 Z" fill="#ffffff"/>
+  <text x="1366" y="1900" font-family="sans-serif" font-weight="bold" font-size="120" fill="#ffffff" text-anchor="middle">Brgy.Tanod-S.O.S</text>
+  <text x="1366" y="2050" font-family="sans-serif" font-size="60" fill="#94a3b8" text-anchor="middle">OFFLINE-FIRST EMERGENCY RESPONSE</text>
+</svg>

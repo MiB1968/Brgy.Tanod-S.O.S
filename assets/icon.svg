@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0f172a"/>
+  <circle cx="512" cy="512" r="300" fill="#3b82f6"/>
+  <path d="M512 350 L650 650 L374 650 Z" fill="#ffffff"/>
+  <text x="512" y="850" font-family="sans-serif" font-weight="bold" font-size="80" fill="#ffffff" text-anchor="middle">S.O.S</text>
+</svg>

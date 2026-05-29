@@ -98,10 +98,47 @@ export default function AppLayout({
         handleInstallApp={handleInstallApp}
       />
 
+      {/* Mobile menu overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] md:hidden cursor-pointer"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden w-full relative z-0">
         {/* Top Bar / Status */}
         <div className="h-1.5 bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 shrink-0" />
+
+        {/* Mobile Top Bar */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-950/70 border-b border-white/5 backdrop-blur-xl shrink-0 z-40">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 rounded-xl bg-slate-900/80 border border-white/10 text-white hover:bg-slate-800 transition-all hover:border-emergency/35 active:scale-95 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.05)]"
+              aria-label="Open side drawer"
+              id="mobile-drawer-trigger"
+            >
+              <Menu className="w-5 h-5 text-emergency animate-pulse" />
+            </button>
+            <div className="flex flex-col">
+              <span className="text-xs font-black font-mono tracking-widest text-white leading-none uppercase italic">
+                BRGY.<span className="text-emergency">S.O.S.</span>
+              </span>
+              <span className="text-[7.5px] font-black text-white/30 uppercase tracking-[0.25em] font-mono leading-none mt-1">
+                Central_Console
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-[#0F172A]/70 px-4 py-1.5 rounded-full border border-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-ping" />
+            <span className="text-[9px] font-mono font-black text-white/50 tracking-widest uppercase">
+              {effectiveRole}
+            </span>
+          </div>
+        </div>
         
         {/* Sandbox Override View Controller Banner */}
         {viewOverride && (
@@ -119,7 +156,7 @@ export default function AppLayout({
             
             <div className="flex flex-wrap items-center gap-1.5 justify-center">
               <span className="text-[9px] font-bold text-zinc-900/60 mr-1 uppercase font-mono hidden md:inline">Quick Swap:</span>
-              <button
+               <button
                 onClick={() => setViewOverride?.('admin')}
                 className={`px-2.5 py-1 rounded-[4px] text-[10px] font-mono font-bold uppercase transition-all tracking-tighter cursor-pointer ${
                   viewOverride === 'admin'
@@ -157,14 +194,6 @@ export default function AppLayout({
               </button>
             </div>
           </div>
-        )}
-        
-        {/* Mobile menu overlay */}
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-[90] md:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
         )}
 
         {children}

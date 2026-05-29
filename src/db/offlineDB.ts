@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import type { Protocol, CachedAudio } from '../types/guardian';
 
 export interface QueuedSOS {
   localId?: number; // Auto-incrementing primary key
@@ -49,6 +50,8 @@ export class SOSDatabase extends Dexie {
   synced!: Table<SyncedReport>;
   pendingLocations!: Table<PendingLocation>;
   aiChatHistory!: Table<AIChatMessage>;
+  protocols!: Table<Protocol>;
+  audioCache!: Table<CachedAudio>;
 
   constructor() {
     super('BrgyTanodSOS_DB');
@@ -87,6 +90,16 @@ export class SOSDatabase extends Dexie {
       synced: 'id, localId, userId, syncedAt',
       pendingLocations: 'id, userId, timestamp, status',
       aiChatHistory: '++id, sessionId, timestamp'
+    });
+
+    // SCHEMA VERSION 6: Added protocols and audioCache for local AI grounding and voice caching
+    this.version(6).stores({
+      outbox: '++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]',
+      synced: 'id, localId, userId, syncedAt',
+      pendingLocations: 'id, userId, timestamp, status',
+      aiChatHistory: '++id, sessionId, timestamp',
+      protocols: 'id, type, keywords',
+      audioCache: 'key, timestamp'
     });
   }
 }

@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { TanodWordmark } from './Branding';
 import { navItems, isRuben } from '../constants';
-import { LogOut } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 
 interface NavigationSidebarProps {
   activeTab: string;
@@ -49,7 +49,16 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
       <div className="absolute top-0 left-0 w-full h-full bg-brand-bg/40 backdrop-blur-2xl -z-10" />
       <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-emergency/5 blur-[100px] rounded-full" />
       
-      <div className="p-6 pt-10 sm:pt-12 overflow-hidden flex flex-col items-center sm:items-start">
+      <div className="p-6 pt-10 sm:pt-12 overflow-hidden flex flex-col items-center sm:items-start relative">
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="md:hidden absolute top-4 right-4 p-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95 z-50"
+          aria-label="Close drawer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
         <div className="scale-75 sm:scale-90 origin-center sm:origin-left mb-2">
           <TanodWordmark size="md" className="filter drop-shadow-xl" />
         </div>

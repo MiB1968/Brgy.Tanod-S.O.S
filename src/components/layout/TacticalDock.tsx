@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bot, Mic, Volume2, ChevronRight, Menu, Info, HelpCircle } from 'lucide-react';
+import { Bot, Mic, Volume2, ChevronRight, Menu, Info, HelpCircle, Zap } from 'lucide-react';
 import { useRBAC } from '../../context/AuthContext';
+import { useAppStore } from '../../store/useAppStore';
 
 export default function TacticalDock() {
   const { role } = useRBAC();
+  const { liteMode, toggleLiteMode } = useAppStore();
   const [isOpen, setIsOpen] = useState(true);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSirenActive, setIsSirenActive] = useState(false);
@@ -210,6 +212,31 @@ export default function TacticalDock() {
                 </motion.button>
                 <span className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${isSirenActive ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>
                   {isSirenActive ? 'SIREN_ON' : 'SIREN'}
+                </span>
+              </div>
+
+              {/* 5. LITE MODE TOGGLE */}
+              <div className="flex flex-col items-center gap-1 w-full text-center group mt-1">
+                <motion.button
+                  whileHover={{ scale: 1.15 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    triggerHaptic(40);
+                    toggleLiteMode();
+                  }}
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden transition-all duration-300
+                    ${liteMode 
+                      ? 'bg-gradient-to-br from-emerald-600 via-teal-500 to-green-700 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]' 
+                      : 'bg-[#1E293B]/60 text-zinc-400 hover:text-white'
+                    }
+                  `}
+                  title="Toggle Lite Mode for low-end devices"
+                  id="tactical-dock-lite-btn"
+                >
+                  <Zap size={20} className={liteMode ? "animate-pulse" : ""} />
+                </motion.button>
+                <span className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${liteMode ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
+                  {liteMode ? 'LITE_ON' : 'LITE'}
                 </span>
               </div>
 

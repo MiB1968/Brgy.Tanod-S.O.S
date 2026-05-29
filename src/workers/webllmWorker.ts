@@ -45,6 +45,7 @@ self.onmessage = async (event) => {
       }
 
       let fullResponse = "";
+      const chunkSize = payload.chunkSize || 1; // Default to single token streaming to preserve backward compatibility
 
       const reply = await engine.chat.completions.create({
         messages: [
@@ -55,13 +56,32 @@ self.onmessage = async (event) => {
         temperature: 0.7,
       });
 
+      let buffer = "";
+      let tokenCount = 0;
+
       for await (const chunk of reply) {
         const delta = chunk.choices[0]?.delta?.content || "";
-        fullResponse += delta;
+        if (delta) {
+          fullResponse += delta;
+          buffer += delta;
+          tokenCount++;
 
+          if (tokenCount >= chunkSize) {
+            self.postMessage({
+              type: 'token',
+              payload: { token: buffer, fullResponse }
+            });
+            buffer = "";
+            tokenCount = 0;
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      if (buffer) {
         self.postMessage({
           type: 'token',
-          payload: { token: delta, fullResponse }
+          payload: { token: buffer, fullResponse }
         });
       }
 

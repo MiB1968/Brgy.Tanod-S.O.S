@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { useGuardian } from '../../hooks/useGuardian';
 import { audioUtils } from '../../lib/audio';
 import socket from '../../lib/socket';
+import { GuardianAILoader } from './GuardianAILoader';
 
 export const GuardianVoiceAssistant: React.FC = () => {
   const { 
@@ -29,9 +30,32 @@ export const GuardianVoiceAssistant: React.FC = () => {
   const [chatInput, setChatInput] = useState('');
   const [debug, setDebug] = useState<string | null>(null);
 
+  const [isLoadingLocalAI, setIsLoadingLocalAI] = useState(false);
+  const [localAIProgress, setLocalAIProgress] = useState(0);
+  const [loaderMessage, setLoaderMessage] = useState('');
+
   const dragControls = useDragControls();
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Monitor for global worker-centric progress changes
+  useEffect(() => {
+    const handleGuardianEvent = (e: any) => {
+      const { type, payload } = e.detail || {};
+      if (type === 'progress') {
+        setIsLoadingLocalAI(true);
+        setLocalAIProgress(payload.progress || 0);
+        setLoaderMessage(payload.text || 'Downloading model weights...');
+      } else if (type === 'ready' || type === 'error') {
+        setIsLoadingLocalAI(false);
+      }
+    };
+
+    window.addEventListener('guardian-ai-event', handleGuardianEvent as any);
+    return () => {
+      window.removeEventListener('guardian-ai-event', handleGuardianEvent as any);
+    };
+  }, []);
 
   // Visualizer logic
   useEffect(() => {
@@ -132,16 +156,27 @@ export const GuardianVoiceAssistant: React.FC = () => {
   }, [isListening]);
 
   return (
-    <motion.div 
-      drag
-      dragControls={dragControls}
-      dragListener={false}
-      dragMomentum={false}
-      onDragStart={() => setIsDraggable(true)}
-      onDragEnd={() => {
-        setIsDraggable(false);
-        clearLongPressTimer();
-      }}
+    <>
+      <AnimatePresence>
+        {isLoadingLocalAI && (
+          <GuardianAILoader 
+            progress={localAIProgress} 
+            message={loaderMessage} 
+            onDismiss={() => setIsLoadingLocalAI(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div 
+        drag
+        dragControls={dragControls}
+        dragListener={false}
+        dragMomentum={false}
+        onDragStart={() => setIsDraggable(true)}
+        onDragEnd={() => {
+          setIsDraggable(false);
+          clearLongPressTimer();
+        }}
       className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 touch-none"
       style={{ x: 0, y: 0 }} // Initialize with 0 to prevent jumping
     >
@@ -344,5 +379,6 @@ export const GuardianVoiceAssistant: React.FC = () => {
         </motion.button>
       </div>
     </motion.div>
+    </>
   );
 };

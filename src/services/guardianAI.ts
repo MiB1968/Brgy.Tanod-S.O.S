@@ -21,6 +21,28 @@ export class GuardianAI {
   private useBackendFallback = false;
   private currentSessionId = `session_${Date.now()}`;
   private currentState: GuardianState = 'IDLE';
+  private deviceProfile: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
+
+  private constructor() {
+    this.deviceProfile = this.calibrateDevice();
+  }
+
+  private calibrateDevice(): 'HIGH' | 'MEDIUM' | 'LOW' {
+    if (typeof navigator === 'undefined') return 'MEDIUM';
+    const memory = (navigator as any).deviceMemory || 4; // GB
+    const hardwareConcurrency = navigator.hardwareConcurrency || 4;
+
+    if (memory <= 3 || hardwareConcurrency <= 4) {
+      console.log('🛡️ Low-end device detected. Using conservative chunk sizes for local AI inference.');
+      return 'LOW';
+    }
+    if (memory >= 6 && hardwareConcurrency >= 8) return 'HIGH';
+    return 'MEDIUM';
+  }
+
+  public getChunkSize(): number {
+    return this.deviceProfile === 'LOW' ? 8 : 1; // Bigger chunks group message passing on slower phones
+  }
 
   get isLoaded(): boolean {
     return this.isInitialized;
@@ -314,7 +336,13 @@ export class GuardianAI {
       };
 
       this.messageHandlers.set(uniqueId, handler);
-      this.worker?.postMessage({ type: 'generate', payload: { prompt: enhancedPrompt } });
+      this.worker?.postMessage({ 
+        type: 'generate', 
+        payload: { 
+          prompt: enhancedPrompt,
+          chunkSize: this.getChunkSize()
+        } 
+      });
     });
   }
 
