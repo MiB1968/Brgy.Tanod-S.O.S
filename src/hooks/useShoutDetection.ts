@@ -35,10 +35,11 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
       const checkVolume = () => {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
+        const len = dataArray.length;
+        for (let i = 0; i < len; i++) {
           sum += dataArray[i];
         }
-        const average = sum / dataArray.length;
+        const average = sum / len;
         
         // Threshold: 100 for high volume
         if (average > 110) {
