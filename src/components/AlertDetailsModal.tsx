@@ -23,15 +23,15 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   useEffect(() => {
     if (alert && alert.residentId) {
       setLoadingResident(true);
-      api.generic.get(`residents/${alert.residentId}`)
-        .then((data) => {
-          if (data) {
-            setResident(data as ResidentProfile);
-          } else {
-             // Fallback to checking users collection
-             api.generic.get(`users/${alert.residentId}`).then(uData => {
-                if (uData) setResident(uData as any);
-             });
+      Promise.all([
+        api.generic.get(`residents/${alert.residentId}`).catch(() => null),
+        api.generic.get(`users/${alert.residentId}`).catch(() => null)
+      ])
+        .then(([resData, uData]) => {
+          if (resData) {
+            setResident(resData as ResidentProfile);
+          } else if (uData) {
+            setResident(uData as any);
           }
         })
         .finally(() => setLoadingResident(false));
