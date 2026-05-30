@@ -13,7 +13,7 @@ import {
   Key 
 } from 'lucide-react';
 import { TanodLogo, BackgroundPattern } from './Branding';
-import { User, UserRole, ResidentProfile } from '../types';
+import { User, UserRole } from '../types';
 import { cn } from '../lib/utils';
 import * as safeStorage from '../lib/safeStorage';
 
