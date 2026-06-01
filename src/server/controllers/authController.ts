@@ -10,6 +10,52 @@ import { logAction } from '../services/auditService';
 // Ensure Firebase Admin is initialized
 initDatabase();
 
+// Helper to sync role to Firebase custom claims
+async function syncUserRoleToFirebase(userIdOrEmail: string, role: string) {
+  try {
+    let firebaseUid: string | null = null;
+
+    if (userIdOrEmail.includes('@')) {
+      // It is an email address
+      try {
+        const fbUser = await admin.auth().getUserByEmail(userIdOrEmail.toLowerCase());
+        firebaseUid = fbUser.uid;
+      } catch (err: any) {
+        console.warn(`[Auth] Firebase user not found by email (${userIdOrEmail}):`, err.message);
+      }
+    } else {
+      // It might be a Postgres UUID. Let's check Postgres first to resolve the email.
+      try {
+        const userRes = await pool.query('SELECT email FROM users WHERE id = $1', [userIdOrEmail]);
+        if (userRes.rows.length > 0) {
+          const email = userRes.rows[0].email;
+          const fbUser = await admin.auth().getUserByEmail(email.toLowerCase());
+          firebaseUid = fbUser.uid;
+        } else {
+          // Fallback check if it was already a direct Firebase Auth UID
+          try {
+            const fbUser = await admin.auth().getUser(userIdOrEmail);
+            firebaseUid = fbUser.uid;
+          } catch {
+            // Unresolvable
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Auth] Resolve check failed for ID ${userIdOrEmail}:`, err.message);
+      }
+    }
+
+    if (firebaseUid) {
+      await admin.auth().setCustomUserClaims(firebaseUid, { role });
+      console.log(`[Auth] Custom claims synced for Firebase user ${firebaseUid} with role: ${role}`);
+    } else {
+      console.warn(`[Auth] Could not resolve Firebase UID for ${userIdOrEmail} to sync claims.`);
+    }
+  } catch (err: any) {
+    console.error(`[Auth] Failed to set custom claims for ${userIdOrEmail}:`, err.message);
+  }
+}
+
 // ── Cookie options (single source of truth) ──────────────────────────────────
 const isProduction = true; // Force production-style cookies for better cross-origin compatibility
 
@@ -87,6 +133,9 @@ export const register = async (req: Request, res: Response) => {
       { expiresIn: '7d' }
     );
     res.cookie('token', token, cookieOptions);
+
+    // Sync role to Firebase custom claims (especially important for tanod/admin)
+    await syncUserRoleToFirebase(user.id, user.role);
 
     return response.success(
       res,
@@ -200,6 +249,11 @@ export const login = async (req: Request, res: Response) => {
       );
       res.cookie('token', token, cookieOptions);
 
+      // Sync role to Firebase custom claims
+      if (user) {
+        await syncUserRoleToFirebase(user.id, user.role);
+      }
+
       const { password: _, ...userWithoutPass } = user;
       return response.success(res, { user: userWithoutPass, token }, 'Google login successful');
     }
@@ -269,6 +323,11 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: '7d' }
     );
     res.cookie('token', token, cookieOptions);
+    
+    // Sync role to Firebase custom claims
+    if (currentUser) {
+      await syncUserRoleToFirebase(currentUser.id, currentUser.role);
+    }
     
     const { password: _, ...userWithoutPass } = currentUser;
     return response.success(res, { user: userWithoutPass, token }, 'Login successful');
