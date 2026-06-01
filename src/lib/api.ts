@@ -51,8 +51,24 @@ export const generic = {
 };
 
 export const admin = {
+  getUsers: () => fetchAPI('/admin/users'),
   createUser: (data: any) => fetchAPI('/admin/users', {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  updateUserRole: (id: string, role: string) => fetchAPI(`/admin/users/${id}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  }),
+  updateUserStatus: (id: string, status: string) => fetchAPI(`/admin/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  deleteUser: (id: string) => fetchAPI(`/admin/users/${id}`, {
+    method: 'DELETE',
+  }),
+  resendWelcomeEmail: (userId: string) => fetchAPI('/admin/users/resend-welcome', {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
   }),
 };

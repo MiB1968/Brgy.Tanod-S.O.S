@@ -39,7 +39,8 @@ export const residents = pgTable('residents', {
   selfieUrl: text('selfie_url'),
   status: text('status').default('pending'),
   isVerified: boolean('is_verified').default(false),
-  verificationDate: timestamp('verification_date', { withTimezone: true })
+  verificationDate: timestamp('verification_date', { withTimezone: true }),
+  rejectionReason: text('rejection_reason')
 });
 
 export const alerts = pgTable('alerts', {

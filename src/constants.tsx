@@ -18,7 +18,8 @@ import {
   UserCheck,
   UserPlus,
   Bot,
-  HardDrive
+  HardDrive,
+  Users
 } from 'lucide-react';
 
 export const SOS_SUGGESTIONS: Record<string, string[]> = {
@@ -67,6 +68,7 @@ export const navItems = [
   { id: 'areas', label: '📥 Offline Cache', icon: HardDrive },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
   { id: 'verification', label: '🛡 Verification', icon: UserCheck },
+  { id: 'users', label: '👥 Users Roster', icon: Users },
   { id: 'create-user', label: '👤 Create User', icon: UserPlus },
   { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },
   { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },

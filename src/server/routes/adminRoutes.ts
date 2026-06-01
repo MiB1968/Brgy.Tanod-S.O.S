@@ -22,6 +22,9 @@ router.post(
 // GET /api/admin/users — list all users
 router.get('/users', adminController.listUsers);
 
+// POST /api/admin/users/resend-welcome — resend welcome email with temporary credential passcode
+router.post('/users/resend-welcome', adminController.resendWelcomeEmail);
+
 // PATCH /api/admin/users/:id/role — change a user's role
 router.patch('/users/:id/role', adminController.updateUserRole);
 

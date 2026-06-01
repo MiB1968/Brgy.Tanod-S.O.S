@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as api from '../../lib/api';
 import { User } from '../../types';
-import { CheckCircle, XCircle, Clock, Shield, Search, UserCheck, Eye, MapPin, Calendar, Phone, Home, X, Mail } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Shield, Search, UserCheck, Eye, MapPin, Calendar, Phone, Home, X, Mail, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapContainer, Marker } from 'react-leaflet';
 import L from 'leaflet';
@@ -30,6 +30,8 @@ export const ResidentVerification = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'verified'>('pending');
   const [search, setSearch] = useState('');
   const [selectedInspect, setSelectedInspect] = useState<any | null>(null);
+  const [showRejectPrompt, setShowRejectPrompt] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const loadResidents = async () => {
     try {
@@ -47,13 +49,19 @@ export const ResidentVerification = () => {
     loadResidents();
   }, []);
 
-  const handleVerify = async (id: string, status: 'approved' | 'rejected' | 'pending') => {
+  const handleVerify = async (id: string, status: 'approved' | 'rejected' | 'pending', reason?: string) => {
     try {
-      await api.residents.update(id, {
+      const updatePayload: any = {
         status: status,
         isVerified: status === 'approved',
         verificationDate: new Date().toISOString()
-      });
+      };
+      if (status === 'rejected') {
+        updatePayload.rejectionReason = reason || 'Audited and rejected by administrator';
+      } else {
+        updatePayload.rejectionReason = '';
+      }
+      await api.residents.update(id, updatePayload);
       
       // Also update the main user status
       await api.generic.update(`users/${id}`, { status });
@@ -62,9 +70,11 @@ export const ResidentVerification = () => {
       
       // Update selectedInspect state if modal is open
       if (selectedInspect && selectedInspect.id === id) {
-        setSelectedInspect((prev: any) => prev ? { ...prev, status, isVerified: status === 'approved' } : null);
+        setSelectedInspect((prev: any) => prev ? { ...prev, status, isVerified: status === 'approved', rejectionReason: reason || '' } : null);
       }
 
+      setShowRejectPrompt(false);
+      setRejectionReason('');
       loadResidents();
     } catch (err) {
       toast.error('Verification update failed');
@@ -301,7 +311,11 @@ export const ResidentVerification = () => {
                     </p>
                   </div>
                   <button 
-                    onClick={() => setSelectedInspect(null)} 
+                    onClick={() => {
+                      setSelectedInspect(null);
+                      setShowRejectPrompt(false);
+                      setRejectionReason('');
+                    }} 
                     className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/10"
                   >
                     <X className="w-5 h-5 text-white/60" />
@@ -412,36 +426,110 @@ export const ResidentVerification = () => {
                 </div>
 
                 {/* Footer Controls */}
-                <div className="p-6 md:p-8 bg-black/40 border-t border-white/5 flex flex-col sm:flex-row justify-end items-center gap-3">
-                  <button
-                    onClick={() => setSelectedInspect(null)}
-                    className="w-full sm:w-auto px-6 py-4 border border-white/10 hover:bg-white/5 font-mono text-xs font-black uppercase tracking-wider rounded-2xl text-white/60 hover:text-white transition-all text-center"
-                  >
-                    Close Inspector
-                  </button>
-                  
-                  {detailed.status === 'pending' ? (
-                    <div className="flex w-full sm:w-auto gap-3">
-                      <button
-                        onClick={() => handleVerify(detailed.id, 'rejected')}
-                        className="flex-1 sm:flex-none px-6 py-4 bg-red-950/20 hover:bg-red-950/40 border border-tactical-red/30 hover:border-tactical-red text-tactical-red font-mono text-xs font-black uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2"
-                      >
-                        <XCircle className="w-4 h-4" /> Reject Account
-                      </button>
-                      <button
-                        onClick={() => handleVerify(detailed.id, 'approved')}
-                        className="flex-2 sm:flex-none px-10 py-4 bg-tactical-cyan text-black font-mono text-xs font-black uppercase tracking-wider rounded-2xl hover:scale-[1.02] active:scale-95 shadow-lg shadow-tactical-cyan/10 transition-all flex items-center justify-center gap-2"
-                      >
-                        <CheckCircle className="w-4 h-4" /> Authorize & Clear
-                      </button>
+                <div className="p-6 md:p-8 bg-black/40 border-t border-white/5 space-y-6">
+                  {showRejectPrompt ? (
+                    <div className="bg-red-500/5 p-6 rounded-3xl border border-red-500/20 space-y-4 animate-in slide-in-from-bottom duration-200">
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-red-550 font-mono flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-500" /> Specify Rejection Parameters (Kulang na Detalye)
+                        </h4>
+                        <p className="text-[10px] text-white/40 font-mono uppercase mt-1">
+                          Select a standard template or describe details with localized Tagalog instructions
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          "Malabong Larawan o Selfie (Blurry Selfie Photograph)",
+                          "Maling Pangalan o ID Mismatch (Government ID mismatches record)",
+                          "Maling Bahay o GPS Coordinates (GPS pin outside barangay bounds)",
+                          "Hindi Ma-verify na Numero (Phone confirmation invalid)"
+                        ].map(tpl => {
+                          const isSelected = rejectionReason === tpl;
+                          return (
+                            <button
+                              key={tpl}
+                              type="button"
+                              onClick={() => setRejectionReason(tpl)}
+                              className={`p-3 text-[9px] font-mono font-black uppercase tracking-wide text-left rounded-xl border transition-all cursor-pointer ${
+                                isSelected 
+                                  ? 'bg-red-500/15 border-red-500 text-red-400 font-extrabold shadow-lg' 
+                                  : 'bg-black/20 border-white/5 hover:bg-black/40 hover:border-white/10 text-white/60'
+                              }`}
+                            >
+                              {tpl}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[8px] font-mono text-white/30 tracking-widest uppercase block">Custom local audit notes / Karagdagang paliwanag (Optional)</label>
+                        <textarea
+                          placeholder="PAALALA SA RESIDENTE: ILAGAY KUNG ANONG PAPELES ANG DAPAT NA MULING KUNIN..."
+                          value={rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          className="w-full h-16 bg-black/40 border border-white/5 rounded-xl p-3 text-[10px] font-mono text-white placeholder-white/15 focus:outline-none focus:border-red-500/50 uppercase"
+                        />
+                      </div>
+
+                      <div className="flex gap-3 justify-end pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRejectPrompt(false);
+                            setRejectionReason('');
+                          }}
+                          className="px-5 py-3 border border-white/10 hover:bg-white/5 text-[9px] font-mono uppercase font-black tracking-wider text-white/60 hover:text-white rounded-xl transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleVerify(detailed.id, 'rejected', rejectionReason)}
+                          className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-[9px] uppercase font-black tracking-wider rounded-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg shadow-red-600/10 cursor-pointer"
+                        >
+                          Submit Rejection
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => handleVerify(detailed.id, 'pending')}
-                      className="w-full sm:w-auto px-6 py-4 border border-white/10 hover:border-white/30 hover:bg-white/5 font-mono text-xs font-black uppercase tracking-wider rounded-2xl text-white/40 hover:text-white transition-all text-center"
-                    >
-                      Revoke Credentials (Set Pending)
-                    </button>
+                    <div className="flex flex-col sm:flex-row justify-end items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setSelectedInspect(null);
+                          setShowRejectPrompt(false);
+                          setRejectionReason('');
+                        }}
+                        className="w-full sm:w-auto px-6 py-4 border border-white/10 hover:bg-white/5 font-mono text-xs font-black uppercase tracking-wider rounded-2xl text-white/60 hover:text-white transition-all text-center cursor-pointer"
+                      >
+                        Close Inspector
+                      </button>
+                      
+                      {detailed.status === 'pending' ? (
+                        <div className="flex w-full sm:w-auto gap-3">
+                          <button
+                            onClick={() => setShowRejectPrompt(true)}
+                            className="flex-1 sm:flex-none px-6 py-4 bg-red-950/20 hover:bg-red-950/40 border border-tactical-red/30 hover:border-tactical-red text-tactical-red font-mono text-xs font-black uppercase tracking-wider rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <XCircle className="w-4 h-4" /> Reject Account
+                          </button>
+                          <button
+                            onClick={() => handleVerify(detailed.id, 'approved')}
+                            className="flex-2 sm:flex-none px-10 py-4 bg-tactical-cyan text-black font-mono text-xs font-black uppercase tracking-wider rounded-2xl hover:scale-[1.02] active:scale-95 shadow-lg shadow-tactical-cyan/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Authorize & Clear
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleVerify(detailed.id, 'pending')}
+                          className="w-full sm:w-auto px-6 py-4 border border-white/10 hover:border-white/30 hover:bg-white/5 font-mono text-xs font-black uppercase tracking-wider rounded-2xl text-white/40 hover:text-white transition-all text-center cursor-pointer"
+                        >
+                          Revoke Credentials (Set Pending)
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </motion.div>
