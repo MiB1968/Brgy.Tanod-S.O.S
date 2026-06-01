@@ -49,3 +49,10 @@ export const generic = {
   }),
   list: (path: string) => fetchAPI(`/sync?path=${encodeURIComponent(path)}`),
 };
+
+export const admin = {
+  createUser: (data: any) => fetchAPI('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+};

@@ -16,6 +16,7 @@ import {
   MapPin, 
   Navigation,
   UserCheck,
+  UserPlus,
   Bot,
   HardDrive
 } from 'lucide-react';
@@ -66,6 +67,7 @@ export const navItems = [
   { id: 'areas', label: '📥 Offline Cache', icon: HardDrive },
   { id: 'tracker', label: '📍 Tactical GPS', icon: Navigation },
   { id: 'verification', label: '🛡 Verification', icon: UserCheck },
+  { id: 'create-user', label: '👤 Create User', icon: UserPlus },
   { id: 'resident-map', label: '📍 Resident Map', icon: MapPin },
   { id: 'roster', label: '👮 Tanods', icon: IconOnlineTanods },
   { id: 'schedule', label: '📅 Schedule', icon: Clock },

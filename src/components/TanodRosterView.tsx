@@ -15,6 +15,7 @@ export default function TanodRosterView() {
   const [addingUnit, setAddingUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
   const [newUnitEmail, setNewUnitEmail] = useState('');
+  const [newUnitPassword, setNewUnitPassword] = useState('');
 
   const fetchTanods = async () => {
     try {
@@ -35,24 +36,30 @@ export default function TanodRosterView() {
   }, []);
 
   const handleAddUnit = async () => {
-    if (!newUnitName.trim() || !newUnitEmail.trim()) return;
+    if (!newUnitName.trim() || !newUnitEmail.trim() || !newUnitPassword.trim()) {
+      toast.error('All deployment parameters required (Name, Email, Password)');
+      return;
+    }
+    if (newUnitPassword.length < 6) {
+      toast.error('Access passcode must be at least 6 characters.');
+      return;
+    }
     try {
-      await api.generic.create('users', {
-        id: Date.now().toString(),
+      await api.admin.createUser({
         name: newUnitName,
-        email: newUnitEmail,
-        role: 'tanod',
-        status: 'approved',
-        createdAt: new Date().toISOString()
+        email: newUnitEmail.toLowerCase().trim(),
+        password: newUnitPassword,
+        role: 'tanod'
       });
       setAddingUnit(false);
       setNewUnitName('');
       setNewUnitEmail('');
-      toast.success('Unit Registered Successfully');
+      setNewUnitPassword('');
+      toast.success('Tanod Unit Deployed Successfully');
       socket.emit('tanod_update', {});
     } catch (e: any) {
       console.error("Failed to add unit", e);
-      toast.error('Failed to register unit');
+      toast.error(e.message || 'Failed to deploy peacekeeper unit');
     }
   };
 
@@ -103,6 +110,16 @@ export default function TanodRosterView() {
                     value={newUnitEmail}
                     onChange={(e) => setNewUnitEmail(e.target.value)}
                     placeholder="unit_alpha@brgy.gov"
+                    className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white placeholder-white/10 focus:outline-none focus:border-emergency/50 font-mono font-bold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase mb-2 block font-mono">Access Passcode (Password)</label>
+                  <input 
+                    type="password"
+                    value={newUnitPassword}
+                    onChange={(e) => setNewUnitPassword(e.target.value)}
+                    placeholder="••••••••"
                     className="w-full bg-brand-bg/50 border border-white/5 rounded-2xl p-5 text-white placeholder-white/10 focus:outline-none focus:border-emergency/50 font-mono font-bold"
                   />
                 </div>

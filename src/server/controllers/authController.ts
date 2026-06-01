@@ -98,24 +98,39 @@ export const register = async (req: Request, res: Response) => {
     );
     const user = result.rows[0];
 
-    if (role === 'resident' && details) {
-      await client.query(
-        `INSERT INTO residents
-           (id, name, phone, address, house_number, household_size,
-            blood_type, medical_conditions,
-            emergency_contact_name, emergency_contact_phone,
-            gps_lat, gps_lng, selfie_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          user.id, name,
-          details.phone, details.address, details.houseNumber,
-          details.householdSize, details.bloodType,
-          details.medicalConditions,
-          details.emergencyContactName, details.emergencyContactPhone,
-          details.gpsLat, details.gpsLng,
-          details.selfieUrl,
-        ]
-      );
+    // =====================================================
+    // ALWAYS create residents record for new resident users
+    // =====================================================
+    if (role === 'resident') {
+      try {
+        await client.query(
+          `INSERT INTO residents 
+             (id, name, status, phone, address, house_number, household_size, 
+              blood_type, medical_conditions, emergency_contact_name, 
+              emergency_contact_phone, gps_lat, gps_lng, selfie_url)
+           VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            user.id,
+            name,
+            details?.phone || null,
+            details?.address || null,
+            details?.houseNumber || null,
+            details?.householdSize !== undefined ? Number(details.householdSize) : 1,
+            details?.bloodType || null,
+            details?.medicalConditions || null,
+            details?.emergencyContactName || null,
+            details?.emergencyContactPhone || null,
+            details?.gpsLat !== undefined && details?.gpsLat !== null ? Number(details.gpsLat) : null,
+            details?.gpsLng !== undefined && details?.gpsLng !== null ? Number(details.gpsLng) : null,
+            details?.selfieUrl || null,
+          ]
+        );
+        console.log(`[Auth] Resident record created for user ${user.id} with status: pending`);
+      } catch (err: any) {
+        console.error(`[Auth] Failed to create residents record for ${user.id}:`, err.message);
+        // Do not fail the whole registration if this fails
+      }
     } else if (role === 'tanod') {
       await client.query(
         `INSERT INTO patrols (tanod_id, tanod_name, is_active, status)

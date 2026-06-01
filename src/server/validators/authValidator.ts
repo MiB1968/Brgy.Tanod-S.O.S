@@ -46,13 +46,20 @@ export const registerSchema = z.object({
 // Use this on a separate protected route, e.g. POST /api/admin/users
 export const adminCreateUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(6).optional(),
+  autoGeneratePassword: z.boolean().optional(),
   name: z.string().min(2).max(100),
   role: z.enum(['resident', 'tanod', 'admin', 'superadmin']),
   details: z
     .object({
-      phone: z.string().optional(),
-      address: z.string().optional(),
+      phone: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+      houseNumber: z.string().nullable().optional(),
+      householdSize: z.number().int().min(1).optional(),
+      bloodType: z.string().nullable().optional(),
+      medicalConditions: z.string().nullable().optional(),
+      emergencyContactName: z.string().nullable().optional(),
+      emergencyContactPhone: z.string().nullable().optional(),
     })
     .optional(),
 });

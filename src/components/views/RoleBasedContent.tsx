@@ -14,6 +14,7 @@ const ResidentDashboard = lazy(() => import("../ResidentDashboard").then(m => ({
 const AdminResidents = lazy(() => import("../AdminResidents"));
 const ResidentVerification = lazy(() => import("../Admin/ResidentVerification").then(m => ({ default: m.ResidentVerification })));
 const ResidentTacticalMap = lazy(() => import("../Admin/ResidentTacticalMap"));
+const CreateUserForm = lazy(() => import("../Admin/CreateUserForm"));
 const TanodRosterView = lazy(() => import("../TanodRosterView"));
 const ScheduleView = lazy(() => import("../ScheduleView"));
 const ReportsView = lazy(() => import("../ReportsView"));
@@ -119,6 +120,14 @@ export function RoleBasedContent({
           <div className="p-4 md:p-8 space-y-6">
             <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Resident Verification</h1>
             <ResidentVerification />
+          </div>
+        );
+
+      case "create-user":
+        return (
+          <div className="p-4 md:p-8 space-y-6">
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Deploy Profile Account</h1>
+            <CreateUserForm />
           </div>
         );
 
