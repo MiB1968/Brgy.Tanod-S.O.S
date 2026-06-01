@@ -214,13 +214,13 @@ export function LoginView({
               </button>
             </div>
             
-            <button
-               onClick={() => window.open(window.location.href, '_blank')}
-               className="w-full flex items-center justify-center gap-2 bg-emergency/10 border border-emergency/20 text-emergency font-black py-4 rounded-[20px] hover:bg-emergency/20 active:scale-95 transition-all text-[11px] uppercase tracking-widest font-mono italic"
-            >
-                <div className="w-1.5 h-1.5 rounded-full bg-emergency animate-pulse" />
-                OPEN IN NEW TAB TO LOGIN
-            </button>
+            <div className="border border-emergency/20 bg-emergency/5 p-4 rounded-[20px] text-center">
+              <span className="text-[10px] font-mono font-black text-emergency uppercase tracking-[0.2em] block mb-2">IFRAME LIMITATION DETECTED</span>
+              <p className="text-[9px] text-white/50 leading-relaxed font-mono uppercase tracking-widest">
+                Google Login is blocked inside the preview window.<br/><br/>
+                Please click the <span className="text-white">"OPEN IN NEW TAB"</span> button at the <strong className="text-white">TOP RIGHT CORNER</strong> of the AI Studio screen to access the app natively.
+              </p>
+            </div>
             <div className="flex justify-center gap-4 pt-2">
                <button 
                  onClick={onResetSession}

@@ -307,10 +307,22 @@ export const incidentService = {
       [incidentId]
     );
 
+    const fullAlertRes = await pool.query(
+      `SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1`,
+      [incidentId]
+    );
+    const updatedAlertFull = fullAlertRes.rows[0];
+
     const updated = {
+      ...updatedAlertFull,
       id: incidentId,
       status: 'CANCELLED',
       updatedAt: result.rows[0].updated_at,
+      location: typeof updatedAlertFull.location === 'string' ? JSON.parse(updatedAlertFull.location) : updatedAlertFull.location,
+      aiAnalysis: typeof updatedAlertFull.ai_analysis === 'string' ? JSON.parse(updatedAlertFull.ai_analysis) : updatedAlertFull.ai_analysis,
+      timestamp: updatedAlertFull.created_at,
+      residentId: updatedAlertFull.resident_id,
+      residentName: updatedAlertFull.residentName
     };
 
     if (getIO()) {
@@ -335,6 +347,7 @@ export const incidentService = {
     
     return result.rows.map(a => ({
       ...a,
+      aiAnalysis: typeof a.ai_analysis === 'string' ? JSON.parse(a.ai_analysis) : a.ai_analysis,
       location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
       timestamp: a.created_at
     }));
@@ -374,7 +387,12 @@ export const incidentService = {
       notes: updated.responder_notes,
       assignedTo: updated.assigned_to,
       assignedToName: updated.assignedToName,
-      updatedAt: updated.updated_at
+      updatedAt: updated.updated_at,
+      location: typeof updated.location === 'string' ? JSON.parse(updated.location) : updated.location,
+      aiAnalysis: typeof updated.ai_analysis === 'string' ? JSON.parse(updated.ai_analysis) : updated.ai_analysis,
+      type: updated.type,
+      description: updated.description,
+      timestamp: updated.created_at
     };
 
     if (getIO()) {

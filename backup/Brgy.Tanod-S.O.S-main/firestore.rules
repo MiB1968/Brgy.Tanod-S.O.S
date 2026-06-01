@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users - strict control
+    match /users/{userId} {
+      allow read, update: if request.auth != null && 
+                          (request.auth.uid == userId || 
+                           request.auth.token.role in ['superadmin', 'admin']);
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Alerts / SOS - Critical!
+    match /alerts/{alertId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && 
+                   (request.auth.token.role in ['tanod', 'admin', 'superadmin'] ||
+                    resource.data.reportedBy == request.auth.uid);
+      allow update: if request.auth != null && 
+                    request.auth.token.role in ['tanod', 'admin', 'superadmin'];
+    }
+
+    // Patrols & Logs - Role restricted
+    match /patrols/{document=**} {
+      allow read, write: if request.auth != null && 
+                         request.auth.token.role in ['tanod', 'admin', 'superadmin'];
+    }
+
+    match /tanod_logs/{document=**} {
+      allow read, write: if request.auth != null && 
+                         request.auth.token.role in ['tanod', 'admin', 'superadmin'];
+    }
+
+    // Public read-only broadcasts
+    match /system_broadcasts/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                   request.auth.token.role in ['admin', 'superadmin'];
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -44,14 +44,16 @@ export const itemVariants = {
 };
 
 export const isRuben = (uid?: string, email?: string) => {
-  // Check against env variables instead of hardcoded strings
+  // Check against env variables and hardcoded bootstrap admin
   const masterEmail = (import.meta.env.VITE_MASTER_EMAIL || '').toLowerCase();
+  const normalizedEmail = email?.toLowerCase() || '';
   
-  if (!uid && !email) return false;
+  if (!uid && !normalizedEmail) return false;
 
   return (
-    (masterEmail && email?.toLowerCase() === masterEmail) ||
-    false
+    (masterEmail && normalizedEmail === masterEmail) ||
+    normalizedEmail === "rubenlleg12@gmail.com" ||
+    normalizedEmail === "ben@brgytanod.com"
   );
 };
 

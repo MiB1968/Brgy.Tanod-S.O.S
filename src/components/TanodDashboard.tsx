@@ -30,6 +30,7 @@ import AboutModal from "./AboutModal";
 import { AlertDetailsModal } from "./AlertDetailsModal";
 import IncidentForm from "./IncidentForm";
 import { usePWA } from "../hooks/usePWA";
+import { ConnectionIndicator } from "./common/ConnectionIndicator";
 
 // Stores & Hooks
 import { useIncidentStore } from "../store/useIncidentStore";
@@ -196,6 +197,10 @@ export default function TanodDashboard({
         onToggleSiren={onToggleSiren}
         updateTanodStatus={updateTanodStatus}
       />
+
+      <motion.div variants={containerVariants} className="w-full">
+        <ConnectionIndicator />
+      </motion.div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* LEFT COMPONENT - ALERTS FEED */}

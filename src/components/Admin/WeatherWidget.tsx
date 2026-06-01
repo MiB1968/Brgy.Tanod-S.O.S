@@ -4,6 +4,22 @@ import { TacticalCard } from '../Tactical/TacticalCard';
 import { CloudRain, Wind, AlertTriangle, Thermometer } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+const LOCAL_STORAGE_KEY = 'brgy_mamburao_weather_cache';
+
+const FALLBACK_WEATHER = {
+  current: {
+    temperature_2m: 31.0,
+    apparent_temperature: 36.5,
+    precipitation: 0.0,
+    wind_speed_10m: 12.0,
+    weather_code: 1, // Clear / Partly Cloudy
+  },
+  daily: {
+    wind_gusts_10m_max: [18.5]
+  },
+  isOffline: true,
+};
+
 export function WeatherWidget() {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -15,10 +31,25 @@ export function WeatherWidget() {
         const url = `https://api.open-meteo.com/v1/forecast?latitude=13.2236&longitude=120.5960&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,weather_code,wind_speed_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&timezone=Asia%2FManila`;
         
         const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP status: ${res.status}`);
+        }
         const data = await res.json();
         setWeather(data);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
       } catch (err) {
-        console.error('Weather fetch error:', err);
+        console.warn('Weather fetch error - utilizing local cache fallback:', err);
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            setWeather({ ...parsed, isOffline: true });
+          } catch {
+            setWeather(FALLBACK_WEATHER);
+          }
+        } else {
+          setWeather(FALLBACK_WEATHER);
+        }
       } finally {
         setLoading(false);
       }
@@ -57,7 +88,9 @@ export function WeatherWidget() {
       <div className="flex justify-between items-start mb-6 z-10 relative">
         <div>
           <h3 className="text-xl font-black font-mono text-white tracking-widest uppercase">Mamburao</h3>
-          <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-mono mt-0.5">Atmospheric Conditions</p>
+          <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-mono mt-0.5">
+            Atmospheric Conditions {weather.isOffline && <span className="text-[8px] text-amber-500 font-extrabold ml-1.5 animate-pulse">● OFFLINE_CACHE</span>}
+          </p>
         </div>
         
         {isDanger ? (

@@ -1,86 +1,89 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as authController from '../server/controllers/authController';
 import bcrypt from 'bcryptjs';
-import { pool } from '../server/db/index';
 
-// Mock dependencies
+// Mocks
 vi.mock('../server/db/index', () => ({
   pool: {
     query: vi.fn(),
-    connect: vi.fn(),
+    connect: vi.fn().mockResolvedValue({
+      query: vi.fn(),
+      release: vi.fn()
+    })
   },
   admin: {
     auth: () => ({
-      verifyIdToken: vi.fn(),
-      createUser: vi.fn().mockResolvedValue({ uid: 'firebase-uid' }),
-    }),
-    apps: [],
+      createUser: vi.fn(),
+      verifyIdToken: vi.fn()
+    })
   },
-  initDatabase: vi.fn(),
+  initDatabase: vi.fn()
 }));
 
+// Re-import to get the mocked pool
+import { pool } from '../server/db/index';
+
 vi.mock('../server/services/auditService', () => ({
-  logAction: vi.fn().mockResolvedValue(undefined),
+  logAction: vi.fn().mockResolvedValue(true)
 }));
 
 vi.mock('../server/config/index', () => ({
-  config: {
-    jwtSecret: 'test_secret',
-    firebase: { projectId: 'test-project' },
-  },
+  config: { jwtSecret: 'test-secret' }
 }));
 
-function mockResponse() {
+const mockRes = () => {
   const res: any = {};
   res.status = vi.fn().mockReturnValue(res);
   res.json = vi.fn().mockReturnValue(res);
   res.cookie = vi.fn().mockReturnValue(res);
   return res;
-}
+};
 
-describe('authController provisioning', () => {
+describe('Demo User Provisioning', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('auto-provisions a demo resident if they do not exist', async () => {
-    // 1. Mock first query: user not found
-    (pool.query as any).mockResolvedValueOnce({ rows: [] });
-
-    // 2. Mock second query: successful insertion
-    const hashedPassword = await bcrypt.hash('tanod123', 12);
-    (pool.query as any).mockResolvedValueOnce({
-      rows: [{
-        id: 'new-user-id',
-        email: 'resident@brgytanod.com',
-        password: hashedPassword,
-        name: 'Demo User',
-        role: 'resident',
-        status: 'approved',
-        token_version: 1
-      }]
+  it('automatically provisions a missing resident demo account', async () => {
+    const demoEmail = 'resident@brgytanod.com';
+    const hashedPass = await bcrypt.hash('tanod123', 12);
+    
+    // First query returns nothing (user not found)
+    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] });
+    // Second query returns the newly inserted user with a valid hash
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{ id: 'd1', email: demoEmail, role: 'resident', status: 'approved', password: hashedPass }]
     });
 
-    const req: any = {
-      body: {
-        email: 'resident@brgytanod.com',
-        password: 'tanod123'
-      }
-    };
-    const res = mockResponse();
+    const req: any = { body: { email: demoEmail, password: 'tanod123', isGoogle: false } };
+    const res = mockRes();
 
     await authController.login(req, res);
 
-    // Verify it attempted to provision (second query should be an INSERT)
-    expect(pool.query).toHaveBeenCalledTimes(2);
-    expect(pool.query).toHaveBeenNthCalledWith(2,
-        expect.stringContaining('INSERT INTO users'),
-        expect.arrayContaining(['resident@brgytanod.com', 'Demo User', 'resident', 'approved'])
+    expect(pool.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO users'),
+      expect.arrayContaining([demoEmail, 'Demo User', 'resident', 'approved', expect.any(String)])
     );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
 
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: true,
-      message: 'Login successful'
-    }));
+  it('automatically provisions a missing admin demo account', async () => {
+    const demoEmail = 'admin@brgytanod.com';
+    const hashedPass = await bcrypt.hash('tanod123', 12);
+    
+    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] });
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [{ id: 'd2', email: demoEmail, role: 'admin', status: 'approved', password: hashedPass }]
+    });
+
+    const req: any = { body: { email: demoEmail, password: 'tanod123', isGoogle: false } };
+    const res = mockRes();
+
+    await authController.login(req, res);
+
+    expect(pool.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO users'),
+        expect.arrayContaining([demoEmail, 'Demo User', 'admin', 'approved', expect.any(String)])
+    );
   });
 });

@@ -55,9 +55,9 @@ export function DashboardHeader({
         </h2>
         
         {/* Superior Admin Controls */}
-        {isSuperAdmin && (
-          <div className="flex flex-wrap items-center gap-4 mt-4">
-            {/* View Override Selector - Polished Interactive Toggle */}
+        <div className="flex flex-wrap items-center gap-4 mt-4">
+          {/* View Override Selector - Polished Interactive Toggle */}
+          {isSuperAdmin && (
             <div className="flex items-center gap-1 bg-gray-950/65 p-1 rounded-2xl border border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] relative">
               {[
                 { key: null, label: "Super", icon: Shield, activeClass: "bg-red-500/15 text-red-400 border-red-500/35", glowColor: "shadow-red-500/20" },
@@ -100,47 +100,47 @@ export function DashboardHeader({
                 </span>
               </div>
             </div>
+          )}
 
-            {/* Layout Switcher - Polished Interactive Toggle */}
-            <div className="flex items-center gap-1 bg-gray-950/65 p-1 rounded-2xl border border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] relative">
-              {([
-                { key: "monitor", icon: Monitor, label: "SOLO", title: "Focus Monitor (1 Panel)" },
-                { key: "standard", icon: Columns, label: "DUAL", title: "Strategic Split (2 Panels)" },
-                { key: "panoramic", icon: LayoutGrid, label: "PANORAMIC", title: "Panoramic Command (3 Panels)" },
-              ] as const).map((item) => {
-                const isSelected = layout === item.key;
-                const IconComponent = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => setLayout(item.key)}
-                    className="relative p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer select-none active:scale-95 group focus:outline-none"
-                    title={item.title}
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                  >
-                    {/* Animated Sliding Highlight Pill */}
-                    {isSelected && (
-                      <motion.div
-                        layoutId="activeLayoutPill"
-                        className="absolute inset-0 rounded-xl bg-cyan-950/30 border border-cyan-500/35 shadow-lg shadow-cyan-500/10"
-                        transition={{ type: "spring", stiffness: 350, damping: 28 }}
-                      />
-                    )}
-                    <span className="relative z-10">
-                      <IconComponent className={`w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110 ${isSelected ? 'text-cyan-400 animate-pulse' : 'text-white/45 group-hover:text-white/80'}`} />
-                    </span>
-                  </button>
-                );
-              })}
-              
-              <div className="px-3.5 py-1 border-l border-white/15 relative z-10 hidden sm:flex items-center">
-                <span className="text-[8px] font-black font-mono text-cyan-400/80 uppercase tracking-widest whitespace-nowrap animate-pulse">
-                  {layout === 'panoramic' ? '3_PANEL' : layout === 'standard' ? 'DUAL_PANEL' : 'SOLO_PANEL'}
-                </span>
-              </div>
+          {/* Layout Switcher - Polished Interactive Toggle */}
+          <div className="flex items-center gap-1 bg-gray-950/65 p-1 rounded-2xl border border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] relative">
+            {([
+              { key: "monitor", icon: Monitor, label: "SOLO", title: "Focus Monitor (1 Panel)" },
+              { key: "standard", icon: Columns, label: "DUAL", title: "Strategic Split (2 Panels)" },
+              { key: "panoramic", icon: LayoutGrid, label: "PANORAMIC", title: "Panoramic Command (3 Panels)" },
+            ] as const).map((item) => {
+              const isSelected = layout === item.key;
+              const IconComponent = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => setLayout(item.key)}
+                  className="relative p-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer select-none active:scale-95 group focus:outline-none"
+                  title={item.title}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
+                >
+                  {/* Animated Sliding Highlight Pill */}
+                  {isSelected && (
+                    <motion.div
+                      layoutId="activeLayoutPill"
+                      className="absolute inset-0 rounded-xl bg-cyan-950/30 border border-cyan-500/35 shadow-lg shadow-cyan-500/10"
+                      transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                    />
+                  )}
+                  <span className="relative z-10">
+                    <IconComponent className={`w-3.5 h-3.5 transition-transform duration-300 group-hover:scale-110 ${isSelected ? 'text-cyan-400 animate-pulse' : 'text-white/45 group-hover:text-white/80'}`} />
+                  </span>
+                </button>
+              );
+            })}
+            
+            <div className="px-3.5 py-1 border-l border-white/15 relative z-10 hidden sm:flex items-center">
+              <span className="text-[8px] font-black font-mono text-cyan-400/80 uppercase tracking-widest whitespace-nowrap animate-pulse">
+                {layout === 'panoramic' ? '3_PANEL' : layout === 'standard' ? 'DUAL_PANEL' : 'SOLO_PANEL'}
+              </span>
             </div>
           </div>
-        )}
+        </div>
 
         <p className="text-[8px] sm:text-[10px] font-mono text-white/40 uppercase tracking-[0.2em] sm:tracking-[0.4em] mt-2 bg-white/5 inline-block px-4 py-1.5 rounded-full border border-white/5">Strategic Response Matrix</p>
       </div>

@@ -338,10 +338,10 @@ export default function AdminDashboard(props: {
         setViewOverride={setViewOverride}
       />
 
-      <div className="flex flex-col xl:flex-row gap-6 items-start h-full">
+      <div className="flex flex-col lg:flex-row gap-6 items-start h-full">
         {/* LEFT PANEL - UNIT STATUS & FEEDS */}
         {(layout === 'panoramic' || layout === 'standard') && (
-          <div className="w-full xl:w-96 space-y-6 flex-shrink-0">
+          <div className="w-full lg:w-80 xl:w-96 space-y-6 flex-shrink-0">
             <AlertsFeed 
               alerts={alerts}
               profile={profile}
@@ -439,7 +439,7 @@ export default function AdminDashboard(props: {
 
         {/* RIGHT PANEL - COMMAND & REPORTS */}
         {layout === 'panoramic' && (
-          <div className="w-full xl:w-96 space-y-6 flex-shrink-0">
+          <div className="w-full lg:w-80 xl:w-96 space-y-6 flex-shrink-0">
             <SOSBroadcastPanel profile={profile} />
             <BroadcastReview />
             <WeatherWidget />

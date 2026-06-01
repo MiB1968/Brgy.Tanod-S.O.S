@@ -84,6 +84,7 @@ export const getSync = async (req: AuthRequest, res: Response) => {
 
         return res.json({
           ...alert,
+          aiAnalysis: typeof alert.ai_analysis === 'string' ? JSON.parse(alert.ai_analysis) : alert.ai_analysis,
           location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
           timestamp: alert.created_at
         });
@@ -99,6 +100,7 @@ export const getSync = async (req: AuthRequest, res: Response) => {
         const result = await pool.query(query, params);
         return res.json(result.rows.map(a => ({
           ...a,
+          aiAnalysis: typeof a.ai_analysis === 'string' ? JSON.parse(a.ai_analysis) : a.ai_analysis,
           location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
           timestamp: a.created_at
         })));

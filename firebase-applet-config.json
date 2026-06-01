@@ -3,8 +3,8 @@
   "appId": "1:480163012087:web:46b6fa93021e131ffca2f2",
   "apiKey": "AIzaSyCiRKS_NqYGHrY_kMz_mY4e0xwE3rUD5bI",
   "authDomain": "brgy-tanod-sos.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "brgy-tanod-sos.firebasestorage.app",
   "messagingSenderId": "480163012087",
-  "measurementId": "G-R5MB1417CL",
-  "firestoreDatabaseId": "(default)"
+  "measurementId": "G-R5MB1417CL"
 }

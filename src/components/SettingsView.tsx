@@ -16,6 +16,7 @@ import * as api from "../lib/api";
 import socket from "../lib/socket";
 import * as safeStorage from "../lib/safeStorage";
 import AudioSettings from "./AudioSettings";
+import MigrationUtility from "./Admin/MigrationUtility";
 
 export default function SettingsView({
   profile,
@@ -212,6 +213,13 @@ export default function SettingsView({
             </button>
           </div>
         </div>
+
+        {/* Database Migration */}
+        {role === 'superadmin' && (
+          <div className="md:col-span-2">
+            <MigrationUtility />
+          </div>
+        )}
 
         {/* Security Alert Header */}
         <div className="md:col-span-2 p-10 bg-emergency/10 border border-emergency/30 rounded-[40px] flex gap-8 items-center">

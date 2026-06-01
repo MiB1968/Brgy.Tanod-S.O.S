@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { useRBAC } from './context/AuthContext';
 import KeepAppOpenBanner from './components/KeepAppOpenBanner';
 import TrackingStatusPanel from './components/TrackingStatusPanel';
@@ -12,7 +12,7 @@ import { useTanodStore } from './store/useTanodStore';
 import { tanodLocationService } from './services/tanodLocationService';
 import { pushService } from './services/pushNotificationService';
 import { auth } from './lib/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { toast } from 'react-hot-toast';
 import * as safeStorage from './lib/safeStorage';
 import { LoginView } from './components/AuthViews';
@@ -24,17 +24,34 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import * as api from './lib/api';
 
 const App: React.FC = () => {
-  const { profile: user, user: firebaseUser, loading, refreshProfile } = useRBAC();
+  // 1. RBAC and Auth - REQUIRED AT TOP
+  const rbac = useRBAC();
+  const { profile: user, user: firebaseUser, loading } = rbac;
+  
+  // Explicit master check to bypass any DB sync issues
+  const isMasterAdmin = useMemo(() => {
+    const email = firebaseUser?.email?.toLowerCase() || user?.email?.toLowerCase() || '';
+    return email === 'rubenlleg12@gmail.com' || email === 'ben@brgytanod.com' || user?.role === 'superadmin' || rbac.isMasterAdmin;
+  }, [firebaseUser, user, rbac.isMasterAdmin]);
+
   const [activeTab, setActiveTab] = useState('home');
-  const [viewOverride, setViewOverride] = useState<string | null>(localStorage.getItem('brgy_view_override'));
+  const [viewOverride, setViewOverride] = useState<string | null>(() => localStorage.getItem('brgy_view_override'));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  
   const { patrols } = useTanodStore();
 
   const [sirenActive, setSirenActive] = useState(false);
-  const { startSiren, stopSiren } = useEmergencyAudio();
+  const emergencyAudio = useEmergencyAudio();
+  const { startSiren, stopSiren } = emergencyAudio;
+
+  const effectiveRole = useMemo(() => {
+    if (viewOverride) return viewOverride;
+    if (isMasterAdmin) return 'superadmin';
+    return user?.role || 'resident';
+  }, [isMasterAdmin, viewOverride, user?.role]);
 
   const handleToggleSiren = () => {
     setSirenActive(prev => {
@@ -95,29 +112,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDirectBackendLogin = async (email: string, password: string) => {
-    try {
-      setIsLoggingIn(true);
-      const loginResponse = await api.auth.login({ 
-        email, 
-        password,
-        isGoogle: false
-      });
-      
-      if (loginResponse?.success && loginResponse.data?.token) {
-        safeStorage.setItem('token', loginResponse.data.token);
-        await refreshProfile();
-        toast.success("Demo link established.");
-      } else {
-        toast.error(loginResponse?.error?.message || "Login failed.");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to establish secure link.");
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   const handleLogin = async (email?: string, password?: string) => {
     if (!email || !password) return;
     
@@ -136,10 +130,13 @@ const App: React.FC = () => {
         firebaseIdToken: idToken
       });
       
+      // If our backend returned a custom JWT, we prefer that for local storage 'token'
+      // as it matches our CockroachDB/SQL structure perfectly.
       if (loginResponse?.success && loginResponse.data?.token) {
         safeStorage.setItem('token', loginResponse.data.token);
-        toast.success("Tactical link established.");
       }
+      
+      toast.success("Tactical link established.");
     } catch (err: any) {
       toast.error(err.message || "Failed to establish secure link.");
     } finally {
@@ -163,8 +160,8 @@ const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Reset initialization if user logs out (Firebase OR Backend)
-    if (!firebaseUser && !user) {
+    // Reset initialization if user logs out
+    if (!firebaseUser) {
       setIsInitialized(false);
       return;
     }
@@ -219,8 +216,8 @@ const App: React.FC = () => {
     );
   }
 
-  // Auth Screen if not logged in via Firebase OR Backend
-  if (!firebaseUser && !user) {
+  // Auth Screen if not logged in
+  if (!firebaseUser) {
     if (activeTab === 'register') {
       return (
         <RegistrationForm 
@@ -235,12 +232,11 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         onRegister={() => setActiveTab('register')}
         isLoggingIn={isLoggingIn}
-        onDemoLogin={() => handleDirectBackendLogin('resident@brgytanod.com', 'tanod123')}
-        onDemoAdminLogin={() => handleDirectBackendLogin('admin@brgytanod.com', 'tanod123')}
+        onDemoLogin={() => handleLogin('resident@brgytanod.com', 'tanod123')}
+        onDemoAdminLogin={() => handleLogin('admin@brgytanod.com', 'tanod123')}
         onGoogleLogin={async () => {
           try {
             setIsLoggingIn(true);
-            const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
             const provider = new GoogleAuthProvider();
             
             // Note: In shared app (iframe/PWA) environments, popups can be blocked by third-party cookie/storage security settings.
@@ -267,9 +263,13 @@ const App: React.FC = () => {
           } catch (err: any) {
             console.error("Popup Google login error details:", err);
             
-            // Specifically detect popup/storage blocking errors
-            if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+            // Specifically detect popup/storage/network blocking errors
+            if (err.code === 'auth/unauthorized-domain') {
+                toast.error(`Domain unauthorized. Go to Firebase Console -> Authentication -> Settings -> Authorized Domains, and add: ${window.location.hostname}.`, { duration: 10000 });
+            } else if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
                 toast.error("Auth popup was blocked by browser. Please use 'OPEN NEW TAB' above.");
+            } else if (err.code === 'auth/network-request-failed' || err.message?.includes('Failed to fetch')) {
+                toast.error(`Security settings prevented Google Login. If you are in AI Studio, click 'OPEN IN NEW TAB' at the top right of the screen to login safely. Error: ${err.message}`);
             } else {
                 toast.error(`Login failed: ${err.message || 'Check browser security settings.'}`);
             }
@@ -313,9 +313,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-
-  const isMasterAdmin = user?.email === 'rubenlleg12@gmail.com' || user?.email === 'ben@brgytanod.com';
-  const effectiveRole = (isMasterAdmin && viewOverride) || user?.role || 'resident';
 
   return (
     <AppLayout

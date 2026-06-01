@@ -13,12 +13,14 @@ import {
   Map as MapIcon,
   Search,
   Zap,
-  PhoneCall
+  PhoneCall,
+  Radio
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 import { generic } from '../../lib/api';
 import SMSFallbackSettings from './SMSFallbackSettings';
+import GSMModemIntegration from './GSMModemIntegration';
 
 interface Integration {
   id: string;
@@ -31,6 +33,15 @@ interface Integration {
 }
 
 const INITIAL_INTEGRATIONS: Integration[] = [
+  {
+    id: 'gsm',
+    name: 'GSM Hardware Modem Gateway',
+    description: 'Decompress compressed cellular alerts (<140 chars) received over-the-air from remote offline Tanods.',
+    icon: Radio,
+    status: 'connected',
+    lastSync: 'Sync active',
+    color: 'text-amber-400 bg-amber-400/10 border-amber-400/20'
+  },
   {
     id: 'kibitzr',
     name: 'Kibitzr Web Assistant',
@@ -260,8 +271,11 @@ export default function OpsIntegrations() {
       </div>
 
       {activeConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#16191F] border border-[#2D3139] p-6 rounded-2xl max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className={cn(
+            "bg-[#16191F] border border-[#2D3139] p-6 rounded-3xl shadow-2xl w-full max-h-[92vh] overflow-y-auto",
+            activeConfig === 'gsm' ? 'max-w-5xl' : 'max-w-md'
+          )}>
             {activeConfig === 'twilio' ? (
               <SMSFallbackSettings 
                 onClose={() => setActiveConfig(null)}
@@ -280,6 +294,8 @@ export default function OpsIntegrations() {
                   setActiveConfig(null);
                 }}
               />
+            ) : activeConfig === 'gsm' ? (
+              <GSMModemIntegration onClose={() => setActiveConfig(null)} />
             ) : (
               <>
                 <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">Configure Service</h3>

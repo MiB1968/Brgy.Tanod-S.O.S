@@ -122,7 +122,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
               {isRuben(user?.id, user?.email) ? 'System Admin' : profile?.name || 'Unit_Unknown'}
             </p>
             <p className="text-[7px] sm:text-[8px] text-white/30 uppercase tracking-[0.2em] font-mono font-bold truncate">
-              {isRuben(user?.id, user?.email) ? 'SYSTEM_PRIME' : profile?.role || 'INITIATING'}
+              {effectiveRole}
             </p>
           </div>
         </div>

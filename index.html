@@ -8,23 +8,31 @@
       const origWarn = console.warn;
       const origError = console.error;
       const origLog = console.log;
-      const shouldFilter = (msg) => {
-         if (!msg || typeof msg !== 'string') return false;
-         return msg.includes('[vite]') || 
-                msg.includes('failed to connect to websocket') || 
-                msg.includes('WebSocket connection to') ||
-                msg.includes('connection aligned');
+      const shouldFilter = (...args) => {
+         try {
+           const str = args.map(arg => {
+             if (typeof arg === 'string') return arg;
+             if (arg instanceof Error) return arg.message + ' ' + arg.stack;
+             try { return JSON.stringify(arg); } catch { return String(arg); }
+           }).join(' ');
+           return str.includes('[vite]') || 
+                  str.includes('failed to connect to websocket') || 
+                  str.includes('WebSocket connection to') ||
+                  str.includes('connection aligned');
+         } catch {
+           return false;
+         }
       };
       console.warn = function(...args) {
-         if (args && args[0] && shouldFilter(args[0])) return;
+         if (shouldFilter(...args)) return;
          origWarn.apply(console, args);
       };
       console.error = function(...args) {
-         if (args && args[0] && shouldFilter(args[0])) return;
+         if (shouldFilter(...args)) return;
          origError.apply(console, args);
       };
       console.log = function(...args) {
-         if (args && args[0] && shouldFilter(args[0])) return;
+         if (shouldFilter(...args)) return;
          origLog.apply(console, args);
       };
     })();

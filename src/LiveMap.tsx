@@ -378,10 +378,20 @@ function MapOfflineControl({
   setIsDrawing: (v: boolean) => void;
 }) {
   const map = useMap();
+  const [showSectorDropdown, setShowSectorDropdown] = useState(false);
+
+  const SECTORS = [
+    { name: "Sector 1 (Poblacion)", lat: 13.2236, lng: 120.5960 },
+    { name: "Sector 2 (Bagna)", lat: 13.2295, lng: 120.5840 },
+    { name: "Sector 3 (Capipisa)", lat: 13.2110, lng: 120.6120 },
+    { name: "Sector 4 (Santol)", lat: 13.2380, lng: 120.6010 },
+    { name: "Sector 5 (Talisay)", lat: 13.2155, lng: 120.5780 }
+  ];
 
   const handleDownloadViewport = async () => {
     if (downloading) return;
     setIsDrawing(false);
+    setShowSectorDropdown(false);
 
     const b = map.getBounds();
     const bounds = {
@@ -422,8 +432,51 @@ function MapOfflineControl({
     }
   };
 
+  const handlePrecacheSector = async (sectorName: string, lat: number, lng: number) => {
+    if (downloading) return;
+    setIsDrawing(false);
+    setShowSectorDropdown(false);
+
+    const confirmCache = window.confirm(
+      `📶 LOCAL TANK SECTOR BUFFER WORKER\n\n` +
+      `Sector Name: ${sectorName}\n` +
+      `Estimated Radius: 5.0 KM Bounds\n` +
+      `Target Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}\n\n` +
+      `Are you sure you want to download and pre-cache this designated sector for remote offline operation? (Wi-Fi is strongly recommended).`
+    );
+    if (!confirmCache) return;
+
+    setDownloading(true);
+    setProgress({ current: 0, total: 1 });
+
+    // Center map view on target sector
+    map.flyTo([lat, lng], 14, { animate: true, duration: 1.2 });
+
+    const bounds = offlineTileService.calculateBoundsFromPoint(lat, lng, 5.0); // 5km sector radius
+
+    try {
+      const success = await offlineTileService.downloadArea(bounds, 13, 16, (statusEv) => {
+        setProgress({ current: statusEv.downloaded, total: statusEv.total });
+      }, `${sectorName} (5km Area)`);
+
+      if (success) {
+        toast.success(`FINISHED: Offline map sector cached for ${sectorName}!`);
+        window.dispatchEvent(new CustomEvent('offline-area-downloaded'));
+      } else {
+        toast.error(`Offline sync for ${sectorName} suspended or timed out.`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Sector pre-caching failed with errors.");
+    } finally {
+      setDownloading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
+
   const handleAreaSelected = async (bounds: any) => {
     setIsDrawing(false);
+    setShowSectorDropdown(false);
     const label = window.prompt(
       "🏷️ ENTER SECTOR LABEL FOR CUSTOM DRAWN OFFLINE CACHE:", 
       `Sector Area (${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`
@@ -460,7 +513,24 @@ function MapOfflineControl({
       <AreaSelector active={isDrawing} onSelected={handleAreaSelected} />
 
       <div className="absolute z-[401] flex flex-col items-end gap-2" style={{ top: '0.75rem', right: '0.75rem' }}>
-        <div className="flex gap-2 backdrop-blur-md bg-black/65 border border-white/5 p-1.5 rounded-full shadow-lg">
+        <div className="flex gap-2 backdrop-blur-md bg-black/65 border border-white/5 p-1.5 rounded-full shadow-lg relative">
+          {/* 5KM Sector Pre-Cache Trigger Button */}
+          <button
+            onClick={() => setShowSectorDropdown(!showSectorDropdown)}
+            disabled={downloading}
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+            title="Download a 5km radius map of your designated patrol sector"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black font-mono uppercase tracking-wider transition-all border",
+              showSectorDropdown
+                ? "bg-amber-500/20 border-amber-500 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse"
+                : "border-transparent text-white/80 hover:text-white hover:bg-white/10"
+            )}
+          >
+            <Download size={12} className="text-amber-400" />
+            <span>Pre-Cache 5KM</span>
+          </button>
+
           {/* Viewport preloader */}
           <button
             onClick={handleDownloadViewport}
@@ -486,6 +556,7 @@ function MapOfflineControl({
                 toast("Interactive sector drawing cancelled.");
               } else {
                 setIsDrawing(true);
+                setShowSectorDropdown(false);
                 toast.success("🟦 Drawing Mode: Click opposite corners of the map sector to cache.");
               }
             }}
@@ -502,6 +573,32 @@ function MapOfflineControl({
             <Square size={12} className={isDrawing ? "text-tactical-cyan" : "text-white/40"} />
             <span>Draw Zone</span>
           </button>
+
+          {/* Sector Selector Dropdown Panel */}
+          {showSectorDropdown && (
+            <div className="absolute right-0 top-11 bg-black/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl w-60 shadow-2xl z-[502]">
+              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block font-mono mb-2 border-b border-white/5 pb-1">
+                Designated Sectors (Mamburao)
+              </span>
+              <div className="space-y-1.5 max-h-[220px] overflow-y-auto">
+                {SECTORS.map((s) => (
+                  <button
+                    key={s.name}
+                    onClick={() => handlePrecacheSector(s.name, s.lat, s.lng)}
+                    className="w-full text-left p-2 hover:bg-white/5 rounded-lg text-[10px] font-mono text-white/80 hover:text-white transition-colors block border border-transparent hover:border-white/5"
+                  >
+                    <div className="font-bold flex justify-between">
+                      <span>{s.name}</span>
+                      <span className="text-amber-400">5KM radius</span>
+                    </div>
+                    <div className="text-[8px] text-white/30 mt-0.5">
+                      Co-ord: {s.lat.toFixed(4)}°N, {s.lng.toFixed(4)}°E
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Progress Alert Panel */}
@@ -543,7 +640,12 @@ function MapOfflineControl({
 }
 
 // ─── LiveMap ──────────────────────────────────────────────────────────────────
-export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | string }) {
+interface LiveMapProps {
+  effectiveRole?: UserRole | string;
+  presetShowHeatmap?: boolean;
+}
+
+export default function LiveMap({ effectiveRole, presetShowHeatmap = true }: LiveMapProps) {
   const { alerts }  = useIncidentStore();
   const { patrols, highlightedPatrolId } = useTanodStore();
   const [showPatrols, setShowPatrols] = useState(true);
@@ -552,6 +654,8 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
   const [showResidents, setShowResidents] = useState(false);
   const [showLegend,  setShowLegend]  = useState(false);
   const [userPos,     setUserPos]     = useState<UserPos | null>(null);
+  const [heatmapPoints, setHeatmapPoints] = useState<any[]>([]);
+  const [showHeatmap, setShowHeatmap] = useState(presetShowHeatmap);
 
   const [downloading, setDownloading] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -683,6 +787,76 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
     };
   }, []);
 
+  useEffect(() => {
+    const fetchHeatmapData = async () => {
+      try {
+        const historical = await api.alerts.getAll();
+        const pts: any[] = [];
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        
+        // Merge with store alerts for absolute real-time coherence
+        const allAlerts = [...historical];
+        alerts.forEach(storeA => {
+          if (!allAlerts.some(histA => histA.id === storeA.id)) {
+            allAlerts.push(storeA);
+          }
+        });
+
+        allAlerts.forEach((data: any) => {
+          let ts = 0;
+          if (data.created_at) ts = typeof data.created_at === 'string' ? new Date(data.created_at).getTime() : data.created_at;
+          else if (data.timestamp) ts = typeof data.timestamp === 'string' ? new Date(data.timestamp).getTime() : data.timestamp;
+          
+          if (ts && ts >= thirtyDaysAgo) {
+            let lat, lng;
+            if (data.location?.lat) { lat = data.location.lat; lng = data.location.lng; }
+            else if (data.lat) { lat = data.lat; lng = data.lng; }
+            else if (data.latitude) { lat = data.latitude; lng = data.longitude; }
+            
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              pts.push({
+                id: data.id,
+                type: data.type || 'UNKNOWN',
+                lat: parseFloat(lat as any),
+                lng: parseFloat(lng as any),
+                timestamp: ts
+              });
+            }
+          }
+        });
+        setHeatmapPoints(pts);
+      } catch (err) {
+        console.warn("[Heatmap] Failed to fetch historical data, using real-time store fallback:", err);
+        const pts: any[] = [];
+        alerts.forEach((data: any) => {
+          let lat, lng;
+          if (data.location?.lat) { lat = data.location.lat; lng = data.location.lng; }
+          else if (data.lat) { lat = data.lat; lng = data.lng; }
+          
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            pts.push({
+              id: data.id,
+              type: data.type || 'UNKNOWN',
+              lat: parseFloat(lat as any),
+              lng: parseFloat(lng as any),
+              timestamp: Date.now()
+            });
+          }
+        });
+        setHeatmapPoints(pts);
+      }
+    };
+
+    fetchHeatmapData();
+    socket.on('incident_new', fetchHeatmapData);
+    socket.on('incident_update', fetchHeatmapData);
+    
+    return () => {
+      socket.off('incident_new', fetchHeatmapData);
+      socket.off('incident_update', fetchHeatmapData);
+    };
+  }, [alerts]);
+
   // Inject global CSS once
   useEffect(() => {
     const ID = "livemap-css";
@@ -735,6 +909,17 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
 
       {/* ── Filter toolbar (left-bottom) ── */}
       <div className="absolute z-[401] flex flex-col gap-2" style={{ bottom: '1rem', left: '1rem' }}>
+        {/* Heatmap toggle */}
+        <button
+          onClick={() => setShowHeatmap(v=>!v)}
+          title="Toggle AI Incident Heatmap"
+          style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+          className={`w-10 h-10 rounded-full backdrop-blur-md border text-sm flex items-center justify-center transition-all
+            ${showHeatmap
+              ? "bg-orange-500/25 border-orange-400/40 shadow-[0_0_12px_rgba(249,115,22,0.4)] animate-pulse"
+              : "bg-black/50 border-white/10 opacity-40 hover:opacity-70"}`}
+        >🔥</button>
+
         {/* Residents toggle */}
         <button
           onClick={() => setShowResidents(v=>!v)}
@@ -808,6 +993,7 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         <div className="absolute z-[401] bg-black/85 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-3 min-w-[168px]" style={{ bottom: '1rem', left: '3.75rem' }}>
           <p className="text-[9px] font-mono uppercase tracking-widest text-white/35 mb-2.5">LEGEND</p>
           {([
+            { emoji:"⭕", color:"#EF4444", label:"AI Threat Hotspot" },
             { emoji:"🏠", color:"#A78BFA", label:"Verified Resident" },
             { emoji:"👮", color:"#4AEF80", label:"Officer / Patrol" },
             { emoji:"🔥", color:"#FF8C00", label:"Fire SOS"         },
@@ -837,6 +1023,54 @@ export default function LiveMap({ effectiveRole }: { effectiveRole?: UserRole | 
         />
 
         <MapController patrols={patrols} alerts={alerts} showP={showPatrols} showS={showSOS} />
+
+        {/* AI Threat Heatmap density hotspots */}
+        {showHeatmap && heatmapPoints.map((pt, idx) => {
+          const s = getSev(pt.type);
+          return (
+            <React.Fragment key={`heat-${pt.id || idx}`}>
+              {/* Outer halo */}
+              <Circle
+                center={[pt.lat, pt.lng]}
+                radius={240}
+                pathOptions={{
+                  color: s.color,
+                  fillColor: s.color,
+                  fillOpacity: 0.04,
+                  stroke: false,
+                  weight: 0,
+                  interactive: false
+                }}
+              />
+              {/* Mid intensity */}
+              <Circle
+                center={[pt.lat, pt.lng]}
+                radius={120}
+                pathOptions={{
+                  color: s.color,
+                  fillColor: s.color,
+                  fillOpacity: 0.10,
+                  stroke: false,
+                  weight: 0,
+                  interactive: false
+                }}
+              />
+              {/* Core hot spot */}
+              <Circle
+                center={[pt.lat, pt.lng]}
+                radius={45}
+                pathOptions={{
+                  color: s.color,
+                  fillColor: s.color,
+                  fillOpacity: 0.32,
+                  weight: 1,
+                  opacity: 0.20,
+                  interactive: false
+                }}
+              />
+            </React.Fragment>
+          );
+        })}
 
         {/* Routing lines: SOS → nearest patrol */}
         {showSOS && showPatrols && (

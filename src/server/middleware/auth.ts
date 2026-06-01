@@ -15,7 +15,7 @@ export interface AuthRequest extends Request {
 }
 
 export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
   const apiKey = req.headers['x-api-key'];
 
   if (config.nodeEnv !== 'production' && req.originalUrl !== '/api/health') {

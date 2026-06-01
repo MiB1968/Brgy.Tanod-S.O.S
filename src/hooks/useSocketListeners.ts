@@ -77,6 +77,11 @@ export function useSocketListeners({
           typeof rawAlert.location === "string"
             ? JSON.parse(rawAlert.location)
             : rawAlert.location,
+        aiAnalysis: 
+          rawAlert.aiAnalysis || 
+          (typeof rawAlert.ai_analysis === "string" 
+            ? JSON.parse(rawAlert.ai_analysis) 
+            : rawAlert.ai_analysis),
         timestamp: rawAlert.created_at || rawAlert.timestamp || new Date().toISOString(),
       };
     };

@@ -1,11 +1,10 @@
-
 # Brgy.Tanod-S.O.S 🚨🇵🇭
 
 **Real-time Emergency Response System for Philippine Barangays**
 
 A responsive, **offline-first**, **PWA-first** SOS alert system designed for local government units (Barangays). It connects citizens directly to Barangay Tanods with reliable performance even in low-connectivity and typhoon-prone areas.
 
-
+![Hero Banner](https://via.placeholder.com/800x300/15803d/ffffff?text=Brgy+Tanod+S.O.S) <!-- Replace with actual screenshot -->
 
 ## ✨ Key Features
 
@@ -26,107 +25,6 @@ A responsive, **offline-first**, **PWA-first** SOS alert system designed for loc
 - **Local AI Processing** — Runs entirely on-device (no cloud dependency, better privacy & works offline)
 - **Hybrid Fallback** — Switches to cloud AI (Gemini) when available for more complex queries
 - **Super Admin Greeting** — Personalized voice welcome for barangay officials
-
-This feature makes the app accessible to elderly residents and users with limited literacy.
-
-### Advanced Capabilities
-- **PWA + Aggressive Offline Map Tiles** — Installable app with cached Leaflet maps
-- **Role-Based Dashboards** — Citizen, Tanod, Admin, and Super Admin views
-- **Patrol Logging & Broadcast System** — Tanod activity logs and system-wide announcements
-- **Geofencing Ready** — Future hotspot alerts (background tracking via Capacitor)
-- **Local AI Voice Assistant** — WebLLM + multiple TTS engines
-
-## 🛠️ Tech Stack
-
-**Frontend**:
-- React 19 + TypeScript + Vite + Tailwind CSS
-- State: Zustand
-- Maps: Leaflet + react-leaflet + Heatmap Layer
-- PWA: vite-plugin-pwa (with Workbox + Background Sync)
-- Local AI: @mlc-ai/web-llm + ONNX Runtime
-- Animations: Framer Motion
-
-**Backend & Services**:
-- Firebase (Auth, Firestore, Functions, Storage)
-- Express + Socket.io (real-time)
-- Drizzle ORM (PostgreSQL / Firebase compatible)
-- Twilio (SMS fallback)
-- Hybrid AI (WebLLM local + Google Gemini)
-
-**Mobile**:
-- Progressive Web App (Primary)
-- Capacitor-ready for native Android/iOS builds
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
-cd Brgy.Tanod-S.O.S
-npm install
-cp .env.example .env
-npm run dev
-```
-
-## 🚨 Background Tanod Tracking
-
-Real-time location tracking for Tanods with **background support**, **offline queuing**, and **geofencing**.
-
-### Key Capabilities
-- Persistent background location on Android/iOS (even when app is closed)
-- Offline queuing via Dexie + auto-sync when online
-- Geofence-triggered alerts for barangay hotspots
-- Battery-optimized with distance filtering (30m)
-- Persistent notification + high-priority SOS wake-up
-
-*(See `docs/` folder for full Capacitor setup)*
-
-## 🌐 PWA (Progressive Web App)
-
-**Primary deployment target** — Works great on any smartphone browser.
-
-**Install Instructions**:
-1. Open in Chrome/Safari on mobile
-2. Tap "Add to Home Screen"
-3. Use as native-like app
-
-## Deployment
-- Firebase Hosting + Functions (recommended)
-- Docker + Nginx (included)
-- Android/iOS via Capacitor (best for background tracking)
-
-## License
-This project is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE) file for details.
-
-## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md)
-
-**Made with ❤️ for Philippine Barangays**
-```
-
----
-
-### 2. GitHub Project Description (Repository Description)
-
-**Recommended new description:**
-
-```
-A responsive, offline-first real-time SOS emergency alert system for Philippine Barangays. Connects citizens directly to Barangay Tanods with PWA support, local AI Guardian Mode (Tagalog), and background tracking.
-```
-
----
-
-### Next Steps for You:
-
-1. Copy the new README content and replace your current `README.md`
-2. Go to your repo **Settings → General** and update the repository description with the one above.
-3. The LICENSE is already **GPLv3** (good choice for this kind of public service project).
-
-Would you like me to also create:
-- A better project banner image prompt (for README)?
-- An improved `CONTRIBUTING.md`?
-- A proper `docs/` setup guide?
-
-Just say the word and I'll generate them.- **Super Admin Greeting** — Personalized voice welcome for barangay officials
 
 This feature makes the app accessible to elderly residents and users with limited literacy.
 

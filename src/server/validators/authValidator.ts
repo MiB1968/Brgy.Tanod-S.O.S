@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(6).optional(),
+  isGoogle: z.boolean().optional(),
+  firebaseIdToken: z.string().optional(),
+}).refine((data) => {
+  if (data.isGoogle) {
+    return !!data.firebaseIdToken;
+  }
+  return !!data.password && data.password.length >= 6;
+}, {
+  message: "Password is required for credentials login, and firebaseIdToken is required for Google login.",
+  path: ["password"]
 });
 
 // ── SECURITY: Only public-facing roles allowed on self-registration ──────────
