@@ -334,6 +334,21 @@ export const resendWelcomeEmail = async (req: AuthRequest, res: Response) => {
   }
 };
 
+export const getAuditLogs = async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, admin_id, action, target_table, target_id, details, created_at
+       FROM audit_logs
+       ORDER BY created_at DESC
+       LIMIT 100`
+    );
+    return response.success(res, result.rows);
+  } catch (err: any) {
+    console.error('[Admin] getAuditLogs error:', err.message);
+    return response.error(res, 'Failed to fetch audit logs.');
+  }
+};
+
 export const approveResident = async (req: AuthRequest, res: Response) => {
   const { residentId, registerInFirebase, sendEmail } = req.body;
   if (!residentId) {

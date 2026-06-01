@@ -161,6 +161,18 @@ export const offlineService = {
           } else if (action.type === 'status_update') {
             const { residentId, status } = action.payload;
             await api.update(`residents/${residentId}`, { status });
+          } else if (action.type === 'update_role') {
+            const { admin: apiAdmin } = await import('../lib/api');
+            const { userId, role } = action.payload;
+            await apiAdmin.updateUserRole(userId, role);
+          } else if (action.type === 'update_status') {
+            const { admin: apiAdmin } = await import('../lib/api');
+            const { userId, status } = action.payload;
+            await apiAdmin.updateUserStatus(userId, status);
+          } else if (action.type === 'revoke_access') {
+             const { admin: apiAdmin } = await import('../lib/api');
+             const { userId } = action.payload;
+             await apiAdmin.deleteUser(userId);
           }
           await db.queuedActions.delete(action.id);
           successCount++;

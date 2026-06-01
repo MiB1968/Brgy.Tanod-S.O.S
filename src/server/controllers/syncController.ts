@@ -367,10 +367,30 @@ export const postSync = async (req: AuthRequest, res: Response) => {
 
       const safeFields = Object.keys(safeData);
       if (safeFields.length === 0) return response.error(res, "No valid fields to update", "BAD_REQUEST", 400);
+
       const setClause = safeFields.map((f, i) => `${f} = $${i + 2}`).join(', ');
       await pool.query(`UPDATE residents SET ${setClause} WHERE id = $1`, [docId, ...safeFields.map(f => safeData[f])]);
-      socketService.emitToAll("resident_update", { id: docId, ...safeData });
-      return res.json({ success: true });
+
+      let isOutsideBarangay = undefined;
+      // Run geofence check if GPS location was updated
+      if (safeData.gps_lat !== undefined && safeData.gps_lng !== undefined) {
+        try {
+          const { checkAndUpdateGeofence } = await import('../services/geofencingService');
+          const result = await checkAndUpdateGeofence(docId as string, Number(safeData.gps_lat), Number(safeData.gps_lng));
+          if (result !== undefined) {
+            isOutsideBarangay = result.is_outside_barangay;
+          }
+        } catch (geofenceErr) {
+          console.warn(`Geofence error during resident update: ${geofenceErr}`);
+        }
+      }
+
+      socketService.emitToAll("resident_update", { 
+        id: docId, 
+        ...safeData,
+        is_outside_barangay: isOutsideBarangay,
+      });
+      return res.json({ success: true, is_outside_barangay: isOutsideBarangay });
     }
 
     if (collection === 'patrols') {

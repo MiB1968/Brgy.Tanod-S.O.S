@@ -22,6 +22,9 @@ router.post(
 // GET /api/admin/users — list all users
 router.get('/users', adminController.listUsers);
 
+// GET /api/admin/audit-logs — fetch audit logs
+router.get('/audit-logs', adminController.getAuditLogs);
+
 // POST /api/admin/approve-resident — approve a resident and sync to firebase
 router.post('/approve-resident', adminController.approveResident);
 

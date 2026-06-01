@@ -23,6 +23,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
+import { useAuthStore } from '../../store/useAuthStore';
+import { auth } from '../../lib/firebase';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 export default function ManageUsers() {
@@ -35,6 +37,7 @@ export default function ManageUsers() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  const { profile } = useAuthStore();
   const { execute, loading: actionLoading } = useAsyncAction();
 
   const loadUsers = async () => {
@@ -73,15 +76,40 @@ export default function ManageUsers() {
 
   const handleRoleChange = async (userId: string, newRole: string, userName: string) => {
     setUpdatingId(userId);
+    if (!navigator.onLine) {
+      try {
+        const { db } = await import('../../db/offlineDB');
+        await db.queuedActions.add({
+          type: 'update_role',
+          payload: { userId, role: newRole },
+          timestamp: Date.now(),
+          retryCount: 0
+        });
+        toast.success(`Action saved offline: ${userName} to ${newRole.toUpperCase()}`);
+        setUpdatingId(null);
+        return;
+      } catch (err) {
+        toast.error('Failed to queue offline role change');
+        setUpdatingId(null);
+        return;
+      }
+    }
+    
     await execute(
       () => api.admin.updateUserRole(userId, newRole),
       {
         successMessage: `${userName} promoted to ${newRole.toUpperCase()}`,
-        onSuccess: () => {
+        onSuccess: async () => {
           const typedRole = newRole as any;
           setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: typedRole } : u));
           socket.emit('tanod_update', {});
           socket.emit('resident_update', {});
+
+          if (userId === profile?.id && auth.currentUser) {
+            await auth.currentUser.getIdToken(true);
+            toast.success("Your permissions have been updated. Reloading...");
+            setTimeout(() => window.location.reload(), 1500);
+          }
         }
       }
     );
@@ -90,6 +118,25 @@ export default function ManageUsers() {
 
   const handleStatusChange = async (userId: string, newStatus: string, userName: string) => {
     setUpdatingId(userId);
+    if (!navigator.onLine) {
+      try {
+        const { db } = await import('../../db/offlineDB');
+        await db.queuedActions.add({
+          type: 'update_status',
+          payload: { userId, status: newStatus },
+          timestamp: Date.now(),
+          retryCount: 0
+        });
+        toast.success(`Action saved offline: Status for ${userName} to ${newStatus.toUpperCase()}`);
+        setUpdatingId(null);
+        return;
+      } catch (err) {
+        toast.error('Failed to queue offline status change');
+        setUpdatingId(null);
+        return;
+      }
+    }
+
     await execute(
       () => api.admin.updateUserStatus(userId, newStatus),
       {
@@ -105,6 +152,25 @@ export default function ManageUsers() {
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!navigator.onLine) {
+      try {
+        const { db } = await import('../../db/offlineDB');
+        await db.queuedActions.add({
+          type: 'revoke_access',
+          payload: { userId },
+          timestamp: Date.now(),
+          retryCount: 0
+        });
+        toast.success(`Action saved offline: Operator ${userName} purged`);
+        setDeletingId(null);
+        return;
+      } catch (err) {
+        toast.error('Failed to queue offline delete action');
+        setDeletingId(null);
+        return;
+      }
+    }
+
     await execute(
       () => api.admin.deleteUser(userId),
       {
