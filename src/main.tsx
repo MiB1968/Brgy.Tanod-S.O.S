@@ -9,8 +9,12 @@ import { nativeService } from './services/nativeService';
 import { initBackgroundRunner } from './services/backgroundService';
 import { modelProfiler } from './services/modelProfiler';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+import { initSentry } from './lib/sentry';
 import { cleanupOldQueues } from './db/offlineDB';
 import { registerBackgroundSync, processQueuedActions } from './sw/backgroundSync';
+
+// Initialize Sentry before rendering the app
+initSentry();
 
 // Safe Native & Profiler Initialization
 async function initializeServices() {

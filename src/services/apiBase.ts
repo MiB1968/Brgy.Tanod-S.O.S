@@ -4,6 +4,7 @@
  */
 
 import * as safeStorage from '../lib/safeStorage';
+import * as ReactSentry from '@sentry/react';
 
 const API_BASE = '/api';
 
@@ -15,6 +16,16 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     ...(token && token !== 'cookie-auth' ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
+
+  ReactSentry.addBreadcrumb({
+    category: 'http',
+    message: `${options.method || 'GET'} ${endpoint}`,
+    level: 'info',
+    data: {
+      endpoint,
+      method: options.method || 'GET',
+    },
+  });
 
   const timeout = endpoint.includes('sync') ? 60000 : 25000;
   const controller = new AbortController();
@@ -41,6 +52,16 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      ReactSentry.addBreadcrumb({
+        category: 'http',
+        message: `API Error: ${endpoint}`,
+        level: 'error',
+        data: {
+          endpoint,
+          status: response.status,
+        },
+      });
+
       if ((response.status >= 500 || response.status === 429) && retries > 0) {
         await new Promise(res => setTimeout(res, 1000 * (3 - retries)));
         return fetchAPI(endpoint, options, retries - 1);
@@ -72,6 +93,17 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     }
   } catch (err: any) {
     clearTimeout(timeoutId);
+    
+    ReactSentry.addBreadcrumb({
+      category: 'http',
+      message: `API Request Failed: ${endpoint}`,
+      level: 'error',
+      data: {
+        endpoint,
+        error: err.message,
+      },
+    });
+
     if (err.name === 'AbortError' && retries > 0) return fetchAPI(endpoint, options, retries - 1);
     throw err;
   }

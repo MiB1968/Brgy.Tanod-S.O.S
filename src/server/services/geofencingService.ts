@@ -1,3 +1,4 @@
+import * as turf from '@turf/turf';
 import { pool } from '../db/index';
 
 interface GeofenceResult {
@@ -6,25 +7,33 @@ interface GeofenceResult {
 }
 
 export async function checkAndUpdateGeofence(
-  residentId: string, 
-  lat: number, 
+  residentId: string,
+  lat: number,
   lng: number
 ): Promise<GeofenceResult | null> {
   try {
-    // Get the latest barangay boundary
     const boundaryRes = await pool.query(
       `SELECT boundary_geojson FROM barangay_boundaries ORDER BY created_at DESC LIMIT 1`
     );
 
     if (boundaryRes.rows.length === 0) {
-      console.warn('[Geofence] No barangay boundary configured in database.');
+      console.warn('[Geofence] No barangay boundary configured.');
       return null;
     }
 
-    const boundary = boundaryRes.rows[0].boundary_geojson;
-    const isInside = isPointInPolygon(lat, lng, boundary);
+    const boundaryGeoJSON = boundaryRes.rows[0].boundary_geojson;
 
-    // Update resident record
+    // Create a Turf point from the resident's coordinates
+    // Note: GeoJSON expects [longitude, latitude]
+    const point = turf.point([lng, lat]);
+
+    // Create a Turf polygon from the stored boundary
+    const polygon = turf.polygon(boundaryGeoJSON.coordinates);
+
+    // Accurate point-in-polygon check using Turf.js
+    const isInside = turf.booleanPointInPolygon(point, polygon);
+
+    // Update the resident record
     await pool.query(
       `UPDATE residents 
        SET is_outside_barangay = $1, 
@@ -38,28 +47,7 @@ export async function checkAndUpdateGeofence(
       checked_at: new Date(),
     };
   } catch (err) {
-    console.error('[Geofence] Error checking location:', err);
+    console.error('[Geofence] Error during geofence check:', err);
     return null;
   }
-}
-
-// Basic point-in-polygon check (replace with Turf.js for production accuracy)
-function isPointInPolygon(lat: number, lng: number, polygon: any): boolean {
-  if (!polygon?.coordinates?.[0]) return true;
-
-  const coords = polygon.coordinates[0];
-  let inside = false;
-
-  for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
-    const xi = coords[i][0], yi = coords[i][1];
-    const xj = coords[j][0], yj = coords[j][1];
-
-    const intersect =
-      yi > lat !== yj > lat &&
-      lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi;
-
-    if (intersect) inside = !inside;
-  }
-
-  return inside;
 }

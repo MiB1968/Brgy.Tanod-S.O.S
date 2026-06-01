@@ -1,4 +1,7 @@
 import * as http from "http";
+import * as Sentry from "@sentry/node";
+import { initSentry } from "./server/lib/sentry";
+initSentry();
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -53,6 +56,7 @@ async function startServer() {
 
   // MOUNT THE BACKEND APP FIRST (SO /api ENDPOINTS ARE INTERCEPTED FIRST)
   // Only apply helmet in production to avoid blocking dev resources or causing CSP issues in iframe
+  // masterApp.use(Sentry.Handlers.requestHandler());
   masterApp.use(app);
 
   let vite: any;
@@ -112,7 +116,7 @@ async function startServer() {
       if (path.extname(pathname).length > 0) {
         return next();
       }
-
+      
       try {
         const template = fs.readFileSync(path.join(rootDir, "index.html"), "utf-8");
         const html = await vite.transformIndexHtml(req.originalUrl, template);
@@ -122,6 +126,8 @@ async function startServer() {
         next(e);
       }
     });
+
+    // masterApp.use(Sentry.Handlers.errorHandler());
   } else {
     // Production Mode: Serve static files
     const distPath = isRunningFromDist ? currentDir : path.join(rootDir, "dist");

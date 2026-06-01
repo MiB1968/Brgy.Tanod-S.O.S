@@ -1,5 +1,6 @@
 import React, { useEffect, useState, Suspense, useMemo } from 'react';
 import { useRBAC } from './context/AuthContext';
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import KeepAppOpenBanner from './components/KeepAppOpenBanner';
 import TrackingStatusPanel from './components/TrackingStatusPanel';
 import NotificationPermission from './components/NotificationPermission';
@@ -315,51 +316,53 @@ const App: React.FC = () => {
   }
 
   return (
-    <AppLayout
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      isMobileMenuOpen={isMobileMenuOpen}
-      setIsMobileMenuOpen={setIsMobileMenuOpen}
-      effectiveRole={effectiveRole}
-      user={firebaseUser}
-      profile={user}
-      handleLogout={handleLogout}
-      viewOverride={viewOverride}
-      setViewOverride={(role) => {
-        setViewOverride(role);
-        if (role) localStorage.setItem('brgy_view_override', role);
-        else localStorage.removeItem('brgy_view_override');
-      }}
-    >
-      <div className="flex-1 overflow-y-auto relative h-full">
-        <KeepAppOpenBanner />
-        <NotificationPermission />
-        <TrackingStatusPanel />
+    <GlobalErrorBoundary>
+      <AppLayout
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        effectiveRole={effectiveRole}
+        user={firebaseUser}
+        profile={user}
+        handleLogout={handleLogout}
+        viewOverride={viewOverride}
+        setViewOverride={(role) => {
+          setViewOverride(role);
+          if (role) localStorage.setItem('brgy_view_override', role);
+          else localStorage.removeItem('brgy_view_override');
+        }}
+      >
+        <div className="flex-1 overflow-y-auto relative h-full">
+          <KeepAppOpenBanner />
+          <NotificationPermission />
+          <TrackingStatusPanel />
 
-        <RoleBasedContent
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          effectiveRole={effectiveRole}
-          effectiveProfile={user}
-          alerts={[]}
-          isOnline={true}
-          visiblePatrols={patrols}
-          viewOverride={viewOverride}
-          setViewOverride={(role) => {
-            setViewOverride(role);
-            if (role) localStorage.setItem('brgy_view_override', role);
-            else localStorage.removeItem('brgy_view_override');
-          }}
-          sirenActive={sirenActive}
-          onToggleSiren={handleToggleSiren}
-        />
+          <RoleBasedContent
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            effectiveRole={effectiveRole}
+            effectiveProfile={user}
+            alerts={[]}
+            isOnline={true}
+            visiblePatrols={patrols}
+            viewOverride={viewOverride}
+            setViewOverride={(role) => {
+              setViewOverride(role);
+              if (role) localStorage.setItem('brgy_view_override', role);
+              else localStorage.removeItem('brgy_view_override');
+            }}
+            sirenActive={sirenActive}
+            onToggleSiren={handleToggleSiren}
+          />
 
-        <TacticalDock />
-        <GuardianVoiceAssistant />
-        <GuardianAIChat isInline={false} />
-        <PWAInstallPrompt />
-      </div>
-    </AppLayout>
+          <TacticalDock />
+          <GuardianVoiceAssistant />
+          <GuardianAIChat isInline={false} />
+          <PWAInstallPrompt />
+        </div>
+      </AppLayout>
+    </GlobalErrorBoundary>
   );
 };
 
