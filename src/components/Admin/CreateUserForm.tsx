@@ -394,6 +394,12 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
         )}
 
         {/* Action Controls */}
+        {!navigator.onLine && (
+          <div className="p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-xl text-sm text-yellow-400 font-mono flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>⚠️ New user creation requires internet connection (Firebase Auth limitation).</span>
+          </div>
+        )}
         <div className="flex gap-4 pt-4 border-t border-white/5">
           <button
             type="submit"
