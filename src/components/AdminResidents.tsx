@@ -287,8 +287,38 @@ export default function AdminResidents({ profile }: { profile: any }) {
                 </div>
 
                 <div className="bg-[#0F1115] p-6 rounded-3xl border border-[#2D3139]">
-                  <h5 className="text-xs font-black text-[#8E9299] uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#FF4B4B]" /> REGISTERED LOCATION
+                  <h5 className="text-xs font-black text-[#8E9299] uppercase tracking-widest mb-4 flex items-center gap-2 justify-between">
+                    <div className="flex items-center gap-2">
+                       <MapPin className="w-4 h-4 text-[#FF4B4B]" /> REGISTERED LOCATION
+                    </div>
+                    {/* Inline update test handler */}
+                    <button 
+                      onClick={async () => {
+                         const lat = prompt("Enter new latitude:", selectedResident.gpsLat?.toString());
+                         const lng = prompt("Enter new longitude:", selectedResident.gpsLng?.toString());
+                         if (lat && lng) {
+                            try {
+                               const res = await api.fetchAPI(`/residents/${selectedResident.id}/location`, {
+                                 method: 'PATCH',
+                                 body: JSON.stringify({ lat: Number(lat), lng: Number(lng) })
+                               });
+                               
+                               if (res.is_outside_barangay) {
+                                 toast.error("⚠️ Warning: This location is outside the barangay boundary.", { duration: 6000 });
+                               } else {
+                                 toast.success("Location updated successfully");
+                               }
+                               // Update local state temporarily
+                               setSelectedResident({ ...selectedResident, gpsLat: Number(lat), gpsLng: Number(lng) });
+                            } catch (e) {
+                               toast.error("Failed to update location");
+                            }
+                         }
+                      }}
+                      className="text-[9px] font-bold tracking-widest text-tactical-cyan hover:text-white transition-colors"
+                    >
+                      UPDATE COORDS
+                    </button>
                   </h5>
                   <div className="flex justify-between items-center text-sm">
                     {selectedResident.gpsLat !== undefined && selectedResident.gpsLat !== null && selectedResident.gpsLng !== undefined && selectedResident.gpsLng !== null ? (

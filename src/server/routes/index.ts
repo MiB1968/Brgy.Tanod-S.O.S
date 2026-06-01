@@ -13,6 +13,7 @@ import webhookRoutes from "./webhookRoutes";
 import smsRoutes from "./sms";
 import otpRoutes from "./otp";
 import scrapeRoutes from "./scrape";
+import residentRoutes from "./residentRoutes";
 
 export const setupRoutes = (app: Express): void => {
   // Health check - Detailed for System Audit
@@ -53,6 +54,7 @@ export const setupRoutes = (app: Express): void => {
   app.use("/api/sms", smsRoutes);
   app.use("/api/otp", otpRoutes);
   app.use("/api/scrape", scrapeRoutes);
+  app.use("/api/residents", residentRoutes);
 
   // 404 catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {

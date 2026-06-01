@@ -24,8 +24,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
 import { useAuthStore } from '../../store/useAuthStore';
-import { auth } from '../../lib/firebase';
 import { useAsyncAction } from '../../hooks/useAsyncAction';
+import { useRoleUpdate } from '../../hooks/useRoleUpdate';
 
 export default function ManageUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -35,10 +35,13 @@ export default function ManageUsers() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'suspended'>('all');
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const { profile } = useAuthStore();
   const { execute, loading: actionLoading } = useAsyncAction();
+  const { updateRole, loading: updatingRole } = useRoleUpdate();
+
+  // Combine updating logic
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const loadUsers = async () => {
     try {
@@ -95,25 +98,17 @@ export default function ManageUsers() {
       }
     }
     
-    await execute(
-      () => api.admin.updateUserRole(userId, newRole),
-      {
-        successMessage: `${userName} promoted to ${newRole.toUpperCase()}`,
-        onSuccess: async () => {
-          const typedRole = newRole as any;
-          setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: typedRole } : u));
-          socket.emit('tanod_update', {});
-          socket.emit('resident_update', {});
-
-          if (userId === profile?.id && auth.currentUser) {
-            await auth.currentUser.getIdToken(true);
-            toast.success("Your permissions have been updated. Reloading...");
-            setTimeout(() => window.location.reload(), 1500);
-          }
-        }
-      }
-    );
-    setUpdatingId(null);
+    try {
+      await updateRole(userId, newRole, userName);
+      const typedRole = newRole as any;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: typedRole } : u));
+      socket.emit('tanod_update', {});
+      socket.emit('resident_update', {});
+    } catch (e) {
+      // Handled in hook
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const handleStatusChange = async (userId: string, newStatus: string, userName: string) => {
