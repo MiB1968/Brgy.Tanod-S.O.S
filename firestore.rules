@@ -3,95 +3,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ============================================
-    // HELPER FUNCTIONS
-    // ============================================
-    function isAuthenticated() {
-      return request.auth != null;
-    }
+    function isAuthenticated() { return request.auth != null; }
+    function isRole(roles) { return isAuthenticated() && request.auth.token.role in roles; }
+    function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
+    function isAdminOrAbove() { return isRole(['admin', 'superadmin']); }
+    function isTanodOrAbove() { return isRole(['tanod', 'admin', 'superadmin']); }
 
-    function isRole(roles) {
-      return isAuthenticated() && 
-             request.auth.token.role in roles;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isAdminOrAbove() {
-      return isRole(['admin', 'superadmin']);
-    }
-
-    function isTanodOrAbove() {
-      return isRole(['tanod', 'admin', 'superadmin']);
-    }
-
-    // ============================================
-    // USERS
-    // ============================================
     match /users/{userId} {
-      // Users can read/update their own profile. Admins can manage all.
       allow read, update: if isOwner(userId) || isAdminOrAbove();
-      
-      // Only self-registration (or admin provisioning via backend)
       allow create: if isOwner(userId);
-      
-      // Only admins can delete user documents
       allow delete: if isAdminOrAbove();
     }
 
-    // ============================================
-    // RESIDENTS (Detailed resident profiles)
-    // ============================================
     match /residents/{residentId} {
-      // Resident can read/update own profile. Tanods/Admins have read access.
       allow read: if isOwner(residentId) || isTanodOrAbove();
       allow update: if isOwner(residentId) || isAdminOrAbove();
-      
-      // Creation usually done via backend on registration
       allow create: if isAuthenticated();
       allow delete: if isAdminOrAbove();
     }
 
-    // ============================================
-    // ALERTS / SOS (Critical Collection)
-    // ============================================
     match /alerts/{alertId} {
-      // Any authenticated user can create an alert (must be for themselves)
       allow create: if isAuthenticated() &&
                     request.resource.data.reportedBy == request.auth.uid &&
                     request.resource.data.location is map &&
                     request.resource.data.type is string &&
                     request.resource.data.timestamp is timestamp;
 
-      // Tanods + Admins can read all alerts. Citizens can only read their own.
       allow read: if isAuthenticated() && 
-                  (isTanodOrAbove() || 
-                   resource.data.reportedBy == request.auth.uid);
-
-      // Only responders can update alerts (status changes, dispatch, etc.)
+                  (isTanodOrAbove() || resource.data.reportedBy == request.auth.uid);
       allow update: if isTanodOrAbove();
-
-      // Only admins can delete alerts (rare)
       allow delete: if isAdminOrAbove();
     }
 
-    // ============================================
-    // REAL-TIME LOCATION TRACKING
-    // ============================================
     match /locations/{userId} {
-      // Tanods can write their own location. Tanods/Admins can read all.
-      allow write: if isAuthenticated() && 
-                   request.auth.uid == userId && 
-                   isTanodOrAbove();
-
+      allow write: if isAuthenticated() && request.auth.uid == userId && isTanodOrAbove();
       allow read: if isTanodOrAbove();
     }
 
-    // ============================================
-    // PATROLS & TANOD LOGS
-    // ============================================
     match /patrols/{document=**} {
       allow read, write: if isTanodOrAbove();
     }
@@ -100,26 +48,16 @@ service cloud.firestore {
       allow read, write: if isTanodOrAbove();
     }
 
-    // ============================================
-    // SYSTEM BROADCASTS (Announcements)
-    // ============================================
     match /system_broadcasts/{document=**} {
       allow read: if isAuthenticated();
       allow write: if isAdminOrAbove();
     }
 
-    // ============================================
-    // AUDIT LOGS (Server writes only)
-    // ============================================
     match /audit_logs/{document=**} {
       allow read: if isAdminOrAbove();
-      // Writes should come from backend only (via Admin SDK)
       allow write: if false;
     }
 
-    // ============================================
-    // DENY EVERYTHING ELSE (Safety Net)
-    // ============================================
     match /{document=**} {
       allow read, write: if false;
     }

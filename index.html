@@ -2,42 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <script>
-    // Silently filter out benign, noisy websocket/Vite connection logs in preview iframe
-    (function() {
-      const origWarn = console.warn;
-      const origError = console.error;
-      const origLog = console.log;
-      const shouldFilter = (...args) => {
-         try {
-           const str = args.map(arg => {
-             if (typeof arg === 'string') return arg;
-             if (arg instanceof Error) return arg.message + ' ' + arg.stack;
-             try { return JSON.stringify(arg); } catch { return String(arg); }
-           }).join(' ');
-           return str.includes('[vite]') || 
-                  str.includes('failed to connect to websocket') || 
-                  str.includes('WebSocket connection to') ||
-                  str.includes('connection aligned');
-         } catch {
-           return false;
-         }
-      };
-      console.warn = function(...args) {
-         if (shouldFilter(...args)) return;
-         origWarn.apply(console, args);
-      };
-      console.error = function(...args) {
-         if (shouldFilter(...args)) return;
-         origError.apply(console, args);
-      };
-      console.log = function(...args) {
-         if (shouldFilter(...args)) return;
-         origLog.apply(console, args);
-      };
-    })();
-  </script>
-  <link rel="icon" type="image/svg+xml" href="/icons/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/icons/icon-192.webp" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brgy Tanod S.O.S.</title>
 </head>
@@ -77,4 +42,3 @@
   </script>
 </body>
 </html>
-
