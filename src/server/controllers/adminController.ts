@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { pool, admin } from '../db/index';
+import { syncUserRoleToFirebase } from './authController';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
-import { logAction } from '../services/auditService';
+import { logAdminAction } from '../services/auditService';
 import { sendWelcomeEmail } from '../services/emailService';
 
 export const createUser = async (req: AuthRequest, res: Response) => {
@@ -99,9 +100,15 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    await logAction(req.user!.id, 'ADMIN_CREATE_USER', 'users', user.id, {
-      createdRole: role,
-      createdEmail: email,
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_CREATE_USER',
+      targetTable: 'users',
+      targetId: user.id,
+      details: {
+        createdRole: role,
+        createdEmail: email,
+      }
     });
 
     await client.query('COMMIT');
@@ -164,19 +171,17 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
 
     const userObj = result.rows[0];
 
-    // Sync custom claims to Firebase
-    if (userObj && admin && admin.apps && admin.apps.length > 0) {
-      try {
-        const fbUser = await admin.auth().getUserByEmail(userObj.email.toLowerCase());
-        await admin.auth().setCustomUserClaims(fbUser.uid, { role });
-        console.log(`[Admin] Custom claims updated on role change for firebase user ${fbUser.uid} to: ${role}`);
-      } catch (fbErr: any) {
-        console.warn(`[Admin] Could not update custom claims on role change for ${userObj.email}:`, fbErr.message);
-      }
-    }
+    // Sync custom claims to Firebase using the high-performance fast path
+    await syncUserRoleToFirebase(id, role);
 
-    await logAction(req.user!.id, 'ADMIN_UPDATE_ROLE', 'users', id, {
-      newRole: role,
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_UPDATE_ROLE',
+      targetTable: 'users',
+      targetId: id,
+      details: {
+        newRole: role,
+      }
     });
 
     return response.success(res, userObj, 'User role updated.');
@@ -205,8 +210,14 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
       return response.error(res, 'User not found.', 'NOT_FOUND', 404);
     }
 
-    await logAction(req.user!.id, 'ADMIN_UPDATE_STATUS', 'users', id, {
-      newStatus: status,
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_UPDATE_STATUS',
+      targetTable: 'users',
+      targetId: id,
+      details: {
+        newStatus: status,
+      }
     });
 
     return response.success(res, result.rows[0], 'User status updated.');
@@ -233,9 +244,15 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
       return response.error(res, 'User not found.', 'NOT_FOUND', 404);
     }
 
-    await logAction(req.user!.id, 'ADMIN_DELETE_USER', 'users', id, {
-      deletedEmail: result.rows[0].email,
-      deletedRole: result.rows[0].role,
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_DELETE_USER',
+      targetTable: 'users',
+      targetId: id,
+      details: {
+        deletedEmail: result.rows[0].email,
+        deletedRole: result.rows[0].role,
+      }
     });
 
     return response.success(res, null, 'User deleted successfully.');
@@ -286,9 +303,15 @@ export const resendWelcomeEmail = async (req: AuthRequest, res: Response) => {
     }
 
     // Call auditor log for compliance
-    await logAction(req.user!.id, 'ADMIN_RESEND_WELCOME', 'users', user.id, {
-      targetEmail: user.email,
-      targetRole: user.role,
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_RESEND_WELCOME',
+      targetTable: 'users',
+      targetId: user.id,
+      details: {
+        targetEmail: user.email,
+        targetRole: user.role,
+      }
     });
 
     // Trigger the physical or console email notification safely
@@ -308,6 +331,121 @@ export const resendWelcomeEmail = async (req: AuthRequest, res: Response) => {
   } catch (err: any) {
     console.error('[Admin] resendWelcomeEmail error:', err.message);
     return response.error(res, 'Failed to resend welcome email.');
+  }
+};
+
+export const approveResident = async (req: AuthRequest, res: Response) => {
+  const { residentId, registerInFirebase, sendEmail } = req.body;
+  if (!residentId) {
+    return response.error(res, 'residentId is required', 'BAD_REQUEST', 400);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Get resident details
+    const resResult = await pool.query(
+      `SELECT r.*, u.email, u.name, u.firebase_uid FROM residents r 
+       JOIN users u ON r.id = u.id 
+       WHERE r.id = $1`,
+      [residentId]
+    );
+
+    if (resResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return response.error(res, 'Resident not found', 'NOT_FOUND', 404);
+    }
+
+    const resident = resResult.rows[0];
+
+    // Create Firebase account if requested and NOT already created
+    let firebaseUid = resident.firebase_uid;
+    let tempPassword = crypto.randomBytes(8).toString('hex');
+
+    if (registerInFirebase && admin && admin.apps && admin.apps.length > 0) {
+      try {
+        const fbUser = await admin.auth().createUser({
+          email: resident.email,
+          password: tempPassword,
+          displayName: resident.name,
+        });
+        firebaseUid = fbUser.uid;
+
+        // Save firebase_uid to PostgreSQL
+        await client.query(
+          `UPDATE users SET firebase_uid = $1 WHERE id = $2`,
+          [firebaseUid, resident.id]
+        );
+      } catch (fbErr: any) {
+        if (fbErr.code === 'auth/email-already-exists') {
+          // Get existing instead
+          try {
+            const existingFb = await admin.auth().getUserByEmail(resident.email);
+            firebaseUid = existingFb.uid;
+            await client.query(
+              `UPDATE users SET firebase_uid = $1 WHERE id = $2`,
+              [firebaseUid, resident.id]
+            );
+          } catch (getFbErr) {
+            console.error('[Admin] Failed to lookup Firebase user:', getFbErr);
+          }
+        } else {
+          throw fbErr;
+        }
+      }
+    }
+
+    // Update status in PostgreSQL for both tables
+    await client.query(`UPDATE users SET status = 'verified' WHERE id = $1`, [residentId]);
+    await client.query(
+      `UPDATE residents SET status = 'approved', is_verified = true, verification_date = now() WHERE id = $1`,
+      [residentId]
+    );
+
+    await client.query('COMMIT');
+
+    // Sync roles to Firebase custom claims
+    if (firebaseUid && admin && admin.apps && admin.apps.length > 0) {
+      try {
+        await admin.auth().setCustomUserClaims(firebaseUid, { role: 'resident' });
+      } catch (syncErr: any) {
+        console.error('[Admin] Custom claims sync failed for resident:', syncErr.message);
+      }
+    }
+
+    // Send welcome/creation email using sendWelcomeEmail service
+    if (sendEmail && registerInFirebase) {
+      try {
+        await sendWelcomeEmail({
+          email: resident.email.toLowerCase(),
+          name: resident.name,
+          role: 'resident',
+          temporaryPassword: tempPassword,
+          isAutoGenerated: true,
+        });
+      } catch (emailErr: any) {
+        console.error('[Admin] Welcome email trigger failed during resident approval:', emailErr.message);
+      }
+    }
+
+    await logAdminAction({
+      adminId: req.user!.id,
+      action: 'ADMIN_APPROVE_RESIDENT',
+      targetTable: 'residents',
+      targetId: residentId,
+      details: {
+        approvedEmail: resident.email,
+      }
+    });
+
+    return response.success(res, { residentId }, 'Resident approved and synchronized successfully.');
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('[Admin] approveResident error:', err.message);
+    return response.error(res, err.message || 'System fault: Failed to approve resident.');
+  } finally {
+    client.release();
   }
 };
 

@@ -22,6 +22,9 @@ router.post(
 // GET /api/admin/users — list all users
 router.get('/users', adminController.listUsers);
 
+// POST /api/admin/approve-resident — approve a resident and sync to firebase
+router.post('/approve-resident', adminController.approveResident);
+
 // POST /api/admin/users/resend-welcome — resend welcome email with temporary credential passcode
 router.post('/users/resend-welcome', adminController.resendWelcomeEmail);
 

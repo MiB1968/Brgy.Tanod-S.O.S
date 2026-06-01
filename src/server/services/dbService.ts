@@ -61,9 +61,35 @@ export async function initDb(retries = 3) {
       };
 
       await runQuerySilently("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1", "Added token_version to users");
+      await runQuerySilently("ALTER TABLE users ADD COLUMN firebase_uid VARCHAR(128)", "Added firebase_uid to users");
+      await runQuerySilently("CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)", "Created idx_users_firebase_uid index");
       await runQuerySilently("ALTER TABLE users ADD COLUMN barangay_id TEXT DEFAULT 'default'", "Added barangay_id to users");
       await runQuerySilently("ALTER TABLE users ADD CONSTRAINT check_token_version CHECK (token_version > 0)", "Added check_token_version to users");
       await runQuerySilently("CREATE INDEX idx_users_token_version ON users(id, token_version)", "Created idx_users_token_version index");
+
+      // Residents migrations
+      await runQuerySilently("ALTER TABLE residents ADD COLUMN is_outside_barangay BOOLEAN DEFAULT false", "Added is_outside_barangay to residents");
+      await runQuerySilently("ALTER TABLE residents ADD COLUMN last_location_check TIMESTAMP WITH TIME ZONE", "Added last_location_check to residents");
+
+      // Barangay boundaries migration
+      await runQuerySilently(`
+        CREATE TABLE IF NOT EXISTS barangay_boundaries (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100),
+          boundary_geojson JSONB NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `, "Created barangay_boundaries table");
+
+      // Admin Audit Logs migrations
+      await runQuerySilently("ALTER TABLE audit_logs ADD COLUMN admin_id UUID REFERENCES users(id)", "Added admin_id to audit_logs");
+      await runQuerySilently("ALTER TABLE audit_logs ADD COLUMN action VARCHAR(100)", "Added action to audit_logs");
+      await runQuerySilently("ALTER TABLE audit_logs ADD COLUMN target_table VARCHAR(50)", "Added target_table to audit_logs");
+      await runQuerySilently("ALTER TABLE audit_logs ADD COLUMN target_id VARCHAR(100)", "Added target_id to audit_logs");
+      await runQuerySilently("ALTER TABLE audit_logs ADD COLUMN details JSONB", "Added details to audit_logs");
+      await runQuerySilently("CREATE INDEX IF NOT EXISTS idx_audit_logs_admin_id ON audit_logs(admin_id)", "Created idx_audit_logs_admin_id");
+      await runQuerySilently("CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)", "Created idx_audit_logs_action");
+      await runQuerySilently("CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)", "Created idx_audit_logs_created_at");
 
       // Alerts migrations
       await runQuerySilently("ALTER TABLE alerts ADD COLUMN barangay_id TEXT DEFAULT 'default'", "Added barangay_id to alerts");

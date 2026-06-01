@@ -51,20 +51,38 @@ export const ResidentVerification = () => {
 
   const handleVerify = async (id: string, status: 'approved' | 'rejected' | 'pending', reason?: string) => {
     try {
-      const updatePayload: any = {
-        status: status,
-        isVerified: status === 'approved',
-        verificationDate: new Date().toISOString()
-      };
-      if (status === 'rejected') {
-        updatePayload.rejectionReason = reason || 'Audited and rejected by administrator';
+      if (status === 'approved' && navigator.onLine) {
+        // High-performance dedicated backend route
+        await api.admin.approveResident(id, true, true);
       } else {
-        updatePayload.rejectionReason = '';
+        const updatePayload: any = {
+          status: status,
+          isVerified: false,
+          verificationDate: new Date().toISOString()
+        };
+        if (status === 'rejected') {
+          updatePayload.rejectionReason = reason || 'Audited and rejected by administrator';
+        } else {
+          updatePayload.rejectionReason = '';
+        }
+        
+        if (navigator.onLine) {
+          await api.residents.update(id, updatePayload);
+          // Also update the main user status
+          await api.generic.update(`users/${id}`, { status });
+        } else {
+          // Offline queue
+          const { db } = await import('../../db/offlineDB');
+          await db.queuedActions.add({
+            type: 'status_update',
+            payload: { residentId: id, status: status },
+            timestamp: Date.now(),
+            retryCount: 0
+          });
+          toast.success(`Action saved offline. Will sync when back online.`);
+          return;
+        }
       }
-      await api.residents.update(id, updatePayload);
-      
-      // Also update the main user status
-      await api.generic.update(`users/${id}`, { status });
       
       toast.success(`Resident ${status.charAt(0).toUpperCase() + status.slice(1)}`);
       

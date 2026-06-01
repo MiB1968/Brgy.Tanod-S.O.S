@@ -52,6 +52,10 @@ export const generic = {
 
 export const admin = {
   getUsers: () => fetchAPI('/admin/users'),
+  approveResident: (residentId: string, registerInFirebase: boolean = true, sendEmail: boolean = true) => fetchAPI('/admin/approve-resident', {
+    method: 'POST',
+    body: JSON.stringify({ residentId, registerInFirebase, sendEmail }),
+  }),
   createUser: (data: any) => fetchAPI('/admin/users', {
     method: 'POST',
     body: JSON.stringify(data),

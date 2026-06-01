@@ -57,7 +57,7 @@ export default function AppLayout({
           { id: "home", label: "Command", icon: Home },
           { id: "map", label: "Live Intel", icon: Map },
           { id: "logs", label: "Logs", icon: ClipboardList },
-          { id: "verification", label: "Verify", icon: UserCheck },
+          { id: "users", label: "Users", icon: UserCheck },
           { id: "settings", label: "Config", icon: Settings },
         ];
       case "tanod":

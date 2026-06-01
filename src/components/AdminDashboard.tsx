@@ -403,7 +403,7 @@ export default function AdminDashboard(props: {
               {[
                 { id: "map", label: "Live Intel Map", icon: MapIcon, desc: "Active Heatmaps", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/45 shadow-[0_0_15px_rgba(0,240,255,0.05)]" },
                 { id: "tracker", label: "GPS Dispatch", icon: Activity, desc: "Tanod Live Tracks", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/45" },
-                { id: "verification", label: "Verifications", icon: UserCheck, desc: "Access Clearances", color: "text-amber-400 border-amber-400/10 hover:bg-amber-400/5 hover:border-amber-400/45" },
+                { id: "users", label: "Verifications", icon: UserCheck, desc: "Access Clearances", color: "text-amber-400 border-amber-400/10 hover:bg-amber-400/5 hover:border-amber-400/45" },
                 { id: "resident-map", label: "Locator Grid", icon: Eye, desc: "Target Overcasts", color: "text-purple-400 border-purple-400/10 hover:bg-purple-400/5 hover:border-purple-400/45" },
                 { id: "roster", label: "Tanod Roster", icon: Shield, desc: "Unit Deployments", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/45" },
                 { id: "schedule", label: "Shift Planner", icon: Calendar, desc: "Patrol Schedules", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/45" },

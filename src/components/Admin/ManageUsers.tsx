@@ -23,6 +23,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
+import { useAsyncAction } from '../../hooks/useAsyncAction';
+
 export default function ManageUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,8 @@ export default function ManageUsers() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const { execute, loading: actionLoading } = useAsyncAction();
 
   const loadUsers = async () => {
     try {
@@ -59,73 +63,60 @@ export default function ManageUsers() {
   }, []);
 
   const handleResendWelcome = async (userId: string, userName: string) => {
-    try {
-      setResendingId(userId);
-      toast.loading(`Re-provisioning credentials for ${userName}...`, { id: 'resend' });
-
-      await api.admin.resendWelcomeEmail(userId);
-
-      toast.success(`Security passcode resent to ${userName}!`, { id: 'resend', icon: '📩' });
-    } catch (err: any) {
-      console.error('Resend welcome email failed:', err);
-      toast.error(err?.message || 'Failed to dispatch welcome communication', { id: 'resend' });
-    } finally {
-      setResendingId(null);
-    }
+    setResendingId(userId);
+    await execute(
+      () => api.admin.resendWelcomeEmail(userId),
+      { successMessage: `Security passcode resent to ${userName}!` }
+    );
+    setResendingId(null);
   };
 
   const handleRoleChange = async (userId: string, newRole: string, userName: string) => {
-    try {
-      setUpdatingId(userId);
-      await api.admin.updateUserRole(userId, newRole);
-      toast.success(`${userName} promoted to ${newRole.toUpperCase()}`);
-      
-      // Update local state without full reload for instant visual responsiveness
-      const typedRole = newRole as any;
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: typedRole } : u));
-      
-      // Trigger live updates to other terminals
-      socket.emit('tanod_update', {});
-      socket.emit('resident_update', {});
-    } catch (err: any) {
-      console.error('Role update failed:', err);
-      toast.error('Failed to alter personnel clearance tier');
-    } finally {
-      setUpdatingId(null);
-    }
+    setUpdatingId(userId);
+    await execute(
+      () => api.admin.updateUserRole(userId, newRole),
+      {
+        successMessage: `${userName} promoted to ${newRole.toUpperCase()}`,
+        onSuccess: () => {
+          const typedRole = newRole as any;
+          setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: typedRole } : u));
+          socket.emit('tanod_update', {});
+          socket.emit('resident_update', {});
+        }
+      }
+    );
+    setUpdatingId(null);
   };
 
   const handleStatusChange = async (userId: string, newStatus: string, userName: string) => {
-    try {
-      setUpdatingId(userId);
-      await api.admin.updateUserStatus(userId, newStatus);
-      toast.success(`Access status for ${userName} modified to ${newStatus.toUpperCase()}`);
-      
-      const typedStatus = newStatus as any;
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: typedStatus } : u));
-      
-      socket.emit('resident_update', {});
-    } catch (err: any) {
-      console.error('Status active failure:', err);
-      toast.error('Failed to update system access state');
-    } finally {
-      setUpdatingId(null);
-    }
+    setUpdatingId(userId);
+    await execute(
+      () => api.admin.updateUserStatus(userId, newStatus),
+      {
+        successMessage: `Access status for ${userName} modified to ${newStatus.toUpperCase()}`,
+        onSuccess: () => {
+          const typedStatus = newStatus as any;
+          setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: typedStatus } : u));
+          socket.emit('resident_update', {});
+        }
+      }
+    );
+    setUpdatingId(null);
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    try {
-      await api.admin.deleteUser(userId);
-      toast.success(`Operator ${userName} purged from security framework`);
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      setDeletingId(null);
-      
-      socket.emit('tanod_update', {});
-      socket.emit('resident_update', {});
-    } catch (err: any) {
-      console.error('Deletion failed:', err);
-      toast.error('Failed to decommission system account');
-    }
+    await execute(
+      () => api.admin.deleteUser(userId),
+      {
+        successMessage: `Operator ${userName} purged from security framework`,
+        onSuccess: () => {
+          setUsers(prev => prev.filter(u => u.id !== userId));
+          setDeletingId(null);
+          socket.emit('tanod_update', {});
+          socket.emit('resident_update', {});
+        }
+      }
+    );
   };
 
   // Helper function to format the Last Login / Last Active timestamp nicely

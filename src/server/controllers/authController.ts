@@ -10,38 +10,59 @@ import { logAction } from '../services/auditService';
 // Ensure Firebase Admin is initialized
 initDatabase();
 
-// Helper to sync role to Firebase custom claims
-async function syncUserRoleToFirebase(userIdOrEmail: string, role: string) {
+// Helper to sync role to Firebase custom claims (exported for administrative syncing)
+export async function syncUserRoleToFirebase(userIdOrEmail: string, role: string) {
   try {
     let firebaseUid: string | null = null;
 
-    if (userIdOrEmail.includes('@')) {
-      // It is an email address
-      try {
-        const fbUser = await admin.auth().getUserByEmail(userIdOrEmail.toLowerCase());
-        firebaseUid = fbUser.uid;
-      } catch (err: any) {
-        console.warn(`[Auth] Firebase user not found by email (${userIdOrEmail}):`, err.message);
-      }
-    } else {
-      // It might be a Postgres UUID. Let's check Postgres first to resolve the email.
-      try {
-        const userRes = await pool.query('SELECT email FROM users WHERE id = $1', [userIdOrEmail]);
-        if (userRes.rows.length > 0) {
-          const email = userRes.rows[0].email;
-          const fbUser = await admin.auth().getUserByEmail(email.toLowerCase());
-          firebaseUid = fbUser.uid;
+    // 1. Try to get firebase_uid directly from database (fast path)
+    if (!userIdOrEmail.includes('@')) {
+      const userRes = await pool.query(
+        'SELECT email, firebase_uid FROM users WHERE id = $1',
+        [userIdOrEmail]
+      );
+
+      if (userRes.rows.length > 0) {
+        const row = userRes.rows[0];
+        if (row.firebase_uid) {
+          firebaseUid = row.firebase_uid;
         } else {
-          // Fallback check if it was already a direct Firebase Auth UID
+          // If uid not in DB, look up by email in Firebase once, then save it
           try {
-            const fbUser = await admin.auth().getUser(userIdOrEmail);
+            const fbUser = await admin.auth().getUserByEmail(row.email.toLowerCase());
             firebaseUid = fbUser.uid;
-          } catch {
-            // Unresolvable
+            // Persist the uid back to DB to speed up future syncs
+            await pool.query(
+              'UPDATE users SET firebase_uid = $1 WHERE id = $2',
+              [firebaseUid, userIdOrEmail]
+            );
+          } catch (err: any) {
+            console.warn(`[Auth] Firebase user not found by email during backfill (${row.email}):`, err.message);
           }
         }
-      } catch (err: any) {
-        console.warn(`[Auth] Resolve check failed for ID ${userIdOrEmail}:`, err.message);
+      }
+    } else {
+      // It is an email address - lookup in DB first too to see if uid is cached
+      const emailQuery = await pool.query(
+        'SELECT id, firebase_uid FROM users WHERE email = $1',
+        [userIdOrEmail.toLowerCase()]
+      );
+
+      if (emailQuery.rows.length > 0 && emailQuery.rows[0].firebase_uid) {
+        firebaseUid = emailQuery.rows[0].firebase_uid;
+      } else {
+        try {
+          const fbUser = await admin.auth().getUserByEmail(userIdOrEmail.toLowerCase());
+          firebaseUid = fbUser.uid;
+          if (emailQuery.rows.length > 0) {
+            await pool.query(
+              'UPDATE users SET firebase_uid = $1 WHERE id = $2',
+              [firebaseUid, emailQuery.rows[0].id]
+            );
+          }
+        } catch (err: any) {
+          console.warn(`[Auth] Firebase user not found by email (${userIdOrEmail}):`, err.message);
+        }
       }
     }
 

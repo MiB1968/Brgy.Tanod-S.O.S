@@ -10,6 +10,7 @@ interface LocationEntry {
   name?: string;
   timestamp?: string;
   status?: string;
+  is_outside_barangay?: boolean;
 }
 
 const activeLocations: Record<string, LocationEntry> = {};
@@ -26,12 +27,29 @@ export function setupLocationHandlers(io: Server, socket: AuthenticatedSocket) {
     socket.emit('location_map', activeLocations);
   }
 
-  socket.on('location_update', (data: LocationEntry) => {
+  socket.on('location_update', async (data: LocationEntry) => {
     if (!data.user_id || typeof data.lat !== 'number' || typeof data.lng !== 'number') return;
+
+    // Perform geofence boundary validation asynchronously
+    let isOutside = false;
+    try {
+      const { checkAndUpdateGeofence } = await import('../../services/geofencingService');
+      
+      // Update residents table is_outside_barangay value when citizen roles update
+      if (data.role?.toLowerCase() === 'resident') {
+        const result = await checkAndUpdateGeofence(data.user_id, data.lat, data.lng);
+        if (result !== undefined) {
+          isOutside = result.is_outside_barangay;
+        }
+      }
+    } catch (geofenceErr: any) {
+      console.warn(`[LocationHandler] Geofence warning for user ${data.user_id}:`, geofenceErr.message);
+    }
 
     const newEntry: LocationEntry = {
       ...data,
       timestamp: new Date().toISOString(),
+      is_outside_barangay: isOutside,
     };
 
     activeLocations[data.user_id] = newEntry;

@@ -134,5 +134,63 @@ export const offlineService = {
       console.error('[Sync] error syncing pending locations:', err);
       return { success: 0, failed: 0 };
     }
+  },
+
+  /**
+   * Synchronizes queued activities/audit actions
+   */
+  async syncPendingQueuedActions(): Promise<{ success: number; failed: number }> {
+    try {
+      const pending = await db.queuedActions.toArray();
+      if (pending.length === 0) return { success: 0, failed: 0 };
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const action of pending) {
+        if (!action.id) continue;
+        try {
+          if (action.type === 'activity_log') {
+            const { path, entry } = action.payload;
+            if (path === 'audit_logs') {
+              await api.create('audit_logs', entry);
+            } else if (path === 'tanod_activity_logs') {
+              const { logs: apiLogs } = await import('../lib/api');
+              await apiLogs.create(entry);
+            }
+          } else if (action.type === 'status_update') {
+            const { residentId, status } = action.payload;
+            await api.update(`residents/${residentId}`, { status });
+          }
+          await db.queuedActions.delete(action.id);
+          successCount++;
+        } catch (err) {
+          failCount++;
+          await db.queuedActions.update(action.id, {
+            retryCount: (action.retryCount || 0) + 1,
+          });
+          console.error(`[Sync] queuedAction ${action.id} upload failed:`, err);
+        }
+      }
+
+      return { success: successCount, failed: failCount };
+    } catch (err) {
+      console.error('[Sync] error syncing queued actions:', err);
+      return { success: 0, failed: 0 };
+    }
+  },
+
+  /**
+   * Process all offline queues
+   */
+  async processOfflineQueue(): Promise<{ success: number; failed: number }> {
+    let success = 0;
+    let failed = 0;
+    const locations = await this.syncPendingLocations();
+    const actions = await this.syncPendingQueuedActions();
+    success += locations.success + actions.success;
+    failed += locations.failed + actions.failed;
+    // Note: You must also handle SOS sync somehow if needed, but for now we do locations & actions
+    return { success, failed };
   }
 };

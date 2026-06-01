@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { UserPlus, Shield, UserCheck, Key, Mail, Check, AlertCircle, Phone, MapPin, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-export default function CreateUserForm() {
+export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -99,6 +99,7 @@ export default function CreateUserForm() {
         emergencyContactPhone: '',
       });
       setAutoGenerate(true);
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('[AdminCreateUserForm] Error:', err);
       toast.error(err.message || 'System fault: Failed to commit user registry.');

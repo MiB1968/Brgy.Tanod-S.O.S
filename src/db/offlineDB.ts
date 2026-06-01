@@ -47,7 +47,7 @@ export interface AIChatMessage {
 
 export interface QueuedAction {
   id?: number;
-  type: 'sos' | 'location' | 'status_update';
+  type: 'sos' | 'location' | 'status_update' | 'activity_log';
   payload: any;
   timestamp: number;
   retryCount: number;

@@ -188,10 +188,16 @@ if (typeof window !== "undefined") {
   window.addEventListener('online', () => {
     console.log("🌐 Connection retrieved online - starting synchronizer batch dispatch");
     syncService.syncPendingReports();
+    import('./offlineService').then(({ offlineService }) => {
+      offlineService.syncPendingQueuedActions().catch(err => console.warn('[Sync] Action queue restoration failed:', err));
+    }).catch(e => console.warn('[Sync] Could not import offlineService dynamically:', e));
   });
 
   // Schedule background startup check
   setTimeout(() => {
     syncService.syncPendingReports().catch(console.error);
+    import('./offlineService').then(({ offlineService }) => {
+      offlineService.syncPendingQueuedActions().catch(err => console.warn('[Sync] Action queue restoration startup failed:', err));
+    }).catch(e => console.warn('[Sync] Could not import offlineService during startup:', e));
   }, 4000);
 }

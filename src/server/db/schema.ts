@@ -6,7 +6,9 @@ import {
   boolean, 
   integer, 
   doublePrecision, 
-  jsonb 
+  jsonb,
+  serial,
+  varchar
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -19,6 +21,7 @@ export const users = pgTable('users', {
   status: text('status').notNull().default('pending'),
   barangayId: text('barangay_id').default('default'),
   tokenVersion: integer('token_version').default(1).notNull(),
+  firebaseUid: text('firebase_uid'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastActive: timestamp('last_active', { withTimezone: true }).defaultNow()
 });
@@ -40,7 +43,16 @@ export const residents = pgTable('residents', {
   status: text('status').default('pending'),
   isVerified: boolean('is_verified').default(false),
   verificationDate: timestamp('verification_date', { withTimezone: true }),
-  rejectionReason: text('rejection_reason')
+  rejectionReason: text('rejection_reason'),
+  isOutsideBarangay: boolean('is_outside_barangay').default(false),
+  lastLocationCheck: timestamp('last_location_check', { withTimezone: true }),
+});
+
+export const barangayBoundaries = pgTable('barangay_boundaries', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 100 }),
+  boundaryGeojson: jsonb('boundary_geojson').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 });
 
 export const alerts = pgTable('alerts', {
@@ -136,7 +148,12 @@ export const auditLogs = pgTable('audit_logs', {
   locationLat: doublePrecision('location_lat'),
   locationLng: doublePrecision('location_lng'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  notes: text('notes')
+  notes: text('notes'),
+  adminId: uuid('admin_id').references(() => users.id),
+  action: varchar('action', { length: 100 }),
+  targetTable: varchar('target_table', { length: 50 }),
+  targetId: varchar('target_id', { length: 100 }),
+  details: jsonb('details')
 });
 
 export const auditLogArchives = pgTable('audit_log_archives', {
