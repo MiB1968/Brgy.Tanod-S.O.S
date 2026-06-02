@@ -30,6 +30,14 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Copy background runner AAR
+        run: |
+          mkdir -p android/app/libs
+          find node_modules/@capacitor/background-runner -name "*.aar" \
+            -exec cp {} android/app/libs/android-js-engine-release.aar \;
+          echo "AAR files copied:"
+          ls -la android/app/libs/
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
