@@ -5,7 +5,7 @@
  */
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import {
   initializeFirestore,
   persistentLocalCache,
@@ -21,6 +21,11 @@ const firebaseApp: FirebaseApp =
   getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth: Auth = getAuth(firebaseApp);
+
+// Configure Auth persistence to browserLocalPersistence to prevent sessionStorage partitioning issues on mobile devices
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  console.warn('[Firebase Auth] Failed to set local storage persistence:', err);
+});
 
 export const db: Firestore = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({
