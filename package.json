@@ -39,7 +39,7 @@
     "@mlc-ai/web-llm": "^0.2.83",
     "@sentry/node": "10.43.0",
     "@sentry/react": "10.43.0",
-    "@sentry/replay": "10.43.0"
+    "@sentry/replay": "10.43.0",
     "@sentry/tracing": "10.43.0",
     "@tailwindcss/vite": "^4.3.0",
     "@turf/turf": "^7.3.5",
