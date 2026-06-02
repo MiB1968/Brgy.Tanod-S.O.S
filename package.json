@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "prebuild": "node scripts/generate-sentry-release.js",
+    "prebuild": "node scripts/generate-sentry-release.cjs",
     "build": "npx rimraf dist && npm run prebuild && npx vite build --mode production && npx esbuild src/server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
