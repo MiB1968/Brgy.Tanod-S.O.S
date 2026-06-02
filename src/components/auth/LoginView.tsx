@@ -7,6 +7,8 @@ interface LoginViewProps {
   onGoogleLogin: () => void;
   onRegister: () => void;
   isLoggingIn: boolean;
+  onDemoLogin?: () => void;
+  onDemoAdminLogin?: () => void;
 }
 
 export default function LoginView({
@@ -14,6 +16,8 @@ export default function LoginView({
   onGoogleLogin,
   onRegister,
   isLoggingIn,
+  onDemoLogin,
+  onDemoAdminLogin,
 }: LoginViewProps) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -98,10 +102,25 @@ export default function LoginView({
 
           <button
             onClick={onRegister}
-            className="w-full text-center mt-6 text-sm text-gray-400 hover:text-white transition-colors"
+            className="w-full text-center mt-6 text-sm font-semibold text-white bg-gray-800 hover:bg-gray-700 py-3 rounded-2xl transition-colors"
           >
-            New Resident? Create Account
+            CITIZEN REGISTRATION
           </button>
+          
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <button
+              onClick={onDemoLogin}
+              className="text-xs text-gray-400 border border-gray-700 py-2 rounded-lg hover:border-gray-500"
+            >
+              RESIDENT DEMO
+            </button>
+            <button
+              onClick={onDemoAdminLogin}
+              className="text-xs text-gray-400 border border-gray-700 py-2 rounded-lg hover:border-gray-500"
+            >
+              COMMANDER DEMO
+            </button>
+          </div>
         </div>
       </div>
     </div>

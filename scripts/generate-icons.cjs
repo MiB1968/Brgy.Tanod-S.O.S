@@ -29,8 +29,8 @@ try {
     'npx @capacitor/assets generate',
     `--iconBackgroundColor "${ICON_BG_LIGHT}"`,
     `--iconBackgroundColorDark "${ICON_BG_DARK}"`,
-    // '--android',   // Disabled for now
-    // '--ios',       // Disabled for now
+    '--android',
+    '--ios',
     '--pwa',       // generate PWA icons for the web manifest
   ].join(' ');
 

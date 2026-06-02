@@ -47,7 +47,7 @@ export default function ManageUsers() {
     try {
       setLoading(true);
       const data = await api.admin.getUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error('Failed to load users:', err);
       toast.error('Failed to retrieve central operator registry');
@@ -243,7 +243,7 @@ export default function ManageUsers() {
   };
 
   // Perform client-side user queries & filters
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = (Array.isArray(users) ? users : []).filter(user => {
     const matchesSearch = 
       user.name.toLowerCase().includes(search.toLowerCase()) || 
       user.email.toLowerCase().includes(search.toLowerCase()) ||

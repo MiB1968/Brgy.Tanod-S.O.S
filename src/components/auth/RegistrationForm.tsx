@@ -81,11 +81,26 @@ const SelfieCamera = ({ onCapture }: { onCapture: (dataUrl: string) => void }) =
 
   const startCamera = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      console.log("Requesting camera access...");
+      // Try specific constraints for better mobile support
+      const s = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
       setStream(s);
       if (videoRef.current) videoRef.current.srcObject = s;
-    } catch (err) {
-      toast.error("Camera access denied.");
+      console.log("Camera access granted.");
+    } catch (err: any) {
+      console.error("Camera access failed:", err);
+      let errorMessage = "Camera access denied or failed.";
+      if (err.name === 'NotAllowedError') errorMessage = "Camera permission denied. Please allow access in browser settings.";
+      else if (err.name === 'NotFoundError') errorMessage = "No camera found on this device.";
+      else errorMessage = `Camera error: ${err.message || err}`;
+      
+      toast.error(errorMessage);
     }
   };
 
