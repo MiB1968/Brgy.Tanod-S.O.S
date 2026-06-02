@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@andresaya/edge-tts": "^1.8.0",
+    "@capacitor/android": "^8.3.4",
     "@capacitor/background-runner": "^3.0.0",
     "@capacitor/core": "^8.3.4",
     "@capacitor/geolocation": "^8.2.0",
