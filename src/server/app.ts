@@ -82,24 +82,21 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      const isStudioPreview =
-        !!origin &&
-        (origin.includes('.run.app') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('google.com'));
+      // For emergency services, we allow requests from local dev and explicitly configured origins.
+      // We avoid .includes() logic on production sensitive domains to prevent subdomain hijacking.
+      const isLocalhost = !!origin && (origin.includes('localhost') || origin.includes('127.0.0.1'));
 
-      const isDevFallback =
-        allowedOrigins.length === 0 && config.nodeEnv !== 'production';
-
-      if (
+      const isAllowed =
         !origin ||
         origin === 'null' ||
-        isStudioPreview ||
-        isDevFallback ||
-        allowedOrigins.includes(origin)
-      ) {
+        (config.nodeEnv !== 'production' && isLocalhost) ||
+        allowedOrigins.includes(origin);
+
+      if (isAllowed) {
         return callback(null, true);
       }
 
-      console.warn(`[CORS] Origin rejected: ${origin}`);
+      console.warn(`[CORS] Illegal origin rejected: ${origin}`);
       return callback(null, false);
     },
     credentials: true

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -40,8 +41,11 @@ export const config = {
   jwtSecret:
     process.env.JWT_SECRET ||
     (process.env.NODE_ENV !== 'production'
-      ? 'DEV_ONLY_jwt_secret_change_before_deploy_32chars'
+      ? randomUUID()
       : ''),
+
+  redisUrl: process.env.REDIS_URL || null,
+  fieldEncryptionKey: process.env.FIELD_ENCRYPTION_KEY || 'default-dev-encryption-key-32chars!!',
 
   databaseUrl: (process.env.COCKROACH_URL || process.env.DATABASE_URL || '')
     .trim()

@@ -6,6 +6,7 @@ import * as response from '../utils/response';
 import { ShiftRepository } from '../db/repositories/ShiftRepository';
 import { z } from 'zod';
 import { config } from '../config/index';
+import { encrypt, decrypt } from '../utils/crypto';
 
 const auditLogArchiveSchema = z.object({
   session_date: z.string().min(1),
@@ -132,7 +133,20 @@ export const getSync = async (req: AuthRequest, res: Response) => {
         const user = result.rows[0];
         if (user && collection === 'residents') {
            const resInfo = await pool.query("SELECT * FROM residents WHERE id = $1", [id]);
-           return res.json({ ...user, ...resInfo.rows[0] });
+           const resident = resInfo.rows[0];
+           if (resident) {
+             if (resident.medical_conditions_enc) {
+               try {
+                 resident.medical_conditions = JSON.parse(decrypt(resident.medical_conditions_enc));
+               } catch (e) { console.warn("Failed to decrypt medical conditions", e); }
+             }
+             if (resident.blood_type_enc) {
+               try {
+                 resident.blood_type = decrypt(resident.blood_type_enc);
+               } catch (e) { console.warn("Failed to decrypt blood type", e); }
+             }
+           }
+           return res.json({ ...user, ...resident });
         }
         return res.json(user || null);
       }
@@ -140,7 +154,20 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       if (!isTanod) return response.error(res, "Forbidden", "FORBIDDEN", 403);
       if (collection === 'residents') {
         const result = await pool.query("SELECT u.id, u.email, u.name, u.role, u.status, r.* FROM users u JOIN residents r ON u.id = r.id WHERE u.role = 'resident'");
-        return res.json(result.rows);
+        const residents = result.rows.map(resident => {
+          if (resident.medical_conditions_enc) {
+            try {
+              resident.medical_conditions = JSON.parse(decrypt(resident.medical_conditions_enc));
+            } catch (e) { console.warn("Failed to decrypt medical conditions", e); }
+          }
+          if (resident.blood_type_enc) {
+            try {
+              resident.blood_type = decrypt(resident.blood_type_enc);
+            } catch (e) { console.warn("Failed to decrypt blood type", e); }
+          }
+          return resident;
+        });
+        return res.json(residents);
       }
       const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE role = 'resident'");
       return res.json(result.rows);
@@ -362,7 +389,15 @@ export const postSync = async (req: AuthRequest, res: Response) => {
       const safeData: Record<string, any> = {};
       Object.keys(data).forEach(key => {
          const mapped = fieldMapping[key] || fieldMapping[key.replace(/([A-Z])/g, "_$1").toLowerCase()];
-         if (mapped) safeData[mapped] = data[key];
+         if (mapped) {
+           if (mapped === 'medical_conditions') {
+             safeData['medical_conditions_enc'] = encrypt(JSON.stringify(data[key]));
+           } else if (mapped === 'blood_type') {
+             safeData['blood_type_enc'] = encrypt(data[key]);
+           } else {
+             safeData[mapped] = data[key];
+           }
+         }
       });
 
       const safeFields = Object.keys(safeData);

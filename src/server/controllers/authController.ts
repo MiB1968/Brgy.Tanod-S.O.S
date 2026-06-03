@@ -5,6 +5,7 @@ import { pool, admin, initDatabase } from '../db/index';
 import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
+import { encrypt } from '../utils/crypto';
 import { logAction } from '../services/auditService';
 
 // Ensure Firebase Admin is initialized
@@ -124,10 +125,13 @@ export const register = async (req: Request, res: Response) => {
     // =====================================================
     if (role === 'resident') {
       try {
+        const bloodTypeEnc = details?.bloodType ? encrypt(details.bloodType) : null;
+        const medicalConditionsEnc = details?.medicalConditions ? encrypt(JSON.stringify(details.medicalConditions)) : null;
+
         await client.query(
           `INSERT INTO residents 
              (id, name, status, phone, address, house_number, household_size, 
-              blood_type, medical_conditions, emergency_contact_name, 
+              blood_type_enc, medical_conditions_enc, emergency_contact_name,
               emergency_contact_phone, gps_lat, gps_lng, selfie_url)
            VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT (id) DO NOTHING`,
@@ -138,8 +142,8 @@ export const register = async (req: Request, res: Response) => {
             details?.address || null,
             details?.houseNumber || null,
             details?.householdSize !== undefined ? Number(details.householdSize) : 1,
-            details?.bloodType || null,
-            details?.medicalConditions || null,
+            bloodTypeEnc,
+            medicalConditionsEnc,
             details?.emergencyContactName || null,
             details?.emergencyContactPhone || null,
             details?.gpsLat !== undefined && details?.gpsLat !== null ? Number(details.gpsLat) : null,

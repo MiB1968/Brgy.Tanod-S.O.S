@@ -3,6 +3,9 @@ import { IncidentRepository } from '../db/repositories';
 import { analyzeIncident } from './aiService';
 import { AppError } from '../middleware/error';
 import { getIO } from '../sockets';
+import { logger } from '../lib/logger';
+import { db } from '../db';
+import { alertHistory } from '../db/schema';
 import { SOCKET_EVENTS } from '../constants';
 import { pool } from '../db/index';
 import { LocationUpdate } from '../types';
@@ -59,10 +62,11 @@ export const incidentService = {
     // 1. Client-Side UUID Deduplication (Highly effective for offline-sync retry)
     if (clientUuid) {
       if (!uuidValidate(clientUuid) || !clientUuid.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+        logger.warn({ clientUuid }, "Invalid clientUuid format");
         throw new AppError("Invalid clientUuid format. Must be UUID v4.", 400, "INVALID_UUID");
       }
       if (processedUuids.has(clientUuid)) {
-        console.log(`[SOS] Duplicate report ignored: ${clientUuid}`);
+        logger.info({ clientUuid }, "Duplicate report ignored (in-memory)");
         throw new AppError("Duplicate report already processed", 200, "DUPLICATE");
       }
       processedUuids.add(clientUuid);
@@ -73,6 +77,7 @@ export const incidentService = {
     // 2. User-Radius/Time Protection
     const lastSOS = recentSOS.get(reporterId);
     if (lastSOS && Date.now() - lastSOS < 5_000) { // Reduced to 5s for genuine emergency retries
+      logger.warn({ reporterId }, "User rate limited for SOS creation");
       throw new AppError("System busy. Please wait 5 seconds before another transmission.", 429, "RATE_LIMITED");
     }
     recentSOS.set(reporterId, Date.now());
@@ -130,6 +135,7 @@ export const incidentService = {
     }
 
     // AI Analysis
+    logger.info({ reporterId, barangayId, type: data.initialType }, "Analyzing new SOS incident");
     const aiAnalysis = await analyzeIncident(
       description,
       data.initialType,
@@ -162,9 +168,19 @@ export const incidentService = {
     let incident;
     try {
       incident = await incidentRepository.create(incidentData);
+
+      // Record initial history
+      await db.insert(alertHistory).values({
+        alertId: incident.id,
+        action: 'CREATED',
+        newStatus: incident.status,
+        details: { description, type: finalType, autoAssignedTo: autoAssignedTanodId }
+      }).catch(e => logger.error({ err: e }, "Failed to record alert history"));
+
+      logger.info({ incidentId: incident.id, status: incident.status }, "SOS incident created successfully");
     } catch (err: any) {
       if (err.code === '23505' && err.constraint?.includes('client_uuid')) {
-        console.log(`[SOS] DB-level duplicate blocked for clientUuid=${clientUuid}`);
+        logger.info({ clientUuid }, "DB-level duplicate blocked");
         const existing = await pool.query(
           'SELECT * FROM alerts WHERE client_uuid = $1',
           [clientUuid]
@@ -172,6 +188,7 @@ export const incidentService = {
         if (existing.rows[0]) return existing.rows[0];
         throw new AppError('Duplicate report already processed', 200, 'DUPLICATE');
       }
+      logger.error({ err, reporterId }, "Failed to create SOS incident in DB");
       throw err;
     }
 
@@ -322,6 +339,15 @@ export const incidentService = {
       [incidentId]
     );
 
+    // Record history
+    await db.insert(alertHistory).values({
+      alertId: incidentId,
+      changedBy: userId,
+      action: 'CANCELLED',
+      oldStatus: alert.status,
+      newStatus: 'cancelled'
+    }).catch(e => logger.error({ err: e }, "Failed to record cancellation history"));
+
     const fullAlertRes = await pool.query(
       `SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1`,
       [incidentId]
@@ -368,7 +394,10 @@ export const incidentService = {
     }));
   },
 
-  async updateSOSStatus(sosId: string, status: string, notes?: string, assignedTo?: string) {
+  async updateSOSStatus(sosId: string, status: string, notes?: string, assignedTo?: string, changedBy?: string) {
+    const oldAlertRes = await pool.query("SELECT status FROM alerts WHERE id = $1", [sosId]);
+    const oldStatus = oldAlertRes.rows[0]?.status;
+
     const result = await pool.query(
       `UPDATE alerts 
        SET status = $1, 
@@ -382,6 +411,16 @@ export const incidentService = {
     if (result.rows.length === 0) {
       throw new AppError("SOS alert not found", 404, "NOT_FOUND");
     }
+
+    // Record history
+    await db.insert(alertHistory).values({
+      alertId: sosId,
+      changedBy: changedBy as any,
+      action: 'STATUS_UPDATE',
+      oldStatus,
+      newStatus: status.toLowerCase(),
+      details: { notes, assignedTo }
+    }).catch(e => logger.error({ err: e }, "Failed to record status update history"));
 
     // Fetch resident and responder names for formatted object
     const detailsRes = await pool.query(

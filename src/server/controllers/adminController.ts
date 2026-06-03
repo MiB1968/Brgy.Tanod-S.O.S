@@ -5,6 +5,7 @@ import { pool, admin } from '../db/index';
 import { syncUserRoleToFirebase } from './authController';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
+import { encrypt } from '../utils/crypto';
 import { logAdminAction } from '../services/auditService';
 import { sendWelcomeEmail } from '../services/emailService';
 
@@ -48,10 +49,13 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     }
 
     if (role === 'resident') {
+      const bloodTypeEnc = details?.bloodType ? encrypt(details.bloodType) : null;
+      const medicalConditionsEnc = details?.medicalConditions ? encrypt(JSON.stringify(details.medicalConditions)) : null;
+
       await client.query(
         `INSERT INTO residents
            (id, name, status, phone, address, house_number, household_size,
-            blood_type, medical_conditions,
+            blood_type_enc, medical_conditions_enc,
             emergency_contact_name, emergency_contact_phone)
          VALUES ($1, $2, 'approved', $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (id) DO NOTHING`,
@@ -59,7 +63,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
           user.id, name,
           details?.phone || null, details?.address || null, details?.houseNumber || null,
           details?.householdSize !== undefined ? Number(details.householdSize) : 1,
-          details?.bloodType || null, details?.medicalConditions || null,
+          bloodTypeEnc, medicalConditionsEnc,
           details?.emergencyContactName || null, details?.emergencyContactPhone || null
         ]
       );
