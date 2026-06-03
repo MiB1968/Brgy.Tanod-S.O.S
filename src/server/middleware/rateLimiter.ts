@@ -1,15 +1,23 @@
 import { rateLimit } from "express-rate-limit";
+import { RedisStore } from 'rate-limit-redis';
+import Redis from 'ioredis';
+import { config } from '../config/index';
 
-// ── NOTE FOR FUTURE SCALING ───────────────────────────────────────────────────
-// These limiters use in-memory storage. They work correctly on a single server
-// instance. If you ever scale to multiple servers (load balancing), replace the
-// default store with a Redis store:
-//   npm install rate-limit-redis ioredis
-//   import RedisStore from 'rate-limit-redis';
-//   store: new RedisStore({ client: redisClient })
-// ─────────────────────────────────────────────────────────────────────────────
+const redisClient = config.redisUrl ? new Redis(config.redisUrl) : null;
+
+const createStore = (prefix: string) => {
+  if (redisClient) {
+    return new RedisStore({
+      // @ts-expect-error - ioredis type mismatch in sendCommand
+      sendCommand: (...args: string[]) => redisClient.call(...args),
+      prefix: `brgy_tanod_sos:${prefix}:`,
+    });
+  }
+  return undefined;
+};
 
 export const globalLimiter = rateLimit({
+  store: createStore('global'),
   windowMs: 15 * 60 * 1000, // 15 minutes
   limit: 5000, // Increased significantly for development and production reliability
   standardHeaders: true,
@@ -25,6 +33,7 @@ export const globalLimiter = rateLimit({
 });
 
 export const authLimiter = rateLimit({
+  store: createStore('auth'),
   windowMs: 15 * 60 * 1000,
   limit: 20, // 20 login/register attempts per 15 minutes
   standardHeaders: true,
@@ -39,6 +48,7 @@ export const authLimiter = rateLimit({
 });
 
 export const apiKeyAuthLimiter = rateLimit({
+  store: createStore('apiKey'),
   windowMs: 5 * 60 * 1000,
   limit: 5,
   standardHeaders: true,
@@ -54,6 +64,7 @@ export const apiKeyAuthLimiter = rateLimit({
 });
 
 export const sosLimiter = rateLimit({
+  store: createStore('sos'),
   windowMs: 1 * 60 * 1000,
   limit: 20, // 20 SOS per minute per IP
   standardHeaders: true,
@@ -71,6 +82,7 @@ export const sosLimiter = rateLimit({
 export const sosRateLimiter = sosLimiter;
 
 export const strictRateLimiter = rateLimit({
+  store: createStore('strict'),
   windowMs: 5 * 60 * 1000,
   limit: 100, // Increased for smoother dev and heavy interactive use
   standardHeaders: true,

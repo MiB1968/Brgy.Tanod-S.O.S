@@ -35,6 +35,8 @@ export const residents = pgTable('residents', {
   householdSize: integer('household_size').default(1),
   bloodType: text('blood_type'),
   medicalConditions: text('medical_conditions').array(),
+  medicalConditionsEnc: text('medical_conditions_enc'),
+  bloodTypeEnc: text('blood_type_enc'),
   emergencyContactName: text('emergency_contact_name'),
   emergencyContactPhone: text('emergency_contact_phone'),
   gpsLat: doublePrecision('gps_lat'),
@@ -124,6 +126,17 @@ export const witnessInvites = pgTable('witness_invites', {
   witnessUserId: uuid('witness_user_id').references(() => users.id),
   status: text('status').notNull().default('pending'),
   timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow()
+});
+
+export const alertHistory = pgTable('alert_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  alertId: uuid('alert_id').references(() => alerts.id, { onDelete: 'cascade' }),
+  changedBy: uuid('changed_by').references(() => users.id),
+  action: text('action').notNull(),
+  oldStatus: text('old_status'),
+  newStatus: text('new_status'),
+  details: jsonb('details'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 });
 
 export const shifts = pgTable('shifts', {
