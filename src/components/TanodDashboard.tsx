@@ -31,6 +31,7 @@ import { AlertDetailsModal } from "./AlertDetailsModal";
 import IncidentForm from "./IncidentForm";
 import { usePWA } from "../hooks/usePWA";
 import { ConnectionIndicator } from "./common/ConnectionIndicator";
+import { TanodStatusPanel } from "./TanodStatusPanel";
 
 // Stores & Hooks
 import { useIncidentStore } from "../store/useIncidentStore";
@@ -221,6 +222,7 @@ export default function TanodDashboard({
 
         {/* CENTER COMPONENT - MAP HUB */}
         <div className="flex-1 w-full space-y-6">
+          <TanodStatusPanel />
           <motion.div className="w-full h-[600px] rounded-[32px] border border-tactical-cyan/10 overflow-hidden relative shadow-2xl">
             <LiveMap effectiveRole={profile?.role} />
           </motion.div>

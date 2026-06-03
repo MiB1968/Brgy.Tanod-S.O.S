@@ -180,24 +180,43 @@ export const syncService = {
     } catch (error) {
       console.error("Failed to empty syncing store:", error);
     }
+  },
+
+  async processAllQueues(): Promise<void> {
+    console.log('[Sync] Starting full queue processing...');
+    if (!navigator.onLine) {
+      console.log('🌐 Offline - Skipping full queue processing.');
+      return;
+    }
+    try {
+      // 1. Sync pending SOS reports
+      await this.syncPendingReports();
+
+      // 2. Sync pending locations
+      const { offlineService } = await import('./offlineService');
+      const locationSyncResult = await offlineService.syncPendingLocations();
+      console.log(`📡 [Sync] Synced pending locations: ${locationSyncResult.success} success, ${locationSyncResult.failed} failed`);
+
+      // 3. Sync pending actions (status updates, activity logs, role changes)
+      const actionSyncResult = await offlineService.syncPendingQueuedActions();
+      console.log(`📡 [Sync] Synced queued actions: ${actionSyncResult.success} success, ${actionSyncResult.failed} failed`);
+
+      console.log('[Sync] All queues processed successfully');
+    } catch (error) {
+      console.error('[Sync] Queue processing failed:', error);
+    }
   }
 };
 
 // Bind browser status triggers
 if (typeof window !== "undefined") {
   window.addEventListener('online', () => {
-    console.log("🌐 Connection retrieved online - starting synchronizer batch dispatch");
-    syncService.syncPendingReports();
-    import('./offlineService').then(({ offlineService }) => {
-      offlineService.syncPendingQueuedActions().catch(err => console.warn('[Sync] Action queue restoration failed:', err));
-    }).catch(e => console.warn('[Sync] Could not import offlineService dynamically:', e));
+    console.log("🌐 Connection retrieved online - starting full synchronizer batch process");
+    syncService.processAllQueues().catch(err => console.error('[Sync] Full queue processing failed on-line:', err));
   });
 
   // Schedule background startup check
   setTimeout(() => {
-    syncService.syncPendingReports().catch(console.error);
-    import('./offlineService').then(({ offlineService }) => {
-      offlineService.syncPendingQueuedActions().catch(err => console.warn('[Sync] Action queue restoration startup failed:', err));
-    }).catch(e => console.warn('[Sync] Could not import offlineService during startup:', e));
+    syncService.processAllQueues().catch(err => console.error('[Sync] Full queue processing failed on startup:', err));
   }, 4000);
 }

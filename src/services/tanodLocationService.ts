@@ -6,11 +6,17 @@ import { db } from '../db/offlineDB';
 import { offlineService } from './offlineService';
 import { Capacitor } from '@capacitor/core';
 import { BackgroundGeolocation } from '@capgo/background-geolocation';
+import { doc, setDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { db as firebaseDb } from '../lib/firebase';
+import { TanodLocation, TanodStatus } from '../types/tanod';
 
 export class TanodLocationService {
   private watchId: number | null = null;
   private lastSent = 0;
   private isTracking = false;
+  private onUpdateCallback?: (location: any) => void;
+  private customUid?: string;
+  private unsubscribeListener: (() => void) | null = null;
   private static instance: TanodLocationService;
 
   static getInstance() {
@@ -20,9 +26,17 @@ export class TanodLocationService {
     return TanodLocationService.instance;
   }
 
-  async startTracking() {
+  async startTracking(uid?: string, onUpdate?: (location: any) => void) {
+    if (uid) {
+      this.customUid = uid;
+    }
+    if (onUpdate) {
+      this.onUpdateCallback = onUpdate;
+    }
+
     const { profile } = useAuthStore.getState();
-    if (!profile || (profile.role !== 'tanod' && (profile.role as string) !== 'responder')) return;
+    if (!profile && !uid) return;
+    if (profile && (profile.role !== 'tanod' && (profile.role as string) !== 'responder') && !uid) return;
 
     if (this.isTracking) return; // Already tracking
 
@@ -115,8 +129,10 @@ export class TanodLocationService {
     const { profile } = useAuthStore.getState();
     if (!profile) return;
 
+    const currentUid = this.customUid || profile.uid || profile.id;
+
     const locationData = {
-      user_id: profile.id || profile.uid,
+      user_id: currentUid,
       role: profile.role,
       lat: position.coords.latitude,
       lng: position.coords.longitude,
@@ -127,8 +143,8 @@ export class TanodLocationService {
 
     // Update local store for patrols
     useTanodStore.getState().updatePatrol({
-      id: profile.id || profile.uid,
-      tanodId: profile.id || profile.uid,
+      id: currentUid,
+      tanodId: currentUid,
       tanodName: profile.name || 'Tanod',
       location: {
         lat: position.coords.latitude,
@@ -140,6 +156,33 @@ export class TanodLocationService {
       lastUpdate: new Date().toISOString()
     });
 
+    // Write to Firestore for persistent, real-time sync
+    if (currentUid) {
+      const fsLocation: Partial<TanodLocation> = {
+        uid: currentUid,
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy || undefined,
+        heading: position.coords.heading || undefined,
+        speed: position.coords.speed || undefined,
+        timestamp: position.timestamp || Date.now(),
+        status: (profile.activeAlertId ? 'responding' : 'on_patrol') as TanodStatus,
+      };
+
+      await this.updateTanodLocation(currentUid, fsLocation);
+
+      if (this.onUpdateCallback) {
+        try {
+          this.onUpdateCallback({
+            ...fsLocation,
+            name: profile.name || 'Tanod',
+          });
+        } catch (cbErr) {
+          console.error('[TanodTracking] onUpdateCallback failed:', cbErr);
+        }
+      }
+    }
+
     // Send to server (real-time matching location.handler.ts)
     if (socket.connected) {
       socket.emit('location_update', locationData);
@@ -148,7 +191,7 @@ export class TanodLocationService {
     // Send via CockroachDB HTTP Api (Heartbeat) or queue if offline
     try {
       await api.update('gps/heartbeat', {
-        id: profile.id || profile.uid,
+        id: currentUid,
         role: profile.role,
         lat: position.coords.latitude,
         lng: position.coords.longitude,
@@ -162,7 +205,7 @@ export class TanodLocationService {
       try {
         await db.pendingLocations.add({
           id: crypto.randomUUID(),
-          userId: profile.id || profile.uid,
+          userId: currentUid,
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           timestamp: new Date().toISOString(),
@@ -252,6 +295,72 @@ export class TanodLocationService {
       if (result.success > 0) {
         console.log(`📡 [TanodTracking] Successfully synced ${result.success} offline GPS tracks.`);
       }
+    }
+  }
+
+  async updateTanodLocation(uid: string, location: Partial<TanodLocation>) {
+    try {
+      const ref = doc(firebaseDb, 'tanod_locations', uid);
+      await setDoc(ref, {
+        ...location,
+        updatedAt: Date.now(),
+      }, { merge: true });
+    } catch (err) {
+      console.error('[TanodTracking] Firestore updateTanodLocation failed:', err);
+    }
+  }
+
+  async updateTanodStatus(uid: string, status: TanodStatus) {
+    try {
+      const ref = doc(firebaseDb, 'tanod_locations', uid);
+      await setDoc(ref, { status, updatedAt: Date.now() }, { merge: true });
+    } catch (err) {
+      console.error('[TanodTracking] Firestore updateTanodStatus failed:', err);
+    }
+  }
+
+  listenToActiveTanods(callback: (tanods: TanodLocation[]) => void) {
+    try {
+      const q = query(
+        collection(firebaseDb, 'tanod_locations'),
+        where('status', 'in', ['available', 'on_patrol', 'responding'])
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const tanods: TanodLocation[] = snapshot.docs.map(doc => ({
+          uid: doc.id,
+          ...doc.data(),
+        })) as TanodLocation[];
+
+        callback(tanods);
+        
+        // Dynamic sync to local Zustand store to automatically update all map views
+        tanods.forEach(t => {
+          useTanodStore.getState().updatePatrol({
+            id: t.uid,
+            tanodId: t.uid,
+            tanodName: (t as any).name || 'Tanod',
+            location: {
+              lat: t.lat,
+              lng: t.lng,
+              accuracy: t.accuracy ? Math.round(t.accuracy) : undefined
+            },
+            isActive: t.status !== 'offline',
+            status: t.status === 'responding' ? 'responding' : 'patrolling',
+            lastUpdate: new Date(t.timestamp || Date.now()).toISOString()
+          });
+        });
+      }, (error) => {
+        console.error('[TanodTracking] Firestore listenToActiveTanods snapshot error:', error);
+      });
+
+      this.unsubscribeListener = unsubscribe;
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe();
+      };
+    } catch (err) {
+      console.error('[TanodTracking] Firestore listenToActiveTanods setup failed:', err);
+      return () => {};
     }
   }
 }

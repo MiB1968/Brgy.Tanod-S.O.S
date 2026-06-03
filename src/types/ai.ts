@@ -9,6 +9,11 @@ export interface GuardianContext {
   activeTanods: number;
   isSuperAdmin: boolean;
   sector?: string;
+  role?: string;
+  hasActiveSOS?: boolean;
+  activeSOSDetails?: string;
+  isOnline?: boolean;
+  location?: { lat: number; lng: number; address?: string };
 }
 
 export interface GuardianResponse {
