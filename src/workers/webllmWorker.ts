@@ -20,40 +20,44 @@ self.onunhandledrejection = (event) => {
 };
 
 self.onmessage = async (event) => {
-  const { type, payload } = event.data;
+  const { type, payload, messageId } = event.data;
 
   try {
     if (type === 'init') {
-      const modelId = payload.modelId || "Qwen2-0.5B-Instruct-q4f16_1-MLC";
+      const modelId = payload?.modelId || "Qwen2-0.5B-Instruct-q4f16_1-MLC";
 
       engine = await CreateMLCEngine(modelId, {
         initProgressCallback: (report) => {
           self.postMessage({
             type: 'progress',
-            payload: { progress: report.progress, text: report.text }
+            payload: { progress: report.progress, text: report.text },
+            messageId
           });
         },
       });
 
-      self.postMessage({ type: 'ready' });
+      self.postMessage({ type: 'ready', messageId });
     }
 
     else if (type === 'generate') {
       if (!engine) {
-        self.postMessage({ type: 'error', payload: 'Engine not initialized' });
+        self.postMessage({ type: 'error', payload: 'Engine not initialized', messageId });
         return;
       }
 
       let fullResponse = "";
-      const chunkSize = payload.chunkSize || 1; // Default to single token streaming to preserve backward compatibility
+      const chunkSize = payload?.chunkSize || 1; // Default to single token streaming to preserve backward compatibility
+
+      const systemContent = payload?.systemPrompt || "You are Guardian AI, a helpful emergency assistant for Barangay Tanod in the Philippines. Respond in simple Tagalog or English. Be direct, calm, and actionable.";
+      const userContent = payload?.prompt || payload?.userMessage || "";
 
       const reply = await engine.chat.completions.create({
         messages: [
-          { role: "system", content: "You are Guardian AI, a helpful emergency assistant for Barangay Tanod in the Philippines. Respond in simple Tagalog or English. Be direct, calm, and actionable." },
-          { role: "user", content: payload.prompt }
+          { role: "system", content: systemContent },
+          { role: "user", content: userContent }
         ],
         stream: true,
-        temperature: 0.7,
+        temperature: payload?.temperature || 0.7,
       });
 
       let buffer = "";
@@ -69,7 +73,9 @@ self.onmessage = async (event) => {
           if (tokenCount >= chunkSize) {
             self.postMessage({
               type: 'token',
-              payload: { token: buffer, fullResponse }
+              token: buffer,
+              payload: { token: buffer, fullResponse },
+              messageId
             });
             buffer = "";
             tokenCount = 0;
@@ -81,13 +87,17 @@ self.onmessage = async (event) => {
       if (buffer) {
         self.postMessage({
           type: 'token',
-          payload: { token: buffer, fullResponse }
+          token: buffer,
+          payload: { token: buffer, fullResponse },
+          messageId
         });
       }
 
       self.postMessage({
         type: 'complete',
-        payload: { response: fullResponse }
+        result: fullResponse.trim(),
+        payload: { response: fullResponse },
+        messageId
       });
     }
   } catch (error: any) {

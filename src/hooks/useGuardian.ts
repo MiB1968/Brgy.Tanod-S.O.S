@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import socket from '../lib/socket';
 import { toast } from 'react-hot-toast';
 import { aiService } from '../services/aiService';
+import { guardianAI } from '../services/guardianAI';
 
 export function useGuardian() {
   const { 
@@ -105,11 +106,17 @@ export function useGuardian() {
     setStatus('PROCESSING');
 
     try {
-        const res = await aiService.getGuardianResponse(userText);
-        return res.response || "I'm monitoring the situation. Stay calm, help is on the way.";
+        const response = await guardianAI.generateResponse(userText);
+        return response || "I'm monitoring the situation. Stay calm, help is on the way.";
     } catch (err) {
-        console.error("Guardian AI call failed:", err);
-        return "I'm monitoring the situation. Stay calm, help is on the way.";
+        console.error("Guardian AI local generation failed, falling back to legacy command routing:", err);
+        try {
+            const res = await aiService.getGuardianResponse(userText);
+            return res.response || "I'm monitoring the situation. Stay calm, help is on the way.";
+        } catch (fbErr) {
+            console.error("All AI strategies exhausted:", fbErr);
+            return "I'm monitoring the situation. Stay calm, help is on the way.";
+        }
     }
   }, [setStatus]);
 

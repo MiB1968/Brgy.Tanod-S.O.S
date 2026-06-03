@@ -2,6 +2,7 @@
 import { fetchAPI } from './apiBase';
 import { db } from '../db/offlineDB';
 import { BARANGAY_PROTOCOLS } from '../data/barangayProtocols';
+import { GuardianContext, GuardianResponse, GuardianState, CrisisType } from '../types/ai';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -9,12 +10,10 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export type GuardianState = 'IDLE' | 'LOADING' | 'READY' | 'PROCESSING' | 'FALLBACK' | 'ERROR';
-
 export class GuardianAI {
   private worker: Worker | null = null;
   private isInitialized = false;
-  private currentModel = "Qwen2-0.5B-Instruct-q4f16_1-MLC"; // Efficient and responsive default
+  private currentModel = "Qwen2-0.5B-Instruct-q4f16_1-MLC"; // Optimal response on low-end phones
   private progressHandlers = new Set<(progress: number, text?: string) => void>();
   private messageHandlers = new Map<string, (type: string, payload: any) => void>();
   private loadPromise: Promise<boolean> | null = null;
@@ -33,7 +32,7 @@ export class GuardianAI {
     const hardwareConcurrency = navigator.hardwareConcurrency || 4;
 
     if (memory <= 3 || hardwareConcurrency <= 4) {
-      console.log('🛡️ Low-end device detected. Using conservative chunk sizes for local AI inference.');
+      console.log('🛡️ Low-spec device profile applied for Offline LLM.');
       return 'LOW';
     }
     if (memory >= 6 && hardwareConcurrency >= 8) return 'HIGH';
@@ -41,7 +40,7 @@ export class GuardianAI {
   }
 
   public getChunkSize(): number {
-    return this.deviceProfile === 'LOW' ? 8 : 1; // Bigger chunks group message passing on slower phones
+    return this.deviceProfile === 'LOW' ? 8 : 1;
   }
 
   get isLoaded(): boolean {
@@ -53,10 +52,25 @@ export class GuardianAI {
   }
 
   static getInstance() {
-    if (!GuardianAI.instance) GuardianAI.instance = new GuardianAI();
+    if (!GuardianAI.instance) {
+      GuardianAI.instance = new GuardianAI();
+    }
     return GuardianAI.instance;
   }
   private static instance: GuardianAI;
+
+  // Preloading hook for compatibility with templates
+  public preload(onProgress?: (progress: number, text: string) => void) {
+    this.loadModel(this.currentModel, (prog, text) => {
+      if (onProgress) onProgress(prog, text || "Initializing engine...");
+    }).catch(err => {
+      console.warn("[GuardianAI] Preload error:", err);
+    });
+  }
+
+  public isReady(): boolean {
+    return this.isInitialized || this.useBackendFallback;
+  }
 
   async saveMessage(role: 'user' | 'assistant', content: string) {
     try {
@@ -67,7 +81,7 @@ export class GuardianAI {
         timestamp: new Date().toISOString()
       });
     } catch (err) {
-      console.error('[GuardianAI] Failed to save message to Dexie history:', err);
+      console.error('[GuardianAI] Failed to persist message:', err);
     }
   }
 
@@ -78,7 +92,7 @@ export class GuardianAI {
         .equals(this.currentSessionId)
         .sortBy('timestamp');
     } catch (err) {
-      console.error('[GuardianAI] Failed to load message history from Dexie:', err);
+      console.error('[GuardianAI] Failed to load chat history:', err);
       return [];
     }
   }
@@ -89,7 +103,7 @@ export class GuardianAI {
       await db.aiChatHistory.where('sessionId').equals(sessionId).delete();
       this.currentSessionId = `session_${Date.now()}`;
     } catch (err) {
-      console.error('[GuardianAI] Failed to clear current AI session:', err);
+      console.error('[GuardianAI] Failed to clear current session:', err);
     }
   }
 
@@ -103,7 +117,7 @@ export class GuardianAI {
     if (this.worker) return;
 
     if (!this.checkWebGPUSupport()) {
-      console.warn("⚠️ WebGPU is not supported in this browser. Activating server-side Guardian AI backend proxy fallback.");
+      console.warn("⚠️ WebGPU is not supported. Gracefully falling back to Express-hosted Gemini API client-side.");
       this.useBackendFallback = true;
       this.isInitialized = true;
       this.setState('FALLBACK');
@@ -111,7 +125,6 @@ export class GuardianAI {
     }
 
     try {
-      // Instantiate with standard worker configuration under Vite
       this.worker = new Worker(new URL('../workers/webllmWorker.ts', import.meta.url), { type: 'module' });
 
       this.worker.onmessage = (e) => {
@@ -121,10 +134,8 @@ export class GuardianAI {
           this.setState('READY');
         }
         
-        // Notify components listening to raw events
         window.dispatchEvent(new CustomEvent('guardian-ai-event', { detail: { type, payload } }));
 
-        // Process direct callbacks
         if (type === 'progress') {
           this.progressHandlers.forEach(handler => handler(payload.progress, payload.text));
         }
@@ -133,13 +144,13 @@ export class GuardianAI {
       };
 
       this.worker.onerror = (e) => {
-        console.error("⚠️ Guardian AI Worker error:", e);
+        console.error("⚠️ Local worker crashed. Deploying fallback to Gemini API proxy server:", e);
         this.useBackendFallback = true;
         this.isInitialized = true;
         this.setState('FALLBACK');
       };
     } catch (err) {
-      console.error("⚠️ Failed to initialize Web Worker for Guardian AI. Using backend fallback:", err);
+      console.error("⚠️ Fail initiating offline worker. Using Gemini backend fallback:", err);
       this.useBackendFallback = true;
       this.isInitialized = true;
       this.setState('FALLBACK');
@@ -152,9 +163,8 @@ export class GuardianAI {
 
     if (this.useBackendFallback) {
       if (onProgress) {
-        onProgress(0.2, "Bypassing WebGPU local engine...");
-        onProgress(0.6, "Establishing link with server-side tactical AI...");
-        onProgress(1.0, "Tactical AI Server Link Online");
+        onProgress(0.5, "Active server connection confirmed...");
+        onProgress(1.0, "Tactical remote link ready");
       }
       this.setState('READY');
       return true;
@@ -162,7 +172,6 @@ export class GuardianAI {
     
     const targetModel = modelId || this.currentModel;
     
-    // If different model is requested and already initialized, reset cleanly
     if (this.isInitialized && targetModel !== this.currentModel) {
       this.clearCache();
       this.init();
@@ -189,7 +198,7 @@ export class GuardianAI {
       return this.loadPromise;
     }
 
-    this.loadPromise = new Promise<boolean>((resolve, reject) => {
+    this.loadPromise = new Promise<boolean>((resolve) => {
       const uniqueId = `load-${Date.now()}`;
       
       const progressListener = (prog: number, text?: string) => {
@@ -209,11 +218,11 @@ export class GuardianAI {
           this.progressHandlers.delete(progressListener);
           this.loadPromise = null;
           this.isInitialized = false;
-          console.warn("⚠️ Local model load encountered an error. Seamlessly switching to server-side AI proxy fallback:", payload);
+          console.warn("⚠️ Local model init error. Shifting dynamically to server-side Gemini backend.", payload);
           this.useBackendFallback = true;
           this.isInitialized = true;
           this.setState('FALLBACK');
-          resolve(true); // Resolve as true so app can proceed with backend fallback
+          resolve(true); 
         }
       };
 
@@ -239,16 +248,13 @@ export class GuardianAI {
     }
 
     if (matches.length === 0) return "";
-    return `Gabay at Opisyal na Protokol ng Barangay:\n${matches.join("\n\n")}`;
+    return `Official Barangay Protocols:\n${matches.join("\n\n")}`;
   }
 
-  async generateResponse(prompt: string, onToken?: (token: string) => void): Promise<string> {
-    this.init();
-    this.setState('PROCESSING');
-    
-    // Crisis Detection (Zero-Latency Regex)
+  // Crisis Detection logic
+  public detectCrisis(prompt: string): boolean {
     const lower = prompt.toLowerCase();
-    let detectedCrisis: { type: string; level: string } | null = null;
+    let detectedCrisis: { type: CrisisType; level: string } | null = null;
     
     if (/sunog|fire|apoy|usok|smoke/i.test(lower)) {
       detectedCrisis = { type: 'FIRE', level: 'CRITICAL' };
@@ -264,59 +270,61 @@ export class GuardianAI {
       window.dispatchEvent(new CustomEvent('guardian-crisis-detected', { 
         detail: { ...detectedCrisis, transcript: prompt } 
       }));
+      return true;
     }
+    return false;
+  }
+
+  // Base prompt-to-response generation (with streaming token callback)
+  async generateResponse(prompt: string, onToken?: (token: string) => void): Promise<string> {
+    this.init();
+    this.setState('PROCESSING');
+    
+    this.detectCrisis(prompt);
 
     if (!this.isInitialized) {
-      console.log(`Guardian AI auto-initializing default model: ${this.currentModel}`);
       await this.loadModel(this.currentModel);
     }
 
     const context = this.retrieveContext(prompt);
     const enhancedPrompt = context 
-      ? `User Command/Question: "${prompt}"\n\nOfficial Barangay Protocol to use for response:\n${context}\n\nTask: Sumagot sa natural na Tagalog/English batay sa opisyal na protokol na ito. Maging maikli, malinaw, at de-kalidad.`
+      ? `User query: "${prompt}"\n\nOfficial Barangay Protocol to reference:\n${context}\n\nRespond briefly in natural Tagalog/Filipino or English matching the intent of this protocol.`
       : prompt;
 
     await this.saveMessage('user', prompt);
 
     if (this.useBackendFallback) {
       try {
-        console.log("⚡ Routing prompt via server-side Express Gemini service...");
-        const response = await fetchAPI('/ai/guardian', {
+        const responseData = await fetchAPI('/ai/guardian', {
           method: 'POST',
           body: JSON.stringify({ text: enhancedPrompt })
         });
-        const finalAns = response.response || "Komunidad na ligtas ang ating hangad. Handang tumulong po sa inyo.";
+        const finalAns = responseData.response || "Mabuhay! Narito po ang inyong Guardian Emergency Assistant upang tumulong.";
         if (onToken) {
-          // Stream/split response slightly to simulate live generation look and feel
-          const words = finalAns.split(' ');
-          let accumulated = "";
-          for (let i = 0; i < words.length; i++) {
-            const part = words[i] + (i < words.length - 1 ? ' ' : '');
-            accumulated += part;
-            onToken(part);
-            // Non-blocking sleep for smooth local simulation experience
-            await new Promise(r => setTimeout(r, Math.random() * 20 + 5));
+          const parts = finalAns.split(' ');
+          for (let i = 0; i < parts.length; i++) {
+            const piece = parts[i] + (i < parts.length - 1 ? ' ' : '');
+            onToken(piece);
+            await new Promise(r => setTimeout(r, Math.random() * 15 + 5));
           }
         }
         await this.saveMessage('assistant', finalAns);
         this.setState('READY');
         return finalAns;
       } catch (err) {
-        console.error("🚨 Server-side fallback also failed:", err);
-        const fallbackMsg = "Paumanhin, hindi maabot ang tactical server sa ngayon. Siguraduhing may internet connection.";
-        if (onToken) onToken(fallbackMsg);
+        console.error("🚨 Remote fallback also unreachable:", err);
+        const failMsg = "Paumanhin, kasalukuyang offline ang link sa tactical server. Siguraduhing ligtas ang inyong kapaligiran at sundin ang pangkaraniwang emergency procedure.";
+        if (onToken) onToken(failMsg);
         this.setState('READY');
-        return fallbackMsg;
+        return failMsg;
       }
     }
     
     return new Promise((resolve, reject) => {
       const uniqueId = `generate-${Date.now()}`;
-      let fullResponse = "";
 
       const handler = (type: string, payload: any) => {
         if (type === 'token') {
-          fullResponse = payload.fullResponse;
           if (onToken) onToken(payload.token);
         }
         if (type === 'complete') {
@@ -327,8 +335,7 @@ export class GuardianAI {
         }
         if (type === 'error') {
           this.messageHandlers.delete(uniqueId);
-          console.warn("⚠️ Local model execution failed during generation. Falling back to backend:", payload);
-          // Fallback on the fly
+          console.warn("⚠️ Local execution failure. Dynamic transition to backend:", payload);
           this.useBackendFallback = true;
           this.setState('FALLBACK');
           this.generateResponse(prompt, onToken).then(resolve).catch(reject);
@@ -346,6 +353,142 @@ export class GuardianAI {
     });
   }
 
+  // Tactical administrative commands handler matching guardianAIService
+  public async processCommand(
+    text: string,
+    context: GuardianContext
+  ): Promise<GuardianResponse> {
+    try {
+      const responseData = await fetchAPI('/ai/guardian', {
+        method: 'POST',
+        body: JSON.stringify({ text })
+      });
+      
+      const content = responseData.response || "";
+      const upper = text.toUpperCase();
+      let action: GuardianResponse["action"];
+      if (upper.includes("STATUS") || upper.includes("ULAT") || upper.includes("SUMMARIZE")) {
+        action = "STATUS_REPORT";
+      } else if (upper.includes("DISPATCH") || upper.includes("IPADALA") || upper.includes("SEND")) {
+        action = "SUGGEST_DISPATCH";
+      } else if (upper.includes("HELP") || upper.includes("TULONG")) {
+        action = "HELP";
+      }
+
+      return { reply: content, action, isCrisis: this.detectCrisis(text) };
+    } catch {
+      return this.fallbackCommand(text, context);
+    }
+  }
+
+  private fallbackCommand(text: string, context: GuardianContext): GuardianResponse {
+    const command = text.toUpperCase().replace(/[.,!?]/g, "").trim();
+
+    if (command.includes("STATUS") || command.includes("SUMMARIZE") || command.includes("ULAT")) {
+      let reply = "System status: ";
+      reply += context.pendingSOS > 0
+          ? `${context.pendingSOS} pending S.O.S reports pending review. `
+          : "All sectors clear. ";
+      reply += `${context.activeTanods} active Tanod patrols tracking.`;
+      return { reply, action: "STATUS_REPORT" };
+    }
+
+    if (command.includes("DISPATCH") || command.includes("IPADALA") || command.includes("SEND")) {
+      if (context.activeTanods === 0) {
+        return { reply: "Caution: No active Barangay Tanods are currently on patrol.", action: "SUGGEST_DISPATCH" };
+      }
+      return {
+        reply: `${context.activeTanods} Tanod personnel designated available. Authorize dispatch on your Tactical Dock.`,
+        action: "SUGGEST_DISPATCH",
+      };
+    }
+
+    if (command.includes("HELP") || command.includes("TULONG")) {
+      return { reply: 'Command guidelines: "Status" for status report, "Dispatch" to allocate patrol officers.', action: "HELP" };
+    }
+
+    return { reply: "Instruction received. Ready and standing by for further tactical input." };
+  }
+
+  // Incident Classification Proxy
+  public async classifyIncident(description: string): Promise<string> {
+    if (!description.trim()) return "Others";
+    try {
+        const responseData = await fetchAPI('/ai/analyze', {
+          method: 'POST',
+          body: JSON.stringify({ description })
+        });
+        const map: Record<string, string> = {
+            "MEDICAL": "Medical",
+            "FIRE": "Fire",
+            "CRIME": "Crime",
+            "DISTURBANCE": "Noise Complaint",
+            "NATURAL_DISASTER": "Flood",
+            "OTHER": "Others"
+        };
+        return map[responseData.analysis?.incidentType] || "Others";
+    } catch {
+        return "Others";
+    }
+  }
+
+  // Shift summary generator
+  public async summarizeShift(incidents: any[]): Promise<string> {
+    if (incidents.length === 0) return "No incidents logged this shift. Peace and safety levels stable.";
+
+    const listStr = incidents.map(i => `- ${i.type} at ${i.location}: ${i.description}`).join('\n');
+    try {
+        const responseData = await fetchAPI('/api/ai/summarize', {
+          method: 'POST',
+          body: JSON.stringify({ incidentNotes: listStr })
+        });
+        return responseData.summary || "Summary successfully compiled but contains empty sections.";
+    } catch {
+        return "Error synthesizing shift logs. Direct record analysis suggested.";
+    }
+  }
+
+  // SOS Detail parsing proxy
+  public async extractSOSDetails(text: string): Promise<{ type: string, location: string, severity: number }> {
+    try {
+      const responseData = await fetchAPI('/ai/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ description: text })
+      });
+      return {
+          type: responseData.analysis?.incidentType || 'OTHER',
+          location: 'Auto-detected Zone',
+          severity: Math.ceil((responseData.analysis?.severityScore || 5) / 2) // Normalizes 1-10 scale down to 1-5
+      };
+    } catch {
+      return { type: 'Others', location: 'Unknown Coordinate', severity: 3 };
+    }
+  }
+
+  // First aid guides
+  public async generateFirstAid(type: string): Promise<string> {
+    try {
+        const responseData = await fetchAPI('/ai/assistant', {
+          method: 'POST',
+          body: JSON.stringify({ query: `Magbigay ng 3 hanggang 5 mahahalagang paunang lunas o first aid steps sa Tagalog para sa emergency na ${type}.` })
+        });
+        return responseData.answer;
+    } catch {
+        return "Gawin ang karaniwang paunang lunas at hintayin ang mga emergency responder.";
+    }
+  }
+
+  // Proactive dashboard alert suggestions
+  public getProactiveSuggestion(context: GuardianContext): string | null {
+    if (context.pendingSOS > 5) {
+      return "Alert: Emergency alert count elevated. Recommended activation of auxiliary Tanod response channels.";
+    }
+    if (context.activeTanods === 0 && context.pendingSOS > 0) {
+      return "Alert: Unhandled SOS reports are logged with zero dispatch Tanods active on patrol.";
+    }
+    return null;
+  }
+
   clearCache() {
     if (this.worker) {
       this.worker.terminate();
@@ -354,21 +497,22 @@ export class GuardianAI {
     this.isInitialized = false;
     this.loadPromise = null;
     this.setState('IDLE');
-    console.log("🧹 Guardian AI Worker terminated and cache handler closed");
+    console.log("🧹 Guardian AI Worker terminated cleanly");
   }
 
+  // Offline-first Web TTS speech synthesis with Filipino local voice support
   speak(text: string) {
     if ('speechSynthesis' in window) {
-      // Cancel active voice playbacks to prevent queue jamming
       speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'tl-PH'; // Native Filipino synthesis support
+      utterance.lang = 'tl-PH';
       speechSynthesis.speak(utterance);
     }
   }
 
   private setState(newState: GuardianState) {
     this.currentState = newState;
+    window.dispatchEvent(new CustomEvent('guardian-state-changed', { detail: { state: newState } }));
   }
 }
 
