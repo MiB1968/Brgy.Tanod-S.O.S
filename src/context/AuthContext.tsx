@@ -9,6 +9,16 @@ import type { User, UserRole } from '../types';
 import { RoleHierarchy, RolePermissions } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 
+// ---------------------------------------------------------------------------
+// Master admin emails are read from the environment at build time.
+// Set VITE_MASTER_EMAILS=email1@example.com,email2@example.com in your .env
+// NEVER hardcode real email addresses in source code.
+// ---------------------------------------------------------------------------
+const MASTER_EMAILS: string[] = (import.meta.env.VITE_MASTER_EMAILS ?? '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 interface RBACContextType {
   user: FirebaseUser | null;
   profile: User | null;
@@ -30,35 +40,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setStoreProfile = useAuthStore((state) => state.setProfile);
   const setStoreLoading = useAuthStore((state) => state.setIsLoading);
 
-  // Failsafe timeout for rbac loading
+  // FIX: Reduced from 15 000 ms → 5 000 ms. 15 s is too long for a safety app.
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
       setStoreLoading(false);
-    }, 15000); // 15 seconds failsafe is safer for multi-step firestore init
+    }, 5000);
     return () => clearTimeout(timer);
   }, []);
 
+  // FIX: isMasterAdmin is derived ONLY from the Firestore role field.
+  // Email-based promotion has been removed. Promotion is handled exclusively
+  // by the `bootstrapSuperAdmin` Cloud Function (see functions/src/index.ts).
   const isMasterAdmin = useMemo(() => {
-    const pEmail = profile?.email?.toLowerCase();
-    const fEmail = firebaseUser?.email?.toLowerCase();
-    const isMaster = (
-      pEmail === "rubenlleg12@gmail.com" ||
-      fEmail === "rubenlleg12@gmail.com" ||
-      pEmail === "ben@brgytanod.com" ||
-      fEmail === "ben@brgytanod.com" ||
-      profile?.role === "superadmin"
-    );
-    return isMaster;
-  }, [profile, firebaseUser]);
+    return profile?.role === 'superadmin';
+  }, [profile]);
 
-  const currentRole: UserRole = isMasterAdmin ? "superadmin" : (profile?.role || "guest");
+  const currentRole: UserRole = isMasterAdmin ? 'superadmin' : (profile?.role || 'guest');
 
   const hasPermission = useCallback((permission: string): boolean => {
     if (isMasterAdmin) return true;
-
     const userPerms = RolePermissions[currentRole] || [];
-    return userPerms.includes("*") || userPerms.includes(permission);
+    return userPerms.includes('*') || userPerms.includes(permission);
   }, [currentRole, isMasterAdmin]);
 
   const canAccessRole = useCallback((requiredRole: UserRole): boolean => {
@@ -67,83 +70,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentRole, isMasterAdmin]);
 
   const fetchProfile = async (uid: string) => {
-    const userRef = doc(db, "users", uid);
-    
-    // Attempt fetch with race for timeout
+    const userRef = doc(db, 'users', uid);
+
+    // Primary: live Firestore fetch with 7 s timeout
     try {
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), 7000)
       );
-      
+
       const userDoc = (await Promise.race([
         getDoc(userRef),
-        timeoutPromise
-      ])) as any;
+        timeoutPromise,
+      ])) as Awaited<ReturnType<typeof getDoc>>;
 
       if (userDoc.exists()) {
         const userData = userDoc.data() as User;
-        
-        // AUTO-PROMOTIONS FOR MASTER ADMINS
-        if (userData.email?.toLowerCase() === "rubenlleg12@gmail.com" || userData.email?.toLowerCase() === "ben@brgytanod.com") {
-          if (userData.role !== "superadmin") {
-            userData.role = "superadmin";
-            console.log("[AuthContext] Master Admin detected. Auto-promoting to superadmin globally.");
-            await setDoc(userRef, { role: "superadmin" }, { merge: true });
-          }
-        }
+
+        // FIX: NO client-side role promotion.
+        // If this user should be superadmin, run `bootstrapSuperAdmin` once from
+        // the Firebase console or call it from a trusted server environment.
 
         setProfile(userData);
         setStoreProfile(userData);
-        safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+        safeStorage.setItem('brgy_user_profile', JSON.stringify(userData));
         return;
       }
     } catch (e) {
-      console.warn("[AuthContext] Primary fetch failed:", e);
+      console.warn('[AuthContext] Primary fetch failed:', e);
     }
 
-    // Fallback 1: Attempt cache directly
+    // Fallback 1: Firestore local cache
     try {
-      console.log("[AuthContext] Trying cache fallback...");
       const cachedDoc = await getDocFromCache(userRef);
       if (cachedDoc.exists()) {
         const userData = cachedDoc.data() as User;
         setProfile(userData);
         setStoreProfile(userData);
-        safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
+        safeStorage.setItem('brgy_user_profile', JSON.stringify(userData));
         return;
       }
     } catch (ce) {
-      console.warn("[AuthContext] Cache fetch failed:", ce);
+      console.warn('[AuthContext] Cache fetch failed:', ce);
     }
 
-    // Fallback 2: Local storage fallback
-    const local = safeStorage.getItem("brgy_user_profile");
+    // Fallback 2: localStorage
+    const local = safeStorage.getItem('brgy_user_profile');
     if (local) {
-      console.log("[AuthContext] Using local storage fallback");
-      const saved = JSON.parse(local);
+      const saved = JSON.parse(local) as User;
       setProfile(saved);
       setStoreProfile(saved);
       return;
     }
 
-    // Default: Setup new profile
-    console.log("[AuthContext] Setting up default profile");
-    const email = firebaseUser?.email || "";
-    const isMaster = email.toLowerCase() === "rubenlleg12@gmail.com" || email.toLowerCase() === "ben@brgytanod.com";
-    
+    // Default: create a minimal resident profile.
+    // FIX: Never assign superadmin here. Role is always 'resident' for new users.
     const userData: User = {
       id: uid,
       uid,
-      name: firebaseUser?.displayName || "Barangay Resident",
-      email: email,
-      role: isMaster ? "superadmin" : "resident",
-      status: "approved",
+      name: firebaseUser?.displayName || 'Barangay Resident',
+      email: firebaseUser?.email || '',
+      role: 'resident',
+      status: 'approved',
       createdAt: new Date().toISOString(),
     };
-    
-    // Persist the new profile immediately
+
     await setDoc(userRef, userData, { merge: true });
-    
     setProfile(userData);
     setStoreProfile(userData);
   };
@@ -152,13 +143,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleAuthExpired = async () => {
       if (auth.currentUser) {
         try {
-          console.warn("[AuthContext] Token expired event detected. Attempting force refresh...");
+          console.warn('[AuthContext] Token expired — attempting force refresh...');
           const token = await auth.currentUser.getIdToken(true);
           safeStorage.setItem('token', token);
           socket.auth = { token };
           if (!socket.connected) socket.connect();
         } catch (e) {
-          console.error("[AuthContext] Force refresh failed. Signing out.", e);
+          console.error('[AuthContext] Force refresh failed. Signing out.', e);
           auth.signOut();
         }
       }
@@ -170,47 +161,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      console.log("[AuthContext] onAuthStateChanged called, fbUser:", fbUser ? fbUser.email : "null");
       setFirebaseUser(fbUser);
 
       if (fbUser) {
-        // Update socket token
         try {
-          console.log("[AuthContext] Getting ID Token...");
           const token = await fbUser.getIdToken();
-          console.log("[AuthContext] ID Token obtained, setting storage...");
           safeStorage.setItem('token', token);
-          
-          // Force socket update if it's already attempting or disconnected
           socket.auth = { token };
-          if (!socket.connected) {
-            socket.connect();
-          }
+          if (!socket.connected) socket.connect();
         } catch (tokenErr) {
-          console.warn("[AuthContext] Failed to get ID token:", tokenErr);
+          console.warn('[AuthContext] Failed to get ID token:', tokenErr);
         }
 
-        // Small delay to ensure Firestore is initialized
         await new Promise(resolve => setTimeout(resolve, 500));
         await fetchProfile(fbUser.uid);
 
-        // Register FCM token
         pushService.initialize().then(async (token) => {
           if (token) {
             await setDoc(doc(db, 'users', fbUser.uid), {
               fcmToken: token,
-              lastActive: serverTimestamp()
+              lastActive: serverTimestamp(),
             }, { merge: true });
           }
         });
       } else {
         setProfile(null);
         setStoreProfile(null);
-        safeStorage.removeItem("brgy_user_profile");
-        safeStorage.removeItem("token");
-        if (socket.connected) {
-          socket.disconnect();
-        }
+        safeStorage.removeItem('brgy_user_profile');
+        safeStorage.removeItem('token');
+        if (socket.connected) socket.disconnect();
       }
 
       setLoading(false);
@@ -218,23 +197,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshProfile = async () => {
     if (firebaseUser?.uid) await fetchProfile(firebaseUser.uid);
   };
 
+  // FIX: setUserRole now calls the Cloud Function instead of writing directly
+  // to Firestore from the client. The Cloud Function enforces server-side
+  // permission checks and sets Firebase custom claims atomically.
   const setUserRole = async (newRole: UserRole) => {
-    if (!firebaseUser || !canAccessRole("admin")) {
-      throw new Error("Insufficient permissions to change role");
-    }
+    if (!firebaseUser) throw new Error('Not authenticated');
+    if (!canAccessRole('admin')) throw new Error('Insufficient permissions to change role');
 
-    await setDoc(
-      doc(db, "users", firebaseUser.uid),
-      { role: newRole, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
-
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const functions = getFunctions();
+    const setRoleFn = httpsCallable(functions, 'setUserRole');
+    await setRoleFn({ uid: firebaseUser.uid, role: newRole });
     await refreshProfile();
   };
 
@@ -256,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useRBAC = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useRBAC must be used within an AuthProvider");
+    throw new Error('useRBAC must be used within an AuthProvider');
   }
   return context;
 };

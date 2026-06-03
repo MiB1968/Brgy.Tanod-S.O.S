@@ -126,9 +126,7 @@ export const generateReportOnResolved = onDocumentUpdated(
   }
 );
 
-// ====================== SOS CLOUD FUNCTIONS ======================
 
-// 1. Create New SOS + Notifications
 export const createSOS = onCall(async (request: any) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be logged in to trigger an SOS alert');
@@ -374,3 +372,6 @@ export const setUserRole = onCall(async (request: any) => {
     throw new HttpsError('internal', error.message);
   }
 });
+
+export { setUserRole } from './setUserRole';
+export { bootstrapSuperAdmin } from './bootstrapSuperAdmin';

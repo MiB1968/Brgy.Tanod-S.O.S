@@ -1,20 +1,67 @@
 rules_version = '2';
 
+// ---------------------------------------------------------------------------
+// KEY SECURITY CHANGE: The `role` field in /users/{userId} is now immutable
+// from the client. Only Firebase Admin SDK (Cloud Functions) can set roles.
+// This prevents any client from elevating their own privileges.
+// ---------------------------------------------------------------------------
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuthenticated() { return request.auth != null; }
-    function isRole(roles) { return isAuthenticated() && request.auth.token.role in roles; }
-    function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
-    function isAdminOrAbove() { return isRole(['admin', 'superadmin']); }
-    function isTanodOrAbove() { return isRole(['tanod', 'admin', 'superadmin']); }
+    // ── Helper functions ────────────────────────────────────────────────────
 
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Role is read from Firebase custom claims (set server-side by Cloud Functions).
+    // This is the ONLY trusted source of role. Firestore profile.role is for
+    // display only; never trust it for access control.
+    function hasRole(roles) {
+      return isAuthenticated() && request.auth.token.role in roles;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdminOrAbove() {
+      return hasRole(['admin', 'superadmin']);
+    }
+
+    function isTanodOrAbove() {
+      return hasRole(['tanod', 'admin', 'superadmin']);
+    }
+
+    // FIX: Prevent clients from writing the `role` field.
+    // The incoming write must NOT include a `role` field,
+    // or the existing role and incoming role must be identical.
+    function roleIsUnchanged() {
+      return !('role' in request.resource.data) ||
+             request.resource.data.role == resource.data.role;
+    }
+
+    // ── Users ───────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read, update: if isOwner(userId) || isAdminOrAbove();
-      allow create: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdminOrAbove();
+
+      // Owners can update their own profile but CANNOT change their role.
+      allow update: if isOwner(userId) && roleIsUnchanged();
+
+      // Admins can update any profile field EXCEPT role.
+      // Role changes are handled exclusively by the setUserRole Cloud Function.
+      allow update: if isAdminOrAbove() && roleIsUnchanged();
+
+      // New user document creation: role must be 'resident' or absent.
+      allow create: if isOwner(userId) &&
+                    (!('role' in request.resource.data) ||
+                     request.resource.data.role == 'resident');
+
       allow delete: if isAdminOrAbove();
     }
 
+    // ── Residents ───────────────────────────────────────────────────────────
     match /residents/{residentId} {
       allow read: if isOwner(residentId) || isTanodOrAbove();
       allow update: if isOwner(residentId) || isAdminOrAbove();
@@ -22,6 +69,7 @@ service cloud.firestore {
       allow delete: if isAdminOrAbove();
     }
 
+    // ── Alerts ──────────────────────────────────────────────────────────────
     match /alerts/{alertId} {
       allow create: if isAuthenticated() &&
                     request.resource.data.reportedBy == request.auth.uid &&
@@ -29,17 +77,23 @@ service cloud.firestore {
                     request.resource.data.type is string &&
                     request.resource.data.timestamp is timestamp;
 
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
                   (isTanodOrAbove() || resource.data.reportedBy == request.auth.uid);
+
       allow update: if isTanodOrAbove();
       allow delete: if isAdminOrAbove();
     }
 
+    // ── Tanod Locations ─────────────────────────────────────────────────────
     match /locations/{userId} {
-      allow write: if isAuthenticated() && request.auth.uid == userId && isTanodOrAbove();
+      // Tanod can only write their OWN location document.
+      allow write: if isAuthenticated() &&
+                   request.auth.uid == userId &&
+                   isTanodOrAbove();
       allow read: if isTanodOrAbove();
     }
 
+    // ── Patrols & Logs ──────────────────────────────────────────────────────
     match /patrols/{document=**} {
       allow read, write: if isTanodOrAbove();
     }
@@ -48,16 +102,20 @@ service cloud.firestore {
       allow read, write: if isTanodOrAbove();
     }
 
+    // ── System Broadcasts ───────────────────────────────────────────────────
     match /system_broadcasts/{document=**} {
       allow read: if isAuthenticated();
       allow write: if isAdminOrAbove();
     }
 
+    // ── Audit Logs (append-only via Cloud Functions) ─────────────────────────
     match /audit_logs/{document=**} {
       allow read: if isAdminOrAbove();
+      // Clients cannot write audit logs — only Cloud Functions via Admin SDK.
       allow write: if false;
     }
 
+    // ── Deny-all fallback ───────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

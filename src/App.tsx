@@ -24,35 +24,66 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 import * as api from './lib/api';
 
+// ... existing imports ...
+const DEMO_RESIDENT_EMAIL    = import.meta.env.VITE_DEMO_RESIDENT_EMAIL    ?? '';
+const DEMO_RESIDENT_PASSWORD = import.meta.env.VITE_DEMO_RESIDENT_PASSWORD ?? '';
+const DEMO_ADMIN_EMAIL       = import.meta.env.VITE_DEMO_ADMIN_EMAIL       ?? '';
+const DEMO_ADMIN_PASSWORD    = import.meta.env.VITE_DEMO_ADMIN_PASSWORD    ?? '';
+
 const App: React.FC = () => {
-  // 1. RBAC and Auth - REQUIRED AT TOP
+  // 1. RBAC and Auth — single source of truth from AuthContext
   const rbac = useRBAC();
-  const { profile: user, user: firebaseUser, loading } = rbac;
-  
-  // Explicit master check to bypass any DB sync issues
-  const isMasterAdmin = useMemo(() => {
-    const email = firebaseUser?.email?.toLowerCase() || user?.email?.toLowerCase() || '';
-    return email === 'rubenlleg12@gmail.com' || email === 'ben@brgytanod.com' || user?.role === 'superadmin' || rbac.isMasterAdmin;
-  }, [firebaseUser, user, rbac.isMasterAdmin]);
+  const { profile: user, user: firebaseUser, loading, isMasterAdmin } = rbac;
+
+  // FIX: isMasterAdmin comes entirely from AuthContext (which reads profile.role).
+  // No email comparison here. No duplicate logic.
 
   const [activeTab, setActiveTab] = useState('home');
-  const [viewOverride, setViewOverride] = useState<string | null>(() => localStorage.getItem('brgy_view_override'));
+
+  // FIX: viewOverride is only honoured when the current user is admin or above.
+  // A resident cannot set this key and gain a different UI role.
+  const [viewOverride, setViewOverrideState] = useState<string | null>(() => {
+    const stored = localStorage.getItem('brgy_view_override');
+    // Will be validated against real role after profile loads
+    return stored;
+  });
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  
-  const { patrols } = useTanodStore();
 
+  const { patrols } = useTanodStore();
   const [sirenActive, setSirenActive] = useState(false);
   const emergencyAudio = useEmergencyAudio();
   const { startSiren, stopSiren } = emergencyAudio;
 
+  // FIX: Gate viewOverride — only admin/superadmin may use it.
+  const canUseViewOverride = useMemo(
+    () => user?.role === 'admin' || user?.role === 'superadmin',
+    [user?.role]
+  );
+
   const effectiveRole = useMemo(() => {
-    if (viewOverride) return viewOverride;
+    if (canUseViewOverride && viewOverride) return viewOverride;
     if (isMasterAdmin) return 'superadmin';
     return user?.role || 'resident';
-  }, [isMasterAdmin, viewOverride, user?.role]);
+  }, [isMasterAdmin, viewOverride, canUseViewOverride, user?.role]);
+
+  const handleSetViewOverride = (role: string | null) => {
+    if (!canUseViewOverride) return;
+    setViewOverrideState(role);
+    if (role) localStorage.setItem('brgy_view_override', role);
+    else localStorage.removeItem('brgy_view_override');
+  };
+
+  // Clear any stale override when a non-admin logs in
+  useEffect(() => {
+    if (!loading && !canUseViewOverride && viewOverride) {
+      setViewOverrideState(null);
+      localStorage.removeItem('brgy_view_override');
+    }
+  }, [loading, canUseViewOverride, viewOverride]);
 
   const handleToggleSiren = () => {
     setSirenActive(prev => {
@@ -233,8 +264,16 @@ const App: React.FC = () => {
         onLogin={handleLogin}
         onRegister={() => setActiveTab('register')}
         isLoggingIn={isLoggingIn}
-        onDemoLogin={() => handleLogin('resident@brgytanod.com', 'tanod123')}
-        onDemoAdminLogin={() => handleLogin('admin@brgytanod.com', 'tanod123')}
+        onDemoLogin={
+          DEMO_RESIDENT_EMAIL && DEMO_RESIDENT_PASSWORD
+            ? () => handleLogin(DEMO_RESIDENT_EMAIL, DEMO_RESIDENT_PASSWORD)
+            : undefined
+        }
+        onDemoAdminLogin={
+          DEMO_ADMIN_EMAIL && DEMO_ADMIN_PASSWORD
+            ? () => handleLogin(DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD)
+            : undefined
+        }
         onGoogleLogin={async () => {
           try {
             setIsLoggingIn(true);
@@ -326,12 +365,8 @@ const App: React.FC = () => {
         user={firebaseUser}
         profile={user}
         handleLogout={handleLogout}
-        viewOverride={viewOverride}
-        setViewOverride={(role) => {
-          setViewOverride(role);
-          if (role) localStorage.setItem('brgy_view_override', role);
-          else localStorage.removeItem('brgy_view_override');
-        }}
+        viewOverride={canUseViewOverride ? viewOverride : null}
+        setViewOverride={handleSetViewOverride}
       >
         <div className="flex-1 overflow-y-auto relative h-full">
           <KeepAppOpenBanner />
@@ -346,12 +381,8 @@ const App: React.FC = () => {
             alerts={[]}
             isOnline={true}
             visiblePatrols={patrols}
-            viewOverride={viewOverride}
-            setViewOverride={(role) => {
-              setViewOverride(role);
-              if (role) localStorage.setItem('brgy_view_override', role);
-              else localStorage.removeItem('brgy_view_override');
-            }}
+            viewOverride={canUseViewOverride ? viewOverride : null}
+            setViewOverride={handleSetViewOverride}
             sirenActive={sirenActive}
             onToggleSiren={handleToggleSiren}
           />

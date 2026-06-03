@@ -120,37 +120,6 @@ export default function ResidentDashboard({
     setQueuedSOSCount(queuedCount);
   }, [queuedCount, setQueuedSOSCount]);
 
-  const handleShout = useCallback((reason: string) => {
-    toast.error(`GUARDIAN AI: ${reason.toUpperCase()}`, {
-      duration: 5000,
-      icon: "🛡️",
-    });
-    handleSOS("OTHER", `Auto-SOS triggered by Guardian AI: ${reason}`);
-  }, []);
-
-  const { startListening, stopListening } = useShoutDetection(handleShout);
-
-  const handleVideoChunk = useCallback(
-    async (chunk: Blob) => {
-      if (!activeAlert?.id) return;
-      const service = await import("../services/StorageService");
-      await service.uploadVideoChunk(activeAlert.id, chunk, Date.now());
-    },
-    [activeAlert],
-  );
-
-  const { isRecording, startRecording, stopRecording } =
-    useVideoRecorder(handleVideoChunk);
-
-  useEffect(() => {
-    if (guardianMode) startListening();
-    else stopListening();
-  }, [guardianMode, startListening, stopListening]);
-
-  useEffect(() => {
-    if (!activeAlert && isRecording) stopRecording();
-  }, [activeAlert, isRecording, stopRecording]);
-
   const handleSOS = async (
     type: EmergencyType = "OTHER",
     description: string,
@@ -212,6 +181,37 @@ export default function ResidentDashboard({
       toast.error("Emergency transmission system failure.");
     }
   };
+
+  const handleShout = useCallback((reason: string) => {
+    toast.error(`GUARDIAN AI: ${reason.toUpperCase()}`, {
+      duration: 5000,
+      icon: "🛡️",
+    });
+    handleSOS("OTHER", `Auto-SOS triggered by Guardian AI: ${reason}`);
+  }, [handleSOS]);
+
+  const { startListening, stopListening } = useShoutDetection(handleShout);
+
+  const handleVideoChunk = useCallback(
+    async (chunk: Blob) => {
+      if (!activeAlert?.id) return;
+      const service = await import("../services/StorageService");
+      await service.uploadVideoChunk(activeAlert.id, chunk, Date.now());
+    },
+    [activeAlert],
+  );
+
+  const { isRecording, startRecording, stopRecording } =
+    useVideoRecorder(handleVideoChunk);
+
+  useEffect(() => {
+    if (guardianMode) startListening();
+    else stopListening();
+  }, [guardianMode, startListening, stopListening]);
+
+  useEffect(() => {
+    if (!activeAlert && isRecording) stopRecording();
+  }, [activeAlert, isRecording, stopRecording]);
 
   if (!profile) {
     return (
