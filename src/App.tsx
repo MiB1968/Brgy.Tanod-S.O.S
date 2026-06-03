@@ -22,6 +22,7 @@ import GuardianAIChat from "./components/GuardianAIChat";
 import { useEmergencyAudio } from "./hooks/useEmergencyAudio";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
+import { offlineService } from "./services/offlineService";
 
 import * as api from "./lib/api";
 
@@ -128,6 +129,10 @@ const App: React.FC = () => {
       })
     );
   }, [sirenActive]);
+
+  useEffect(() => {
+    offlineService.setupSyncOnReconnection();
+  }, []);
 
   const handleRegistrationComplete = async (regData: any) => {
     try {
