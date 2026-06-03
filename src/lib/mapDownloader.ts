@@ -27,7 +27,8 @@ export async function downloadRegion(
   zoomLevels: number[] = [12, 13, 14, 15, 16],
   onProgress: (current: number, total: number) => void
 ) {
-  const tasks: { url: string }[] = [];
+  const tasks: { url: string; originalSub: string }[] = [];
+  const subdomainOptions = ['a', 'b', 'c', 'd'];
 
   for (const zoom of zoomLevels) {
     const startX = lng2tile(bounds.minLng, zoom);
@@ -42,9 +43,16 @@ export async function downloadRegion(
 
     for (let x = xStartIdx; x <= xEndIdx; x++) {
       for (let y = yStartIdx; y <= yEndIdx; y++) {
-        tasks.push({ url: `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}.png` });
-        // Also support @2x variant in case high-density screens trigger high-dpi requests
-        tasks.push({ url: `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png` });
+        // Distribute reads round-robin across CDNs to avoid rate-limits
+        const sub = subdomainOptions[(x + y) % subdomainOptions.length];
+        tasks.push({ 
+          url: `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}.png`,
+          originalSub: sub
+        });
+        tasks.push({ 
+          url: `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${x}/${y}@2x.png`,
+          originalSub: sub
+        });
       }
     }
   }
@@ -58,6 +66,12 @@ export async function downloadRegion(
   
   for (let i = 0; i < tasks.length; i += batchSize) {
     const batch = tasks.slice(i, i + batchSize);
+    
+    // Add gentle pacing between batches to prevent socket congestion
+    if (i > 0) {
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+
     await Promise.all(batch.map(async (task) => {
       let retries = 3;
       while (retries > 0) {
@@ -67,7 +81,7 @@ export async function downloadRegion(
             const blob = await response.blob();
             // Store under all possible Leaflet subdomains to guarantee offline hits
             for (const s of subdomains) {
-              const mappedUrl = task.url.replace(/a\.basemaps/, `${s}.basemaps`);
+              const mappedUrl = task.url.replace(`${task.originalSub}.basemaps`, `${s}.basemaps`);
               await cacheTile(mappedUrl, blob);
             }
             break; // Success, exit retry loop
@@ -77,10 +91,10 @@ export async function downloadRegion(
         } catch (e) {
           retries--;
           if (retries === 0) {
-            console.error('Failed to download tile:', task.url, e);
+            console.warn('[MapDownloader] Tile fallback gracefully skipped:', task.url, e);
           } else {
-            // Wait before retrying (exponential backoff)
-            const delay = Math.pow(2, 3 - retries) * 500 + Math.random() * 500;
+            // Wait before retrying (exponential backoff with jitter)
+            const delay = Math.pow(2, 3 - retries) * 400 + Math.random() * 400;
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }

@@ -25,7 +25,7 @@ export function useOnlineStatus(): OnlineStatus {
       setLastChanged(new Date().toISOString());
       console.log('[Network] Connection restored — triggering offline queue flush');
       // Flush any queued SOS / location updates
-      syncService.processQueue().catch((err) =>
+      syncService.syncPendingReports().catch((err) =>
         console.warn('[Network] Queue flush failed:', err)
       );
     }, DEBOUNCE_MS);
