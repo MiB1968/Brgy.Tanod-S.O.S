@@ -373,5 +373,58 @@ export const setUserRole = onCall(async (request: any) => {
   }
 });
 
-export { setUserRole } from './setUserRole';
 export { bootstrapSuperAdmin } from './bootstrapSuperAdmin';
+
+/**
+ * Triggered when a new SOS alert is created
+ */
+export const onNewSOS = functionsLegacy.firestore
+  .document('alerts/{alertId}')
+  .onCreate(async (snap, context) => {
+    const alertData = snap.data();
+    const alertId = context.params.alertId;
+
+    if (!alertData || alertData.status !== 'pending') return;
+
+    console.log(`New SOS created: ${alertId}`);
+
+    try {
+      // Get all Tanods (users with role 'tanod')
+      const tanodsSnapshot = await admin.firestore()
+        .collection('users')
+        .where('role', '==', 'tanod')
+        .get();
+
+      const tokens: string[] = [];
+
+      tanodsSnapshot.forEach((doc) => {
+        const fcmToken = doc.data().fcmToken;
+        if (fcmToken) tokens.push(fcmToken);
+      });
+
+      if (tokens.length === 0) {
+        console.log('No Tanods with FCM tokens found.');
+        return;
+      }
+
+      // Send notification to all Tanods
+      const payload = {
+        notification: {
+          title: '🚨 New Emergency Alert',
+          body: `${alertData.type} reported nearby. Tap to respond.`,
+        },
+        data: {
+          alertId: alertId,
+          type: alertData.type,
+          lat: alertData.location?.lat?.toString() || '',
+          lng: alertData.location?.lng?.toString() || '',
+        },
+      };
+
+      const response = await admin.messaging().sendToDevice(tokens, payload);
+      console.log('Notifications sent:', response.successCount, 'success');
+
+    } catch (error) {
+      console.error('Error sending SOS notifications:', error);
+    }
+  });

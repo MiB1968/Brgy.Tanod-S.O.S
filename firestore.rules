@@ -75,12 +75,19 @@ service cloud.firestore {
                     request.resource.data.reportedBy == request.auth.uid &&
                     request.resource.data.location is map &&
                     request.resource.data.type is string &&
-                    request.resource.data.timestamp is timestamp;
+                    (request.auth.token.email_verified == true || request.auth.token.role in ['resident', 'tanod', 'admin', 'superadmin']);
 
       allow read: if isAuthenticated() &&
                   (isTanodOrAbove() || resource.data.reportedBy == request.auth.uid);
 
-      allow update: if isTanodOrAbove();
+      // Only assigned Tanod, Admins, or any Tanod (if accepting a pending alert) can update
+      allow update: if isAuthenticated() && (
+                    isAdminOrAbove() ||
+                    (hasRole(['tanod']) && (
+                      resource.data.status == 'pending' ||
+                      resource.data.assignedTo == request.auth.uid
+                    ))
+                  );
       allow delete: if isAdminOrAbove();
     }
 

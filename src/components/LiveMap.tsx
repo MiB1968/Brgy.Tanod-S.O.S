@@ -5,6 +5,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTanodStore } from "../store/useTanodStore";
 import { MAMBURAO_CENTER } from "../constants";
+import { TanodMarkers } from "./TanodMarkers";
+import { SOSMarkers } from "./SOSMarkers";
 
 // Custom red icon for Tanods
 const tanodIcon = new L.Icon({
@@ -111,6 +113,10 @@ export default function LiveMap() {
         />
 
         <MapUpdater patrols={patrols} resizeTrigger={mapKey} />
+
+        {/* Real-time Firestore Markers */}
+        <TanodMarkers />
+        <SOSMarkers />
 
         {patrols.map((patrol: any) => (
           <Marker

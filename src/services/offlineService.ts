@@ -204,5 +204,38 @@ export const offlineService = {
     failed += locations.failed + actions.failed;
     // Note: You must also handle SOS sync somehow if needed, but for now we do locations & actions
     return { success, failed };
+  },
+
+  /**
+   * Registers a window-level online listener to immediately trigger queues and SOS reports upload.
+   */
+  setupSyncOnReconnection() {
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('online', async () => {
+      console.log('[OfflineService] Network restored. Starting automatic sync...');
+      toast.success('Internet connection restored! Syncing offline reports...');
+
+      try {
+        const { sosService } = await import('./sosService');
+        const sosResult = await this.syncPending(async (data) => {
+          await sosService.triggerSOS({
+            type: data.type,
+            description: data.description,
+            location: {
+              lat: data.location.lat,
+              lng: data.location.lng,
+            },
+            reportedBy: data.userId,
+            reportedByName: data.userName,
+          });
+        });
+
+        const otherResult = await this.processOfflineQueue();
+        console.log(`[OfflineService] Sync completed. SOS: ${sosResult.success} synced. Actions/Locations: ${otherResult.success} synced.`);
+      } catch (err: any) {
+        console.error('[OfflineService] Sync on reconnection failed:', err);
+      }
+    });
   }
 };

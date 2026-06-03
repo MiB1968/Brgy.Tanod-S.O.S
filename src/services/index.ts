@@ -6,3 +6,5 @@ export { offlineService } from './offlineService';
 export { offlineTileService } from './offlineTileService';
 export { batteryGuardService } from './batteryGuardService';
 export { sosService } from './sosService';
+export { dispatchService } from './dispatchService';
+export { reportService } from './reportService';
