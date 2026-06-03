@@ -20,7 +20,7 @@ export enum VoicePermissionLevel {
   TANOD       = "tanod",
   ADMIN       = "admin",
   COMMANDER   = "commander",
-  SUPER_ADMIN = "superadmin",
+  SUPER_ADMIN = "super_admin",
 }
 
 export enum VoiceResponseTone {

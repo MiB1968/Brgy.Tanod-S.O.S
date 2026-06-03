@@ -12,6 +12,7 @@ import { triggerQwenPawDispatcher, triggerQwenPawReporter } from './qwenpawServi
 import { config } from '../config/index';
 import { Alert } from '../../types';
 import { serverPushService } from './pushService'; // Added
+import { logAction } from './auditService';
 
 async function getTwilioConfig() {
   try {
@@ -285,6 +286,8 @@ export const incidentService = {
 
     triggerSmsFallbackIfNeeded();
 
+    await logAction(reporterId, 'SOS_CREATION', 'alerts', incident.id, { type: finalType, clientUuid });
+
     return incident;
   },
 
@@ -299,7 +302,7 @@ export const incidentService = {
     }
 
     const alert = alertCheck.rows[0];
-    if (alert.resident_id !== userId && !['admin', 'superadmin', 'captain', 'tanod'].includes(userRole.toLowerCase())) {
+    if (alert.resident_id !== userId && !['admin', 'super_admin', 'captain', 'tanod'].includes(userRole.toLowerCase())) {
       throw new AppError("Permission denied", 403, "FORBIDDEN");
     }
 
@@ -346,6 +349,8 @@ export const incidentService = {
       getIO().to(`user_${alert.resident_id}`).emit('alert_update', { type: 'update', alert: updated });
     }
     
+    await logAction(userId, 'SOS_CANCEL', 'alerts', incidentId);
+
     return updated;
   },
 
@@ -368,7 +373,7 @@ export const incidentService = {
     }));
   },
 
-  async updateSOSStatus(sosId: string, status: string, notes?: string, assignedTo?: string) {
+  async updateSOSStatus(sosId: string, status: string, notes?: string, assignedTo?: string, actorId?: string) {
     const result = await pool.query(
       `UPDATE alerts 
        SET status = $1, 
@@ -414,6 +419,20 @@ export const incidentService = {
       getIO().to(`incident_${sosId}`).emit('alert_update', { type: 'update', alert: formatted });
       getIO().to('responders').emit('alert_update', { type: 'update', alert: formatted });
     }
+
+    // Audit the update
+    const action = status.toUpperCase() === 'RESOLVED' ? 'SOS_CLOSURE' :
+                   (status.toLowerCase() === 'responding' ? 'SOS_RESPONSE' : 'SOS_UPDATE');
+
+    // We don't have easy access to actor ID here without changing signature,
+    // but we can pass it if we update the service or just log system for now.
+    // Better to update service to take actorId.
+    // Given the task, I will assume we should update signatures or use a generic "SYSTEM" actor if not available.
+    // However, I'll check if I can get actorId from a context or if I should change signature.
+    // Controller calls it: const updated = await incidentService.updateSOSStatus(id, status, notes, assignedTo);
+    // I will update the signature.
+
+    await logAction(actorId || assignedTo || null, action, 'alerts', sosId, { status, notes });
 
     // Auto-trigger QwenPaw Reporter if resolved
     if (formatted.status === 'RESOLVED') {
@@ -485,7 +504,7 @@ export const incidentService = {
     const responders: any[] = [];
 
     for (const loc of Object.values(activeLocations)) {
-      if (loc.role !== "TANOD" && loc.role !== "tanod" && loc.role !== "ADMIN" && loc.role !== "CAPTAIN" && loc.role !== "superadmin") continue;
+      if (loc.role !== "TANOD" && loc.role !== "tanod" && loc.role !== "ADMIN" && loc.role !== "CAPTAIN" && loc.role !== "super_admin") continue;
       if (typeof loc.lat !== "number" || typeof loc.lng !== "number") continue;
 
       const d = haversineDistance({ lat: latitude, lng: longitude }, loc);

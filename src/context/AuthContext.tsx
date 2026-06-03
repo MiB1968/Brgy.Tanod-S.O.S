@@ -68,11 +68,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Email-based promotion has been removed. Promotion is handled exclusively
   // by the `bootstrapSuperAdmin` Cloud Function (see functions/src/index.ts).
   const isMasterAdmin = useMemo(() => {
-    return profile?.role === "superadmin";
+    return profile?.role === "super_admin";
   }, [profile]);
 
   const currentRole: UserRole = isMasterAdmin
-    ? "superadmin"
+    ? "super_admin"
     : profile?.role || "guest";
 
   const hasPermission = useCallback(
@@ -112,9 +112,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const isMasterEmail =
           userData.email === "rubenlleg12@gmail.com" ||
           userData.email === "ben@brgytanod.com";
-        if (isMasterEmail && userData.role !== "superadmin") {
-          userData.role = "superadmin";
-          await setDoc(userRef, { role: "superadmin" }, { merge: true });
+        if (isMasterEmail && userData.role !== "super_admin") {
+          userData.role = "super_admin";
+          await setDoc(userRef, { role: "super_admin" }, { merge: true });
         }
 
         setProfile(userData);
@@ -135,8 +135,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const isMasterEmail =
           userData.email === "rubenlleg12@gmail.com" ||
           userData.email === "ben@brgytanod.com";
-        if (isMasterEmail && userData.role !== "superadmin") {
-          userData.role = "superadmin";
+        if (isMasterEmail && userData.role !== "super_admin") {
+          userData.role = "super_admin";
         }
 
         setProfile(userData);
@@ -160,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const isMasterEmail =
       firebaseUser?.email === "rubenlleg12@gmail.com" ||
       firebaseUser?.email === "ben@brgytanod.com";
-    const initialRole = isMasterEmail ? "superadmin" : "resident";
+    const initialRole = isMasterEmail ? "super_admin" : "resident";
 
     // Default: create a minimal resident profile.
     const userData: User = {

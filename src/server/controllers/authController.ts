@@ -256,10 +256,10 @@ export const login = async (req: Request, res: Response) => {
 
       const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
 
-      if (user && isMaster && user.role !== 'superadmin') {
+      if (user && isMaster && user.role !== 'super_admin') {
         const promoteRes = await pool.query(
           'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
-          ['superadmin', 'approved', user.id]
+          ['super_admin', 'approved', user.id]
         );
         user = promoteRes.rows[0];
       }
@@ -272,7 +272,7 @@ export const login = async (req: Request, res: Response) => {
             `INSERT INTO users (email, name, role, status, password)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING *`,
-            [normalizedEmail, decodedToken.name || 'Master Admin', 'superadmin', 'approved', 'google-auth-no-pass']
+            [normalizedEmail, decodedToken.name || 'Master Admin', 'super_admin', 'approved', 'google-auth-no-pass']
           );
           user = provisionRes.rows[0];
         } else {
@@ -285,7 +285,7 @@ export const login = async (req: Request, res: Response) => {
         }
       }
 
-      await logAction(user.id, 'USER_LOGIN_GOOGLE', 'users', user.id);
+      await logAction(user.id, 'LOGIN_GOOGLE', 'users', user.id);
 
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
@@ -312,10 +312,10 @@ export const login = async (req: Request, res: Response) => {
 
     const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
 
-    if (user && isMaster && user.role !== 'superadmin') {
+    if (user && isMaster && user.role !== 'super_admin') {
       const promoteRes = await pool.query(
         'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
-        ['superadmin', 'approved', user.id]
+        ['super_admin', 'approved', user.id]
       );
       user = promoteRes.rows[0];
     }
@@ -326,12 +326,12 @@ export const login = async (req: Request, res: Response) => {
     let currentUser = user;
     const isDemo = normalizedEmail === 'resident@brgytanod.com' || 
                    normalizedEmail === 'admin@brgytanod.com' ||
-                   normalizedEmail === 'superadmin@brgy.gov';
+                   normalizedEmail === 'super_admin@brgy.gov';
     if (!currentUser && isDemo) {
         console.log(`[Auth] Auto-provisioning demo user account: ${normalizedEmail}`);
         let role = 'resident';
         if (normalizedEmail === 'admin@brgytanod.com') role = 'admin';
-        else if (normalizedEmail === 'superadmin@brgy.gov') role = 'superadmin';
+        else if (normalizedEmail === 'super_admin@brgy.gov') role = 'super_admin';
         
         // Provision in Firebase Auth
         try {
@@ -371,7 +371,7 @@ export const login = async (req: Request, res: Response) => {
       return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
-    await logAction(currentUser.id, 'USER_LOGIN', 'users', currentUser.id);
+    await logAction(currentUser.id, 'LOGIN', 'users', currentUser.id);
     
     const token = jwt.sign(
       { id: currentUser.id, email: currentUser.email, role: currentUser.role, tokenVersion: currentUser.token_version || 1 },
@@ -395,7 +395,10 @@ export const login = async (req: Request, res: Response) => {
 };
 
 // ── Logout ────────────────────────────────────────────────────────────────────
-export const logout = (req: Request, res: Response) => {
+export const logout = async (req: AuthRequest, res: Response) => {
+  if (req.user) {
+    await logAction(req.user.id, 'LOGOUT', 'users', req.user.id);
+  }
   res.clearCookie('token', {
     httpOnly: true,
     secure: isProduction,

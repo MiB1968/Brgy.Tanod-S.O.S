@@ -7,7 +7,7 @@ import { aiService } from '../services/aiService';
 export const getDashboardAnalytics = async (req: AuthRequest, res: Response) => {
   try {
     const userRole = req.user?.role;
-    if (userRole !== 'admin' && userRole !== 'superadmin' && userRole !== 'tanod') {
+    if (userRole !== 'admin' && userRole !== 'super_admin' && userRole !== 'tanod') {
       return response.error(res, "Administrative clearance required", "FORBIDDEN", 403);
     }
 

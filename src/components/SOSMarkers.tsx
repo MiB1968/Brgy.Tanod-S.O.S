@@ -21,7 +21,7 @@ export const SOSMarkers: React.FC = () => {
   const { profile, user } = useRBAC();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  const isTanod = profile?.role === 'tanod' || profile?.role === 'admin' || profile?.role === 'superadmin';
+  const isTanod = profile?.role === 'tanod' || profile?.role === 'admin' || profile?.role === 'super_admin';
 
   const handleRespondToAlert = async (sosId: string) => {
     if (!user?.uid) {

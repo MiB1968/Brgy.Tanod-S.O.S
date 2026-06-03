@@ -74,7 +74,7 @@ describe('authorize middleware', () => {
   it('calls next() when the user role is in the allowed list', () => {
     const req: any = { user: { id: 'u1', role: 'admin', email: 'a@a.com' } };
     const next = vi.fn();
-    authorize(['admin', 'superadmin'])(req, mockRes(), next);
+    authorize(['admin', 'super_admin'])(req, mockRes(), next);
     expect(next).toHaveBeenCalled();
   });
 

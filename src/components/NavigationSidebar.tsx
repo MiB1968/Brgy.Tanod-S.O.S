@@ -31,7 +31,7 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   handleInstallApp,
 }) => {
   const items = navItems.filter((item) => {
-    if (effectiveRole === "admin" || effectiveRole === "superadmin") {
+    if (effectiveRole === "admin" || effectiveRole === "super_admin") {
       return true;
     }
     if (effectiveRole === "tanod") {

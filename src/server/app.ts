@@ -7,10 +7,12 @@ import { setupRoutes } from './routes/index';
 import { globalLimiter, authLimiter, sosLimiter, apiKeyAuthLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/error';
 import { config } from './config/index';
+import { requestIdMiddleware } from './middleware/requestId';
 
 const app = express();
 
 app.set('trust proxy', 1);
+app.use(requestIdMiddleware);
 
 const allowedOrigins: string[] = config.corsOrigin
   ? config.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
@@ -82,17 +84,15 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      const isStudioPreview =
-        !!origin &&
-        (origin.includes('.run.app') || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('google.com'));
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin || origin === 'null') {
+        return callback(null, true);
+      }
 
       const isDevFallback =
         allowedOrigins.length === 0 && config.nodeEnv !== 'production';
 
       if (
-        !origin ||
-        origin === 'null' ||
-        isStudioPreview ||
         isDevFallback ||
         allowedOrigins.includes(origin)
       ) {

@@ -1019,7 +1019,7 @@ export default function LiveMap({
 
   useEffect(() => {
     const loadResidents = async () => {
-      if (!["admin", "superadmin", "tanod"].includes(effectiveRole || "")) {
+      if (!["admin", "super_admin", "tanod"].includes(effectiveRole || "")) {
         return;
       }
       try {

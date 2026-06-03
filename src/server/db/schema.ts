@@ -141,6 +141,14 @@ export const shifts = pgTable('shifts', {
 
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
+  actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+  action: varchar('action', { length: 100 }).notNull(),
+  entityType: varchar('entity_type', { length: 50 }),
+  entityId: varchar('entity_id', { length: 100 }),
+  metadata: jsonb('metadata').default(sql`'{}'::jsonb`),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+
+  // Legacy fields (kept for compatibility or gradual migration)
   incidentId: uuid('incident_id'),
   type: text('type'),
   status: text('status'),
@@ -148,10 +156,8 @@ export const auditLogs = pgTable('audit_logs', {
   tanodAssigned: text('tanod_assigned'),
   locationLat: doublePrecision('location_lat'),
   locationLng: doublePrecision('location_lng'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   notes: text('notes'),
   adminId: uuid('admin_id').references(() => users.id),
-  action: varchar('action', { length: 100 }),
   targetTable: varchar('target_table', { length: 50 }),
   targetId: varchar('target_id', { length: 100 }),
   details: jsonb('details')

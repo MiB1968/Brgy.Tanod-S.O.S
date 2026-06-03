@@ -12,7 +12,7 @@ export async function initDb(retries = 3) {
       logger.info("DB_INIT: Auth Successful.");
 
       // Bootstrap Admin - ONLY check if we actually need an admin account
-      const adminResult = await client.query("SELECT * FROM users WHERE role = 'admin' OR role = 'superadmin'");
+      const adminResult = await client.query("SELECT * FROM users WHERE role = 'admin' OR role = 'super_admin'");
       
       if (adminResult.rows.length === 0) {
         // No admin exists, require the bootstrap keys

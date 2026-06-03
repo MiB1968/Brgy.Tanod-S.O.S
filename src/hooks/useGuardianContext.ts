@@ -10,7 +10,7 @@ export const useGuardianContext = () => {
   const [context, setContext] = useState<GuardianContext>({
     pendingSOS: 0,
     activeTanods: 3,
-    isSuperAdmin: profile?.role === 'superadmin' || profile?.role === 'admin',
+    isSuperAdmin: profile?.role === 'super_admin' || profile?.role === 'admin',
     role: profile?.role || 'resident',
     hasActiveSOS: false,
     isOnline,
@@ -21,7 +21,7 @@ export const useGuardianContext = () => {
     setContext(prev => ({
       ...prev,
       role: profile?.role || 'resident',
-      isSuperAdmin: profile?.role === 'superadmin' || profile?.role === 'admin',
+      isSuperAdmin: profile?.role === 'super_admin' || profile?.role === 'admin',
       isOnline,
     }));
   }, [profile?.role, isOnline]);

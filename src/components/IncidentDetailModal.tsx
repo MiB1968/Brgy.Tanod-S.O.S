@@ -20,7 +20,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   const { profile, user } = useRBAC();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const isTanod = profile?.role === 'tanod' || profile?.role === 'admin' || profile?.role === 'superadmin';
+  const isTanod = profile?.role === 'tanod' || profile?.role === 'admin' || profile?.role === 'super_admin';
   const currentUserId = user?.uid;
 
   const handleAccept = async () => {

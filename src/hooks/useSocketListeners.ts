@@ -96,7 +96,7 @@ export function useSocketListeners({
       if (type === 'new' || !payload.type) {
         addAlert(alert);
 
-        if (["admin", "superadmin", "tanod"].includes(effectiveRole)) {
+        if (["admin", "super_admin", "tanod"].includes(effectiveRole)) {
           setActiveTab("home");
           setIsShaking(true);
           setTimeout(() => setIsShaking(false), 2000);
@@ -121,7 +121,7 @@ export function useSocketListeners({
       if (!rawAlert) return;
       const alert = normalizeAlert(rawAlert);
       addAlert(alert);
-      if (["admin", "superadmin", "tanod"].includes(effectiveRole)) {
+      if (["admin", "super_admin", "tanod"].includes(effectiveRole)) {
         setActiveTab("home");
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 2000);
@@ -146,7 +146,7 @@ export function useSocketListeners({
     });
 
     socket.on("tanod_status", (data: any) => {
-      if (["admin", "superadmin"].includes(effectiveRole)) {
+      if (["admin", "super_admin"].includes(effectiveRole)) {
         toast(`${data.name} is now ${data.status}`, { icon: "ℹ️" });
       }
     });
@@ -235,7 +235,7 @@ export function useSocketListeners({
     isActive: boolean;
     batteryLevel?: number;
   }) => {
-    if (socket.connected && (effectiveRole === "tanod" || effectiveRole === "superadmin")) {
+    if (socket.connected && (effectiveRole === "tanod" || effectiveRole === "super_admin")) {
       socket.emit("location_update", locationData);
     }
   };

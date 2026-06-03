@@ -6,7 +6,7 @@ describe('normalizeRole', () => {
     expect(normalizeRole('TANOD')).toBe('tanod');
     expect(normalizeRole('ADMIN')).toBe('admin');
     expect(normalizeRole('CAPTAIN')).toBe('captain');
-    expect(normalizeRole('SUPERADMIN')).toBe('superadmin');
+    expect(normalizeRole('SUPER_ADMIN')).toBe('super_admin');
     expect(normalizeRole('RESIDENT')).toBe('resident');
   });
 
@@ -27,8 +27,8 @@ describe('isTanodOrAbove', () => {
     expect(isTanodOrAbove('TANOD')).toBe(true);
     expect(isTanodOrAbove('admin')).toBe(true);
     expect(isTanodOrAbove('ADMIN')).toBe(true);
-    expect(isTanodOrAbove('superadmin')).toBe(true);
-    expect(isTanodOrAbove('SUPERADMIN')).toBe(true);
+    expect(isTanodOrAbove('super_admin')).toBe(true);
+    expect(isTanodOrAbove('SUPER_ADMIN')).toBe(true);
     expect(isTanodOrAbove('captain')).toBe(true);
     expect(isTanodOrAbove('CAPTAIN')).toBe(true);
   });
@@ -42,11 +42,11 @@ describe('isTanodOrAbove', () => {
 });
 
 describe('isAdminOrAbove', () => {
-  it('returns true for admin, superadmin, and captain', () => {
+  it('returns true for admin, super_admin, and captain', () => {
     expect(isAdminOrAbove('admin')).toBe(true);
     expect(isAdminOrAbove('ADMIN')).toBe(true);
-    expect(isAdminOrAbove('superadmin')).toBe(true);
-    expect(isAdminOrAbove('SUPERADMIN')).toBe(true);
+    expect(isAdminOrAbove('super_admin')).toBe(true);
+    expect(isAdminOrAbove('SUPER_ADMIN')).toBe(true);
     expect(isAdminOrAbove('captain')).toBe(true);
     expect(isAdminOrAbove('CAPTAIN')).toBe(true);
   });

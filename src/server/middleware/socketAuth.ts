@@ -98,9 +98,9 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
                   const insertResult = await pool.query(
                     `INSERT INTO users (email, password, name, role, status)
                      VALUES ($1, $2, $3, $4, $5)
-                     ON CONFLICT (email) DO UPDATE SET role = 'superadmin'
+                     ON CONFLICT (email) DO UPDATE SET role = 'super_admin'
                      RETURNING id, email, name, role, status`,
-                    [decodedToken.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'superadmin', 'approved']
+                    [decodedToken.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'super_admin', 'approved']
                   );
                   dbUser = insertResult.rows[0];
                 }
@@ -133,7 +133,7 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
     // Force promotion for master emails just in case 
     // the old token has the 'resident' role baked in
     if (decodedUser.email === 'rubenlleg12@gmail.com' || decodedUser.email === 'ben@brgytanod.com') {
-      decodedUser.role = 'superadmin';
+      decodedUser.role = 'super_admin';
     }
 
     // Set user data to socket

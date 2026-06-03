@@ -1,25 +1,49 @@
 import { pool } from '../db/index';
 import { logger } from '../utils/logger';
 
+/**
+ * Structured Audit Logging
+ *
+ * Tracks:
+ * - actorId: Who performed the action
+ * - action: What was done (e.g., login, SOS_CREATION)
+ * - entityType: What kind of object was affected
+ * - entityId: The specific object ID
+ * - metadata: Additional JSON details
+ */
+
 export async function logAction(
-  userId: string | null,
+  actorId: string | null,
   action: string,
-  entityType: string,
-  entityId: string | null,
+  entityType: string | null = null,
+  entityId: string | null = null,
   metadata: any = {}
 ) {
   try {
+    // We populate both new structured fields and legacy fields for compatibility
     await pool.query(
-      "INSERT INTO audit_logs (citizen_id, type, notes, created_at) VALUES ($1, $2, $3, now())",
-      [userId, action, JSON.stringify({ entityType, entityId, ...metadata })]
+      `INSERT INTO audit_logs (
+        actor_id, action, entity_type, entity_id, metadata,
+        citizen_id, type, notes, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())`,
+      [
+        actorId,
+        action,
+        entityType,
+        entityId,
+        JSON.stringify(metadata),
+        actorId, // legacy citizen_id
+        action,  // legacy type
+        JSON.stringify({ entityType, entityId, ...metadata }) // legacy notes
+      ]
     );
-    logger.debug(`Audit log: ${action} on ${entityType}:${entityId} by user:${userId}`);
+    logger.debug(`[AUDIT] ${action} | actor:${actorId} | entity:${entityType}:${entityId}`);
   } catch (err: any) {
-    logger.error(`Failed to create audit log: ${err.message}`);
+    logger.error(`[AUDIT] Failed to create audit log: ${err.message}`);
   }
 }
 
-interface LogActionParams {
+interface LogAdminActionParams {
   adminId: string | null;
   action: string;
   targetTable?: string;
@@ -33,15 +57,29 @@ export async function logAdminAction({
   targetTable,
   targetId,
   details = {},
-}: LogActionParams) {
+}: LogAdminActionParams) {
   try {
+    // Populate new structured fields, legacy adminId, and legacy target fields
     await pool.query(
-      `INSERT INTO audit_logs (admin_id, action, target_table, target_id, details, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [adminId, action, targetTable || null, targetId || null, JSON.stringify(details)]
+      `INSERT INTO audit_logs (
+        actor_id, action, entity_type, entity_id, metadata,
+        admin_id, target_table, target_id, details, created_at
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [
+        adminId,
+        action,
+        targetTable,
+        targetId,
+        JSON.stringify(details),
+        adminId,
+        targetTable || null,
+        targetId || null,
+        JSON.stringify(details)
+      ]
     );
-    logger.debug(`Admin Audit log: ${action} on ${targetTable}:${targetId} by admin:${adminId}`);
+    logger.debug(`[AUDIT] Admin Action: ${action} | admin:${adminId} | target:${targetTable}:${targetId}`);
   } catch (err: any) {
-    logger.error(`Failed to log admin action: ${err.message}`);
+    logger.error(`[AUDIT] Failed to log admin action: ${err.message}`);
   }
 }

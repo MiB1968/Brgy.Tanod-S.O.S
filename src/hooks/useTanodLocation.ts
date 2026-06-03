@@ -29,7 +29,7 @@ export function useTanodLocation(
 
   const startBackgroundTracking = useCallback(() => {
     // Only Tanod should track
-    if (role !== "tanod" && role !== "superadmin") {
+    if (role !== "tanod" && role !== "super_admin") {
       stopTracking();
       return;
     }
