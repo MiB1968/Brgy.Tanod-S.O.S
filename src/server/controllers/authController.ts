@@ -254,9 +254,18 @@ export const login = async (req: Request, res: Response) => {
       );
       let user = userRes.rows[0];
 
+      const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
+
+      if (user && isMaster && user.role !== 'superadmin') {
+        const promoteRes = await pool.query(
+          'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
+          ['superadmin', 'approved', user.id]
+        );
+        user = promoteRes.rows[0];
+      }
+
       if (!user) {
         // AUTO-PROVISION Master User if they don't exist
-        const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
         if (isMaster) {
           console.log('[Auth] Auto-provisioning master user account');
           const provisionRes = await pool.query(
@@ -295,11 +304,22 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // ── Standard email/password login ─────────────────────────────────────────
-    const result = await pool.query(
+    let result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [normalizedEmail]
     );
-    const user = result.rows[0];
+    let user = result.rows[0];
+
+    const isMaster = normalizedEmail === 'rubenlleg12@gmail.com' || normalizedEmail === 'ben@brgytanod.com';
+
+    if (user && isMaster && user.role !== 'superadmin') {
+      const promoteRes = await pool.query(
+        'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
+        ['superadmin', 'approved', user.id]
+      );
+      user = promoteRes.rows[0];
+    }
+    
     let passwordMatch = false;
 
     // AUTO-PROVISION demo users if they don't exist

@@ -83,7 +83,7 @@ export const CitizenReportTracker = ({ userId }: { userId: string }) => {
                       "px-3 py-1 rounded-lg border",
                       report.status === "resolved"
                         ? "bg-green-500/10 border-green-500/20 text-green-400"
-                        : "bg-amber-500/10 border-amber-500/20 text-amber-400",
+                        : "bg-amber-500/10 border-amber-500/20 text-amber-400"
                     )}
                   >
                     <span className="text-[9px] font-black uppercase tracking-widest font-mono">

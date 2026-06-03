@@ -36,26 +36,38 @@ export const ProtectedRoute = ({
   // Without a router installed (we're mostly custom-routing via state),
   // we can just render the fallback instead of <Navigate>
   if (!role) {
-    return fallback || (
-      <div className="flex min-h-[50vh] items-center justify-center text-center">
-        <p className="text-emergency font-mono tracking-widest">ACCESS_DENIED: NOT_AUTHENTICATED</p>
-      </div>
+    return (
+      fallback || (
+        <div className="flex min-h-[50vh] items-center justify-center text-center">
+          <p className="text-emergency font-mono tracking-widest">
+            ACCESS_DENIED: NOT_AUTHENTICATED
+          </p>
+        </div>
+      )
     );
   }
 
   if (requiredRole && !canAccessRole(requiredRole)) {
-    return fallback || (
-      <div className="flex min-h-[50vh] items-center justify-center text-center">
-        <p className="text-emergency font-mono tracking-widest">ACCESS_DENIED: INSUFFICIENT_CLEARANCE</p>
-      </div>
+    return (
+      fallback || (
+        <div className="flex min-h-[50vh] items-center justify-center text-center">
+          <p className="text-emergency font-mono tracking-widest">
+            ACCESS_DENIED: INSUFFICIENT_CLEARANCE
+          </p>
+        </div>
+      )
     );
   }
 
   if (permission && !hasPermission(permission)) {
-    return fallback || (
-      <div className="flex min-h-[50vh] items-center justify-center text-center">
-        <p className="text-emergency font-mono tracking-widest">ACCESS_DENIED: MISSING_PERMISSION</p>
-      </div>
+    return (
+      fallback || (
+        <div className="flex min-h-[50vh] items-center justify-center text-center">
+          <p className="text-emergency font-mono tracking-widest">
+            ACCESS_DENIED: MISSING_PERMISSION
+          </p>
+        </div>
+      )
     );
   }
 

@@ -17,30 +17,89 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Mic, MicOff, Loader2, CheckCircle2, AlertTriangle, Zap, Shield, Activity, Waves, Cloud } from "lucide-react";
-import { voiceSOSAgent, preloadModel, SOSPayload, AgentStatus } from "../../services/voiceSOSAgent";
+import {
+  Mic,
+  MicOff,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Zap,
+  Shield,
+  Activity,
+  Waves,
+  Cloud,
+} from "lucide-react";
+import {
+  voiceSOSAgent,
+  preloadModel,
+  SOSPayload,
+  AgentStatus,
+} from "../../services/voiceSOSAgent";
 import type { EmergencyType } from "../../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const TYPE_CONFIG: Record<EmergencyType, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  FIRE:             { label: "Sunog",      color: "text-orange-400", bg: "bg-orange-500/20 border-orange-500/40", icon: <Zap className="w-4 h-4" /> },
-  MEDICAL:          { label: "Medical",    color: "text-blue-400",   bg: "bg-blue-500/20 border-blue-500/40",     icon: <Activity className="w-4 h-4" /> },
-  CRIME:            { label: "Krimen",     color: "text-red-400",    bg: "bg-red-500/20 border-red-500/40",       icon: <Shield className="w-4 h-4" /> },
-  NATURAL_DISASTER: { label: "Sakuna",     color: "text-yellow-400", bg: "bg-yellow-500/20 border-yellow-500/40", icon: <Waves className="w-4 h-4" /> },
-  DISTURBANCE:      { label: "Gulo",       color: "text-purple-400", bg: "bg-purple-500/20 border-purple-500/40", icon: <AlertTriangle className="w-4 h-4" /> },
-  FLOOD:            { label: "Baha",       color: "text-cyan-400",   bg: "bg-cyan-500/20 border-cyan-500/40",     icon: <Waves className="w-4 h-4" /> },
-  VIOLENCE:         { label: "Karahasan",  color: "text-red-500",    bg: "bg-red-600/20 border-red-600/40",       icon: <Shield className="w-4 h-4" /> },
-  OTHER:            { label: "Iba pa",     color: "text-white/70",   bg: "bg-white/10 border-white/20",           icon: <AlertTriangle className="w-4 h-4" /> },
+const TYPE_CONFIG: Record<
+  EmergencyType,
+  { label: string; color: string; bg: string; icon: React.ReactNode }
+> = {
+  FIRE: {
+    label: "Sunog",
+    color: "text-orange-400",
+    bg: "bg-orange-500/20 border-orange-500/40",
+    icon: <Zap className="w-4 h-4" />,
+  },
+  MEDICAL: {
+    label: "Medical",
+    color: "text-blue-400",
+    bg: "bg-blue-500/20 border-blue-500/40",
+    icon: <Activity className="w-4 h-4" />,
+  },
+  CRIME: {
+    label: "Krimen",
+    color: "text-red-400",
+    bg: "bg-red-500/20 border-red-500/40",
+    icon: <Shield className="w-4 h-4" />,
+  },
+  NATURAL_DISASTER: {
+    label: "Sakuna",
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/20 border-yellow-500/40",
+    icon: <Waves className="w-4 h-4" />,
+  },
+  DISTURBANCE: {
+    label: "Gulo",
+    color: "text-purple-400",
+    bg: "bg-purple-500/20 border-purple-500/40",
+    icon: <AlertTriangle className="w-4 h-4" />,
+  },
+  FLOOD: {
+    label: "Baha",
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/20 border-cyan-500/40",
+    icon: <Waves className="w-4 h-4" />,
+  },
+  VIOLENCE: {
+    label: "Karahasan",
+    color: "text-red-500",
+    bg: "bg-red-600/20 border-red-600/40",
+    icon: <Shield className="w-4 h-4" />,
+  },
+  OTHER: {
+    label: "Iba pa",
+    color: "text-white/70",
+    bg: "bg-white/10 border-white/20",
+    icon: <AlertTriangle className="w-4 h-4" />,
+  },
 };
 
 const STATUS_MESSAGES: Record<AgentStatus, string> = {
-  idle:         "Pindutin para magsalita",
-  listening:    "Magsalita na... (Tagalog/English)",
+  idle: "Pindutin para magsalita",
+  listening: "Magsalita na... (Tagalog/English)",
   transcribing: "Narinig...",
-  analyzing:    "Sinusuri ng AI...",
-  done:         "Naproseso!",
-  error:        "May error",
+  analyzing: "Sinusuri ng AI...",
+  done: "Naproseso!",
+  error: "May error",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -55,7 +114,7 @@ interface VoiceSOSButtonProps {
 export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
   const [status, setStatus] = useState<AgentStatus>("idle");
   const [statusDetail, setStatusDetail] = useState("");
-  const [payload, setPayload]   = useState<SOSPayload | null>(null);
+  const [payload, setPayload] = useState<SOSPayload | null>(null);
   const [modelReady, setModelReady] = useState(false);
   const [modelPct, setModelPct] = useState(0);
   const isListening = status === "listening";
@@ -79,12 +138,10 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
     setPayload(null);
     setStatus("idle");
 
-    const result = await voiceSOSAgent.startListening(
-      (s, detail) => {
-        setStatus(s);
-        if (detail) setStatusDetail(detail);
-      }
-    );
+    const result = await voiceSOSAgent.startListening((s, detail) => {
+      setStatus(s);
+      if (detail) setStatusDetail(detail);
+    });
 
     if (result) {
       setPayload(result);
@@ -113,15 +170,18 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
 
   return (
     <div className="mt-6 space-y-3">
-
       {/* ── Model loading indicator ── */}
       {!modelReady && modelPct > 0 && modelPct < 100 && (
         <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
           <Cloud className="w-4 h-4 text-cyan-400/70 shrink-0" />
           <div className="flex-1">
             <div className="flex justify-between mb-1">
-              <span className="text-[10px] font-mono text-white/40 tracking-widest uppercase">AI Model Loading</span>
-              <span className="text-[10px] font-mono text-cyan-400/70">{modelPct}%</span>
+              <span className="text-[10px] font-mono text-white/40 tracking-widest uppercase">
+                AI Model Loading
+              </span>
+              <span className="text-[10px] font-mono text-cyan-400/70">
+                {modelPct}%
+              </span>
             </div>
             <div className="h-1 bg-white/10 rounded-full overflow-hidden">
               <motion.div
@@ -145,13 +205,14 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
             relative w-full flex items-center justify-center gap-3 
             px-6 py-4 rounded-2xl border font-black tracking-widest text-sm uppercase
             transition-all duration-300 overflow-hidden
-            ${isListening
-              ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
-              : isProcessing
-              ? "bg-cyan-500/10 border-cyan-400/40 text-cyan-300 cursor-wait"
-              : isError
-              ? "bg-red-500/10 border-red-400/40 text-red-300"
-              : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30"
+            ${
+              isListening
+                ? "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
+                : isProcessing
+                ? "bg-cyan-500/10 border-cyan-400/40 text-cyan-300 cursor-wait"
+                : isError
+                ? "bg-red-500/10 border-red-400/40 text-red-300"
+                : "bg-white/5 border-white/20 text-white/80 hover:bg-white/10 hover:border-white/30"
             }
           `}
         >
@@ -212,7 +273,11 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className={`text-[11px] font-mono text-center tracking-wider ${
-                isError ? "text-red-400" : isListening ? "text-emerald-400" : "text-white/40"
+                isError
+                  ? "text-red-400"
+                  : isListening
+                  ? "text-emerald-400"
+                  : "text-white/40"
               }`}
             >
               {statusDetail || STATUS_MESSAGES[status]}
@@ -233,7 +298,9 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between">
-              <div className={`flex items-center gap-2 font-black text-sm tracking-widest uppercase ${typeConf.color}`}>
+              <div
+                className={`flex items-center gap-2 font-black text-sm tracking-widest uppercase ${typeConf.color}`}
+              >
                 {typeConf.icon}
                 {typeConf.label}
               </div>
@@ -247,13 +314,15 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
                     Regex fallback
                   </span>
                 )}
-                <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
-                  payload.severity >= 8
-                    ? "text-red-400 bg-red-500/10 border-red-500/20"
-                    : payload.severity >= 5
-                    ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
-                    : "text-white/40 bg-white/5 border-white/10"
-                }`}>
+                <span
+                  className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                    payload.severity >= 8
+                      ? "text-red-400 bg-red-500/10 border-red-500/20"
+                      : payload.severity >= 5
+                      ? "text-orange-400 bg-orange-500/10 border-orange-500/20"
+                      : "text-white/40 bg-white/5 border-white/10"
+                  }`}
+                >
                   Severity {payload.severity}/10
                 </span>
               </div>
@@ -261,13 +330,19 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
 
             {/* Transcript */}
             <div className="px-3 py-2 bg-black/30 rounded-xl border border-white/5">
-              <p className="text-[10px] font-mono text-white/40 mb-1 uppercase tracking-widest">Sinabi mo:</p>
-              <p className="text-xs text-white/70 italic">"{payload.transcript}"</p>
+              <p className="text-[10px] font-mono text-white/40 mb-1 uppercase tracking-widest">
+                Sinabi mo:
+              </p>
+              <p className="text-xs text-white/70 italic">
+                "{payload.transcript}"
+              </p>
             </div>
 
             {/* Parsed description */}
             <div>
-              <p className="text-[10px] font-mono text-white/40 mb-1 uppercase tracking-widest">Para sa admin:</p>
+              <p className="text-[10px] font-mono text-white/40 mb-1 uppercase tracking-widest">
+                Para sa admin:
+              </p>
               <p className="text-xs text-white/80">{payload.description}</p>
               {payload.locationHint && (
                 <p className="text-[11px] text-white/50 mt-1">

@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
-import { Download, CheckCircle, Trash2, AlertTriangle, HardDrive } from 'lucide-react';
-import { motion } from 'motion/react';
-import { toast } from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import {
+  Download,
+  CheckCircle,
+  Trash2,
+  AlertTriangle,
+  HardDrive,
+} from "lucide-react";
+import { motion } from "motion/react";
+import { toast } from "react-hot-toast";
 
-const CACHE_NAME = 'supertonic-models-v1';
+const CACHE_NAME = "supertonic-models-v1";
 const MODEL_FILES = [
-  '/models/supertonic/model.onnx',
+  "/models/supertonic/model.onnx",
   // In reality, this would include the tokenizer config, vocabulary JSONs, etc.
 ];
 const ESTIMATED_SIZE_MB = 350;
@@ -14,7 +20,10 @@ export function OfflineVoiceManager() {
   const [isCached, setIsCached] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [storageInfo, setStorageInfo] = useState<{ quota: number; usage: number } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<{
+    quota: number;
+    usage: number;
+  } | null>(null);
 
   useEffect(() => {
     checkCache();
@@ -37,15 +46,15 @@ export function OfflineVoiceManager() {
       const estimate = await navigator.storage.estimate();
       setStorageInfo({
         usage: (estimate.usage || 0) / (1024 * 1024),
-        quota: (estimate.quota || 0) / (1024 * 1024)
+        quota: (estimate.quota || 0) / (1024 * 1024),
       });
     }
   };
 
   const handleDownload = async () => {
     // Memory/Device capability guard
-    if ('deviceMemory' in navigator && (navigator as any).deviceMemory < 2) {
-      toast.error('Device memory is too low (< 2GB) to run offline AI safely.');
+    if ("deviceMemory" in navigator && (navigator as any).deviceMemory < 2) {
+      toast.error("Device memory is too low (< 2GB) to run offline AI safely.");
       return;
     }
 
@@ -54,10 +63,10 @@ export function OfflineVoiceManager() {
     try {
       const cache = await caches.open(CACHE_NAME);
       let loaded = 0;
-      
+
       // Simulate progress for UI, in reality you'd track fetch progress or just wait
       const interval = setInterval(() => {
-        setProgress(p => Math.min(p + 10, 90));
+        setProgress((p) => Math.min(p + 10, 90));
       }, 500);
 
       await Promise.all(
@@ -69,26 +78,37 @@ export function OfflineVoiceManager() {
             }
             await cache.put(url, response);
           } catch (fetchErr) {
-            console.warn(`[OfflineVoicePack] Managed cache load for ${url}: Placing simulated sandbox placeholder instead of triggering 404.`, fetchErr);
-            const dummyBlob = new Blob([JSON.stringify({ simulated: true, description: "Sandbox Offline Voice Model Placeholder" })], { type: 'application/json' });
+            console.warn(
+              `[OfflineVoicePack] Managed cache load for ${url}: Placing simulated sandbox placeholder instead of triggering 404.`,
+              fetchErr
+            );
+            const dummyBlob = new Blob(
+              [
+                JSON.stringify({
+                  simulated: true,
+                  description: "Sandbox Offline Voice Model Placeholder",
+                }),
+              ],
+              { type: "application/json" }
+            );
             const dummyResponse = new Response(dummyBlob, {
               status: 200,
-              statusText: 'OK',
-              headers: { 'Content-Type': 'application/json' }
+              statusText: "OK",
+              headers: { "Content-Type": "application/json" },
             });
             await cache.put(url, dummyResponse);
           }
         })
       );
-      
+
       clearInterval(interval);
       setProgress(100);
       setIsCached(true);
-      toast.success('Offline Voice Pack downloaded successfully!');
+      toast.success("Offline Voice Pack downloaded successfully!");
       checkStorage();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to download voice pack. Check connection.');
+      toast.error("Failed to download voice pack. Check connection.");
     } finally {
       setDownloading(false);
       setTimeout(() => setProgress(0), 1000);
@@ -99,7 +119,7 @@ export function OfflineVoiceManager() {
     await caches.delete(CACHE_NAME);
     setIsCached(false);
     checkStorage();
-    toast.success('Offline Voice Pack removed.');
+    toast.success("Offline Voice Pack removed.");
   };
 
   return (
@@ -111,7 +131,8 @@ export function OfflineVoiceManager() {
             Offline Voice Pack
           </h3>
           <p className="text-xs text-text-muted mt-1 leading-relaxed max-w-sm">
-            Download AI models to allow the Guardian app to speak even without an internet connection. Required for field offline use.
+            Download AI models to allow the Guardian app to speak even without
+            an internet connection. Required for field offline use.
           </p>
         </div>
         {isCached ? (
@@ -134,8 +155,15 @@ export function OfflineVoiceManager() {
           {storageInfo && (
             <div>
               <span className="block text-[#5a7080]">Free Space</span>
-              <span className={storageInfo.quota - storageInfo.usage < 1000 ? 'text-danger' : 'text-success'}>
-                {Math.max(0, Math.floor(storageInfo.quota - storageInfo.usage))} MB
+              <span
+                className={
+                  storageInfo.quota - storageInfo.usage < 1000
+                    ? "text-danger"
+                    : "text-success"
+                }
+              >
+                {Math.max(0, Math.floor(storageInfo.quota - storageInfo.usage))}{" "}
+                MB
               </span>
             </div>
           )}
@@ -144,14 +172,14 @@ export function OfflineVoiceManager() {
 
       <div className="flex flex-col gap-2">
         {isCached ? (
-          <button 
+          <button
             onClick={handleDelete}
             className="w-full py-2 flex items-center justify-center gap-2 text-danger hover:bg-danger/10 border border-danger/20 rounded-lg text-sm transition-colors uppercase font-bold"
           >
             <Trash2 className="w-4 h-4" /> Remove Voice Pack
           </button>
         ) : (
-          <button 
+          <button
             onClick={handleDownload}
             disabled={downloading}
             className="w-full relative overflow-hidden bg-accent text-black font-bold uppercase text-sm py-2 px-4 rounded-lg hover:bg-[#00e5ff] transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
@@ -162,25 +190,30 @@ export function OfflineVoiceManager() {
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" /> Download 
+                <Download className="w-4 h-4" /> Download
               </span>
             )}
             {downloading && (
-                <div 
-                  className="absolute bottom-0 left-0 h-1 bg-black/30 transition-all duration-300" 
-                  style={{ width: `${progress}%` }}
-                />
+              <div
+                className="absolute bottom-0 left-0 h-1 bg-black/30 transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
             )}
           </button>
         )}
       </div>
 
-      {(!isCached && storageInfo && (storageInfo.quota - storageInfo.usage) < 500) && (
-        <div className="flex items-start gap-2 text-warning bg-warning/10 p-3 rounded-lg border border-warning/20">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-          <p className="text-xs">Your device might not have enough free storage. Ensure you have at least 1GB free before downloading.</p>
-        </div>
-      )}
+      {!isCached &&
+        storageInfo &&
+        storageInfo.quota - storageInfo.usage < 500 && (
+          <div className="flex items-start gap-2 text-warning bg-warning/10 p-3 rounded-lg border border-warning/20">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p className="text-xs">
+              Your device might not have enough free storage. Ensure you have at
+              least 1GB free before downloading.
+            </p>
+          </div>
+        )}
     </div>
   );
 }

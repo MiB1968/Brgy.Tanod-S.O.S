@@ -1,0 +1,5 @@
+# Add this block to .gitignore
+# (or run: echo "firebase-applet-config.json" >> .gitignore)
+
+# Firebase live config — values live in env vars, not the repo
+firebase-applet-config.json

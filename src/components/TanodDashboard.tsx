@@ -2,18 +2,18 @@ import { useState, useEffect } from "react";
 import * as api from "../lib/api";
 import socket from "../lib/socket";
 import { Alert, User, SystemBroadcast, RegistryStatus } from "../types";
-import { 
-  Shield, 
-  Map as MapIcon, 
-  Activity, 
-  Calendar, 
-  Cpu, 
-  Settings as SettingsIcon, 
-  PhoneCall, 
+import {
+  Shield,
+  Map as MapIcon,
+  Activity,
+  Calendar,
+  Cpu,
+  Settings as SettingsIcon,
+  PhoneCall,
   AlertOctagon,
   Eye,
-  Grid
-} from 'lucide-react';
+  Grid,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import toast from "react-hot-toast";
 import LiveMap from "../LiveMap";
@@ -65,27 +65,31 @@ export default function TanodDashboard({
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isReportFormOpen, setIsReportFormOpen] = useState(false);
 
-  const { isInstallable, installPWA, requestWakeLock, releaseWakeLock } = usePWA();
+  const { isInstallable, installPWA, requestWakeLock, releaseWakeLock } =
+    usePWA();
 
   useEffect(() => {
     if (!profile) return;
-    
+
     // Subscribe to push notifications if using PWA or mobile
-    if ('Notification' in window && Notification.permission !== 'denied') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
+    if ("Notification" in window && Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
           subscribeToTanodTopic(profile.id);
         }
       });
     }
 
     const hasActive = alerts.some((a) =>
-      ["pending", "active"].includes(a.status?.toLowerCase() || ""),
+      ["pending", "active"].includes(a.status?.toLowerCase() || "")
     );
     setIsFlashing(hasActive || sirenActive);
   }, [alerts, profile, sirenActive]);
 
-  const isOnDuty = profile?.status === "On Patrol" || profile?.status === "Responding" || profile?.status === "Available";
+  const isOnDuty =
+    profile?.status === "On Patrol" ||
+    profile?.status === "Responding" ||
+    profile?.status === "Available";
 
   useEffect(() => {
     if (isOnDuty) {
@@ -123,7 +127,7 @@ export default function TanodDashboard({
         } catch (incidentError) {
           console.warn(
             "Failed to create incident log, but continuing to resolve SOS",
-            incidentError,
+            incidentError
           );
         }
       }
@@ -161,7 +165,9 @@ export default function TanodDashboard({
       <div className="flex items-center justify-center min-h-screen p-8 text-zinc-400 bg-tactical-dark">
         <div className="text-center">
           <div className="animate-pulse w-12 h-12 border-2 border-tactical-cyan/20 rounded-full mx-auto mb-4" />
-          <p className="text-[10px] font-mono uppercase tracking-widest text-tactical-cyan">Synchronizing Responder Uplink...</p>
+          <p className="text-[10px] font-mono uppercase tracking-widest text-tactical-cyan">
+            Synchronizing Responder Uplink...
+          </p>
         </div>
       </div>
     );
@@ -225,7 +231,9 @@ export default function TanodDashboard({
               <div className="absolute top-0 right-0 w-64 h-64 bg-tactical-cyan/5 blur-[80px] rounded-full pointer-events-none" />
               <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
                 <div>
-                  <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">PATROL_HUD_MATRIX</span>
+                  <span className="text-[8px] font-black tracking-widest text-tactical-cyan font-mono uppercase">
+                    PATROL_HUD_MATRIX
+                  </span>
                   <h3 className="text-sm font-black uppercase tracking-wider font-display text-white mt-0.5 flex items-center gap-1.5">
                     <Grid className="w-4 h-4 text-tactical-cyan animate-pulse" />
                     TACTICAL RESPONDER GRID
@@ -235,14 +243,70 @@ export default function TanodDashboard({
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
                 {[
-                  { id: "map", label: "Intel Livemap", icon: MapIcon, desc: "Community Grid", color: "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40" },
-                  { id: "tracker", label: "Tactical Tracker", icon: Activity, desc: "GPS Live Units", color: "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40" },
-                  { id: "roster", label: "Tanod Units", icon: Shield, desc: "Active Forces", color: "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/40" },
-                  { id: "schedule", label: "Shift Schedule", icon: Calendar, desc: "Planning", color: "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40" },
-                  { id: "reports", label: "Threat Feeds", icon: AlertOctagon, desc: "Broadcasts", color: "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/40" },
-                  { id: "directory", label: "Hotlines", icon: PhoneCall, desc: "Channels", color: "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40" },
-                  { id: "guardian", label: "Guardian AI", icon: Cpu, desc: "Sound analysis", color: "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40" },
-                  { id: "settings", label: "Profile", icon: SettingsIcon, desc: "Configs", color: "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40" }
+                  {
+                    id: "map",
+                    label: "Intel Livemap",
+                    icon: MapIcon,
+                    desc: "Community Grid",
+                    color:
+                      "text-tactical-cyan border-tactical-cyan/10 hover:bg-tactical-cyan/5 hover:border-tactical-cyan/40",
+                  },
+                  {
+                    id: "tracker",
+                    label: "Tactical Tracker",
+                    icon: Activity,
+                    desc: "GPS Live Units",
+                    color:
+                      "text-emerald-400 border-emerald-400/10 hover:bg-emerald-400/5 hover:border-emerald-400/40",
+                  },
+                  {
+                    id: "roster",
+                    label: "Tanod Units",
+                    icon: Shield,
+                    desc: "Active Forces",
+                    color:
+                      "text-blue-400 border-blue-400/10 hover:bg-blue-400/5 hover:border-blue-400/40",
+                  },
+                  {
+                    id: "schedule",
+                    label: "Shift Schedule",
+                    icon: Calendar,
+                    desc: "Planning",
+                    color:
+                      "text-indigo-400 border-indigo-400/10 hover:bg-indigo-400/5 hover:border-indigo-400/40",
+                  },
+                  {
+                    id: "reports",
+                    label: "Threat Feeds",
+                    icon: AlertOctagon,
+                    desc: "Broadcasts",
+                    color:
+                      "text-tactical-red border-tactical-red/10 hover:bg-tactical-red/5 hover:border-tactical-red/40",
+                  },
+                  {
+                    id: "directory",
+                    label: "Hotlines",
+                    icon: PhoneCall,
+                    desc: "Channels",
+                    color:
+                      "text-rose-400 border-rose-400/10 hover:bg-rose-400/5 hover:border-rose-400/40",
+                  },
+                  {
+                    id: "guardian",
+                    label: "Guardian AI",
+                    icon: Cpu,
+                    desc: "Sound analysis",
+                    color:
+                      "text-fuchsia-400 border-fuchsia-400/10 hover:bg-fuchsia-400/5 hover:border-fuchsia-400/40",
+                  },
+                  {
+                    id: "settings",
+                    label: "Profile",
+                    icon: SettingsIcon,
+                    desc: "Configs",
+                    color:
+                      "text-slate-400 border-slate-400/10 hover:bg-slate-400/5 hover:border-slate-400/40",
+                  },
                 ].map((mod) => {
                   const Icon = mod.icon;
                   return (
@@ -256,7 +320,9 @@ export default function TanodDashboard({
                           <Icon className="w-4 h-4 text-white/70 group-hover:text-white" />
                         </div>
                       </div>
-                      <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">{mod.label}</h4>
+                      <h4 className="text-[10px] font-black uppercase font-mono tracking-wider italic text-white/90 leading-tight group-hover:text-white transition-colors">
+                        {mod.label}
+                      </h4>
                     </button>
                   );
                 })}
@@ -274,7 +340,11 @@ export default function TanodDashboard({
                   ACTIVE_PATROL
                 </span>
                 <span className="text-xl font-black text-tactical-cyan font-mono">
-                  {patrols.filter((p) => p.isActive && p.status === "patrolling").length}
+                  {
+                    patrols.filter(
+                      (p) => p.isActive && p.status === "patrolling"
+                    ).length
+                  }
                 </span>
               </div>
               <div className="flex justify-between items-center p-4 bg-tactical-dark rounded-2xl border border-tactical-cyan/20">
@@ -282,7 +352,11 @@ export default function TanodDashboard({
                   ACTIVE_RESPONSE
                 </span>
                 <span className="text-xl font-black text-tactical-red font-mono">
-                  {patrols.filter((p) => p.isActive && p.status === "responding").length}
+                  {
+                    patrols.filter(
+                      (p) => p.isActive && p.status === "responding"
+                    ).length
+                  }
                 </span>
               </div>
             </div>
@@ -302,7 +376,9 @@ export default function TanodDashboard({
           <IncidentForm
             userRole={profile.role}
             onClose={() => setIsReportFormOpen(false)}
-            onSubmit={(data) => { console.log(data); }}
+            onSubmit={(data) => {
+              console.log(data);
+            }}
           />
         )}
       </AnimatePresence>

@@ -1,18 +1,28 @@
 // src/components/views/RoleBasedContent.tsx
 import React, { lazy, Suspense } from "react";
 import { useTanodStore } from "../../store/useTanodStore";
-import LiveMap from '../LiveMap';
-import AboutModal from '../AboutModal';
-import { CitizenReportTracker } from '../CitizenReportTracker';
+import LiveMap from "../LiveMap";
+import AboutModal from "../AboutModal";
+import { CitizenReportTracker } from "../CitizenReportTracker";
 import { UserRole, PatrolLocation } from "../../types";
 
-const AdminDashboard = lazy(() => import("../AdminDashboard").then(m => ({ default: m.default })));
-const TanodDashboard = lazy(() => import("../TanodDashboard").then(m => ({ default: m.default })));
-const ResidentDashboard = lazy(() => import("../ResidentDashboard").then(m => ({ default: m.default })));
+const AdminDashboard = lazy(() =>
+  import("../AdminDashboard").then((m) => ({ default: m.default }))
+);
+const TanodDashboard = lazy(() =>
+  import("../TanodDashboard").then((m) => ({ default: m.default }))
+);
+const ResidentDashboard = lazy(() =>
+  import("../ResidentDashboard").then((m) => ({ default: m.default }))
+);
 
 // Dynamic sub-views for sidebar navigation tabs
 const AdminResidents = lazy(() => import("../AdminResidents"));
-const ResidentVerification = lazy(() => import("../Admin/ResidentVerification").then(m => ({ default: m.ResidentVerification })));
+const ResidentVerification = lazy(() =>
+  import("../Admin/ResidentVerification").then((m) => ({
+    default: m.ResidentVerification,
+  }))
+);
 const ResidentTacticalMap = lazy(() => import("../Admin/ResidentTacticalMap"));
 const CreateUserForm = lazy(() => import("../Admin/CreateUserForm"));
 const AdminUsersDashboard = lazy(() => import("../Admin/AdminUsersDashboard"));
@@ -24,7 +34,11 @@ const DirectoryView = lazy(() => import("../DirectoryView"));
 const GuardianAIChat = lazy(() => import("../GuardianAIChat"));
 const SettingsView = lazy(() => import("../SettingsView"));
 const OpsIntegrations = lazy(() => import("../Admin/OpsIntegrations"));
-const TanodActivityLogs = lazy(() => import("../Admin/TanodActivityLogs").then(m => ({ default: m.TanodActivityLogs })));
+const TanodActivityLogs = lazy(() =>
+  import("../Admin/TanodActivityLogs").then((m) => ({
+    default: m.TanodActivityLogs,
+  }))
+);
 const SavedAreasManager = lazy(() => import("../SavedAreasManager"));
 
 interface Props {
@@ -81,15 +95,19 @@ export function RoleBasedContent({
       case "areas":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Offline Cache Index</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Offline Cache Index
+            </h1>
             <SavedAreasManager />
           </div>
         );
-      
+
       case "logs":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Detailed Tanod Activity Logs</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Detailed Tanod Activity Logs
+            </h1>
             <TanodActivityLogs />
           </div>
         );
@@ -97,8 +115,10 @@ export function RoleBasedContent({
       case "tracker":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Tactical GPS Tracker</h1>
-            {effectiveRole === 'resident' ? (
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Tactical GPS Tracker
+            </h1>
+            {effectiveRole === "resident" ? (
               <CitizenReportTracker userId={effectiveProfile?.id || ""} />
             ) : (
               <div className="h-[600px] rounded-[32px] overflow-hidden border border-white/5 relative">
@@ -111,7 +131,9 @@ export function RoleBasedContent({
       case "residents":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Community Residents</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Community Residents
+            </h1>
             <AdminResidents profile={effectiveProfile} />
           </div>
         );
@@ -126,7 +148,9 @@ export function RoleBasedContent({
       case "resident-map":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Resident Tactical Map</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Resident Tactical Map
+            </h1>
             <div className="h-[600px] rounded-[32px] overflow-hidden border border-white/5 relative">
               <ResidentTacticalMap profile={effectiveProfile} />
             </div>
@@ -136,7 +160,9 @@ export function RoleBasedContent({
       case "roster":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Tanod Units Roster</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Tanod Units Roster
+            </h1>
             <TanodRosterView />
           </div>
         );
@@ -144,15 +170,22 @@ export function RoleBasedContent({
       case "schedule":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Patrol Schedule</h1>
-            <ScheduleView role={effectiveRole as UserRole} profile={effectiveProfile} />
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Patrol Schedule
+            </h1>
+            <ScheduleView
+              role={effectiveRole as UserRole}
+              profile={effectiveProfile}
+            />
           </div>
         );
 
       case "reports":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">SOS Threat Reports</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              SOS Threat Reports
+            </h1>
             <ReportsView />
           </div>
         );
@@ -160,7 +193,9 @@ export function RoleBasedContent({
       case "records":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Workspace Documents</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Workspace Documents
+            </h1>
             <DigitalRecordsView />
           </div>
         );
@@ -168,7 +203,9 @@ export function RoleBasedContent({
       case "directory":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Emergency Directory</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Emergency Directory
+            </h1>
             <DirectoryView />
           </div>
         );
@@ -176,7 +213,9 @@ export function RoleBasedContent({
       case "guardian":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Guardian AI Operations</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Guardian AI Operations
+            </h1>
             <div className="max-w-4xl mx-auto">
               <GuardianAIChat isInline={true} />
             </div>
@@ -186,15 +225,22 @@ export function RoleBasedContent({
       case "settings":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Config Dashboard</h1>
-            <SettingsView profile={effectiveProfile} role={effectiveRole as UserRole} />
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Config Dashboard
+            </h1>
+            <SettingsView
+              profile={effectiveProfile}
+              role={effectiveRole as UserRole}
+            />
           </div>
         );
 
       case "ops":
         return (
           <div className="p-4 md:p-8 space-y-6">
-            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">Operations Integrations</h1>
+            <h1 className="text-3xl font-black italic tracking-tight font-display mb-8">
+              Operations Integrations
+            </h1>
             <OpsIntegrations />
           </div>
         );
@@ -242,15 +288,14 @@ export function RoleBasedContent({
             />
           );
         } else {
-          return <div className="p-8 text-center text-red-400">Unknown role: {effectiveRole}</div>;
+          return (
+            <div className="p-8 text-center text-red-400">
+              Unknown role: {effectiveRole}
+            </div>
+          );
         }
     }
   };
 
-  return (
-    <Suspense fallback={loadingFallback}>
-      {renderTabContent()}
-    </Suspense>
-  );
+  return <Suspense fallback={loadingFallback}>{renderTabContent()}</Suspense>;
 }
-

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, BookOpen, ChevronRight, Loader2 } from 'lucide-react';
-import { guardianAI } from '../../services/guardianAIService';
-import { isWebLLMReady } from '../../lib/webllm';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ShieldAlert, BookOpen, ChevronRight, Loader2 } from "lucide-react";
+import { guardianAI } from "../../services/guardianAIService";
+import { isWebLLMReady } from "../../lib/webllm";
 
 interface SOSGuidanceProps {
   type: string;
@@ -17,11 +17,29 @@ export const SOSGuidance: React.FC<SOSGuidanceProps> = ({ type }) => {
       if (!isWebLLMReady()) {
         // Basic fallback
         const basics = {
-          FIRE: ['Lisanin agad ang gusali.', 'Tumawag sa 911.', 'Huwag gumamit ng elevator.'],
-          MEDICAL: ['Tingnan kung humihinga ang biktima.', 'Huwag galawin kung may tama sa leeg.', 'Tumawag sa ambulansya.'],
-          CRIME: ['Pumunta sa ligtas na lugar.', 'Huwag lumaban kung may sandata.', 'Tandaan ang itsura ng salarin.'],
+          FIRE: [
+            "Lisanin agad ang gusali.",
+            "Tumawag sa 911.",
+            "Huwag gumamit ng elevator.",
+          ],
+          MEDICAL: [
+            "Tingnan kung humihinga ang biktima.",
+            "Huwag galawin kung may tama sa leeg.",
+            "Tumawag sa ambulansya.",
+          ],
+          CRIME: [
+            "Pumunta sa ligtas na lugar.",
+            "Huwag lumaban kung may sandata.",
+            "Tandaan ang itsura ng salarin.",
+          ],
         };
-        setSteps(basics[type as keyof typeof basics] || ['Manatiling kalmado.', 'Hintayin ang pagdating ng Tanod.', 'Humingi ng tulong sa kapitbahay.']);
+        setSteps(
+          basics[type as keyof typeof basics] || [
+            "Manatiling kalmado.",
+            "Hintayin ang pagdating ng Tanod.",
+            "Humingi ng tulong sa kapitbahay.",
+          ]
+        );
         setLoading(false);
         return;
       }
@@ -29,8 +47,11 @@ export const SOSGuidance: React.FC<SOSGuidanceProps> = ({ type }) => {
       setLoading(true);
       try {
         const raw = await guardianAI.generateFirstAid(type);
-        const split = raw.split('\n').filter(s => s.trim().length > 3).map(s => s.replace(/^\d+[.)\s]*/, '').trim());
-        setSteps(split.length > 0 ? split : ['Manatiling kalmado.']);
+        const split = raw
+          .split("\n")
+          .filter((s) => s.trim().length > 3)
+          .map((s) => s.replace(/^\d+[.)\s]*/, "").trim());
+        setSteps(split.length > 0 ? split : ["Manatiling kalmado."]);
       } catch (e) {
         console.error("Guidance error:", e);
       } finally {
@@ -60,7 +81,7 @@ export const SOSGuidance: React.FC<SOSGuidanceProps> = ({ type }) => {
       ) : (
         <div className="space-y-3">
           {steps.map((step, i) => (
-            <motion.div 
+            <motion.div
               key={i}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -68,7 +89,10 @@ export const SOSGuidance: React.FC<SOSGuidanceProps> = ({ type }) => {
               className="flex items-start gap-3 group"
             >
               <div className="mt-1 flex-shrink-0">
-                <ChevronRight size={14} className="text-cyan-500 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight
+                  size={14}
+                  className="text-cyan-500 group-hover:translate-x-1 transition-transform"
+                />
               </div>
               <p className="text-xs text-white/80 font-medium font-mono italic leading-relaxed">
                 {step}

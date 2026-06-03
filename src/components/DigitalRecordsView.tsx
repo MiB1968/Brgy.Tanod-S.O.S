@@ -1,14 +1,30 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { FileText, ClipboardList, Plus, ExternalLink, Loader2, CheckCircle2, HardDrive, FolderPlus } from 'lucide-react';
-import { docsService, formsService, driveService } from '../services/googleWorkspaceService';
-import { toast } from 'react-hot-toast';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  FileText,
+  ClipboardList,
+  Plus,
+  ExternalLink,
+  Loader2,
+  CheckCircle2,
+  HardDrive,
+  FolderPlus,
+} from "lucide-react";
+import {
+  docsService,
+  formsService,
+  driveService,
+} from "../services/googleWorkspaceService";
+import { toast } from "react-hot-toast";
 
 const DigitalRecordsView: React.FC = () => {
   const [isCreatingDoc, setIsCreatingDoc] = useState(false);
   const [isCreatingForm, setIsCreatingForm] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [lastCreated, setLastCreated] = useState<{ type: 'doc' | 'form' | 'folder', url: string } | null>(null);
+  const [lastCreated, setLastCreated] = useState<{
+    type: "doc" | "form" | "folder";
+    url: string;
+  } | null>(null);
 
   const handleCreateIncidentReport = async () => {
     setIsCreatingDoc(true);
@@ -17,13 +33,13 @@ const DigitalRecordsView: React.FC = () => {
       const result = await docsService.createDocument(title);
       if (result.documentId) {
         const url = `https://docs.google.com/document/d/${result.documentId}/edit`;
-        setLastCreated({ type: 'doc', url });
-        toast.success('Incident Report Document Created!', { icon: '📄' });
+        setLastCreated({ type: "doc", url });
+        toast.success("Incident Report Document Created!", { icon: "📄" });
       } else {
-        throw new Error('Failed to retrieve Document ID');
+        throw new Error("Failed to retrieve Document ID");
       }
     } catch (error: any) {
-      console.error('Error creating doc:', error);
+      console.error("Error creating doc:", error);
       toast.error(`Verification Failed: ${error.message}`);
     } finally {
       setIsCreatingDoc(false);
@@ -37,13 +53,13 @@ const DigitalRecordsView: React.FC = () => {
       const result = await formsService.createForm(title);
       if (result.formId) {
         const url = `https://docs.google.com/forms/d/${result.formId}/edit`;
-        setLastCreated({ type: 'form', url });
-        toast.success('Clearance Request Form Created!', { icon: '📝' });
+        setLastCreated({ type: "form", url });
+        toast.success("Clearance Request Form Created!", { icon: "📝" });
       } else {
-        throw new Error('Failed to retrieve Form ID');
+        throw new Error("Failed to retrieve Form ID");
       }
     } catch (error: any) {
-      console.error('Error creating form:', error);
+      console.error("Error creating form:", error);
       toast.error(`Auth Error: ${error.message}`);
     } finally {
       setIsCreatingForm(false);
@@ -53,18 +69,33 @@ const DigitalRecordsView: React.FC = () => {
   const handleCreateArchiveFolder = async () => {
     setIsCreatingFolder(true);
     try {
-      const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-      const folderName = `SOS_ARCHIVE_${months[new Date().getMonth()]}_${new Date().getFullYear()}`;
+      const months = [
+        "JAN",
+        "FEB",
+        "MAR",
+        "APR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AUG",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DEC",
+      ];
+      const folderName = `SOS_ARCHIVE_${
+        months[new Date().getMonth()]
+      }_${new Date().getFullYear()}`;
       const result = await driveService.createFolder(folderName);
       if (result.id) {
         const url = `https://drive.google.com/drive/folders/${result.id}`;
-        setLastCreated({ type: 'folder', url });
-        toast.success('Evidence Archive Folder Created!', { icon: '📁' });
+        setLastCreated({ type: "folder", url });
+        toast.success("Evidence Archive Folder Created!", { icon: "📁" });
       } else {
-        throw new Error('Failed to create Folder');
+        throw new Error("Failed to create Folder");
       }
     } catch (error: any) {
-      console.error('Error creating folder:', error);
+      console.error("Error creating folder:", error);
       toast.error(`Drive Error: ${error.message}`);
     } finally {
       setIsCreatingFolder(false);
@@ -79,13 +110,14 @@ const DigitalRecordsView: React.FC = () => {
           DIGITAL COMMAND RECORDS
         </h1>
         <p className="text-white/50 font-mono text-xs mt-2 uppercase tracking-widest">
-          Generate official Barangay documentation using Google Workspace integration.
+          Generate official Barangay documentation using Google Workspace
+          integration.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Google Drive Card */}
-        <motion.div 
+        <motion.div
           whileHover={{ y: -5 }}
           className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 relative overflow-hidden"
         >
@@ -97,7 +129,9 @@ const DigitalRecordsView: React.FC = () => {
             Evidence Archive
           </h2>
           <p className="text-white/40 text-sm mb-6 leading-relaxed">
-            Provision a dedicated Google Drive folder for the current operational cycle. Use this to organize incident photos and video evidence.
+            Provision a dedicated Google Drive folder for the current
+            operational cycle. Use this to organize incident photos and video
+            evidence.
           </p>
           <button
             onClick={handleCreateArchiveFolder}
@@ -114,7 +148,7 @@ const DigitalRecordsView: React.FC = () => {
         </motion.div>
 
         {/* Google Docs Card */}
-        <motion.div 
+        <motion.div
           whileHover={{ y: -5 }}
           className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 relative overflow-hidden"
         >
@@ -126,7 +160,8 @@ const DigitalRecordsView: React.FC = () => {
             Incident Reports
           </h2>
           <p className="text-white/40 text-sm mb-6 leading-relaxed">
-            Generate a secure Google Doc for detailed incident logging, evidence compilation, and official archiving.
+            Generate a secure Google Doc for detailed incident logging, evidence
+            compilation, and official archiving.
           </p>
           <button
             onClick={handleCreateIncidentReport}
@@ -143,7 +178,7 @@ const DigitalRecordsView: React.FC = () => {
         </motion.div>
 
         {/* Google Forms Card */}
-        <motion.div 
+        <motion.div
           whileHover={{ y: -5 }}
           className="bg-zinc-900/50 border border-white/10 rounded-2xl p-6 relative overflow-hidden"
         >
@@ -155,7 +190,8 @@ const DigitalRecordsView: React.FC = () => {
             Resident Forms
           </h2>
           <p className="text-white/40 text-sm mb-6 leading-relaxed">
-            Deploy Google Forms for Barangay Clearance requests, mapping surveys, or community feedback collection.
+            Deploy Google Forms for Barangay Clearance requests, mapping
+            surveys, or community feedback collection.
           </p>
           <button
             onClick={handleCreateClearanceForm}
@@ -173,7 +209,7 @@ const DigitalRecordsView: React.FC = () => {
       </div>
 
       {lastCreated && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mt-8 bg-success/10 border border-success/20 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4"
@@ -183,11 +219,21 @@ const DigitalRecordsView: React.FC = () => {
               <CheckCircle2 className="text-success" />
             </div>
             <div>
-              <p className="text-white font-bold uppercase tracking-tight">Resource Created Successfully</p>
-              <p className="text-white/50 text-xs font-mono">Your {lastCreated.type === 'doc' ? 'Google Doc' : lastCreated.type === 'form' ? 'Google Form' : 'Drive Folder'} is ready.</p>
+              <p className="text-white font-bold uppercase tracking-tight">
+                Resource Created Successfully
+              </p>
+              <p className="text-white/50 text-xs font-mono">
+                Your{" "}
+                {lastCreated.type === "doc"
+                  ? "Google Doc"
+                  : lastCreated.type === "form"
+                  ? "Google Form"
+                  : "Drive Folder"}{" "}
+                is ready.
+              </p>
             </div>
           </div>
-          <a 
+          <a
             href={lastCreated.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -199,24 +245,29 @@ const DigitalRecordsView: React.FC = () => {
       )}
 
       <div className="mt-12 bg-info/5 border border-info/10 rounded-2xl p-6">
-        <h3 className="text-info font-black font-mono text-sm mb-4 uppercase tracking-widest">Digital Archive Pipeline</h3>
+        <h3 className="text-info font-black font-mono text-sm mb-4 uppercase tracking-widest">
+          Digital Archive Pipeline
+        </h3>
         <ul className="space-y-4">
           <li className="flex items-start gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-info mt-1.5" />
             <p className="text-white/60 text-xs leading-relaxed">
-              Documents are automatically created in the connected Google account's primary directory.
+              Documents are automatically created in the connected Google
+              account's primary directory.
             </p>
           </li>
           <li className="flex items-start gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-info mt-1.5" />
             <p className="text-white/60 text-xs leading-relaxed">
-              Incident reports include dynamic timestamps but require manual summary population from the AI Command console.
+              Incident reports include dynamic timestamps but require manual
+              summary population from the AI Command console.
             </p>
           </li>
           <li className="flex items-start gap-3">
             <div className="w-1.5 h-1.5 rounded-full bg-info mt-1.5" />
             <p className="text-white/60 text-xs leading-relaxed">
-              Google Forms can be linked to QR codes for physical deployment at Barangay checkpoints.
+              Google Forms can be linked to QR codes for physical deployment at
+              Barangay checkpoints.
             </p>
           </li>
         </ul>

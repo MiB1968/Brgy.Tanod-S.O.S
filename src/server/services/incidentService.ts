@@ -155,10 +155,25 @@ export const incidentService = {
       photos: data.photos || [],
       voiceClip: data.voiceClip,
       assignedTo: autoAssignedTanodId,
-      assignedToName: autoAssignedTanodName
+      assignedToName: autoAssignedTanodName,
+      clientUuid: data.clientUuid,
     };
 
-    const incident = await incidentRepository.create(incidentData);
+    let incident;
+    try {
+      incident = await incidentRepository.create(incidentData);
+    } catch (err: any) {
+      if (err.code === '23505' && err.constraint?.includes('client_uuid')) {
+        console.log(`[SOS] DB-level duplicate blocked for clientUuid=${clientUuid}`);
+        const existing = await pool.query(
+          'SELECT * FROM alerts WHERE client_uuid = $1',
+          [clientUuid]
+        );
+        if (existing.rows[0]) return existing.rows[0];
+        throw new AppError('Duplicate report already processed', 200, 'DUPLICATE');
+      }
+      throw err;
+    }
 
     // Handle automated broadcast recommendation
     if (aiAnalysis.broadcastRecommendation?.shouldBroadcast) {
@@ -469,7 +484,7 @@ export const incidentService = {
     
     const responders: any[] = [];
 
-    for (const loc of activeLocations) {
+    for (const loc of Object.values(activeLocations)) {
       if (loc.role !== "TANOD" && loc.role !== "tanod" && loc.role !== "ADMIN" && loc.role !== "CAPTAIN" && loc.role !== "superadmin") continue;
       if (typeof loc.lat !== "number" || typeof loc.lng !== "number") continue;
 

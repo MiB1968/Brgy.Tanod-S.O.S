@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Send, Check, Loader2 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Send, Check, Loader2 } from "lucide-react";
+import { cn } from "../lib/utils";
 
 interface AnimatedButtonProps {
   onClick: () => void | Promise<void>;
@@ -11,7 +11,7 @@ interface AnimatedButtonProps {
   isLoading?: boolean;
   isSuccess?: boolean;
   disabled?: boolean;
-  type?: 'button' | 'submit';
+  type?: "button" | "submit";
 }
 
 export default function AnimatedButton({
@@ -22,7 +22,7 @@ export default function AnimatedButton({
   isLoading = false,
   isSuccess = false,
   disabled = false,
-  type = 'button'
+  type = "button",
 }: AnimatedButtonProps) {
   const [localSuccess, setLocalSuccess] = useState(false);
 
@@ -36,7 +36,7 @@ export default function AnimatedButton({
 
   const handleClick = async (e: React.MouseEvent) => {
     if (disabled || isLoading || localSuccess) return;
-    if (type === 'button') {
+    if (type === "button") {
       e.preventDefault();
       await onClick();
     }
@@ -50,8 +50,12 @@ export default function AnimatedButton({
       className={cn(
         "relative overflow-hidden group transition-all duration-300",
         "h-14 px-8 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] font-mono italic",
-        localSuccess ? "bg-success text-white shadow-glow-green" : "bg-emergency text-white shadow-glow-red",
-        (disabled || isLoading) && !localSuccess && "opacity-50 grayscale cursor-not-allowed",
+        localSuccess
+          ? "bg-success text-white shadow-glow-green"
+          : "bg-emergency text-white shadow-glow-red",
+        (disabled || isLoading) &&
+          !localSuccess &&
+          "opacity-50 grayscale cursor-not-allowed",
         className
       )}
     >
@@ -66,9 +70,9 @@ export default function AnimatedButton({
           >
             <span className="relative z-10">{label}</span>
             <motion.div
-              animate={{ 
+              animate={{
                 x: [0, 2, 0],
-                rotate: [0, -5, 0]
+                rotate: [0, -5, 0],
               }}
               transition={{ repeat: Infinity, duration: 2 }}
             >
@@ -100,7 +104,7 @@ export default function AnimatedButton({
             <motion.div
               initial={{ scale: 0, rotate: -45 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', damping: 12 }}
+              transition={{ type: "spring", damping: 12 }}
             >
               <Check className="w-4 h-4" />
             </motion.div>
@@ -113,11 +117,11 @@ export default function AnimatedButton({
         {isLoading && (
           <motion.div
             initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-            animate={{ 
-              x: 200, 
-              y: -100, 
-              opacity: 0, 
-              rotate: -20 
+            animate={{
+              x: 200,
+              y: -100,
+              opacity: 0,
+              rotate: -20,
             }}
             transition={{ duration: 0.8, ease: "easeIn" }}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"

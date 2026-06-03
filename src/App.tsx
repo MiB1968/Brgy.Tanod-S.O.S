@@ -1,36 +1,39 @@
-import React, { useEffect, useState, Suspense, useMemo } from 'react';
-import { useRBAC } from './context/AuthContext';
-import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
-import KeepAppOpenBanner from './components/KeepAppOpenBanner';
-import TrackingStatusPanel from './components/TrackingStatusPanel';
-import NotificationPermission from './components/NotificationPermission';
-import { GuardianVoiceAssistant } from './components/ai/GuardianVoiceAssistant';
-import TacticalDock from './components/layout/TacticalDock';
-import LiveMap from './components/LiveMap';
-import AppLayout from './components/layout/AppLayout';
-import { RoleBasedContent } from './components/views/RoleBasedContent';
-import { useTanodStore } from './store/useTanodStore';
-import { tanodLocationService } from './services/tanodLocationService';
-import { pushService } from './services/pushNotificationService';
-import { auth } from './lib/firebase';
-import { signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { toast } from 'react-hot-toast';
-import * as safeStorage from './lib/safeStorage';
-import { LoginView } from './components/AuthViews';
-import RegistrationForm from './components/auth/RegistrationForm';
-import GuardianAIChat from './components/GuardianAIChat';
-import { useEmergencyAudio } from './hooks/useEmergencyAudio';
-import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import React, { useEffect, useState, Suspense, useMemo } from "react";
+import { useRBAC } from "./context/AuthContext";
+import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
+import KeepAppOpenBanner from "./components/KeepAppOpenBanner";
+import TrackingStatusPanel from "./components/TrackingStatusPanel";
+import NotificationPermission from "./components/NotificationPermission";
+import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
+import TacticalDock from "./components/layout/TacticalDock";
+import LiveMap from "./components/LiveMap";
+import AppLayout from "./components/layout/AppLayout";
+import { RoleBasedContent } from "./components/views/RoleBasedContent";
+import { useTanodStore } from "./store/useTanodStore";
+import { tanodLocationService } from "./services/tanodLocationService";
+import { pushService } from "./services/pushNotificationService";
+import { auth } from "./lib/firebase";
+import { signOut, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { toast } from "react-hot-toast";
+import * as safeStorage from "./lib/safeStorage";
+import { LoginView } from "./components/AuthViews";
+import RegistrationForm from "./components/auth/RegistrationForm";
+import GuardianAIChat from "./components/GuardianAIChat";
+import { useEmergencyAudio } from "./hooks/useEmergencyAudio";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
 
-import * as api from './lib/api';
+import * as api from "./lib/api";
 
 // ... existing imports ...
-const DEMO_RESIDENT_EMAIL    = import.meta.env.VITE_DEMO_RESIDENT_EMAIL    ?? '';
-const DEMO_RESIDENT_PASSWORD = import.meta.env.VITE_DEMO_RESIDENT_PASSWORD ?? '';
-const DEMO_ADMIN_EMAIL       = import.meta.env.VITE_DEMO_ADMIN_EMAIL       ?? '';
-const DEMO_ADMIN_PASSWORD    = import.meta.env.VITE_DEMO_ADMIN_PASSWORD    ?? '';
+const DEMO_RESIDENT_EMAIL = import.meta.env.VITE_DEMO_RESIDENT_EMAIL ?? "";
+const DEMO_RESIDENT_PASSWORD =
+  import.meta.env.VITE_DEMO_RESIDENT_PASSWORD ?? "";
+const DEMO_ADMIN_EMAIL = import.meta.env.VITE_DEMO_ADMIN_EMAIL ?? "";
+const DEMO_ADMIN_PASSWORD = import.meta.env.VITE_DEMO_ADMIN_PASSWORD ?? "";
 
 const App: React.FC = () => {
+  const { isOnline } = useOnlineStatus();
   // 1. RBAC and Auth — single source of truth from AuthContext
   const rbac = useRBAC();
   const { profile: user, user: firebaseUser, loading, isMasterAdmin } = rbac;
@@ -38,12 +41,12 @@ const App: React.FC = () => {
   // FIX: isMasterAdmin comes entirely from AuthContext (which reads profile.role).
   // No email comparison here. No duplicate logic.
 
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState("home");
 
   // FIX: viewOverride is only honoured when the current user is admin or above.
   // A resident cannot set this key and gain a different UI role.
   const [viewOverride, setViewOverrideState] = useState<string | null>(() => {
-    const stored = localStorage.getItem('brgy_view_override');
+    const stored = localStorage.getItem("brgy_view_override");
     // Will be validated against real role after profile loads
     return stored;
   });
@@ -60,38 +63,38 @@ const App: React.FC = () => {
 
   // FIX: Gate viewOverride — only admin/superadmin may use it.
   const canUseViewOverride = useMemo(
-    () => user?.role === 'admin' || user?.role === 'superadmin',
+    () => user?.role === "admin" || user?.role === "superadmin",
     [user?.role]
   );
 
   const effectiveRole = useMemo(() => {
     if (canUseViewOverride && viewOverride) return viewOverride;
-    if (isMasterAdmin) return 'superadmin';
-    return user?.role || 'resident';
+    if (isMasterAdmin) return "superadmin";
+    return user?.role || "resident";
   }, [isMasterAdmin, viewOverride, canUseViewOverride, user?.role]);
 
   const handleSetViewOverride = (role: string | null) => {
     if (!canUseViewOverride) return;
     setViewOverrideState(role);
-    if (role) localStorage.setItem('brgy_view_override', role);
-    else localStorage.removeItem('brgy_view_override');
+    if (role) localStorage.setItem("brgy_view_override", role);
+    else localStorage.removeItem("brgy_view_override");
   };
 
   // Clear any stale override when a non-admin logs in
   useEffect(() => {
     if (!loading && !canUseViewOverride && viewOverride) {
       setViewOverrideState(null);
-      localStorage.removeItem('brgy_view_override');
+      localStorage.removeItem("brgy_view_override");
     }
   }, [loading, canUseViewOverride, viewOverride]);
 
   const handleToggleSiren = () => {
-    setSirenActive(prev => {
+    setSirenActive((prev) => {
       const next = !prev;
       if (next) {
-        toast.success("🚨 SIREN ACTIVATED", { id: 'siren' });
+        toast.success("🚨 SIREN ACTIVATED", { id: "siren" });
       } else {
-        toast.success("Siren Deactivated", { id: 'siren' });
+        toast.success("Siren Deactivated", { id: "siren" });
       }
       return next;
     });
@@ -99,7 +102,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (sirenActive) {
-      startSiren('wail');
+      startSiren("wail");
     } else {
       stopSiren();
     }
@@ -112,16 +115,18 @@ const App: React.FC = () => {
     const handleSirenEvent = () => {
       handleToggleSiren();
     };
-    window.addEventListener('toggle-siren', handleSirenEvent);
+    window.addEventListener("toggle-siren", handleSirenEvent);
     return () => {
-      window.removeEventListener('toggle-siren', handleSirenEvent);
+      window.removeEventListener("toggle-siren", handleSirenEvent);
     };
   }, []);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('siren-state-change', {
-      detail: { active: sirenActive }
-    }));
+    window.dispatchEvent(
+      new CustomEvent("siren-state-change", {
+        detail: { active: sirenActive },
+      })
+    );
   }, [sirenActive]);
 
   const handleRegistrationComplete = async (regData: any) => {
@@ -129,13 +134,19 @@ const App: React.FC = () => {
       setIsLoggingIn(true);
       // 1. Backend Registration (SQL)
       await api.auth.register(regData);
-      
+
       // 2. Firebase Registration (for RBAC/Firestore)
-      const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-      const userCred = await createUserWithEmailAndPassword(auth, regData.email, regData.password);
+      const { createUserWithEmailAndPassword, updateProfile } = await import(
+        "firebase/auth"
+      );
+      const userCred = await createUserWithEmailAndPassword(
+        auth,
+        regData.email,
+        regData.password
+      );
       await updateProfile(userCred.user, { displayName: regData.name });
-      
-      setActiveTab('home');
+
+      setActiveTab("home");
       toast.success("Security profile established. Awaiting tactical link...");
     } catch (err: any) {
       toast.error(err.message || "Registration sequence interrupted.");
@@ -146,28 +157,28 @@ const App: React.FC = () => {
 
   const handleLogin = async (email?: string, password?: string) => {
     if (!email || !password) return;
-    
+
     try {
       setIsLoggingIn(true);
       // 1. Firebase Auth
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
+      const { signInWithEmailAndPassword } = await import("firebase/auth");
       const userCred = await signInWithEmailAndPassword(auth, email, password);
-      
+
       // 2. Backend Handshake (JWT Cookie)
       const idToken = await userCred.user.getIdToken();
-      const loginResponse = await api.auth.login({ 
-        email, 
+      const loginResponse = await api.auth.login({
+        email,
         password,
         isGoogle: false,
-        firebaseIdToken: idToken
+        firebaseIdToken: idToken,
       });
-      
+
       // If our backend returned a custom JWT, we prefer that for local storage 'token'
       // as it matches our CockroachDB/SQL structure perfectly.
       if (loginResponse?.success && loginResponse.data?.token) {
-        safeStorage.setItem('token', loginResponse.data.token);
+        safeStorage.setItem("token", loginResponse.data.token);
       }
-      
+
       toast.success("Tactical link established.");
     } catch (err: any) {
       toast.error(err.message || "Failed to establish secure link.");
@@ -180,9 +191,9 @@ const App: React.FC = () => {
     try {
       await signOut(auth);
       // Clear all local state
-      safeStorage.removeItem('token');
-      safeStorage.removeItem('brgy_user_profile');
-      localStorage.removeItem('brgy_view_override');
+      safeStorage.removeItem("token");
+      safeStorage.removeItem("brgy_user_profile");
+      localStorage.removeItem("brgy_view_override");
       window.location.reload();
     } catch (err) {
       console.error("Logout failed:", err);
@@ -207,7 +218,7 @@ const App: React.FC = () => {
         pushService.listenForMessages();
 
         // Start location tracking for Tanod users
-        if (user?.role === 'tanod') {
+        if (user?.role === "tanod") {
           tanodLocationService.startTracking();
         }
 
@@ -227,7 +238,7 @@ const App: React.FC = () => {
 
     return () => {
       isMounted = false;
-      if (user?.role === 'tanod') {
+      if (user?.role === "tanod") {
         tanodLocationService.stopTracking();
       }
     };
@@ -250,19 +261,19 @@ const App: React.FC = () => {
 
   // Auth Screen if not logged in
   if (!firebaseUser) {
-    if (activeTab === 'register') {
+    if (activeTab === "register") {
       return (
-        <RegistrationForm 
+        <RegistrationForm
           onComplete={handleRegistrationComplete}
-          onCancel={() => setActiveTab('home')}
+          onCancel={() => setActiveTab("home")}
         />
       );
     }
 
     return (
-      <LoginView 
+      <LoginView
         onLogin={handleLogin}
-        onRegister={() => setActiveTab('register')}
+        onRegister={() => setActiveTab("register")}
         isLoggingIn={isLoggingIn}
         onDemoLogin={
           DEMO_RESIDENT_EMAIL && DEMO_RESIDENT_PASSWORD
@@ -278,40 +289,58 @@ const App: React.FC = () => {
           try {
             setIsLoggingIn(true);
             const provider = new GoogleAuthProvider();
-            
+
             // Note: In shared app (iframe/PWA) environments, popups can be blocked by third-party cookie/storage security settings.
             const userCred = await signInWithPopup(auth, provider);
-            
+
             console.log("Popup login success, user:", userCred.user.email);
             const idToken = await userCred.user.getIdToken();
-            
-            const loginResponse = await api.auth.login({ 
+
+            const loginResponse = await api.auth.login({
               email: userCred.user.email,
               isGoogle: true,
-              firebaseIdToken: idToken
+              firebaseIdToken: idToken,
             });
-            
+
             console.log("Popup loginResponse:", loginResponse);
-            
+
             if (loginResponse?.success && loginResponse.data?.token) {
-              safeStorage.setItem('token', loginResponse.data.token);
+              safeStorage.setItem("token", loginResponse.data.token);
               toast.success("Google Tactical Link Active.");
             } else {
-              const backendError = loginResponse?.error?.message || "Login with backend failed.";
+              const backendError =
+                loginResponse?.error?.message || "Login with backend failed.";
               throw new Error(backendError);
             }
           } catch (err: any) {
             console.error("Popup Google login error details:", err);
-            
+
             // Specifically detect popup/storage/network blocking errors
-            if (err.code === 'auth/unauthorized-domain') {
-                toast.error(`Domain unauthorized. Go to Firebase Console -> Authentication -> Settings -> Authorized Domains, and add: ${window.location.hostname}.`, { duration: 10000 });
-            } else if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
-                toast.error("Auth popup was blocked by browser. Please use 'OPEN NEW TAB' above.");
-            } else if (err.code === 'auth/network-request-failed' || err.message?.includes('Failed to fetch')) {
-                toast.error(`Security settings prevented Google Login. If you are in AI Studio, click 'OPEN IN NEW TAB' at the top right of the screen to login safely. Error: ${err.message}`);
+            if (err.code === "auth/unauthorized-domain") {
+              toast.error(
+                `Domain unauthorized. Go to Firebase Console -> Authentication -> Settings -> Authorized Domains, and add: ${window.location.hostname}.`,
+                { duration: 10000 }
+              );
+            } else if (
+              err.code === "auth/popup-blocked" ||
+              err.code === "auth/cancelled-popup-request"
+            ) {
+              toast.error(
+                "Auth popup was blocked by browser. Please use 'OPEN NEW TAB' above."
+              );
+            } else if (
+              err.code === "auth/network-request-failed" ||
+              err.message?.includes("Failed to fetch")
+            ) {
+              toast.error(
+                `Security settings prevented Google Login. If you are in AI Studio, click 'OPEN IN NEW TAB' at the top right of the screen to login safely. Error: ${err.message}`
+              );
             } else {
-                toast.error(`Login failed: ${err.message || 'Check browser security settings.'}`);
+              toast.error(
+                `Login failed: ${
+                  err.message || "Check browser security settings."
+                }`
+              );
             }
           } finally {
             setIsLoggingIn(false);
@@ -330,9 +359,11 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6 text-center text-white">
         <div>
           <div className="text-6xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-red-500">Initialization Failed</h2>
+          <h2 className="text-xl font-bold text-red-500">
+            Initialization Failed
+          </h2>
           <p className="text-zinc-400 mt-2">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="mt-6 px-8 py-3 bg-red-600 rounded-xl"
           >
@@ -348,7 +379,9 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-zinc-400 font-mono tracking-widest uppercase">Initializing Central Command...</p>
+          <p className="text-zinc-400 font-mono tracking-widest uppercase">
+            Initializing Central Command...
+          </p>
         </div>
       </div>
     );
@@ -379,7 +412,7 @@ const App: React.FC = () => {
             effectiveRole={effectiveRole}
             effectiveProfile={user}
             alerts={[]}
-            isOnline={true}
+            isOnline={isOnline}
             visiblePatrols={patrols}
             viewOverride={canUseViewOverride ? viewOverride : null}
             setViewOverride={handleSetViewOverride}

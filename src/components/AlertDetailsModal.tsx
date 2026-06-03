@@ -1,13 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, User, ShieldAlert, Clock, Info, CheckCircle, Activity, Shield } from 'lucide-react';
-import { Alert, ResidentProfile } from '../types';
-import ReportMap from './ReportMap';
-import * as api from '../lib/api';
-import { fetchAPI } from '../lib/api';
-import socket from '../lib/socket';
-import { cn } from '../lib/utils';
-import FlameAnimation from './FlameAnimation';
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  X,
+  MapPin,
+  User,
+  ShieldAlert,
+  Clock,
+  Info,
+  CheckCircle,
+  Activity,
+  Shield,
+} from "lucide-react";
+import { Alert, ResidentProfile } from "../types";
+import ReportMap from "./ReportMap";
+import * as api from "../lib/api";
+import { fetchAPI } from "../lib/api";
+import socket from "../lib/socket";
+import { cn } from "../lib/utils";
+import FlameAnimation from "./FlameAnimation";
 
 interface AlertDetailsModalProps {
   alert: Alert | null;
@@ -23,23 +33,24 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   useEffect(() => {
     if (alert && alert.residentId) {
       setLoadingResident(true);
-      api.generic.get(`residents/${alert.residentId}`)
+      api.generic
+        .get(`residents/${alert.residentId}`)
         .then((data) => {
           if (data) {
             setResident(data as ResidentProfile);
           } else {
-             // Fallback to checking users collection
-             api.generic.get(`users/${alert.residentId}`).then(uData => {
-                if (uData) setResident(uData as any);
-             });
+            // Fallback to checking users collection
+            api.generic.get(`users/${alert.residentId}`).then((uData) => {
+              if (uData) setResident(uData as any);
+            });
           }
         })
         .finally(() => setLoadingResident(false));
-      
+
       // Load evidence
       setLoadingEvidence(true);
       fetchAPI(`storage/evidence/${alert.id}`)
-        .then(res => setEvidence(res.data || []))
+        .then((res) => setEvidence(res.data || []))
         .finally(() => setLoadingEvidence(false));
     }
   }, [alert]);
@@ -47,17 +58,17 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
   if (!alert) return null;
 
   const STATUS_COLORS: Record<string, string> = {
-    pending: 'text-emergency bg-emergency/10 border-emergency/20',
-    responding: 'text-info bg-info/10 border-info/20',
-    resolved: 'text-success bg-success/10 border-success/20',
-    cancelled: 'text-white/50 bg-white/5 border-white/10'
+    pending: "text-emergency bg-emergency/10 border-emergency/20",
+    responding: "text-info bg-info/10 border-info/20",
+    resolved: "text-success bg-success/10 border-success/20",
+    cancelled: "text-white/50 bg-white/5 border-white/10",
   };
 
   const TYPE_COLORS: Record<string, string> = {
-    MEDICAL: 'text-[#00D4FF]',
-    FIRE: 'text-[#FF8C00]',
-    CRIME: 'text-[#FF4B4B]',
-    FLOOD: 'text-[#A78BFA]'
+    MEDICAL: "text-[#00D4FF]",
+    FIRE: "text-[#FF8C00]",
+    CRIME: "text-[#FF4B4B]",
+    FLOOD: "text-[#A78BFA]",
   };
 
   return (
@@ -70,7 +81,7 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
           onClick={onClose}
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         />
-        
+
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -80,7 +91,12 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
           {/* Header */}
           <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#12141A] z-10">
             <div className="flex items-center gap-3">
-              <div className={cn("p-2 rounded-lg bg-white/5", TYPE_COLORS[alert.type])}>
+              <div
+                className={cn(
+                  "p-2 rounded-lg bg-white/5",
+                  TYPE_COLORS[alert.type]
+                )}
+              >
                 <ShieldAlert className="w-6 h-6" />
               </div>
               <div>
@@ -103,17 +119,17 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-            
             {/* Top Grid: Resident Info & Current Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
               {/* Box 1: Resident & Identity */}
               <div className="glass-panel p-5 rounded-xl border border-white/5 relative overflow-hidden">
                 <div className="flex items-center gap-2 mb-4">
                   <User className="w-4 h-4 text-[#A78BFA]" />
-                  <h3 className="tex-sm font-semibold tracking-widest text-[#A78BFA] uppercase">Subject Identification</h3>
+                  <h3 className="tex-sm font-semibold tracking-widest text-[#A78BFA] uppercase">
+                    Subject Identification
+                  </h3>
                 </div>
-                
+
                 {loadingResident ? (
                   <div className="animate-pulse flex space-x-4">
                     <div className="rounded-full bg-white/10 h-10 w-10"></div>
@@ -126,37 +142,59 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                   <div className="space-y-4">
                     <div className="flex items-center gap-4">
                       {resident.photoURL || resident.idPhotoUrl ? (
-                         <img src={resident.photoURL || resident.idPhotoUrl} className="w-12 h-12 rounded-full border border-white/10 object-cover" />
+                        <img
+                          src={resident.photoURL || resident.idPhotoUrl}
+                          className="w-12 h-12 rounded-full border border-white/10 object-cover"
+                        />
                       ) : (
-                         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 text-white/50 font-bold text-lg">
-                           {resident.name?.[0] || '?'}
-                         </div>
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 text-white/50 font-bold text-lg">
+                          {resident.name?.[0] || "?"}
+                        </div>
                       )}
                       <div>
-                        <p className="font-bold text-lg">{resident.fullName ? resident.fullName : (resident.name || 'Unknown')}</p>
-                        <p className="text-xs text-white/50 font-mono">UID: {resident.uid?.substring(0,8)}</p>
+                        <p className="font-bold text-lg">
+                          {resident.fullName
+                            ? resident.fullName
+                            : resident.name || "Unknown"}
+                        </p>
+                        <p className="text-xs text-white/50 font-mono">
+                          UID: {resident.uid?.substring(0, 8)}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div className="bg-black/30 p-2 rounded border border-white/5">
-                        <p className="text-[10px] text-white/40 uppercase mb-1">Mobile Number</p>
-                        <p className="font-mono text-white/80">{resident.mobileNumber || resident.phone || 'N/A'}</p>
+                        <p className="text-[10px] text-white/40 uppercase mb-1">
+                          Mobile Number
+                        </p>
+                        <p className="font-mono text-white/80">
+                          {resident.mobileNumber || resident.phone || "N/A"}
+                        </p>
                       </div>
                       <div className="bg-black/30 p-2 rounded border border-white/5">
-                        <p className="text-[10px] text-white/40 uppercase mb-1">Registered Zone</p>
-                        <p className="font-mono text-white/80">{(resident as any).zone || 'N/A'}</p>
+                        <p className="text-[10px] text-white/40 uppercase mb-1">
+                          Registered Zone
+                        </p>
+                        <p className="font-mono text-white/80">
+                          {(resident as any).zone || "N/A"}
+                        </p>
                       </div>
                     </div>
                     <div className="bg-black/30 p-2 rounded border border-white/5">
-                        <p className="text-[10px] text-white/40 uppercase mb-1">Registered Address</p>
-                        <p className="text-white/80 text-xs">{resident.houseNumber} {resident.street}</p>
+                      <p className="text-[10px] text-white/40 uppercase mb-1">
+                        Registered Address
+                      </p>
+                      <p className="text-white/80 text-xs">
+                        {resident.houseNumber} {resident.street}
+                      </p>
                     </div>
                   </div>
                 ) : (
                   <div className="text-sm text-white/50 italic border border-white/5 bg-black/20 p-4 rounded-lg">
                     <User className="w-6 h-6 mb-2 opacity-50" />
                     Resident profile not found or unavailable.
-                    <br/>Name registered on alert: {alert.residentName}
+                    <br />
+                    Name registered on alert: {alert.residentName}
                   </div>
                 )}
               </div>
@@ -166,37 +204,65 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                       <Shield className="w-4 h-4 text-info" />
-                       <h3 className="tex-sm font-semibold tracking-widest text-info uppercase">Disposition & Status</h3>
+                      <Shield className="w-4 h-4 text-info" />
+                      <h3 className="tex-sm font-semibold tracking-widest text-info uppercase">
+                        Disposition & Status
+                      </h3>
                     </div>
-                    <span className={cn("px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border", STATUS_COLORS[alert.status])}>
+                    <span
+                      className={cn(
+                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border",
+                        STATUS_COLORS[alert.status]
+                      )}
+                    >
                       {alert.status}
                     </span>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex flex-col gap-1 pb-3 border-b border-white/5">
-                       <span className="text-[10px] text-white/40 uppercase">Emergency Type</span>
-                       <span className={cn("font-bold capitalize text-lg", TYPE_COLORS[alert.type])}>{alert.type} Emergency</span>
+                      <span className="text-[10px] text-white/40 uppercase">
+                        Emergency Type
+                      </span>
+                      <span
+                        className={cn(
+                          "font-bold capitalize text-lg",
+                          TYPE_COLORS[alert.type]
+                        )}
+                      >
+                        {alert.type} Emergency
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-sm pt-2">
                       <div>
-                        <p className="text-[10px] text-white/40 uppercase mb-1">Assigned Unit</p>
-                        <p className="font-mono text-white/90">{alert.assignedToName || 'Unassigned'}</p>
+                        <p className="text-[10px] text-white/40 uppercase mb-1">
+                          Assigned Unit
+                        </p>
+                        <p className="font-mono text-white/90">
+                          {alert.assignedToName || "Unassigned"}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-[10px] text-white/40 uppercase mb-1">First Responder</p>
-                        <p className="font-mono text-white/90">{alert.respondedByName || 'N/A'}</p>
+                        <p className="text-[10px] text-white/40 uppercase mb-1">
+                          First Responder
+                        </p>
+                        <p className="font-mono text-white/90">
+                          {alert.respondedByName || "N/A"}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
-                
+
                 {alert.description && (
                   <div className="mt-4 p-3 bg-[#FF4B4B]/10 border border-[#FF4B4B]/20 rounded-lg">
-                    <p className="text-[10px] text-[#FF4B4B] uppercase tracking-widest mb-1 font-bold">Incoming Message</p>
-                    <p className="text-sm text-white/90 italic">"{alert.description}"</p>
+                    <p className="text-[10px] text-[#FF4B4B] uppercase tracking-widest mb-1 font-bold">
+                      Incoming Message
+                    </p>
+                    <p className="text-sm text-white/90 italic">
+                      "{alert.description}"
+                    </p>
                   </div>
                 )}
               </div>
@@ -205,138 +271,199 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
             {/* AI Analysis Section */}
             {alert.aiAnalysis && (
               <div className="glass-panel p-5 rounded-xl border border-white/5 relative overflow-hidden">
-                 {alert.aiAnalysis.severityScore >= 8 && (
-                    <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
-                      <FlameAnimation size="sm" />
-                    </div>
-                 )}
-                 <div className="flex items-center gap-2 mb-4">
-                    <Activity className="w-4 h-4 text-purple-400" />
-                    <h3 className="tex-sm font-semibold tracking-widest text-purple-400 uppercase">Guardian AI Intelligence Assessment</h3>
-                    <div className="ml-auto flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg border border-white/5">
-                      <span className="text-[10px] text-white/50 uppercase">Threat Level</span>
-                      <span className={cn(
+                {alert.aiAnalysis.severityScore >= 8 && (
+                  <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
+                    <FlameAnimation size="sm" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mb-4">
+                  <Activity className="w-4 h-4 text-purple-400" />
+                  <h3 className="tex-sm font-semibold tracking-widest text-purple-400 uppercase">
+                    Guardian AI Intelligence Assessment
+                  </h3>
+                  <div className="ml-auto flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg border border-white/5">
+                    <span className="text-[10px] text-white/50 uppercase">
+                      Threat Level
+                    </span>
+                    <span
+                      className={cn(
                         "font-black font-mono",
-                        alert.aiAnalysis.severityScore >= 8 ? "text-emergency" :
-                        alert.aiAnalysis.severityScore >= 5 ? "text-warning" : "text-info"
-                      )}>{alert.aiAnalysis.severityScore}/10</span>
-                    </div>
+                        alert.aiAnalysis.severityScore >= 8
+                          ? "text-emergency"
+                          : alert.aiAnalysis.severityScore >= 5
+                          ? "text-warning"
+                          : "text-info"
+                      )}
+                    >
+                      {alert.aiAnalysis.severityScore}/10
+                    </span>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-sm text-white/80 leading-relaxed bg-black/20 p-4 rounded-lg border border-white/5 h-full">
-                        {alert.aiAnalysis.summary}
-                      </p>
-                    </div>
-                    <div className="space-y-4">
-                      {alert.aiAnalysis.riskFactors?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] text-white/40 uppercase mb-2">Identified Risk Factors</p>
-                          <div className="flex flex-wrap gap-2">
-                             {alert.aiAnalysis.riskFactors.map((factor: string, i: number) => (
-                               <span key={i} className="px-2 py-1 bg-emergency/10 border border-emergency/20 text-emergency text-[10px] rounded uppercase font-mono">
-                                 {factor}
-                               </span>
-                             ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {alert.aiAnalysis.recommendedResponders?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] text-white/40 uppercase mb-2">Recommended Units</p>
-                          <div className="flex flex-wrap gap-2">
-                             {alert.aiAnalysis.recommendedResponders.map((unit: string, i: number) => (
-                               <span key={i} className="px-2 py-1 bg-info/10 border border-info/20 text-info text-[10px] rounded uppercase font-mono">
-                                 {unit}
-                               </span>
-                             ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {alert.aiAnalysis.instructions?.length > 0 && (
-                        <div>
-                          <p className="text-[10px] text-white/40 uppercase mb-2">Instructions Transmitted to Subject</p>
-                          <div className="space-y-1.5">
-                             {alert.aiAnalysis.instructions.map((instruction: string, i: number) => (
-                               <div key={i} className="flex items-center gap-2 text-[11px] text-white/70 italic bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                                 <CheckCircle className="w-3 h-3 text-info shrink-0" />
-                                 <span>{instruction}</span>
-                               </div>
-                             ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-white/80 leading-relaxed bg-black/20 p-4 rounded-lg border border-white/5 h-full">
+                      {alert.aiAnalysis.summary}
+                    </p>
                   </div>
+                  <div className="space-y-4">
+                    {alert.aiAnalysis.riskFactors?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-white/40 uppercase mb-2">
+                          Identified Risk Factors
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {alert.aiAnalysis.riskFactors.map(
+                            (factor: string, i: number) => (
+                              <span
+                                key={i}
+                                className="px-2 py-1 bg-emergency/10 border border-emergency/20 text-emergency text-[10px] rounded uppercase font-mono"
+                              >
+                                {factor}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {alert.aiAnalysis.recommendedResponders?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-white/40 uppercase mb-2">
+                          Recommended Units
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {alert.aiAnalysis.recommendedResponders.map(
+                            (unit: string, i: number) => (
+                              <span
+                                key={i}
+                                className="px-2 py-1 bg-info/10 border border-info/20 text-info text-[10px] rounded uppercase font-mono"
+                              >
+                                {unit}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {alert.aiAnalysis.instructions?.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-white/40 uppercase mb-2">
+                          Instructions Transmitted to Subject
+                        </p>
+                        <div className="space-y-1.5">
+                          {alert.aiAnalysis.instructions.map(
+                            (instruction: string, i: number) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-[11px] text-white/70 italic bg-black/20 px-3 py-1.5 rounded-lg border border-white/5"
+                              >
+                                <CheckCircle className="w-3 h-3 text-info shrink-0" />
+                                <span>{instruction}</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Map & Logs Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               
-               {/* Map View */}
-               <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                       <MapPin className="w-4 h-4 text-emerald-400" />
-                       <h3 className="tex-sm font-semibold tracking-widest text-emerald-400 uppercase">Transmitted Coordinates</h3>
-                    </div>
+              {/* Map View */}
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-emerald-400" />
+                    <h3 className="tex-sm font-semibold tracking-widest text-emerald-400 uppercase">
+                      Transmitted Coordinates
+                    </h3>
                   </div>
-                  
-                  <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative">
-                     <ReportMap lat={alert.location.lat} lng={alert.location.lng} />
-                     <div className="absolute bottom-4 left-4 z-[400] bg-black/80 backdrop-blur border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white/70 shadow-lg" style={{ pointerEvents: 'none' }}>
-                        LAT: {alert.location?.lat ? alert.location.lat.toFixed(6) : 'N/A'}<br/>
-                        LNG: {alert.location?.lng ? alert.location.lng.toFixed(6) : 'N/A'}
-                     </div>
-                  </div>
-               </div>
+                </div>
 
-               {/* Evidence Feed */}
-               <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                       <Activity className="w-4 h-4 text-tactical-cyan" />
-                       <h3 className="tex-sm font-semibold tracking-widest text-tactical-cyan uppercase">Live Evidence Feed</h3>
+                <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative">
+                  <ReportMap
+                    lat={alert.location.lat}
+                    lng={alert.location.lng}
+                  />
+                  <div
+                    className="absolute bottom-4 left-4 z-[400] bg-black/80 backdrop-blur border border-white/10 px-3 py-2 rounded-lg text-xs font-mono text-white/70 shadow-lg"
+                    style={{ pointerEvents: "none" }}
+                  >
+                    LAT:{" "}
+                    {alert.location?.lat
+                      ? alert.location.lat.toFixed(6)
+                      : "N/A"}
+                    <br />
+                    LNG:{" "}
+                    {alert.location?.lng
+                      ? alert.location.lng.toFixed(6)
+                      : "N/A"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Evidence Feed */}
+              <div className="glass-panel p-5 rounded-xl border border-white/5 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-tactical-cyan" />
+                    <h3 className="tex-sm font-semibold tracking-widest text-tactical-cyan uppercase">
+                      Live Evidence Feed
+                    </h3>
+                  </div>
+                  {evidence.length > 0 && (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-tactical-red/20 text-tactical-red text-[8px] font-black rounded border border-tactical-red/30 animate-pulse">
+                      <div className="w-1.5 h-1.5 rounded-full bg-tactical-red" />{" "}
+                      REC
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative flex flex-col items-center justify-center">
+                  {loadingEvidence ? (
+                    <div className="text-white/20 text-[10px] uppercase font-mono animate-pulse">
+                      Establishing Data Link...
                     </div>
-                    {evidence.length > 0 && (
-                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-tactical-red/20 text-tactical-red text-[8px] font-black rounded border border-tactical-red/30 animate-pulse">
-                        <div className="w-1.5 h-1.5 rounded-full bg-tactical-red" /> REC
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 bg-black/40 rounded-xl overflow-hidden border border-white/10 min-h-[250px] relative flex flex-col items-center justify-center">
-                     {loadingEvidence ? (
-                       <div className="text-white/20 text-[10px] uppercase font-mono animate-pulse">Establishing Data Link...</div>
-                     ) : evidence.length > 0 ? (
-                       <div className="w-full h-full flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
-                         {evidence.map((url, i) => (
-                           <div key={url} className="space-y-1">
-                             <div className="flex justify-between items-center text-[8px] font-mono text-white/40 uppercase">
-                               <span>Chunk_{i + 1}</span>
-                               <span>{url.split('_').pop()?.split('.')[0] ? new Date(parseInt(url.split('_').pop()!.split('.')[0])).toLocaleTimeString() : ''}</span>
-                             </div>
-                             <video 
-                               src={url} 
-                               controls 
-                               className="w-full rounded-lg border border-white/10 bg-black shadow-lg"
-                               preload="metadata"
-                             />
-                           </div>
-                         ))}
-                       </div>
-                     ) : (
-                       <div className="text-center p-8">
-                         <Shield className="w-12 h-12 text-white/5 mx-auto mb-4" />
-                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">No Recorded Evidence Stream Available</p>
-                       </div>
-                     )}
-                  </div>
-               </div>
+                  ) : evidence.length > 0 ? (
+                    <div className="w-full h-full flex flex-col gap-4 p-4 overflow-y-auto custom-scrollbar">
+                      {evidence.map((url, i) => (
+                        <div key={url} className="space-y-1">
+                          <div className="flex justify-between items-center text-[8px] font-mono text-white/40 uppercase">
+                            <span>Chunk_{i + 1}</span>
+                            <span>
+                              {url.split("_").pop()?.split(".")[0]
+                                ? new Date(
+                                    parseInt(
+                                      url.split("_").pop()!.split(".")[0]
+                                    )
+                                  ).toLocaleTimeString()
+                                : ""}
+                            </span>
+                          </div>
+                          <video
+                            src={url}
+                            controls
+                            className="w-full rounded-lg border border-white/10 bg-black shadow-lg"
+                            preload="metadata"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center p-8">
+                      <Shield className="w-12 h-12 text-white/5 mx-auto mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
+                        No Recorded Evidence Stream Available
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Action Logs */}

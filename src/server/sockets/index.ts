@@ -250,7 +250,7 @@ export function initSocket(server: HttpServer): Server {
   });
 
   // Start background tasks
-  startLocationExpiryTask(io);
+  startLocationExpiryTask();
 
   console.log('[Socket] Socket.IO initialized successfully');
   return io;

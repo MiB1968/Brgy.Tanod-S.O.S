@@ -6,22 +6,29 @@ interface GeofenceResult {
   checked_at: Date;
 }
 
+let cachedBoundary: any = null;
+let cacheExpiry = 0;
+
+async function getBoundary() {
+  if (Date.now() < cacheExpiry && cachedBoundary) return cachedBoundary;
+  const res = await pool.query('SELECT boundary_geojson FROM barangay_boundaries ORDER BY created_at DESC LIMIT 1');
+  cachedBoundary = res.rows[0]?.boundary_geojson ?? null;
+  cacheExpiry = Date.now() + 10 * 60 * 1000;
+  return cachedBoundary;
+}
+
 export async function checkAndUpdateGeofence(
   residentId: string,
   lat: number,
   lng: number
 ): Promise<GeofenceResult | null> {
   try {
-    const boundaryRes = await pool.query(
-      `SELECT boundary_geojson FROM barangay_boundaries ORDER BY created_at DESC LIMIT 1`
-    );
+    const boundaryGeoJSON = await getBoundary();
 
-    if (boundaryRes.rows.length === 0) {
+    if (!boundaryGeoJSON) {
       console.warn('[Geofence] No barangay boundary configured.');
       return null;
     }
-
-    const boundaryGeoJSON = boundaryRes.rows[0].boundary_geojson;
 
     // Create a Turf point from the resident's coordinates
     // Note: GeoJSON expects [longitude, latitude]

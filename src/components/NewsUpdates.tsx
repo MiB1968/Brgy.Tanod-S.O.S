@@ -9,7 +9,9 @@ export default function NewsUpdates() {
   const fetchLatestNews = async () => {
     setLoading(true);
     try {
-      const result = await searchWeb("Philippines typhoon OR flood OR earthquake OR barangay emergency OR weather alert");
+      const result = await searchWeb(
+        "Philippines typhoon OR flood OR earthquake OR barangay emergency OR weather alert"
+      );
       setNews(result.results || []);
     } catch (err) {
       console.error(err);
@@ -29,7 +31,11 @@ export default function NewsUpdates() {
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm"
         >
-          {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+          {loading ? (
+            <Loader2 className="animate-spin w-4 h-4" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
           Refresh
         </button>
       </div>

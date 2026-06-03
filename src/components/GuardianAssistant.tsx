@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useGuardianAI } from '../hooks/useGuardianAI';
-import IncidentLogger from './IncidentLogger';
-import { Mic, MicOff, Volume2 } from 'lucide-react';
+import React, { useState } from "react";
+import { useGuardianAI } from "../hooks/useGuardianAI";
+import IncidentLogger from "./IncidentLogger";
+import { Mic, MicOff, Volume2 } from "lucide-react";
 
 const GuardianAssistant: React.FC = () => {
   const { isListening, startVoiceRecognition } = useGuardianAI();
@@ -27,18 +27,24 @@ const GuardianAssistant: React.FC = () => {
           <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           Guardian AI
         </h2>
-        <span className="text-[10px] uppercase tracking-widest text-zinc-500">System Ready</span>
+        <span className="text-[10px] uppercase tracking-widest text-zinc-500">
+          System Ready
+        </span>
       </div>
-      <button 
-        onClick={startVoiceRecognition} 
+      <button
+        onClick={startVoiceRecognition}
         className={`w-full py-5 rounded-2xl flex items-center justify-center gap-3 transition-all ${
-          isListening ? 'bg-red-600 animate-pulse scale-95 shadow-inner' : 'bg-zinc-800 hover:bg-zinc-700'
+          isListening
+            ? "bg-red-600 animate-pulse scale-95 shadow-inner"
+            : "bg-zinc-800 hover:bg-zinc-700"
         }`}
       >
         {isListening ? (
           <>
             <Mic size={24} className="animate-bounce" />
-            <span className="font-bold tracking-tight">Listening for S.O.S...</span>
+            <span className="font-bold tracking-tight">
+              Listening for S.O.S...
+            </span>
           </>
         ) : (
           <>
@@ -47,16 +53,20 @@ const GuardianAssistant: React.FC = () => {
           </>
         )}
       </button>
-      <button 
-        onClick={() => setShowLogger(!showLogger)} 
+      <button
+        onClick={() => setShowLogger(!showLogger)}
         className="w-full mt-3 py-4 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-300 font-medium hover:bg-zinc-800 transition-colors"
       >
-        {showLogger ? 'Close Incident Form' : 'Log Incident Manually'}
+        {showLogger ? "Close Incident Form" : "Log Incident Manually"}
       </button>
-      {showLogger && <IncidentLogger onComplete={() => {
-        setShowLogger(false);
-        triggerFeedback("REPORT FILED");
-      }}/>}
+      {showLogger && (
+        <IncidentLogger
+          onComplete={() => {
+            setShowLogger(false);
+            triggerFeedback("REPORT FILED");
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
-import ResidentDashboard from './ResidentDashboard';
-import TanodDashboard from './TanodDashboard';
-import AdminDashboard from './AdminDashboard';
-import { User, Alert, PatrolLocation, SystemBroadcast } from '../types';
+import ResidentDashboard from "./ResidentDashboard";
+import TanodDashboard from "./TanodDashboard";
+import AdminDashboard from "./AdminDashboard";
+import { User, Alert, PatrolLocation, SystemBroadcast } from "../types";
 
 interface DashboardViewProps {
   profile: User;
@@ -30,45 +30,50 @@ export default function DashboardView({
   onToggleSiren,
   activeBroadcast,
 }: DashboardViewProps) {
-  console.log('[DEBUG] DashboardView rendered with profile role:', profile.role);
-  if (profile.role === 'resident') {
+  console.log(
+    "[DEBUG] DashboardView rendered with profile role:",
+    profile.role
+  );
+  if (profile.role === "resident") {
     return (
-      <ResidentDashboard 
-        profile={profile} 
-        patrols={patrols} 
-        visiblePatrols={visiblePatrols} 
-        isOnline={isOnline} 
-        deferredPrompt={deferredPrompt} 
-        onInstall={onInstall} 
-        onTabChange={onTabChange} 
-        sirenActive={sirenActive} 
-        onToggleSiren={onToggleSiren} 
+      <ResidentDashboard
+        profile={profile}
+        patrols={patrols}
+        visiblePatrols={visiblePatrols}
+        isOnline={isOnline}
+        deferredPrompt={deferredPrompt}
+        onInstall={onInstall}
+        onTabChange={onTabChange}
+        sirenActive={sirenActive}
+        onToggleSiren={onToggleSiren}
       />
     );
   }
-  if (profile.role === 'tanod') {
+  if (profile.role === "tanod") {
     return (
-      <TanodDashboard 
-        profile={profile} 
-        deferredPrompt={deferredPrompt} 
-        onInstall={onInstall} 
-        sirenActive={sirenActive} 
-        onToggleSiren={onToggleSiren} 
+      <TanodDashboard
+        profile={profile}
+        deferredPrompt={deferredPrompt}
+        onInstall={onInstall}
+        sirenActive={sirenActive}
+        onToggleSiren={onToggleSiren}
       />
     );
   }
-  if (profile.role === 'admin' || profile.role === 'superadmin') {
+  if (profile.role === "admin" || profile.role === "superadmin") {
     return (
-      <AdminDashboard 
-        profile={profile} 
-        onTabChange={onTabChange} 
-        deferredPrompt={deferredPrompt} 
-        onInstall={onInstall} 
-        sirenActive={sirenActive} 
-        onToggleSiren={onToggleSiren} 
-        activeBroadcast={activeBroadcast} 
+      <AdminDashboard
+        profile={profile}
+        onTabChange={onTabChange}
+        deferredPrompt={deferredPrompt}
+        onInstall={onInstall}
+        sirenActive={sirenActive}
+        onToggleSiren={onToggleSiren}
+        activeBroadcast={activeBroadcast}
       />
     );
   }
-  return <div className="text-center p-12 text-[#8E9299]">Unauthorized Access</div>;
+  return (
+    <div className="text-center p-12 text-[#8E9299]">Unauthorized Access</div>
+  );
 }

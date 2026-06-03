@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { cn } from '../../lib/utils';
+import { ReactNode } from "react";
+import { cn } from "../../lib/utils";
 
 interface Props {
   title?: string;
@@ -10,7 +10,13 @@ interface Props {
 
 export function TacticalCard({ title, children, className, onClick }: Props) {
   return (
-    <div className={cn("tactical-panel p-5 tactical-grid relative overflow-hidden", className)} onClick={onClick}>
+    <div
+      className={cn(
+        "tactical-panel p-5 tactical-grid relative overflow-hidden",
+        className
+      )}
+      onClick={onClick}
+    >
       <div className="absolute inset-0 opacity-20 pointer-events-none">
         <div className="absolute top-0 left-0 w-full h-px bg-cyan-400" />
       </div>

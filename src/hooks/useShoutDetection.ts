@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'react-hot-toast';
+import { micManager } from '../lib/microphoneManager';
 
 // Tactical Distress Detection Hook
 // Uses volume peaks + duration + keyword probability (simulated)
@@ -18,8 +19,8 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
   const startListening = useCallback(async () => {
     try {
       // 1. Audio Level Analysis
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioContext = new AudioContext();
+      const stream = await micManager.acquire('shout-detection', 'useShoutDetection');
+      const audioContext = micManager.getAudioContext();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
       
@@ -100,7 +101,7 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
 
   const stopListening = useCallback(() => {
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-    if (audioContextRef.current) audioContextRef.current.close();
+    micManager.release('shout-detection');
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();

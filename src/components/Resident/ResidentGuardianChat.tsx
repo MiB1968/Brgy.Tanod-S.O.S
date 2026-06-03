@@ -1,24 +1,32 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Bot, Shield, HelpCircle, HardDrive } from 'lucide-react';
-import { guardianAI } from '../../services/guardianAIService';
-import { isWebLLMReady } from '../../lib/webllm';
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  MessageCircle,
+  X,
+  Send,
+  Bot,
+  Shield,
+  HelpCircle,
+  HardDrive,
+} from "lucide-react";
+import { guardianAI } from "../../services/guardianAIService";
+import { isWebLLMReady } from "../../lib/webllm";
 
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'guardian';
+  sender: "user" | "guardian";
   timestamp: Date;
 }
 
 export const ResidentGuardianChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
-      text: 'Magandang araw! Ako si Guardian. Paano kita matutulungan sa kaligtasan ng ating Barangay?',
-      sender: 'guardian',
+      id: "1",
+      text: "Magandang araw! Ako si Guardian. Paano kita matutulungan sa kaligtasan ng ating Barangay?",
+      sender: "guardian",
       timestamp: new Date(),
     },
   ]);
@@ -37,23 +45,23 @@ export const ResidentGuardianChat: React.FC = () => {
     const userMsg: Message = {
       id: Date.now().toString(),
       text: input,
-      sender: 'user',
+      sender: "user",
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInput('');
+    setInput("");
     setIsTyping(true);
 
     try {
       if (isWebLLMReady()) {
         const context = { pendingSOS: 0, activeTanods: 5, isSuperAdmin: false };
         const response = await guardianAI.processCommand(input, context);
-        
+
         const botMsg: Message = {
           id: (Date.now() + 1).toString(),
           text: response.reply,
-          sender: 'guardian',
+          sender: "guardian",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, botMsg]);
@@ -61,8 +69,8 @@ export const ResidentGuardianChat: React.FC = () => {
         setTimeout(() => {
           const botMsg: Message = {
             id: (Date.now() + 1).toString(),
-            text: 'Pasensya na, pinaghahandaan ko pa ang aking kaalaman (AI model loading). Maaari kang tumawag sa hotline kung may emergency.',
-            sender: 'guardian',
+            text: "Pasensya na, pinaghahandaan ko pa ang aking kaalaman (AI model loading). Maaari kang tumawag sa hotline kung may emergency.",
+            sender: "guardian",
             timestamp: new Date(),
           };
           setMessages((prev) => [...prev, botMsg]);
@@ -71,7 +79,7 @@ export const ResidentGuardianChat: React.FC = () => {
         return;
       }
     } catch (error) {
-      console.error('Chat error:', error);
+      console.error("Chat error:", error);
     } finally {
       setIsTyping(false);
     }
@@ -105,32 +113,54 @@ export const ResidentGuardianChat: React.FC = () => {
                   <Shield className="text-white w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-white font-black italic text-sm tracking-tighter uppercase">Guardian Bot</h3>
+                  <h3 className="text-white font-black italic text-sm tracking-tighter uppercase">
+                    Guardian Bot
+                  </h3>
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                    <span className="text-[10px] text-cyan-200/60 font-mono tracking-widest uppercase">Secured & Offline</span>
+                    <span className="text-[10px] text-cyan-200/60 font-mono tracking-widest uppercase">
+                      Secured & Offline
+                    </span>
                   </div>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-white/40 hover:text-white">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/40 hover:text-white"
+              >
                 <X size={20} />
               </button>
             </div>
 
             {/* Messages */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide"
+            >
               {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  key={m.id}
+                  className={`flex ${
+                    m.sender === "user" ? "justify-end" : "justify-start"
+                  }`}
+                >
                   <div
                     className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${
-                      m.sender === 'user'
-                        ? 'bg-cyan-600 text-white rounded-tr-none'
-                        : 'bg-white/5 border border-white/10 text-gray-200 rounded-tl-none'
+                      m.sender === "user"
+                        ? "bg-cyan-600 text-white rounded-tr-none"
+                        : "bg-white/5 border border-white/10 text-gray-200 rounded-tl-none"
                     }`}
                   >
                     {m.text}
-                    <div className={`text-[9px] mt-1 opacity-40 font-mono ${m.sender === 'user' ? 'text-right' : 'text-left'}`}>
-                      {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <div
+                      className={`text-[9px] mt-1 opacity-40 font-mono ${
+                        m.sender === "user" ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {m.timestamp.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                   </div>
                 </div>
@@ -148,20 +178,20 @@ export const ResidentGuardianChat: React.FC = () => {
 
             {/* Quick Actions */}
             <div className="px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar border-t border-white/5 bg-white/5">
-              <button 
-                onClick={() => setInput('Paano ang first aid sa sugat?')}
+              <button
+                onClick={() => setInput("Paano ang first aid sa sugat?")}
                 className="flex-shrink-0 text-[10px] bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10"
               >
                 🩹 First Aid Guide
               </button>
-              <button 
-                onClick={() => setInput('Ano ang main hotline ng barangay?')}
+              <button
+                onClick={() => setInput("Ano ang main hotline ng barangay?")}
                 className="flex-shrink-0 text-[10px] bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10"
               >
                 📞 Hotline Info
               </button>
-              <button 
-                onClick={() => setInput('Mag-report ng gulo sa kanto.')}
+              <button
+                onClick={() => setInput("Mag-report ng gulo sa kanto.")}
                 className="flex-shrink-0 text-[10px] bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10"
               >
                 🚨 How to Report
@@ -175,7 +205,7 @@ export const ResidentGuardianChat: React.FC = () => {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   placeholder="Mag-tanong kay Guardian..."
                   className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500/50"
                 />

@@ -231,6 +231,18 @@ export interface Location {
   timestamp: number;
 }
 
+export interface LocationUpdate {
+  userId: string;
+  role: UserRole;
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  speed?: number;
+  heading?: number;
+  timestamp: string;
+  alertId: string | null;
+}
+
 export interface SOSChatMessage {
   id: string;
   senderId: string;

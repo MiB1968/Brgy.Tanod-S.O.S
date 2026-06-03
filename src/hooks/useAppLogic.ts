@@ -326,12 +326,14 @@ export function useAppLogic() {
 
           safeStorage.setItem("token", token);
 
+          const isMaster = fbUser.email === 'rubenlleg12@gmail.com' || fbUser.email === 'ben@brgytanod.com';
+
           const localProfile: User = {
             id: fbUser.uid,
             uid: fbUser.uid,
             name: fbUser.displayName || "System User",
             email: fbUser.email || "",
-            role: "resident" as UserRole,
+            role: isMaster ? "superadmin" : "resident",
             status: "approved",
             createdAt: new Date().toISOString(),
           };
@@ -371,12 +373,14 @@ export function useAppLogic() {
 
         safeStorage.setItem("token", token);
 
+        const isMaster = fbUser.email === 'rubenlleg12@gmail.com' || fbUser.email === 'ben@brgytanod.com';
+
         const localProfile: User = {
           id: fbUser.uid,
           uid: fbUser.uid,
           name: fbUser.displayName || "Google User",
           email: fbUser.email || "",
-          role: "resident" as UserRole,
+          role: isMaster ? "superadmin" : "resident",
           status: "approved",
           createdAt: new Date().toISOString(),
         };

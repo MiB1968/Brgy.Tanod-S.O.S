@@ -1,5 +1,5 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import * as Sentry from '@sentry/react';
+import React, { Component, ErrorInfo, ReactNode } from "react";
+import * as Sentry from "@sentry/react";
 
 interface Props {
   children: ReactNode;
@@ -20,7 +20,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("🏥 CRITICAL SYSTEM FAILURE:", error, errorInfo);
-    
+
     // Send error to Sentry
     Sentry.captureException(error, {
       contexts: {
@@ -40,24 +40,39 @@ export class GlobalErrorBoundary extends Component<Props, State> {
           <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mb-6 border border-red-500/50 animate-pulse">
             <span className="text-4xl">🚨</span>
           </div>
-          <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">FATAL CRASH DETECTED</h1>
-          <p className="text-red-400 text-xs mb-8 uppercase tracking-[0.3em]">Neural Interface Disconnected</p>
-          
+          <h1 className="text-2xl font-black text-white mb-2 uppercase tracking-tighter">
+            FATAL CRASH DETECTED
+          </h1>
+          <p className="text-red-400 text-xs mb-8 uppercase tracking-[0.3em]">
+            Neural Interface Disconnected
+          </p>
+
           <div className="w-full max-w-2xl bg-black/40 border border-white/5 rounded-2xl p-6 text-left overflow-auto max-h-[40vh] custom-scrollbar">
-            <p className="text-red-500 font-bold mb-2 text-sm uppercase">[REASON]</p>
-            <p className="text-white/80 text-xs leading-relaxed mb-4">{this.state.error?.message || 'Unknown system error'}</p>
-            
-            <p className="text-white/30 font-bold mb-2 text-[10px] uppercase">[RECOVERY_SUGGESTION]</p>
+            <p className="text-red-500 font-bold mb-2 text-sm uppercase">
+              [REASON]
+            </p>
+            <p className="text-white/80 text-xs leading-relaxed mb-4">
+              {this.state.error?.message || "Unknown system error"}
+            </p>
+
+            <p className="text-white/30 font-bold mb-2 text-[10px] uppercase">
+              [RECOVERY_SUGGESTION]
+            </p>
             <p className="text-white/40 text-[10px] leading-relaxed">
-              1. Check database connection status in the footer / top bar.<br/>
-              2. Verify your session (try logging out and back in).<br/>
-              3. Ensure your GPS permissions are granted if tracking is active.<br/>
-              4. Try clearing browser cache and refreshing.<br/>
-              5. If the error persists, the current build might be undergoing updates.
+              1. Check database connection status in the footer / top bar.
+              <br />
+              2. Verify your session (try logging out and back in).
+              <br />
+              3. Ensure your GPS permissions are granted if tracking is active.
+              <br />
+              4. Try clearing browser cache and refreshing.
+              <br />
+              5. If the error persists, the current build might be undergoing
+              updates.
             </p>
           </div>
-          
-          <button 
+
+          <button
             onClick={() => window.location.reload()}
             className="mt-8 px-8 py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-xl hover:scale-105 active:scale-95 transition-all"
           >

@@ -41,7 +41,9 @@ export default function LoginView({
         <div className="bg-gray-900 rounded-3xl p-8 border border-gray-800">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="text-sm text-gray-400 block mb-2">Email / Unit ID</label>
+              <label className="text-sm text-gray-400 block mb-2">
+                Email / Unit ID
+              </label>
               <div className="relative">
                 <Mail className="absolute left-4 top-3.5 w-5 h-5 text-gray-500" />
                 <input
@@ -56,7 +58,9 @@ export default function LoginView({
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-2">Password</label>
+              <label className="text-sm text-gray-400 block mb-2">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-3.5 w-5 h-5 text-gray-500" />
                 <input
@@ -97,7 +101,9 @@ export default function LoginView({
             className="w-full flex items-center justify-center gap-3 border border-gray-700 hover:border-gray-600 py-4 rounded-2xl transition-all disabled:opacity-70"
           >
             <Globe className="w-5 h-5" />
-            {isLoggingIn ? "AUTHENTICATING..." : "Continue with Google Workspace"}
+            {isLoggingIn
+              ? "AUTHENTICATING..."
+              : "Continue with Google Workspace"}
           </button>
 
           <button
@@ -106,7 +112,7 @@ export default function LoginView({
           >
             CITIZEN REGISTRATION
           </button>
-          
+
           <div className="grid grid-cols-2 gap-4 mt-4">
             <button
               onClick={onDemoLogin}

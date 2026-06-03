@@ -48,7 +48,7 @@ export class BatteryGuardService {
       console.warn('[BatteryGuard] Wake Lock API not supported on this device browser.');
       return false;
     } catch (err) {
-      console.error('[BatteryGuard] Failed to capture device wake lock:', err);
+      console.warn('[BatteryGuard] Failed to capture device wake lock:', err);
       return false;
     }
   }

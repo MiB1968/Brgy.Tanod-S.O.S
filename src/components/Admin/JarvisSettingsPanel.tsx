@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Volume2, Mic, Settings, Save } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { X, Volume2, Mic, Settings, Save } from "lucide-react";
 
 export interface VoiceSettings {
   voiceId: string;
@@ -9,7 +9,7 @@ export interface VoiceSettings {
   similarity: number;
   style: number;
   wakeWord: string;
-  language: 'en' | 'fil';
+  language: "en" | "fil";
   volume: number;
   autoListen: boolean;
 }
@@ -22,7 +22,7 @@ export const defaultSettings: VoiceSettings = {
   similarity: 0.95,
   style: 0.45,
   wakeWord: "guardian",
-  language: 'en',
+  language: "en",
   volume: 0.95,
   autoListen: true,
 };
@@ -31,7 +31,7 @@ export function JarvisSettingsPanel({
   isOpen,
   onClose,
   onSave,
-  initialSettings
+  initialSettings,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -39,7 +39,9 @@ export function JarvisSettingsPanel({
   initialSettings: VoiceSettings;
 }) {
   const [settings, setSettings] = useState<VoiceSettings>(initialSettings);
-  const [previewText, setPreviewText] = useState("Systems online. How may I assist you, Sir?");
+  const [previewText, setPreviewText] = useState(
+    "Systems online. How may I assist you, Sir?"
+  );
 
   useEffect(() => {
     setSettings(initialSettings);
@@ -68,9 +70,14 @@ export function JarvisSettingsPanel({
         <div className="flex items-center justify-between border-b border-amber-500/30 px-6 py-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             <Settings className="text-amber-400" size={24} />
-            <h2 className="text-2xl font-bold text-amber-400 tracking-widest">JARVIS SETTINGS</h2>
+            <h2 className="text-2xl font-bold text-amber-400 tracking-widest">
+              JARVIS SETTINGS
+            </h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
             <X size={24} />
           </button>
         </div>
@@ -78,12 +85,16 @@ export function JarvisSettingsPanel({
         <div className="p-6 space-y-8 overflow-y-auto flex-1">
           {/* Voice Profile */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2 font-mono">VOICE PROFILE</label>
+            <label className="text-sm text-gray-400 block mb-2 font-mono">
+              VOICE PROFILE
+            </label>
             <div className="bg-zinc-900 rounded-2xl p-4 border border-amber-500/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-amber-500">JARVIS Prime</p>
-                  <p className="text-xs text-gray-500">ElevenLabs • British • Premium</p>
+                  <p className="text-xs text-gray-500">
+                    ElevenLabs • British • Premium
+                  </p>
                 </div>
                 <button
                   onClick={playPreview}
@@ -100,7 +111,9 @@ export function JarvisSettingsPanel({
             <div>
               <label className="flex justify-between text-sm text-gray-400 mb-2 font-mono">
                 <span>Speed</span>
-                <span className="text-amber-500">{settings.speed.toFixed(2)}x</span>
+                <span className="text-amber-500">
+                  {settings.speed.toFixed(2)}x
+                </span>
               </label>
               <input
                 type="range"
@@ -108,7 +121,12 @@ export function JarvisSettingsPanel({
                 max="1.3"
                 step="0.01"
                 value={settings.speed}
-                onChange={(e) => setSettings({ ...settings, speed: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    speed: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full accent-amber-500"
               />
             </div>
@@ -116,7 +134,9 @@ export function JarvisSettingsPanel({
             <div>
               <label className="flex justify-between text-sm text-gray-400 mb-2 font-mono">
                 <span>Pitch</span>
-                <span className="text-amber-500">{settings.pitch.toFixed(2)}</span>
+                <span className="text-amber-500">
+                  {settings.pitch.toFixed(2)}
+                </span>
               </label>
               <input
                 type="range"
@@ -124,7 +144,12 @@ export function JarvisSettingsPanel({
                 max="1.3"
                 step="0.01"
                 value={settings.pitch}
-                onChange={(e) => setSettings({ ...settings, pitch: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    pitch: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full accent-amber-500"
               />
             </div>
@@ -132,7 +157,9 @@ export function JarvisSettingsPanel({
             <div>
               <label className="flex justify-between text-sm text-gray-400 mb-2 font-mono">
                 <span>Stability</span>
-                <span className="text-amber-500">{settings.stability.toFixed(2)}</span>
+                <span className="text-amber-500">
+                  {settings.stability.toFixed(2)}
+                </span>
               </label>
               <input
                 type="range"
@@ -140,7 +167,12 @@ export function JarvisSettingsPanel({
                 max="1"
                 step="0.05"
                 value={settings.stability}
-                onChange={(e) => setSettings({ ...settings, stability: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    stability: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full accent-amber-500"
               />
             </div>
@@ -148,7 +180,9 @@ export function JarvisSettingsPanel({
             <div>
               <label className="flex justify-between text-sm text-gray-400 mb-2 font-mono">
                 <span>Style / Emotion</span>
-                <span className="text-amber-500">{settings.style.toFixed(2)}</span>
+                <span className="text-amber-500">
+                  {settings.style.toFixed(2)}
+                </span>
               </label>
               <input
                 type="range"
@@ -156,7 +190,12 @@ export function JarvisSettingsPanel({
                 max="1"
                 step="0.05"
                 value={settings.style}
-                onChange={(e) => setSettings({ ...settings, style: parseFloat(e.target.value) })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    style: parseFloat(e.target.value),
+                  })
+                }
                 className="w-full accent-amber-500"
               />
             </div>
@@ -165,21 +204,35 @@ export function JarvisSettingsPanel({
           {/* Wake Word & Language */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <label className="text-sm text-gray-400 block mb-2 font-mono">WAKE WORD</label>
+              <label className="text-sm text-gray-400 block mb-2 font-mono">
+                WAKE WORD
+              </label>
               <input
                 type="text"
                 value={settings.wakeWord}
-                onChange={(e) => setSettings({ ...settings, wakeWord: e.target.value.toLowerCase() })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    wakeWord: e.target.value.toLowerCase(),
+                  })
+                }
                 className="w-full bg-zinc-900 border border-amber-500/30 rounded-2xl px-4 py-3 focus:outline-none focus:border-amber-500 text-white"
                 placeholder="e.g. guardian"
               />
             </div>
 
             <div>
-              <label className="text-sm text-gray-400 block mb-2 font-mono">LANGUAGE MODE</label>
+              <label className="text-sm text-gray-400 block mb-2 font-mono">
+                LANGUAGE MODE
+              </label>
               <select
                 value={settings.language}
-                onChange={(e) => setSettings({ ...settings, language: e.target.value as 'en' | 'fil' })}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    language: e.target.value as "en" | "fil",
+                  })
+                }
                 className="w-full bg-zinc-900 border border-amber-500/30 rounded-2xl px-4 py-3 focus:outline-none focus:border-amber-500 text-white"
               >
                 <option value="en">English (British JARVIS)</option>
@@ -190,7 +243,9 @@ export function JarvisSettingsPanel({
 
           {/* Preview Text */}
           <div>
-            <label className="text-sm text-gray-400 block mb-2 font-mono">PREVIEW TEXT</label>
+            <label className="text-sm text-gray-400 block mb-2 font-mono">
+              PREVIEW TEXT
+            </label>
             <textarea
               value={previewText}
               onChange={(e) => setPreviewText(e.target.value)}
@@ -202,10 +257,14 @@ export function JarvisSettingsPanel({
             <input
               type="checkbox"
               checked={settings.autoListen}
-              onChange={(e) => setSettings({ ...settings, autoListen: e.target.checked })}
+              onChange={(e) =>
+                setSettings({ ...settings, autoListen: e.target.checked })
+              }
               className="w-5 h-5 accent-amber-500"
             />
-            <span className="text-sm text-gray-300">Always Listening Mode (after activation)</span>
+            <span className="text-sm text-gray-300">
+              Always Listening Mode (after activation)
+            </span>
           </div>
         </div>
 

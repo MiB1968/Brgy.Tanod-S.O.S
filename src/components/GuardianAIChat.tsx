@@ -1,20 +1,55 @@
 // src/components/GuardianAIChat.tsx
-import { useState, useRef, useEffect } from 'react';
-import { Send, X, Bot, Settings as SettingsIcon, Mic, MicOff, Trash2, Download, Sun, Moon, Camera, AlertTriangle, Info, CheckCircle } from 'lucide-react';
-import { useGuardianChat } from '../hooks/useGuardianChat';
-import GuardianAISettings from './GuardianAISettings';
-import { motion, AnimatePresence } from 'motion/react';
-import jsPDF from 'jspdf';
-import { useRBAC } from '../context/AuthContext';
-import { syncService } from '../services/syncService';
-import { guardianAI } from '../services/guardianAI';
+import { useState, useRef, useEffect } from "react";
+import {
+  Send,
+  X,
+  Bot,
+  Settings as SettingsIcon,
+  Mic,
+  MicOff,
+  Trash2,
+  Download,
+  Sun,
+  Moon,
+  Camera,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+} from "lucide-react";
+import { useGuardianChat } from "../hooks/useGuardianChat";
+import GuardianAISettings from "./GuardianAISettings";
+import { motion, AnimatePresence } from "motion/react";
+import jsPDF from "jspdf";
+import { useRBAC } from "../context/AuthContext";
+import { syncService } from "../services/syncService";
+import { guardianAI } from "../services/guardianAI";
 
 const emergencyTemplates = [
-  { label: "🔥 Sunog", prompt: "May nangyayaring sunog sa aming Purok. Ano ang dapat gawin ng komunidad ngayon?" },
-  { label: "🩹 Medical Rescue", prompt: "May kasamang nakaranas ng matinding hirap sa paghinga at kawalan ng malay. Paano mag-lapat ng first aid?" },
-  { label: "🌊 Pagbaha", prompt: "Mabilis na tumataas ang tubig-baha dahil sa bagyo. Ano ang opisyal na evacuation procedure?" },
-  { label: "🚨 Kahina-hinala", prompt: "May mga kahina-hinalang tao na umaaligid sa aming pinto. Paano ito ligtas na haharapin?" },
-  { label: "⚡ Kuryente", prompt: "May bumagsak na kable ng kuryente sa kalsada at kumikislap. Ano ang tamang safety protocol?" },
+  {
+    label: "🔥 Sunog",
+    prompt:
+      "May nangyayaring sunog sa aming Purok. Ano ang dapat gawin ng komunidad ngayon?",
+  },
+  {
+    label: "🩹 Medical Rescue",
+    prompt:
+      "May kasamang nakaranas ng matinding hirap sa paghinga at kawalan ng malay. Paano mag-lapat ng first aid?",
+  },
+  {
+    label: "🌊 Pagbaha",
+    prompt:
+      "Mabilis na tumataas ang tubig-baha dahil sa bagyo. Ano ang opisyal na evacuation procedure?",
+  },
+  {
+    label: "🚨 Kahina-hinala",
+    prompt:
+      "May mga kahina-hinalang tao na umaaligid sa aming pinto. Paano ito ligtas na haharapin?",
+  },
+  {
+    label: "⚡ Kuryente",
+    prompt:
+      "May bumagsak na kable ng kuryente sa kalsada at kumikislap. Ano ang tamang safety protocol?",
+  },
 ];
 
 const QUICK_ACTIONS = [
@@ -25,35 +60,46 @@ const QUICK_ACTIONS = [
   { label: "🗣️ Voice Navigation", action: "voice_nav" },
 ];
 
-export default function GuardianAIChat({ isInline = false }: { isInline?: boolean }) {
-  const { messages, sendMessage, clearConversation, isThinking } = useGuardianChat();
+export default function GuardianAIChat({
+  isInline = false,
+}: {
+  isInline?: boolean;
+}) {
+  const { messages, sendMessage, clearConversation, isThinking } =
+    useGuardianChat();
   const { profile } = useRBAC();
 
   const handleQuickAction = (action: string) => {
     let prompt = "";
     switch (action) {
-      case "sos": 
-        prompt = "SOS! May aktwal na emergency dito. Mangyaring abisuhan ang pinakamalapit na Barangay Tanod patrol at i-record ito bilang priority dispatch alert ng Command Center."; 
+      case "sos":
+        prompt =
+          "SOS! May aktwal na emergency dito. Mangyaring abisuhan ang pinakamalapit na Barangay Tanod patrol at i-record ito bilang priority dispatch alert ng Command Center.";
         break;
-      case "fire": 
-        prompt = "May sunog sa ating barangay! Ano ang agarang fire first aid at evacuations protocols, at paano abisuhan ang BFP hotlines?"; 
+      case "fire":
+        prompt =
+          "May sunog sa ating barangay! Ano ang agarang fire first aid at evacuations protocols, at paano abisuhan ang BFP hotlines?";
         break;
-      case "medical": 
-        prompt = "May nangangailangan ng medical assistance at rescue. Anong first aid o CPR techniques ang kailangang ilapat at tawagan ang aming emergency responders?"; 
+      case "medical":
+        prompt =
+          "May nangangailangan ng medical assistance at rescue. Anong first aid o CPR techniques ang kailangang ilapat at tawagan ang aming emergency responders?";
         break;
-      case "location": 
-        prompt = `Ipadala ang aking kasalukuyang lokasyon (${profile?.name || 'User'}) sa Command Center at abisuhan ang pinakamalapit na Tanod Patrol para sa security duty dispatch.`; 
+      case "location":
+        prompt = `Ipadala ang aking kasalukuyang lokasyon (${
+          profile?.name || "User"
+        }) sa Command Center at abisuhan ang pinakamalapit na Tanod Patrol para sa security duty dispatch.`;
         break;
       case "voice_nav":
-        prompt = "Guide me with voice navigation to the nearest command center or safe area in Mamburao, Occidental Mindoro.";
+        prompt =
+          "Guide me with voice navigation to the nearest command center or safe area in Mamburao, Occidental Mindoro.";
         break;
     }
     sendMessage(prompt);
   };
-  
+
   const [isOpen, setIsOpen] = useState(isInline);
   const [showSettings, setShowSettings] = useState(false);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -61,12 +107,15 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   const [compatibility, setCompatibility] = useState<{
     supported: boolean;
     message: string;
-    level: 'good' | 'warning' | 'error';
-  }>({ supported: true, message: '', level: 'good' });
+    level: "good" | "warning" | "error";
+  }>({ supported: true, message: "", level: "good" });
 
   const [showFirstTimeSetup, setShowFirstTimeSetup] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [recentCrisis, setRecentCrisis] = useState<{ type: string; level: string } | null>(null);
+  const [recentCrisis, setRecentCrisis] = useState<{
+    type: string;
+    level: string;
+  } | null>(null);
   const hasShownSetup = useRef(false);
 
   // Listen for crisis events in UI
@@ -76,14 +125,18 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       const timer = setTimeout(() => setRecentCrisis(null), 8000);
       return () => clearTimeout(timer);
     };
-    window.addEventListener('guardian-crisis-detected', handler);
-    return () => window.removeEventListener('guardian-crisis-detected', handler);
+    window.addEventListener("guardian-crisis-detected", handler);
+    return () =>
+      window.removeEventListener("guardian-crisis-detected", handler);
   }, []);
 
-  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "error" | "success" | "info";
+  } | null>(null);
   const toastTimerRef = useRef<any>(null);
 
-  const showToast = (message: string, type: 'error' | 'success' | 'info') => {
+  const showToast = (message: string, type: "error" | "success" | "info") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
     toastTimerRef.current = setTimeout(() => {
@@ -107,13 +160,13 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     const handleClose = () => setIsOpen(false);
-    
-    window.addEventListener('open-guardian-chat', handleOpen);
-    window.addEventListener('close-guardian-chat', handleClose);
-    
+
+    window.addEventListener("open-guardian-chat", handleOpen);
+    window.addEventListener("close-guardian-chat", handleClose);
+
     return () => {
-      window.removeEventListener('open-guardian-chat', handleOpen);
-      window.removeEventListener('close-guardian-chat', handleClose);
+      window.removeEventListener("open-guardian-chat", handleOpen);
+      window.removeEventListener("close-guardian-chat", handleClose);
     };
   }, []);
 
@@ -125,8 +178,9 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       if (!gpu) {
         setCompatibility({
           supported: false,
-          message: "Hindi suportado ang WebGPU sa browser na ito. Maaari tayong gumamit ng server AI kung online.",
-          level: 'error'
+          message:
+            "Hindi suportado ang WebGPU sa browser na ito. Maaari tayong gumamit ng server AI kung online.",
+          level: "error",
         });
         return;
       }
@@ -136,20 +190,22 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       if (ua.includes("Firefox")) {
         setCompatibility({
           supported: true,
-          message: "Firefox naman ito, subalit mas mabilis ang offline AI kapag sa Google Chrome.",
-          level: 'warning'
+          message:
+            "Firefox naman ito, subalit mas mabilis ang offline AI kapag sa Google Chrome.",
+          level: "warning",
         });
       } else if (ua.includes("Android") && !ua.includes("Chrome")) {
         setCompatibility({
           supported: true,
-          message: "Inirerekomenda ang paggamit ng Google Chrome sa Android para sa mas mabilis na offline response.",
-          level: 'warning'
+          message:
+            "Inirerekomenda ang paggamit ng Google Chrome sa Android para sa mas mabilis na offline response.",
+          level: "warning",
         });
       } else {
         setCompatibility({
           supported: true,
           message: "WebGPU Ready ✓",
-          level: 'good'
+          level: "good",
         });
       }
     };
@@ -160,8 +216,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   // Auto-suggest model loading or first-time setup or changelog when chat opens
   useEffect(() => {
     if (isOpen && compatibility.supported) {
-      const hasLoadedBefore = localStorage.getItem('guardianAI_hasCompletedSetup');
-      const lastVersion = localStorage.getItem('guardianAI_lastVersion');
+      const hasLoadedBefore = localStorage.getItem(
+        "guardianAI_hasCompletedSetup"
+      );
+      const lastVersion = localStorage.getItem("guardianAI_lastVersion");
       const currentVersion = "1.5.0";
 
       if (!hasLoadedBefore) {
@@ -179,7 +237,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           const timer = setTimeout(() => {
             setShowChangelog(true);
             hasShownSetup.current = true;
-            localStorage.setItem('guardianAI_lastVersion', currentVersion);
+            localStorage.setItem("guardianAI_lastVersion", currentVersion);
           }, 1000);
           return () => clearTimeout(timer);
         }
@@ -187,14 +245,25 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
         // Setup completed, up to date version, but no model currently loaded inside brain
         if (guardianAI.isLoaded) return;
         const timer = setTimeout(() => {
-          if (!guardianAI.isLoaded && !showSettings && !showFirstTimeSetup && !showChangelog) {
+          if (
+            !guardianAI.isLoaded &&
+            !showSettings &&
+            !showFirstTimeSetup &&
+            !showChangelog
+          ) {
             setShowSettings(true);
           }
         }, 1500);
         return () => clearTimeout(timer);
       }
     }
-  }, [isOpen, compatibility.supported, showSettings, showFirstTimeSetup, showChangelog]);
+  }, [
+    isOpen,
+    compatibility.supported,
+    showSettings,
+    showFirstTimeSetup,
+    showChangelog,
+  ]);
 
   const chatRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -202,19 +271,19 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   const completeFirstTimeSetup = () => {
     setShowFirstTimeSetup(false);
     setShowSettings(true);
-    localStorage.setItem('guardianAI_hasCompletedSetup', 'true');
+    localStorage.setItem("guardianAI_hasCompletedSetup", "true");
   };
 
   const skipSetup = () => {
     setShowFirstTimeSetup(false);
-    localStorage.setItem('guardianAI_hasCompletedSetup', 'true');
+    localStorage.setItem("guardianAI_hasCompletedSetup", "true");
   };
 
   const capturePhoto = () => {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.capture = 'environment'; // Rear camera on mobile
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.capture = "environment"; // Rear camera on mobile
     fileInput.onchange = (e: any) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -222,7 +291,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
         reader.onload = (ev) => {
           const base64 = ev.target?.result as string;
           if (base64) {
-            setAttachedPhotos(prev => [...prev, base64]);
+            setAttachedPhotos((prev) => [...prev, base64]);
           }
         };
         reader.readAsDataURL(file);
@@ -232,7 +301,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   };
 
   const removePhoto = (index: number) => {
-    setAttachedPhotos(prev => prev.filter((_, i) => i !== index));
+    setAttachedPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Auto-open if inline
@@ -245,29 +314,39 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
   // WebLLM Progress Event Listener (from global event dispatcher)
   useEffect(() => {
     const handler = (e: any) => {
-      if (e.detail?.type === 'progress') {
+      if (e.detail?.type === "progress") {
         const rawProgress = e.detail.payload.progress;
-        const prog = Math.round(rawProgress <= 1 ? rawProgress * 100 : rawProgress);
+        const prog = Math.round(
+          rawProgress <= 1 ? rawProgress * 100 : rawProgress
+        );
         setLoadingProgress(prog);
-      } else if (e.detail?.type === 'ready') {
+      } else if (e.detail?.type === "ready") {
         setLoadingProgress(100);
         setTimeout(() => setLoadingProgress(0), 1500);
       }
     };
-    window.addEventListener('guardian-ai-event', handler);
-    return () => window.removeEventListener('guardian-ai-event', handler);
+    window.addEventListener("guardian-ai-event", handler);
+    return () => window.removeEventListener("guardian-ai-event", handler);
   }, []);
 
   // Auto-scroll on new messages
   useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
+    chatRef.current?.scrollTo({
+      top: chatRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [messages]);
 
   const toggleVoiceInput = () => {
-    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionAPI) {
-      showToast("Ang voice input ay hindi suportado sa browser na ito. Pakigamit ang Google Chrome.", 'error');
+      showToast(
+        "Ang voice input ay hindi suportado sa browser na ito. Pakigamit ang Google Chrome.",
+        "error"
+      );
       return;
     }
 
@@ -279,22 +358,22 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
     try {
       const rec = new SpeechRecognitionAPI();
-      rec.lang = 'fil-PH'; // Native Filipino/Tagalog locale code
+      rec.lang = "fil-PH"; // Native Filipino/Tagalog locale code
       rec.continuous = false;
       rec.interimResults = false;
       rec.maxAlternatives = 1;
 
       rec.onstart = () => {
         setIsListening(true);
-        showToast("🎤 Nakikinig na... Magsalita ng iyong ulat.", 'info');
+        showToast("🎤 Nakikinig na... Magsalita ng iyong ulat.", "info");
       };
 
       rec.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript.trim();
         if (transcript) {
-          setInput(prev => (prev ? prev + ' ' : '') + transcript);
+          setInput((prev) => (prev ? prev + " " : "") + transcript);
           sendMessage(transcript);
-          showToast("✅ Narinig at naipadala!", 'success');
+          showToast("✅ Narinig at naipadala!", "success");
         }
       };
 
@@ -304,31 +383,35 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
         let canRetry = true;
 
         switch (event.error) {
-          case 'no-speech':
-            message = "Walang narinig na salita. Pakisubukang magsalita muli nang malinaw.";
+          case "no-speech":
+            message =
+              "Walang narinig na salita. Pakisubukang magsalita muli nang malinaw.";
             break;
-          case 'audio-capture':
-            message = "Hindi ma-access ang mikropono. Pakisuri kung nakasaksak ito.";
+          case "audio-capture":
+            message =
+              "Hindi ma-access ang mikropono. Pakisuri kung nakasaksak ito.";
             break;
-          case 'not-allowed':
-          case 'permission-denied':
-            message = "Hindi binigyan ng pahintulot ang mikropono sa iyong browser.";
+          case "not-allowed":
+          case "permission-denied":
+            message =
+              "Hindi binigyan ng pahintulot ang mikropono sa iyong browser.";
             canRetry = false;
             break;
-          case 'network':
-            message = "May problema sa koneksyon ng internet para sa voice parsing.";
+          case "network":
+            message =
+              "May problema sa koneksyon ng internet para sa voice parsing.";
             break;
-          case 'aborted':
+          case "aborted":
             message = "Kinansela ang pag-record ng boses.";
             break;
           default:
             message = `Error sa boses: ${event.error}`;
         }
 
-        showToast(message, 'error');
+        showToast(message, "error");
 
         // Automatically retry once if it was just a transient 'no-speech' error and dialog is still active
-        if (canRetry && event.error === 'no-speech' && isOpen) {
+        if (canRetry && event.error === "no-speech" && isOpen) {
           setTimeout(() => {
             if (isOpen && !isListening) {
               toggleVoiceInput();
@@ -346,7 +429,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
     } catch (err) {
       console.error("Failed to start speech recognition:", err);
       setIsListening(false);
-      showToast("Hindi ma-start ang boses. Pakitiyak na pinayagan ang mic.", 'error');
+      showToast(
+        "Hindi ma-start ang boses. Pakitiyak na pinayagan ang mic.",
+        "error"
+      );
     }
   };
 
@@ -357,97 +443,127 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       finalInput += ` (May kalakip na ${attachedPhotos.length} larawan/ebidensya sa ulat na ito)`;
     }
     sendMessage(finalInput);
-    setInput('');
+    setInput("");
   };
 
   const exportIncidentReport = async () => {
     if (messages.length === 0) {
-      showToast("Walang laman ang chat para i-export.", 'error');
+      showToast("Walang laman ang chat para i-export.", "error");
       return;
     }
 
     // 1. Plain Text Format Download
-    const reportHeadline = `GUARDIAN AI EMERGENCY INCIDENT REPORT\n` +
-      `Barangay Tanod Emergency Unit • Date: ${new Date().toLocaleDateString('en-PH')}\n` +
-      `Reporter Tanod: ${profile?.name || 'Unknown Officer'} (${profile?.id || profile?.uid || 'N/A'})\n` +
+    const reportHeadline =
+      `GUARDIAN AI EMERGENCY INCIDENT REPORT\n` +
+      `Barangay Tanod Emergency Unit • Date: ${new Date().toLocaleDateString(
+        "en-PH"
+      )}\n` +
+      `Reporter Tanod: ${profile?.name || "Unknown Officer"} (${
+        profile?.id || profile?.uid || "N/A"
+      })\n` +
       `========================================================================\n\n`;
-    
+
     const reportText = messages
-      .map(m => {
-        const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
+      .map((m) => {
+        const timeStr = m.timestamp
+          ? new Date(m.timestamp).toLocaleTimeString("en-PH", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
         return `[${timeStr}] ${m.role.toUpperCase()}:\n${m.content}\n`;
       })
-      .join('\n------------------------------------------------------------\n');
+      .join("\n------------------------------------------------------------\n");
 
-    const blob = new Blob([reportHeadline + reportText], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([reportHeadline + reportText], {
+      type: "text/plain;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.download = `Tanod-Incident-Report-${new Date().toISOString().slice(0, 10)}.txt`;
+    link.download = `Tanod-Incident-Report-${new Date()
+      .toISOString()
+      .slice(0, 10)}.txt`;
     link.click();
     URL.revokeObjectURL(url);
 
     // 2. Beautiful PDF formatting download using jsPDF (auto-wraps and handles pagination)
     try {
       const doc = new jsPDF();
-      
+
       // Top theme header decoration panel
       doc.setFillColor(15, 23, 42); // slate-900
-      doc.rect(0, 0, 210, 42, 'F');
-      
+      doc.rect(0, 0, 210, 42, "F");
+
       // Label headers
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(18);
       doc.text("GUARDIAN AI EMERGENCY INCIDENT REPORT", 14, 18);
-      
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(165, 180, 252); // indigo-300
       doc.text(`Barangay S.O.S. Command & Patrol System`, 14, 26);
-      doc.text(`Generated: ${new Date().toLocaleString('en-PH')}`, 14, 32);
-      
+      doc.text(`Generated: ${new Date().toLocaleString("en-PH")}`, 14, 32);
+
       // Overview stats box
       doc.setTextColor(51, 65, 85); // slate-700
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.text("REPORT OVERVIEW", 14, 52);
-      
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.text(`Total Logged Exchanges: ${messages.length}`, 14, 60);
-      doc.text(`Reporter Officer: ${profile?.name || 'Local Barangay Tanod Officer'}`, 14, 66);
-      doc.text(`Operational Target Core: Local Barangay Emergency Safety & Patrol Coordination`, 14, 72);
-      
+      doc.text(
+        `Reporter Officer: ${profile?.name || "Local Barangay Tanod Officer"}`,
+        14,
+        66
+      );
+      doc.text(
+        `Operational Target Core: Local Barangay Emergency Safety & Patrol Coordination`,
+        14,
+        72
+      );
+
       // Section separator rule
       doc.setFont("helvetica", "bold");
       doc.text("LIVE DIALOG LOGS AND GUIDANCE:", 14, 84);
       doc.setFillColor(109, 40, 217); // purple-700 rule
-      doc.rect(14, 86, 182, 1, 'F');
-      
+      doc.rect(14, 86, 182, 1, "F");
+
       // Iterate messages
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(30, 41, 59); // graphite text
-      
+
       let verticalCursor = 94;
-      
+
       messages.forEach((m) => {
         if (verticalCursor > 270) {
           doc.addPage();
           verticalCursor = 20;
         }
-        
-        const timeStr = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '';
-        const roleLabel = m.role === 'user' ? "Resident / Officer Prompt" : "Guardian AI Safety Helper";
-        
+
+        const timeStr = m.timestamp
+          ? new Date(m.timestamp).toLocaleTimeString("en-PH", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
+        const roleLabel =
+          m.role === "user"
+            ? "Resident / Officer Prompt"
+            : "Guardian AI Safety Helper";
+
         doc.setFont("helvetica", "bold");
         doc.text(`[${timeStr}] ${roleLabel}:`, 14, verticalCursor);
         verticalCursor += 5;
-        
+
         doc.setFont("helvetica", "normal");
         const lines = doc.splitTextToSize(m.content, 182);
-        
+
         lines.forEach((line: string) => {
           if (verticalCursor > 275) {
             doc.addPage();
@@ -456,21 +572,21 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           doc.text(line, 14, verticalCursor);
           verticalCursor += 5;
         });
-        
+
         verticalCursor += 4; // structural padding
       });
-      
+
       // Add Photos to PDF Report
       if (attachedPhotos.length > 0) {
         doc.addPage();
-        
+
         doc.setFillColor(15, 23, 42); // slate-900
-        doc.rect(0, 0, 210, 20, 'F');
+        doc.rect(0, 0, 210, 20, "F");
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
         doc.text("ATTACHED PHOTO EVIDENCE (MGA LITRATONG EBIDENSYA)", 14, 13);
-        
+
         let photoCursor = 35;
         for (const photo of attachedPhotos) {
           if (photoCursor > 150) {
@@ -478,7 +594,7 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
             photoCursor = 20;
           }
           try {
-            doc.addImage(photo, 'JPEG', 14, photoCursor, 182, 110);
+            doc.addImage(photo, "JPEG", 14, photoCursor, 182, 110);
             photoCursor += 120;
           } catch (imgError) {
             console.error("Failed to add image to PDF:", imgError);
@@ -487,19 +603,28 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       }
 
       // Save PDF
-      doc.save(`Brgy-Tanod-Incident-Report-${new Date().toISOString().slice(0, 10)}.pdf`);
+      doc.save(
+        `Brgy-Tanod-Incident-Report-${new Date()
+          .toISOString()
+          .slice(0, 10)}.pdf`
+      );
 
       // === AUTO-SYNC QUEUE TO COMMAND CENTER ===
       const reportPayload = {
         type: "incident_report",
         reportId: `REP-${Date.now()}`,
-        tanodId: profile?.id || profile?.uid || 'guest_tanod',
-        tanodName: profile?.name || 'Active Barangay Officer',
+        tanodId: profile?.id || profile?.uid || "guest_tanod",
+        tanodName: profile?.name || "Active Barangay Officer",
         timestamp: new Date().toISOString(),
-        messages: messages.map(m => ({
+        messages: messages.map((m) => ({
           role: m.role,
           content: m.content,
-          timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp ? new Date(m.timestamp).toISOString() : new Date().toISOString())
+          timestamp:
+            m.timestamp instanceof Date
+              ? m.timestamp.toISOString()
+              : m.timestamp
+              ? new Date(m.timestamp).toISOString()
+              : new Date().toISOString(),
         })),
         attachedPhotosCount: attachedPhotos.length,
         generatedBy: "Guardian AI Chat",
@@ -507,7 +632,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
       await syncService.queueReport(reportPayload);
       setAttachedPhotos([]);
-      showToast("✅ Na-save na ang Report bilang PDF at naka-queue para mag-upload!", "success");
+      showToast(
+        "✅ Na-save na ang Report bilang PDF at naka-queue para mag-upload!",
+        "success"
+      );
     } catch (pdfErr) {
       console.error("Failed to generate report PDF: ", pdfErr);
       showToast("❌ May problema sa pag-export. Subukan muli.", "error");
@@ -540,364 +668,490 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                   className="fixed inset-0 bg-black z-[70] backdrop-blur-sm cursor-pointer"
                 />
 
-                <motion.div 
+                <motion.div
                   initial={{ x: "100%", opacity: 0.9 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: "100%", opacity: 0.9 }}
                   transition={{ type: "spring", damping: 26, stiffness: 280 }}
                   className={`fixed top-0 right-0 w-full sm:w-[420px] h-full shadow-2xl flex flex-col z-[80] overflow-hidden font-sans border-l transition-all ${
-                    isDark 
-                      ? 'bg-[#060b14] border-purple-500/20 text-white animate-fade-in' 
-                      : 'bg-white border-gray-200 text-gray-900 shadow-xl'
+                    isDark
+                      ? "bg-[#060b14] border-purple-500/20 text-white animate-fade-in"
+                      : "bg-white border-gray-200 text-gray-900 shadow-xl"
                   }`}
                 >
-                {/* First Time Setup Modal - Pure Tagalog */}
-                {showFirstTimeSetup && (
-                  <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
-                    <div className="flex flex-col items-center text-center max-w-[320px]">
-                      <div className="mx-auto w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5 animate-pulse">
-                        <Bot className="w-10 h-10 text-purple-400" />
-                      </div>
-                      
-                      <h2 className="text-xl font-bold mb-3 tracking-tight">Maligayang Pagdating sa Guardian AI!</h2>
-                      <p className={`text-xs mb-6 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                        Upang magamit ang offline na artificial intelligence, kailangan muna nating i-load ang isang AI Model. Mangyayari ito nang ligtas mismo sa iyong browser sandbox.
-                      </p>
+                  {/* First Time Setup Modal - Pure Tagalog */}
+                  {showFirstTimeSetup && (
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${
+                        isDark ? "bg-black/95" : "bg-gray-100/95"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center max-w-[320px]">
+                        <div className="mx-auto w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5 animate-pulse">
+                          <Bot className="w-10 h-10 text-purple-400" />
+                        </div>
 
-                      <div className="space-y-3 w-full">
-                        <button
-                          onClick={completeFirstTimeSetup}
-                          className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer"
-                        >
-                          <CheckCircle size={16} />
-                          I-load ang Unang Model Ngayon
-                        </button>
-
-                        <button
-                          onClick={skipSetup}
-                          className={`w-full py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                            isDark 
-                              ? 'border-white/10 hover:bg-white/5 text-gray-400' 
-                              : 'border-gray-200 hover:bg-gray-100 text-gray-500'
+                        <h2 className="text-xl font-bold mb-3 tracking-tight">
+                          Maligayang Pagdating sa Guardian AI!
+                        </h2>
+                        <p
+                          className={`text-xs mb-6 leading-relaxed ${
+                            isDark ? "text-gray-300" : "text-gray-600"
                           }`}
                         >
-                          Gagawin ko na lang mamaya
+                          Upang magamit ang offline na artificial intelligence,
+                          kailangan muna nating i-load ang isang AI Model.
+                          Mangyayari ito nang ligtas mismo sa iyong browser
+                          sandbox.
+                        </p>
+
+                        <div className="space-y-3 w-full">
+                          <button
+                            onClick={completeFirstTimeSetup}
+                            className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-lg cursor-pointer"
+                          >
+                            <CheckCircle size={16} />
+                            I-load ang Unang Model Ngayon
+                          </button>
+
+                          <button
+                            onClick={skipSetup}
+                            className={`w-full py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                              isDark
+                                ? "border-white/10 hover:bg-white/5 text-gray-400"
+                                : "border-gray-200 hover:bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            Gagawin ko na lang mamaya
+                          </button>
+                        </div>
+
+                        <p className="text-[10px] text-gray-400 mt-6 leading-normal">
+                          Inirerekomenda: <strong>Phi-3.5 Mini</strong>
+                          <br />
+                          (Mabilis at sapat na matalino para sa Tanod)
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What's New Modal - Pure Tagalog */}
+                  {showChangelog && (
+                    <div
+                      className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${
+                        isDark ? "bg-black/95" : "bg-gray-100/95"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center text-center max-w-[320px]">
+                        <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-4 text-3xl animate-bounce">
+                          ✨
+                        </div>
+
+                        <h2 className="text-xl font-bold mb-1 tracking-tight">
+                          Ano ang Bago?
+                        </h2>
+                        <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">
+                          Bersyon v1.5.0
+                        </p>
+
+                        <div
+                          className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${
+                            isDark ? "text-gray-300" : "text-gray-600"
+                          }`}
+                        >
+                          <p className="font-semibold text-purple-400">
+                            Mga Pagbabago:
+                          </p>
+                          <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
+                            <li>One-time First Time Setup Guide</li>
+                            <li>Advanced WebGPU compatibility checker</li>
+                            <li>Automatic model loading suggestion</li>
+                            <li>Ligtas na offline Background Sync</li>
+                            <li>
+                              Suporta sa PDF Incident Report na May Larawan
+                            </li>
+                            <li>Pending Reports Viewer sa Settings Panel</li>
+                          </ul>
+                        </div>
+
+                        <button
+                          onClick={() => setShowChangelog(false)}
+                          className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs transition-all shadow-lg cursor-pointer"
+                        >
+                          Naintindihan ko, Salamat!
                         </button>
                       </div>
-
-                      <p className="text-[10px] text-gray-400 mt-6 leading-normal">
-                        Inirerekomenda: <strong>Phi-3.5 Mini</strong><br />
-                        (Mabilis at sapat na matalino para sa Tanod)
-                      </p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* What's New Modal - Pure Tagalog */}
-                {showChangelog && (
-                  <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
-                    <div className="flex flex-col items-center text-center max-w-[320px]">
-                      <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-4 text-3xl animate-bounce">
-                        ✨
-                      </div>
-                      
-                      <h2 className="text-xl font-bold mb-1 tracking-tight">Ano ang Bago?</h2>
-                      <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">Bersyon v1.5.0</p>
-                      
-                      <div className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                        <p className="font-semibold text-purple-400">Mga Pagbabago:</p>
-                        <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
-                          <li>One-time First Time Setup Guide</li>
-                          <li>Advanced WebGPU compatibility checker</li>
-                          <li>Automatic model loading suggestion</li>
-                          <li>Ligtas na offline Background Sync</li>
-                          <li>Suporta sa PDF Incident Report na May Larawan</li>
-                          <li>Pending Reports Viewer sa Settings Panel</li>
-                        </ul>
-                      </div>
-
-                      <button
-                        onClick={() => setShowChangelog(false)}
-                        className="w-full bg-purple-600 hover:bg-purple-700 active:scale-95 text-white py-3 px-4 rounded-xl font-semibold text-xs transition-all shadow-lg cursor-pointer"
+                  {/* Header section with operational status and actions */}
+                  <div
+                    className={`p-4 border-b flex items-center justify-between transition-colors ${
+                      isDark
+                        ? "border-white/10 bg-gradient-to-r from-purple-950/80 to-[#0a1428]"
+                        : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
+                          isDark
+                            ? "bg-purple-500/15 border-purple-500/30"
+                            : "bg-purple-100 border-purple-300"
+                        }`}
                       >
-                        Naintindihan ko, Salamat!
+                        <Bot
+                          className={`w-6 h-6 animate-pulse ${
+                            isDark ? "text-purple-400" : "text-purple-600"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <p
+                          className={`font-bold text-base ${
+                            isDark ? "text-white" : "text-gray-900"
+                          }`}
+                        >
+                          Guardian AI
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
+                          <p className="text-[10px] text-green-500 font-mono uppercase tracking-wider font-semibold">
+                            Offline Guard
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setIsDark(!isDark)}
+                        className={`p-1.5 rounded-xl transition ${
+                          isDark
+                            ? "hover:bg-white/5 text-gray-400 hover:text-yellow-400"
+                            : "hover:bg-gray-200 text-gray-500 hover:text-purple-600"
+                        }`}
+                        title={isDark ? "Maliwanag na Mode" : "Madilim na Mode"}
+                      >
+                        {isDark ? <Sun size={17} /> : <Moon size={17} />}
+                      </button>
+                      <button
+                        onClick={exportIncidentReport}
+                        className={`p-1.5 rounded-xl transition ${
+                          isDark
+                            ? "hover:bg-white/5 text-gray-400 hover:text-emerald-400"
+                            : "hover:bg-gray-200 text-gray-500 hover:text-emerald-600"
+                        }`}
+                        title="I-export ang Report (PDF + Text)"
+                      >
+                        <Download size={17} />
+                      </button>
+                      <button
+                        onClick={clearConversation}
+                        className={`p-1.5 rounded-xl transition ${
+                          isDark
+                            ? "hover:bg-white/5 text-gray-400 hover:text-red-400"
+                            : "hover:bg-gray-200 text-gray-500 hover:text-red-600"
+                        }`}
+                        title="Burahin ang Chat"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => setShowSettings(true)}
+                        className={`p-1.5 rounded-xl transition ${
+                          isDark
+                            ? "hover:bg-white/5 text-gray-400 hover:text-white"
+                            : "hover:bg-gray-200 text-gray-500 hover:text-black"
+                        }`}
+                        title="AI Config"
+                      >
+                        <SettingsIcon size={17} />
+                      </button>
+                      <button
+                        onClick={() => setIsOpen(false)}
+                        className={`p-1.5 rounded-xl transition ${
+                          isDark
+                            ? "hover:bg-white/5 text-gray-400 hover:text-white"
+                            : "hover:bg-gray-200 text-gray-500 hover:text-black"
+                        }`}
+                      >
+                        <X size={20} />
                       </button>
                     </div>
                   </div>
-                )}
 
-                {/* Header section with operational status and actions */}
-                <div className={`p-4 border-b flex items-center justify-between transition-colors ${
-                  isDark 
-                    ? 'border-white/10 bg-gradient-to-r from-purple-950/80 to-[#0a1428]' 
-                    : 'border-gray-200 bg-gray-50'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
-                      isDark 
-                        ? 'bg-purple-500/15 border-purple-500/30' 
-                        : 'bg-purple-100 border-purple-300'
-                    }`}>
-                      <Bot className={`w-6 h-6 animate-pulse ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
-                    </div>
-                    <div>
-                      <p className={`font-bold text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>Guardian AI</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
-                        <p className="text-[10px] text-green-500 font-mono uppercase tracking-wider font-semibold">Offline Guard</p>
+                  {/* Compatibility Banner */}
+                  {compatibility.level !== "good" && (
+                    <div
+                      className={`px-4 py-2.5 flex items-start gap-2.5 text-xs border-b ${
+                        compatibility.level === "error"
+                          ? isDark
+                            ? "bg-red-950/40 border-red-500/20 text-red-300"
+                            : "bg-red-50 border-red-200 text-red-800"
+                          : isDark
+                          ? "bg-amber-950/40 border-amber-500/20 text-amber-300"
+                          : "bg-amber-50 border-amber-200 text-amber-800"
+                      }`}
+                    >
+                      {compatibility.level === "error" ? (
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
+                      ) : (
+                        <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium">{compatibility.message}</p>
+                        {compatibility.level === "error" && (
+                          <a
+                            href="https://www.google.com/chrome/"
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`mt-1 inline-block font-semibold underline ${
+                              isDark
+                                ? "text-red-400 hover:text-red-300"
+                                : "text-red-600 hover:text-red-700"
+                            }`}
+                          >
+                            → I-download ang Google Chrome
+                          </a>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5">
-                    <button 
-                      onClick={() => setIsDark(!isDark)}
-                      className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-yellow-400' : 'hover:bg-gray-200 text-gray-500 hover:text-purple-600'}`}
-                      title={isDark ? "Maliwanag na Mode" : "Madilim na Mode"}
-                    >
-                      {isDark ? <Sun size={17} /> : <Moon size={17} />}
-                    </button>
-                    <button 
-                      onClick={exportIncidentReport}
-                      className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-emerald-400' : 'hover:bg-gray-200 text-gray-500 hover:text-emerald-600'}`}
-                      title="I-export ang Report (PDF + Text)"
-                    >
-                      <Download size={17} />
-                    </button>
-                    <button 
-                      onClick={clearConversation}
-                      className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-red-400' : 'hover:bg-gray-200 text-gray-500 hover:text-red-600'}`}
-                      title="Burahin ang Chat"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                    <button 
-                      onClick={() => setShowSettings(true)}
-                      className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-black'}`}
-                      title="AI Config"
-                    >
-                      <SettingsIcon size={17} />
-                    </button>
-                    <button 
-                      onClick={() => setIsOpen(false)}
-                      className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-black'}`}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                </div>
+                  )}
 
-                {/* Compatibility Banner */}
-                {compatibility.level !== 'good' && (
-                  <div className={`px-4 py-2.5 flex items-start gap-2.5 text-xs border-b ${
-                    compatibility.level === 'error' 
-                      ? isDark ? 'bg-red-950/40 border-red-500/20 text-red-300' : 'bg-red-50 border-red-200 text-red-800'
-                      : isDark ? 'bg-amber-950/40 border-amber-500/20 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
-                  }`}>
-                    {compatibility.level === 'error' ? 
-                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" /> : 
-                      <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
-                    }
-                    <div className="flex-1">
-                      <p className="font-medium">{compatibility.message}</p>
-                      {compatibility.level === 'error' && (
-                        <a 
-                          href="https://www.google.com/chrome/" 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className={`mt-1 inline-block font-semibold underline ${isDark ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}`}
-                        >
-                          → I-download ang Google Chrome
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Model Load Warning / Status Progress bar */}
-                {loadingProgress > 0 && loadingProgress < 100 && (
-                  <div className={`px-4 py-2 text-xs border-b transition-colors ${
-                    isDark ? 'bg-purple-950/35 border-purple-500/10' : 'bg-purple-50 border-purple-200'
-                  }`}>
-                    <div className={`mb-1 flex justify-between font-mono ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
-                      <span>I-download ang AI model nang lokal...</span>
-                      <span>{loadingProgress}%</span>
-                    </div>
-                    <div className="h-1 bg-gray-300 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300" style={{ width: `${loadingProgress}%` }} />
-                    </div>
-                  </div>
-                )}
-
-                {/* Emergency Quick Actions */}
-                <div className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
-                  isDark ? 'border-white/5 bg-red-950/20' : 'bg-red-50/40 border-gray-100'
-                }`}>
-                  {QUICK_ACTIONS.map((qa, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleQuickAction(qa.action)}
-                      className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer ${
-                        isDark 
-                          ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10' 
-                          : 'bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm'
-                      }`}
-                    >
-                      {qa.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Quick Emergency Templates List */}
-                <div className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${
-                  isDark ? 'border-white/5 bg-slate-950/45' : 'border-gray-100 bg-gray-50/80'
-                }`}>
-                  {emergencyTemplates.map((template, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => sendMessage(template.prompt)}
-                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition active:scale-95 select-none ${
+                  {/* Model Load Warning / Status Progress bar */}
+                  {loadingProgress > 0 && loadingProgress < 100 && (
+                    <div
+                      className={`px-4 py-2 text-xs border-b transition-colors ${
                         isDark
-                          ? 'bg-slate-800 border border-white/5 text-gray-200 hover:bg-purple-600 hover:text-white hover:border-purple-500'
-                          : 'bg-white border border-gray-200 text-gray-700 hover:bg-purple-600 hover:text-white hover:border-purple-500 shadow-sm'
+                          ? "bg-purple-950/35 border-purple-500/10"
+                          : "bg-purple-50 border-purple-200"
                       }`}
                     >
-                      {template.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Chat message timeline scrolls here */}
-                <div 
-                  ref={chatRef} 
-                  className={`flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar transition-colors ${
-                    isDark ? 'bg-[#070e1c]' : 'bg-gray-50/40'
-                  }`}
-                >
-                  {/* Tactical Crisis Banner */}
-                  <AnimatePresence>
-                    {recentCrisis && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="bg-red-600 text-white px-4 py-2 flex items-center justify-between z-10 sticky top-0 shadow-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 animate-bounce" />
-                          <div className="text-[10px] font-bold leading-tight">
-                            <p className="uppercase tracking-widest">{recentCrisis.level} ALERT: {recentCrisis.type}</p>
-                            <p className="opacity-90 font-normal">Command Center notified automatically.</p>
-                          </div>
-                        </div>
-                        <CheckCircle size={14} className="opacity-50" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {messages.map((msg, i) => (
-                    <motion.div 
-                      key={i} 
-                      initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20, y: 10 }}
-                      animate={{ opacity: 1, x: 0, y: 0 }}
-                      transition={{ duration: 0.3, delay: i % 5 * 0.05 }}
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`max-w-[85%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm transition-all ${
-                          msg.role === 'user' 
-                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-none' 
-                            : isDark
-                              ? 'bg-slate-900 border border-white/5 text-gray-100 rounded-tl-none'
-                              : 'bg-white border-gray-200 text-gray-800 rounded-tl-none'
+                      <div
+                        className={`mb-1 flex justify-between font-mono ${
+                          isDark ? "text-purple-400" : "text-purple-700"
                         }`}
                       >
-                        {msg.content}
+                        <span>I-download ang AI model nang lokal...</span>
+                        <span>{loadingProgress}%</span>
                       </div>
-                    </motion.div>
-                  ))}
-
-                  {isThinking && (
-                    <div className="flex items-center gap-2 text-purple-500 text-xs pl-1">
-                      <span className="flex h-2 w-2 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-                      </span>
-                      <span>Sumusuri sa Barangay Protocols...</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer with speech actions and input controls */}
-                <div className={`p-4 border-t transition-colors ${isDark ? 'border-white/10 bg-[#0a1428]' : 'border-gray-200 bg-white'}`}>
-                  {attachedPhotos.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-2 mb-2 border-b border-gray-100 dark:border-white/5">
-                      {attachedPhotos.map((photo, index) => (
-                        <div key={index} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 flex-shrink-0">
-                          <img src={photo} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <button 
-                            type="button"
-                            onClick={() => removePhoto(index)}
-                            className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow transition active:scale-95 cursor-pointer"
-                            title="Remove photo"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
+                      <div className="h-1 bg-gray-300 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                          style={{ width: `${loadingProgress}%` }}
+                        />
+                      </div>
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={toggleVoiceInput}
-                      className={`p-3 rounded-2xl border transition-all ${
-                        isListening 
-                          ? 'bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
-                          : isDark
-                            ? 'bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800'
-                            : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200'
-                      }`}
-                      title="Mag-salita sa Native Tagalog"
-                    >
-                      {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-                    </button>
-
-                    <button 
-                      onClick={capturePhoto}
-                      className={`p-3 rounded-2xl border transition-all ${
-                        isDark
-                          ? 'bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800'
-                          : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200'
-                      }`}
-                      title="Kumuha o Mag-upload ng Ebidensya (Camera)"
-                    >
-                      <Camera size={18} />
-                    </button>
-
-                    <input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                      placeholder={isListening ? "Nakikinig sa iyo..." : "Magtanong ukol sa emergency..."}
-                      className={`flex-1 border text-sm rounded-2xl px-4 py-3 outline-none transition ${
-                        isDark 
-                          ? 'bg-slate-950/80 border-white/15 focus:border-purple-500 text-gray-100 placeholder-gray-500'
-                          : 'bg-gray-50 border-gray-300 focus:border-purple-500 text-gray-900 placeholder-gray-400'
-                      }`}
-                      disabled={isThinking}
-                    />
-                    
-                    <button
-                      onClick={handleSend}
-                      disabled={isThinking || (!input.trim() && attachedPhotos.length === 0)}
-                      className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white p-3 rounded-2xl transition shadow-lg flex items-center justify-center cursor-pointer"
-                    >
-                      <Send size={18} />
-                    </button>
+                  {/* Emergency Quick Actions */}
+                  <div
+                    className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
+                      isDark
+                        ? "border-white/5 bg-red-950/20"
+                        : "bg-red-50/40 border-gray-100"
+                    }`}
+                  >
+                    {QUICK_ACTIONS.map((qa, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleQuickAction(qa.action)}
+                        className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer ${
+                          isDark
+                            ? "bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10"
+                            : "bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm"
+                        }`}
+                      >
+                        {qa.label}
+                      </button>
+                    ))}
                   </div>
-                </div>
-              </motion.div>
+
+                  {/* Quick Emergency Templates List */}
+                  <div
+                    className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${
+                      isDark
+                        ? "border-white/5 bg-slate-950/45"
+                        : "border-gray-100 bg-gray-50/80"
+                    }`}
+                  >
+                    {emergencyTemplates.map((template, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => sendMessage(template.prompt)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition active:scale-95 select-none ${
+                          isDark
+                            ? "bg-slate-800 border border-white/5 text-gray-200 hover:bg-purple-600 hover:text-white hover:border-purple-500"
+                            : "bg-white border border-gray-200 text-gray-700 hover:bg-purple-600 hover:text-white hover:border-purple-500 shadow-sm"
+                        }`}
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chat message timeline scrolls here */}
+                  <div
+                    ref={chatRef}
+                    className={`flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar transition-colors ${
+                      isDark ? "bg-[#070e1c]" : "bg-gray-50/40"
+                    }`}
+                  >
+                    {/* Tactical Crisis Banner */}
+                    <AnimatePresence>
+                      {recentCrisis && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="bg-red-600 text-white px-4 py-2 flex items-center justify-between z-10 sticky top-0 shadow-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 animate-bounce" />
+                            <div className="text-[10px] font-bold leading-tight">
+                              <p className="uppercase tracking-widest">
+                                {recentCrisis.level} ALERT: {recentCrisis.type}
+                              </p>
+                              <p className="opacity-90 font-normal">
+                                Command Center notified automatically.
+                              </p>
+                            </div>
+                          </div>
+                          <CheckCircle size={14} className="opacity-50" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {messages.map((msg, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{
+                          opacity: 0,
+                          x: msg.role === "user" ? 20 : -20,
+                          y: 10,
+                        }}
+                        animate={{ opacity: 1, x: 0, y: 0 }}
+                        transition={{ duration: 0.3, delay: (i % 5) * 0.05 }}
+                        className={`flex ${
+                          msg.role === "user" ? "justify-end" : "justify-start"
+                        }`}
+                      >
+                        <div
+                          className={`max-w-[85%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm transition-all ${
+                            msg.role === "user"
+                              ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-none"
+                              : isDark
+                              ? "bg-slate-900 border border-white/5 text-gray-100 rounded-tl-none"
+                              : "bg-white border-gray-200 text-gray-800 rounded-tl-none"
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    {isThinking && (
+                      <div className="flex items-center gap-2 text-purple-500 text-xs pl-1">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                        </span>
+                        <span>Sumusuri sa Barangay Protocols...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer with speech actions and input controls */}
+                  <div
+                    className={`p-4 border-t transition-colors ${
+                      isDark
+                        ? "border-white/10 bg-[#0a1428]"
+                        : "border-gray-200 bg-white"
+                    }`}
+                  >
+                    {attachedPhotos.length > 0 && (
+                      <div className="flex gap-2 overflow-x-auto pb-2 mb-2 border-b border-gray-100 dark:border-white/5">
+                        {attachedPhotos.map((photo, index) => (
+                          <div
+                            key={index}
+                            className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 flex-shrink-0"
+                          >
+                            <img
+                              src={photo}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(index)}
+                              className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow transition active:scale-95 cursor-pointer"
+                              title="Remove photo"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={toggleVoiceInput}
+                        className={`p-3 rounded-2xl border transition-all ${
+                          isListening
+                            ? "bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                            : isDark
+                            ? "bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800"
+                            : "bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200"
+                        }`}
+                        title="Mag-salita sa Native Tagalog"
+                      >
+                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                      </button>
+
+                      <button
+                        onClick={capturePhoto}
+                        className={`p-3 rounded-2xl border transition-all ${
+                          isDark
+                            ? "bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800"
+                            : "bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200"
+                        }`}
+                        title="Kumuha o Mag-upload ng Ebidensya (Camera)"
+                      >
+                        <Camera size={18} />
+                      </button>
+
+                      <input
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                        placeholder={
+                          isListening
+                            ? "Nakikinig sa iyo..."
+                            : "Magtanong ukol sa emergency..."
+                        }
+                        className={`flex-1 border text-sm rounded-2xl px-4 py-3 outline-none transition ${
+                          isDark
+                            ? "bg-slate-950/80 border-white/15 focus:border-purple-500 text-gray-100 placeholder-gray-500"
+                            : "bg-gray-50 border-gray-300 focus:border-purple-500 text-gray-900 placeholder-gray-400"
+                        }`}
+                        disabled={isThinking}
+                      />
+
+                      <button
+                        onClick={handleSend}
+                        disabled={
+                          isThinking ||
+                          (!input.trim() && attachedPhotos.length === 0)
+                        }
+                        className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white p-3 rounded-2xl transition shadow-lg flex items-center justify-center cursor-pointer"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
               </>
             )}
           </AnimatePresence>
@@ -905,24 +1159,36 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       )}
 
       {isInline ? (
-        <div 
+        <div
           className={`w-full max-w-4xl mx-auto h-[620px] rounded-3xl flex flex-col overflow-hidden font-sans border transition-all relative ${
-            isDark 
-              ? 'bg-[#0a1428] border-purple-500/30 text-white' 
-              : 'bg-white border-gray-200 text-gray-900 shadow-xl'
+            isDark
+              ? "bg-[#0a1428] border-purple-500/30 text-white"
+              : "bg-white border-gray-200 text-gray-900 shadow-xl"
           }`}
         >
           {/* First Time Setup Modal - Pure Tagalog */}
           {showFirstTimeSetup && (
-            <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+            <div
+              className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${
+                isDark ? "bg-black/95" : "bg-gray-100/95"
+              }`}
+            >
               <div className="flex flex-col items-center text-center max-w-[320px]">
                 <div className="mx-auto w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5 animate-pulse">
                   <Bot className="w-10 h-10 text-purple-400" />
                 </div>
-                
-                <h2 className="text-xl font-bold mb-3 tracking-tight">Maligayang Pagdating sa Guardian AI!</h2>
-                <p className={`text-xs mb-6 leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Upang magamit ang offline na artificial intelligence, kailangan muna nating i-load ang isang AI Model. Mangyayari ito nang ligtas mismo sa iyong browser sandbox.
+
+                <h2 className="text-xl font-bold mb-3 tracking-tight">
+                  Maligayang Pagdating sa Guardian AI!
+                </h2>
+                <p
+                  className={`text-xs mb-6 leading-relaxed ${
+                    isDark ? "text-gray-300" : "text-gray-600"
+                  }`}
+                >
+                  Upang magamit ang offline na artificial intelligence,
+                  kailangan muna nating i-load ang isang AI Model. Mangyayari
+                  ito nang ligtas mismo sa iyong browser sandbox.
                 </p>
 
                 <div className="space-y-3 w-full">
@@ -937,9 +1203,9 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                   <button
                     onClick={skipSetup}
                     className={`w-full py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                      isDark 
-                        ? 'border-white/10 hover:bg-white/5 text-gray-400' 
-                        : 'border-gray-200 hover:bg-gray-100 text-gray-500'
+                      isDark
+                        ? "border-white/10 hover:bg-white/5 text-gray-400"
+                        : "border-gray-200 hover:bg-gray-100 text-gray-500"
                     }`}
                   >
                     Gagawin ko na lang mamaya
@@ -947,7 +1213,8 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
                 </div>
 
                 <p className="text-[10px] text-gray-400 mt-6 leading-normal">
-                  Inirerekomenda: <strong>Phi-3.5 Mini</strong><br />
+                  Inirerekomenda: <strong>Phi-3.5 Mini</strong>
+                  <br />
                   (Mabilis at sapat na matalino para sa Tanod)
                 </p>
               </div>
@@ -956,17 +1223,31 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
           {/* What's New Modal - Pure Tagalog */}
           {showChangelog && (
-            <div className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${isDark ? 'bg-black/95' : 'bg-gray-100/95'}`}>
+            <div
+              className={`absolute inset-0 flex items-center justify-center z-50 rounded-3xl p-6 select-none ${
+                isDark ? "bg-black/95" : "bg-gray-100/95"
+              }`}
+            >
               <div className="flex flex-col items-center text-center max-w-[320px]">
                 <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-4 text-3xl animate-bounce">
                   ✨
                 </div>
-                
-                <h2 className="text-xl font-bold mb-1 tracking-tight">Ano ang Bago?</h2>
-                <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">Bersyon v1.5.0</p>
-                
-                <div className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  <p className="font-semibold text-purple-400">Mga Pagbabago:</p>
+
+                <h2 className="text-xl font-bold mb-1 tracking-tight">
+                  Ano ang Bago?
+                </h2>
+                <p className="text-[10px] font-mono font-bold text-purple-400 tracking-wider mb-3">
+                  Bersyon v1.5.0
+                </p>
+
+                <div
+                  className={`text-left text-xs space-y-1.5 mb-6 max-h-40 overflow-y-auto custom-scrollbar pr-1 ${
+                    isDark ? "text-gray-300" : "text-gray-600"
+                  }`}
+                >
+                  <p className="font-semibold text-purple-400">
+                    Mga Pagbabago:
+                  </p>
                   <ul className="list-disc list-inside space-y-1 pl-1 text-[11px] leading-relaxed">
                     <li>One-time First Time Setup Guide</li>
                     <li>Advanced WebGPU compatibility checker</li>
@@ -988,53 +1269,85 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           )}
 
           {/* Header section with operational status and actions */}
-          <div className={`p-4 border-b flex items-center justify-between transition-colors ${
-            isDark 
-              ? 'border-white/10 bg-gradient-to-r from-purple-950/80 to-[#0a1428]' 
-              : 'border-gray-200 bg-gray-50'
-          }`}>
+          <div
+            className={`p-4 border-b flex items-center justify-between transition-colors ${
+              isDark
+                ? "border-white/10 bg-gradient-to-r from-purple-950/80 to-[#0a1428]"
+                : "border-gray-200 bg-gray-50"
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
-                isDark 
-                  ? 'bg-purple-500/15 border-purple-500/30' 
-                  : 'bg-purple-100 border-purple-300'
-              }`}>
-                <Bot className={`w-6 h-6 animate-pulse ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+              <div
+                className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-all ${
+                  isDark
+                    ? "bg-purple-500/15 border-purple-500/30"
+                    : "bg-purple-100 border-purple-300"
+                }`}
+              >
+                <Bot
+                  className={`w-6 h-6 animate-pulse ${
+                    isDark ? "text-purple-400" : "text-purple-600"
+                  }`}
+                />
               </div>
               <div>
-                <p className={`font-bold text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>Guardian AI Command Center</p>
+                <p
+                  className={`font-bold text-base ${
+                    isDark ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Guardian AI Command Center
+                </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
-                  <p className="text-[10px] text-green-500 font-mono uppercase tracking-wider font-semibold">Active Inline Security Duty</p>
+                  <p className="text-[10px] text-green-500 font-mono uppercase tracking-wider font-semibold">
+                    Active Inline Security Duty
+                  </p>
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-1.5">
-              <button 
+              <button
                 onClick={() => setIsDark(!isDark)}
-                className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-yellow-400' : 'hover:bg-gray-200 text-gray-500 hover:text-purple-600'}`}
+                className={`p-1.5 rounded-xl transition ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-yellow-400"
+                    : "hover:bg-gray-200 text-gray-500 hover:text-purple-600"
+                }`}
                 title={isDark ? "Maliwanag na Mode" : "Madilim na Mode"}
               >
                 {isDark ? <Sun size={17} /> : <Moon size={17} />}
               </button>
-              <button 
+              <button
                 onClick={exportIncidentReport}
-                className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-emerald-400' : 'hover:bg-gray-200 text-gray-500 hover:text-emerald-600'}`}
+                className={`p-1.5 rounded-xl transition ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-emerald-400"
+                    : "hover:bg-gray-200 text-gray-500 hover:text-emerald-600"
+                }`}
                 title="I-export ang Report (PDF + Text)"
               >
                 <Download size={17} />
               </button>
-              <button 
+              <button
                 onClick={clearConversation}
-                className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-red-400' : 'hover:bg-gray-200 text-gray-500 hover:text-red-600'}`}
+                className={`p-1.5 rounded-xl transition ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-red-400"
+                    : "hover:bg-gray-200 text-gray-500 hover:text-red-600"
+                }`}
                 title="Burahin ang Chat"
               >
                 <Trash2 size={16} />
               </button>
-              <button 
+              <button
                 onClick={() => setShowSettings(true)}
-                className={`p-1.5 rounded-xl transition ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-black'}`}
+                className={`p-1.5 rounded-xl transition ${
+                  isDark
+                    ? "hover:bg-white/5 text-gray-400 hover:text-white"
+                    : "hover:bg-gray-200 text-gray-500 hover:text-black"
+                }`}
                 title="AI Config"
               >
                 <SettingsIcon size={17} />
@@ -1043,24 +1356,35 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           </div>
 
           {/* Compatibility Banner */}
-          {compatibility.level !== 'good' && (
-            <div className={`px-4 py-2.5 flex items-start gap-2.5 text-xs border-b ${
-              compatibility.level === 'error' 
-                ? isDark ? 'bg-red-950/40 border-red-500/20 text-red-300' : 'bg-red-50 border-red-200 text-red-800'
-                : isDark ? 'bg-amber-950/40 border-amber-500/20 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
-            }`}>
-              {compatibility.level === 'error' ? 
-                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" /> : 
+          {compatibility.level !== "good" && (
+            <div
+              className={`px-4 py-2.5 flex items-start gap-2.5 text-xs border-b ${
+                compatibility.level === "error"
+                  ? isDark
+                    ? "bg-red-950/40 border-red-500/20 text-red-300"
+                    : "bg-red-50 border-red-200 text-red-800"
+                  : isDark
+                  ? "bg-amber-950/40 border-amber-500/20 text-amber-300"
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+            >
+              {compatibility.level === "error" ? (
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400" />
+              ) : (
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
-              }
+              )}
               <div className="flex-1">
                 <p className="font-medium">{compatibility.message}</p>
-                {compatibility.level === 'error' && (
-                  <a 
-                    href="https://www.google.com/chrome/" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className={`mt-1 inline-block font-semibold underline ${isDark ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}`}
+                {compatibility.level === "error" && (
+                  <a
+                    href="https://www.google.com/chrome/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`mt-1 inline-block font-semibold underline ${
+                      isDark
+                        ? "text-red-400 hover:text-red-300"
+                        : "text-red-600 hover:text-red-700"
+                    }`}
                   >
                     → I-download ang Google Chrome
                   </a>
@@ -1071,31 +1395,46 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
 
           {/* Model Load Warning / Status Progress bar */}
           {loadingProgress > 0 && loadingProgress < 100 && (
-            <div className={`px-4 py-2 text-xs border-b transition-colors ${
-              isDark ? 'bg-purple-950/35 border-purple-500/10' : 'bg-purple-50 border-purple-200'
-            }`}>
-              <div className={`mb-1 flex justify-between font-mono ${isDark ? 'text-purple-400' : 'text-purple-700'}`}>
+            <div
+              className={`px-4 py-2 text-xs border-b transition-colors ${
+                isDark
+                  ? "bg-purple-950/35 border-purple-500/10"
+                  : "bg-purple-50 border-purple-200"
+              }`}
+            >
+              <div
+                className={`mb-1 flex justify-between font-mono ${
+                  isDark ? "text-purple-400" : "text-purple-700"
+                }`}
+              >
                 <span>I-download ang AI model nang lokal...</span>
                 <span>{loadingProgress}%</span>
               </div>
               <div className="h-1 bg-gray-300 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300" style={{ width: `${loadingProgress}%` }} />
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${loadingProgress}%` }}
+                />
               </div>
             </div>
           )}
 
           {/* Emergency Quick Actions */}
-          <div className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
-            isDark ? 'border-white/5 bg-red-950/20' : 'bg-red-50/40 border-gray-100'
-          }`}>
+          <div
+            className={`px-4 py-2.5 border-b flex flex-wrap gap-2 ${
+              isDark
+                ? "border-white/5 bg-red-950/20"
+                : "bg-red-50/40 border-gray-100"
+            }`}
+          >
             {QUICK_ACTIONS.map((qa, i) => (
               <button
                 key={i}
                 onClick={() => handleQuickAction(qa.action)}
                 className={`text-[11px] font-bold px-3 py-1.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer ${
-                  isDark 
-                    ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10' 
-                    : 'bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm'
+                  isDark
+                    ? "bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 shadow-sm shadow-red-950/10"
+                    : "bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 shadow-sm"
                 }`}
               >
                 {qa.label}
@@ -1104,17 +1443,21 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           </div>
 
           {/* Quick Emergency Templates List */}
-          <div className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${
-            isDark ? 'border-white/5 bg-slate-950/45' : 'border-gray-100 bg-gray-50/80'
-          }`}>
+          <div
+            className={`p-2.5 border-b flex gap-1.5 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth ${
+              isDark
+                ? "border-white/5 bg-slate-950/45"
+                : "border-gray-100 bg-gray-50/80"
+            }`}
+          >
             {emergencyTemplates.map((template, idx) => (
               <button
                 key={idx}
                 onClick={() => sendMessage(template.prompt)}
                 className={`text-xs px-3 py-1.5 rounded-full font-medium transition active:scale-95 select-none ${
                   isDark
-                    ? 'bg-slate-800 border border-white/5 text-gray-200 hover:bg-purple-600 hover:text-white hover:border-purple-500'
-                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-purple-600 hover:text-white hover:border-purple-500 shadow-sm'
+                    ? "bg-slate-800 border border-white/5 text-gray-200 hover:bg-purple-600 hover:text-white hover:border-purple-500"
+                    : "bg-white border border-gray-200 text-gray-700 hover:bg-purple-600 hover:text-white hover:border-purple-500 shadow-sm"
                 }`}
               >
                 {template.label}
@@ -1123,10 +1466,10 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           </div>
 
           {/* Chat message timeline scrolls here */}
-          <div 
-            ref={chatRef} 
+          <div
+            ref={chatRef}
             className={`flex-1 overflow-y-auto p-4 space-y-4 text-sm custom-scrollbar transition-colors ${
-              isDark ? 'bg-[#070e1c]' : 'bg-gray-50/40'
+              isDark ? "bg-[#070e1c]" : "bg-gray-50/40"
             }`}
           >
             {/* Tactical Crisis Banner */}
@@ -1134,15 +1477,19 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
               {recentCrisis && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
+                  animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   className="bg-red-600 text-white px-4 py-2 flex items-center justify-between z-10 sticky top-0 shadow-lg rounded-xl mb-2"
                 >
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 animate-bounce" />
                     <div className="text-[10px] font-bold leading-tight">
-                      <p className="uppercase tracking-widest">{recentCrisis.level} ALERT: {recentCrisis.type}</p>
-                      <p className="opacity-90 font-normal">Command Center notified automatically.</p>
+                      <p className="uppercase tracking-widest">
+                        {recentCrisis.level} ALERT: {recentCrisis.type}
+                      </p>
+                      <p className="opacity-90 font-normal">
+                        Command Center notified automatically.
+                      </p>
                     </div>
                   </div>
                   <CheckCircle size={14} className="opacity-50" />
@@ -1151,20 +1498,26 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
             </AnimatePresence>
 
             {messages.map((msg, i) => (
-              <motion.div 
-                key={i} 
-                initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20, y: 10 }}
+              <motion.div
+                key={i}
+                initial={{
+                  opacity: 0,
+                  x: msg.role === "user" ? 20 : -20,
+                  y: 10,
+                }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 0.3, delay: i % 5 * 0.05 }}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                transition={{ duration: 0.3, delay: (i % 5) * 0.05 }}
+                className={`flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                }`}
               >
-                <div 
+                <div
                   className={`max-w-[85%] px-4 py-3 rounded-2xl leading-relaxed whitespace-pre-wrap shadow-sm transition-all ${
-                    msg.role === 'user' 
-                      ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-none' 
+                    msg.role === "user"
+                      ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-tr-none"
                       : isDark
-                        ? 'bg-slate-900 border border-white/5 text-gray-100 rounded-tl-none'
-                        : 'bg-white border-gray-200 text-gray-800 rounded-tl-none'
+                      ? "bg-slate-900 border border-white/5 text-gray-100 rounded-tl-none"
+                      : "bg-white border-gray-200 text-gray-800 rounded-tl-none"
                   }`}
                 >
                   {msg.content}
@@ -1184,13 +1537,26 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
           </div>
 
           {/* Footer with speech actions and input controls */}
-          <div className={`p-4 border-t transition-colors ${isDark ? 'border-white/10 bg-[#0a1428]' : 'border-gray-200 bg-white'}`}>
+          <div
+            className={`p-4 border-t transition-colors ${
+              isDark
+                ? "border-white/10 bg-[#0a1428]"
+                : "border-gray-200 bg-white"
+            }`}
+          >
             {attachedPhotos.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-2 mb-2 border-b border-gray-100 dark:border-white/5">
                 {attachedPhotos.map((photo, index) => (
-                  <div key={index} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 flex-shrink-0">
-                    <img src={photo} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    <button 
+                  <div
+                    key={index}
+                    className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 flex-shrink-0"
+                  >
+                    <img
+                      src={photo}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <button
                       type="button"
                       onClick={() => removePhoto(index)}
                       className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow transition active:scale-95 cursor-pointer"
@@ -1204,26 +1570,26 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
             )}
 
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={toggleVoiceInput}
                 className={`p-3 rounded-2xl border transition-all ${
-                  isListening 
-                    ? 'bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]' 
+                  isListening
+                    ? "bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.4)]"
                     : isDark
-                      ? 'bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800'
-                      : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200'
+                    ? "bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800"
+                    : "bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200"
                 }`}
                 title="Mag-salita sa Native Tagalog"
               >
                 {isListening ? <MicOff size={18} /> : <Mic size={18} />}
               </button>
 
-              <button 
+              <button
                 onClick={capturePhoto}
                 className={`p-3 rounded-2xl border transition-all ${
                   isDark
-                    ? 'bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800'
-                    : 'bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200'
+                    ? "bg-slate-900 border-white/10 text-gray-400 hover:text-white hover:bg-slate-800"
+                    : "bg-gray-100 border-gray-300 text-gray-600 hover:text-purple-600 hover:bg-gray-200"
                 }`}
                 title="Kumuha o Mag-upload ng Ebidensya (Camera)"
               >
@@ -1233,19 +1599,25 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={isListening ? "Nakikinig sa iyo..." : "Magtanong ukol sa emergency..."}
+                onKeyPress={(e) => e.key === "Enter" && handleSend()}
+                placeholder={
+                  isListening
+                    ? "Nakikinig sa iyo..."
+                    : "Magtanong ukol sa emergency..."
+                }
                 className={`flex-1 border text-sm rounded-2xl px-4 py-3 outline-none transition ${
-                  isDark 
-                    ? 'bg-slate-950/80 border-white/15 focus:border-purple-500 text-gray-100 placeholder-gray-500'
-                    : 'bg-gray-50 border-gray-300 focus:border-purple-500 text-gray-900 placeholder-gray-400'
+                  isDark
+                    ? "bg-slate-950/80 border-white/15 focus:border-purple-500 text-gray-100 placeholder-gray-500"
+                    : "bg-gray-50 border-gray-300 focus:border-purple-500 text-gray-900 placeholder-gray-400"
                 }`}
                 disabled={isThinking}
               />
-              
+
               <button
                 onClick={handleSend}
-                disabled={isThinking || (!input.trim() && attachedPhotos.length === 0)}
+                disabled={
+                  isThinking || (!input.trim() && attachedPhotos.length === 0)
+                }
                 className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 disabled:text-gray-400 text-white p-3 rounded-2xl transition shadow-lg flex items-center justify-center cursor-pointer"
               >
                 <Send size={18} />
@@ -1256,25 +1628,36 @@ export default function GuardianAIChat({ isInline = false }: { isInline?: boolea
       ) : null}
 
       {/* Embedded Settings View overlay popup panel */}
-      <GuardianAISettings 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
+      <GuardianAISettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
       />
 
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold tracking-wide border border-white/10"
             style={{
-              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6',
-              color: '#ffffff'
+              backgroundColor:
+                toast.type === "success"
+                  ? "#10b981"
+                  : toast.type === "error"
+                  ? "#ef4444"
+                  : "#3b82f6",
+              color: "#ffffff",
             }}
           >
-            <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '⚠️' : '🎤'}</span>
+            <span>
+              {toast.type === "success"
+                ? "✅"
+                : toast.type === "error"
+                ? "⚠️"
+                : "🎤"}
+            </span>
             <span>{toast.message}</span>
           </motion.div>
         )}

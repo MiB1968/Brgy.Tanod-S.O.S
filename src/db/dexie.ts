@@ -1,1 +1,1 @@
-export { db } from './offlineDB';
+export { db } from "./offlineDB";

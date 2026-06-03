@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Bot, Mic, Volume2, ChevronRight, Menu, Info, HelpCircle, Zap } from 'lucide-react';
-import { useRBAC } from '../../context/AuthContext';
-import { useAppStore } from '../../store/useAppStore';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Bot,
+  Mic,
+  Volume2,
+  ChevronRight,
+  Menu,
+  Info,
+  HelpCircle,
+  Zap,
+} from "lucide-react";
+import { useRBAC } from "../../context/AuthContext";
+import { useAppStore } from "../../store/useAppStore";
 
 export default function TacticalDock() {
   const { role } = useRBAC();
@@ -13,7 +22,7 @@ export default function TacticalDock() {
 
   // Vibe haptic trigger helper
   const triggerHaptic = (pattern: number | number[]) => {
-    if ('vibrate' in navigator) {
+    if ("vibrate" in navigator) {
       navigator.vibrate(pattern);
     }
   };
@@ -26,11 +35,11 @@ export default function TacticalDock() {
         setIsVoiceActive(!!customEvent.detail.isListening);
       }
     };
-    
+
     // We can also infer active listening state
-    window.addEventListener('voice-assistant-change', handleVoiceChange);
+    window.addEventListener("voice-assistant-change", handleVoiceChange);
     return () => {
-      window.removeEventListener('voice-assistant-change', handleVoiceChange);
+      window.removeEventListener("voice-assistant-change", handleVoiceChange);
     };
   }, []);
 
@@ -42,26 +51,26 @@ export default function TacticalDock() {
         setIsSirenActive(!!customEvent.detail.active);
       }
     };
-    window.addEventListener('siren-state-change', handleSirenChange);
+    window.addEventListener("siren-state-change", handleSirenChange);
     return () => {
-      window.removeEventListener('siren-state-change', handleSirenChange);
+      window.removeEventListener("siren-state-change", handleSirenChange);
     };
   }, []);
 
   const handleOpenGuardianChat = () => {
     triggerHaptic(50);
-    window.dispatchEvent(new CustomEvent('open-guardian-chat'));
+    window.dispatchEvent(new CustomEvent("open-guardian-chat"));
   };
 
   const handleToggleVoiceAssistant = () => {
     triggerHaptic([60, 40]);
-    window.dispatchEvent(new CustomEvent('toggle-voice-assistant'));
-    setIsVoiceActive(prev => !prev);
+    window.dispatchEvent(new CustomEvent("toggle-voice-assistant"));
+    setIsVoiceActive((prev) => !prev);
   };
 
   const handleToggleSiren = () => {
     triggerHaptic([30, 20]);
-    window.dispatchEvent(new CustomEvent('toggle-siren'));
+    window.dispatchEvent(new CustomEvent("toggle-siren"));
   };
 
   return (
@@ -100,7 +109,7 @@ export default function TacticalDock() {
             initial={{ opacity: 0, x: 80 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 80 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 120 }}
+            transition={{ type: "spring", damping: 20, stiffness: 120 }}
             className="fixed right-1 top-1/2 -translate-y-1/2 z-[400] flex items-center gap-1.5"
             id="tactical-dock-tray-container"
           >
@@ -120,7 +129,7 @@ export default function TacticalDock() {
             <div className="w-20 py-5 bg-[#0F172A]/75 backdrop-blur-2xl border border-white/10 rounded-2xl flex flex-col items-center gap-5 shadow-[0_0_40px_rgba(15,23,42,0.8)] relative overflow-hidden">
               {/* Sleek cyber backdrop lines */}
               <div className="absolute top-0 bottom-0 left-0 w-[2px] bg-gradient-to-b from-blue-500/20 via-red-500/20 to-purple-500/20 pointer-events-none" />
-              
+
               {/* Header Title Accent */}
               <div className="text-[8px] font-black font-mono tracking-widest text-[#64748B] uppercase italic mb-1">
                 S.O.S.
@@ -138,7 +147,10 @@ export default function TacticalDock() {
                   title="Open Guardian AI Chat"
                   id="tactical-dock-chat-btn"
                 >
-                  <Bot size={22} className="group-hover:rotate-12 transition-transform" />
+                  <Bot
+                    size={22}
+                    className="group-hover:rotate-12 transition-transform"
+                  />
                 </motion.button>
                 <span className="text-[8px] font-black font-mono tracking-widest text-indigo-400 uppercase select-none">
                   CHAT
@@ -151,18 +163,23 @@ export default function TacticalDock() {
                   whileHover={{ scale: 1.15 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={handleToggleVoiceAssistant}
-                  animate={isVoiceActive ? {
-                    boxShadow: [
-                      "0 0 10px rgba(56, 189, 248, 0.4)",
-                      "0 0 25px rgba(56, 189, 248, 0.8)",
-                      "0 0 10px rgba(56, 189, 248, 0.4)"
-                    ]
-                  } : {}}
+                  animate={
+                    isVoiceActive
+                      ? {
+                          boxShadow: [
+                            "0 0 10px rgba(56, 189, 248, 0.4)",
+                            "0 0 25px rgba(56, 189, 248, 0.8)",
+                            "0 0 10px rgba(56, 189, 248, 0.4)",
+                          ],
+                        }
+                      : {}
+                  }
                   transition={{ repeat: Infinity, duration: 1.5 }}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden transition-all
-                    ${isVoiceActive 
-                      ? 'bg-gradient-to-br from-sky-500 via-blue-600 to-sky-400 text-white' 
-                      : 'bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-sky-400 hover:text-white'
+                    ${
+                      isVoiceActive
+                        ? "bg-gradient-to-br from-sky-500 via-blue-600 to-sky-400 text-white"
+                        : "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 text-sky-400 hover:text-white"
                     }
                   `}
                   title="Toggle Guardian Voice mic"
@@ -180,7 +197,7 @@ export default function TacticalDock() {
                   )}
                 </motion.button>
                 <span className="text-[8px] font-black font-mono tracking-widest text-sky-400 uppercase select-none">
-                  {isVoiceActive ? 'ACTIVE' : 'VOICE'}
+                  {isVoiceActive ? "ACTIVE" : "VOICE"}
                 </span>
               </div>
 
@@ -191,9 +208,10 @@ export default function TacticalDock() {
                   whileTap={{ scale: 0.9 }}
                   onClick={handleToggleSiren}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden transition-all duration-300
-                    ${isSirenActive 
-                      ? 'bg-gradient-to-br from-red-600 via-rose-500 to-red-800 text-white shadow-[0_0_20px_rgba(239,68,68,0.7)]' 
-                      : 'bg-gradient-to-br from-amber-600 via-orange-500 to-amber-700 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                    ${
+                      isSirenActive
+                        ? "bg-gradient-to-br from-red-600 via-rose-500 to-red-800 text-white shadow-[0_0_20px_rgba(239,68,68,0.7)]"
+                        : "bg-gradient-to-br from-amber-600 via-orange-500 to-amber-700 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]"
                     }
                   `}
                   title="Toggle Siren Alarm"
@@ -201,7 +219,10 @@ export default function TacticalDock() {
                 >
                   {isSirenActive ? (
                     <motion.div
-                      animate={{ scale: [1, 1.25, 1], rotate: [0, -10, 10, -10, 10, 0] }}
+                      animate={{
+                        scale: [1, 1.25, 1],
+                        rotate: [0, -10, 10, -10, 10, 0],
+                      }}
                       transition={{ repeat: Infinity, duration: 1 }}
                     >
                       <Volume2 size={22} />
@@ -210,8 +231,14 @@ export default function TacticalDock() {
                     <Volume2 size={22} className="group-hover:animate-bounce" />
                   )}
                 </motion.button>
-                <span className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${isSirenActive ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>
-                  {isSirenActive ? 'SIREN_ON' : 'SIREN'}
+                <span
+                  className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${
+                    isSirenActive
+                      ? "text-red-400 animate-pulse"
+                      : "text-amber-400"
+                  }`}
+                >
+                  {isSirenActive ? "SIREN_ON" : "SIREN"}
                 </span>
               </div>
 
@@ -225,9 +252,10 @@ export default function TacticalDock() {
                     toggleLiteMode();
                   }}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center border border-white/20 overflow-hidden transition-all duration-300
-                    ${liteMode 
-                      ? 'bg-gradient-to-br from-emerald-600 via-teal-500 to-green-700 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]' 
-                      : 'bg-[#1E293B]/60 text-zinc-400 hover:text-white'
+                    ${
+                      liteMode
+                        ? "bg-gradient-to-br from-emerald-600 via-teal-500 to-green-700 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                        : "bg-[#1E293B]/60 text-zinc-400 hover:text-white"
                     }
                   `}
                   title="Toggle Lite Mode for low-end devices"
@@ -235,11 +263,14 @@ export default function TacticalDock() {
                 >
                   <Zap size={20} className={liteMode ? "animate-pulse" : ""} />
                 </motion.button>
-                <span className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${liteMode ? 'text-emerald-400 font-bold' : 'text-zinc-500'}`}>
-                  {liteMode ? 'LITE_ON' : 'LITE'}
+                <span
+                  className={`text-[8px] font-black font-mono tracking-widest uppercase select-none ${
+                    liteMode ? "text-emerald-400 font-bold" : "text-zinc-500"
+                  }`}
+                >
+                  {liteMode ? "LITE_ON" : "LITE"}
                 </span>
               </div>
-
             </div>
           </motion.div>
         )}

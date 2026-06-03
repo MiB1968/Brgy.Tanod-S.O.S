@@ -8,14 +8,22 @@ import { MAMBURAO_CENTER } from "../constants";
 
 // Custom red icon for Tanods
 const tanodIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   iconSize: [28, 46],
   iconAnchor: [14, 46],
   popupAnchor: [0, -35],
 });
 
-function MapUpdater({ patrols, resizeTrigger }: { patrols: any[], resizeTrigger: number }) {
+function MapUpdater({
+  patrols,
+  resizeTrigger,
+}: {
+  patrols: any[];
+  resizeTrigger: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -24,9 +32,13 @@ function MapUpdater({ patrols, resizeTrigger }: { patrols: any[], resizeTrigger:
 
   useEffect(() => {
     if (patrols.length > 0) {
-      const bounds = patrols.map(p => [p.location.lat, p.location.lng] as [number, number]);
+      const bounds = patrols.map(
+        (p) => [p.location.lat, p.location.lng] as [number, number]
+      );
       if (bounds.length > 1) {
-        map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
+        map.fitBounds(bounds as L.LatLngBoundsExpression, {
+          padding: [50, 50],
+        });
       } else if (bounds[0][0] && bounds[0][1]) {
         map.flyTo(bounds[0], 15, { duration: 1.5 });
       }
@@ -44,19 +56,22 @@ export default function LiveMap() {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    
+
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      
+
       const { width, height } = entry.contentRect;
       // Only refresh trigger if the size actually changed more than a threshold to avoid oscillating loops
-      if (Math.abs(width - lastSize.current.width) > 2 || Math.abs(height - lastSize.current.height) > 2) {
+      if (
+        Math.abs(width - lastSize.current.width) > 2 ||
+        Math.abs(height - lastSize.current.height) > 2
+      ) {
         lastSize.current = { width, height };
-        setMapKey(prev => prev + 1);
+        setMapKey((prev) => prev + 1);
       }
     });
-    
+
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
@@ -65,19 +80,22 @@ export default function LiveMap() {
     // Inject a demo patrol if none exists so the user isn't stuck with an empty map
     if (patrols.length === 0) {
       updatePatrol({
-        id: 'demo-tanod-1',
-        tanodId: 'demo-tanod-1',
-        tanodName: 'Bgy. Patrol 01',
+        id: "demo-tanod-1",
+        tanodId: "demo-tanod-1",
+        tanodName: "Bgy. Patrol 01",
         location: { lat: MAMBURAO_CENTER[0], lng: MAMBURAO_CENTER[1] },
         isActive: true,
-        status: 'patrolling',
-        lastUpdate: new Date().toISOString()
+        status: "patrolling",
+        lastUpdate: new Date().toISOString(),
       });
     }
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full h-[70vh] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950">
+    <div
+      ref={containerRef}
+      className="relative w-full h-[70vh] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950"
+    >
       <MapContainer
         center={MAMBURAO_CENTER}
         zoom={13}
@@ -86,7 +104,7 @@ export default function LiveMap() {
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; OpenStreetMap contributors'
+          attribution="&copy; OpenStreetMap contributors"
           maxZoom={19}
           crossOrigin={true}
           bounds={L.latLngBounds(L.latLng(4.0, 116.0), L.latLng(21.0, 127.0))}
@@ -102,12 +120,15 @@ export default function LiveMap() {
           >
             <Popup className="custom-popup">
               <div className="text-center min-w-[160px]">
-                <div className="font-bold text-lg">{patrol.tanodName || "Tanod"}</div>
+                <div className="font-bold text-lg">
+                  {patrol.tanodName || "Tanod"}
+                </div>
                 <div className="text-green-500 text-sm flex items-center justify-center gap-1 mt-1">
                   ● LIVE
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  Last updated: {new Date(patrol.lastUpdate).toLocaleTimeString()}
+                  Last updated:{" "}
+                  {new Date(patrol.lastUpdate).toLocaleTimeString()}
                 </div>
                 {patrol.speed && (
                   <div className="text-xs mt-1">Speed: {patrol.speed} km/h</div>

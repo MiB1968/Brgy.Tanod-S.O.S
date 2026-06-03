@@ -14,7 +14,7 @@ export default function SOSAlertSiren({ onSOS }: Props) {
   useEffect(() => {
     setPosition({
       x: window.innerWidth - 100,
-      y: window.innerHeight - 160
+      y: window.innerHeight - 160,
     });
     setMounted(true);
   }, []);
@@ -67,14 +67,18 @@ export default function SOSAlertSiren({ onSOS }: Props) {
       let newY = clientY - rect.height / 2;
 
       newX = Math.max(16, Math.min(newX, window.innerWidth - rect.width - 16));
-      newY = Math.max(16, Math.min(newY, window.innerHeight - rect.height - 100));
+      newY = Math.max(
+        16,
+        Math.min(newY, window.innerHeight - rect.height - 100)
+      );
 
       setPosition({ x: newX, y: newY });
     };
 
     const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      if (e.touches.length > 0)
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
     };
 
     if (isDragging) {
@@ -91,7 +95,9 @@ export default function SOSAlertSiren({ onSOS }: Props) {
   return (
     <div
       ref={buttonRef}
-      className={`fixed z-[150] transition-all duration-200 ${isDragging ? "scale-110" : ""} ${!mounted ? "opacity-0" : "opacity-100"}`}
+      className={`fixed z-[150] transition-all duration-200 ${
+        isDragging ? "scale-110" : ""
+      } ${!mounted ? "opacity-0" : "opacity-100"}`}
       style={{ left: position.x, top: position.y }}
       onMouseDown={(e) => {
         setIsDragging(true);

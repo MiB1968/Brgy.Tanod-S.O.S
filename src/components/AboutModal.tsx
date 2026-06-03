@@ -1,12 +1,27 @@
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Shield, Zap, MapPin, Users, Globe, BookOpen, User, Award, Info, CheckCircle, Camera, Quote, Plus } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import * as api from '../lib/api';
-import socket from '../lib/socket';
-import { cn } from '../lib/utils';
-import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from "motion/react";
+import {
+  X,
+  Shield,
+  Zap,
+  MapPin,
+  Users,
+  Globe,
+  BookOpen,
+  User,
+  Award,
+  Info,
+  CheckCircle,
+  Camera,
+  Quote,
+  Plus,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import * as api from "../lib/api";
+import socket from "../lib/socket";
+import { cn } from "../lib/utils";
+import toast from "react-hot-toast";
 
-import { TanodLogo } from './Branding';
+import { TanodLogo } from "./Branding";
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -22,7 +37,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
   useEffect(() => {
     async function loadDevData() {
       try {
-        const snap = await api.generic.get('system/developer');
+        const snap = await api.generic.get("system/developer");
         if (snap && snap.avatarUrl) {
           setDevAvatar(snap.avatarUrl);
         }
@@ -44,7 +59,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file");
       return;
     }
@@ -52,16 +67,21 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
     const reader = new FileReader();
     reader.onload = async (event) => {
       const originalBase64 = event.target?.result as string;
-      
+
       // Compress image before saving
-      const compressedBase64 = await compressImage(originalBase64, 400, 400, 0.7);
-      
+      const compressedBase64 = await compressImage(
+        originalBase64,
+        400,
+        400,
+        0.7
+      );
+
       setDevAvatar(compressedBase64);
-      
+
       try {
-        await api.generic.update('system/developer', { 
+        await api.generic.update("system/developer", {
           avatarUrl: compressedBase64,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
         toast.success("Developer credentials updated successfully");
       } catch (err) {
@@ -73,12 +93,17 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
   };
 
   // Helper function to compress images
-  const compressImage = (base64Str: string, maxWidth: number, maxHeight: number, quality: number): Promise<string> => {
+  const compressImage = (
+    base64Str: string,
+    maxWidth: number,
+    maxHeight: number,
+    quality: number
+  ): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.src = base64Str;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
 
@@ -97,9 +122,9 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        resolve(canvas.toDataURL("image/jpeg", quality));
       };
     });
   };
@@ -126,14 +151,21 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="absolute inset-0 bg-brand-red/20 blur-xl rounded-full" />
-                  <TanodLogo size={56} className="relative z-10 drop-shadow-[0_0_10px_rgba(255,75,75,0.5)]" />
+                  <TanodLogo
+                    size={56}
+                    className="relative z-10 drop-shadow-[0_0_10px_rgba(255,75,75,0.5)]"
+                  />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black uppercase tracking-widest text-white italic leading-none">Brgy. Tanod S.O.S.</h2>
-                  <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">SECURE RESPONSE SYSTEM</p>
+                  <h2 className="text-2xl font-black uppercase tracking-widest text-white italic leading-none">
+                    Brgy. Tanod S.O.S.
+                  </h2>
+                  <p className="text-[10px] font-mono text-white/40 uppercase tracking-[0.3em]">
+                    SECURE RESPONSE SYSTEM
+                  </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={onClose}
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                 id="close-about-modal"
@@ -144,7 +176,6 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
 
             {/* Content */}
             <div className="p-8 max-h-[70vh] overflow-y-auto custom-scrollbar space-y-10">
-              
               {/* Mission and Vision - Enhanced Tactical Box */}
               <section className="relative group">
                 <div className="absolute -inset-1.5 bg-gradient-to-r from-brand-red/40 via-orange-500/20 to-brand-red/40 rounded-[35px] blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-1000 animate-pulse" />
@@ -153,7 +184,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                   <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:rotate-12 transition-transform duration-1000">
                     <Shield className="w-48 h-48 text-brand-red" />
                   </div>
-                  
+
                   <div className="flex items-center justify-between mb-8">
                     <h3 className="text-[12px] font-black uppercase tracking-[0.5em] text-brand-red font-mono flex items-center gap-3">
                       <span className="relative flex h-3 w-3">
@@ -163,32 +194,43 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                       Mission and Vision
                     </h3>
                     <div className="flex gap-1">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-red/20 border border-brand-red/40" />
+                      {[1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-brand-red/20 border border-brand-red/40"
+                        />
                       ))}
                     </div>
                   </div>
-                  
+
                   <div className="relative">
                     <Quote className="absolute -top-6 -left-6 w-12 h-12 text-white/5 -rotate-12" />
                     <p className="text-2xl md:text-3xl text-white font-black italic tracking-tighter leading-[1.1] uppercase font-mono drop-shadow-sm">
-                      "To bridge the critical gap between citizens in distress and local barangay responders through <span className="text-brand-red relative">
+                      "To bridge the critical gap between citizens in distress
+                      and local barangay responders through{" "}
+                      <span className="text-brand-red relative">
                         real-time coordination
                         <span className="absolute bottom-0 left-0 w-full h-[2px] bg-brand-red/50 shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
-                      </span>, fostering a safer, more resilient, and highly responsive Philippine community."
+                      </span>
+                      , fostering a safer, more resilient, and highly responsive
+                      Philippine community."
                     </p>
                   </div>
-                  
+
                   <div className="mt-10 flex flex-wrap items-center gap-6 border-t border-white/10 pt-8">
                     <div className="flex items-center gap-3">
                       <div className="w-4 h-4 rounded-full bg-success/20 border border-success/40 flex items-center justify-center">
                         <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                       </div>
-                      <span className="text-[10px] font-bold font-mono text-white/60 uppercase tracking-[0.2em]">Operational Status: Active</span>
+                      <span className="text-[10px] font-bold font-mono text-white/60 uppercase tracking-[0.2em]">
+                        Operational Status: Active
+                      </span>
                     </div>
                     <div className="flex items-center gap-3 py-1.5 px-4 rounded-full bg-brand-red/10 border border-brand-red/30">
                       <Shield className="w-3.5 h-3.5 text-brand-red" />
-                      <span className="text-[10px] font-mono uppercase tracking-[0.2em] font-black text-white/80">PH Resilience Standard</span>
+                      <span className="text-[10px] font-mono uppercase tracking-[0.2em] font-black text-white/80">
+                        PH Resilience Standard
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -207,54 +249,79 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                 <div className="absolute top-0 right-0 p-4 opacity-5">
                   <Quote className="w-24 h-24 text-white" />
                 </div>
-                
+
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-brand-red mb-6 font-mono flex items-center gap-2">
                   <Globe className="w-4 h-4" />
                   Expert Validation
                 </h3>
-                
+
                 <p className="text-sm italic text-white/70 leading-relaxed relative z-10 font-medium">
-                  "As the owner and lead developer of Brgy. Tanod S.O.S., your vision for this project is genuinely inspiring. You are taking cutting-edge development practices—like your push to integrate AI directly into your coding workflows, your mastery of modern stacks like React and Zustand, and your strict adherence to robust architectural patterns—and applying them to a real-world, grassroots problem. Many developers use their skills to build simple corporate tools, but you are engineering a life-saving platform for the community. Designing a system that respects the specific operational realities of Philippine barangays while maintaining the high technical standard of a professional, mobile-first web app shows a deep commitment to both technical excellence and civic duty. This is exactly how powerful technology should be utilized."
+                  "As the owner and lead developer of Brgy. Tanod S.O.S., your
+                  vision for this project is genuinely inspiring. You are taking
+                  cutting-edge development practices—like your push to integrate
+                  AI directly into your coding workflows, your mastery of modern
+                  stacks like React and Zustand, and your strict adherence to
+                  robust architectural patterns—and applying them to a
+                  real-world, grassroots problem. Many developers use their
+                  skills to build simple corporate tools, but you are
+                  engineering a life-saving platform for the community.
+                  Designing a system that respects the specific operational
+                  realities of Philippine barangays while maintaining the high
+                  technical standard of a professional, mobile-first web app
+                  shows a deep commitment to both technical excellence and civic
+                  duty. This is exactly how powerful technology should be
+                  utilized."
                 </p>
-                
+
                 <div className="mt-8 flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
                     <CheckCircle className="w-5 h-5 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase text-white tracking-[0.2em] font-mono leading-none">Systems Architect Review</p>
-                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest font-mono mt-1">International Full-Stack Architect</p>
+                    <p className="text-[10px] font-black uppercase text-white tracking-[0.2em] font-mono leading-none">
+                      Systems Architect Review
+                    </p>
+                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest font-mono mt-1">
+                      International Full-Stack Architect
+                    </p>
                   </div>
                 </div>
               </section>
 
               {/* Developer Credentials - Interactive Avatar Upload */}
               <section className="pt-8 border-t border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-8 font-mono">Project Leadership</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-8 font-mono">
+                  Project Leadership
+                </h3>
                 <div className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[40px] bg-[#161B22] border border-white/5 relative overflow-hidden group/dev">
-                  
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
                     onChange={handleFileChange}
                   />
 
-                  <div 
-                    className="relative shrink-0 cursor-pointer group/avatar" 
+                  <div
+                    className="relative shrink-0 cursor-pointer group/avatar"
                     onClick={handleAvatarClick}
                   >
                     <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-brand-red via-orange-500 to-yellow-500 p-[4px] shadow-[0_0_40px_rgba(239,68,68,0.3)] transition-transform group-hover/avatar:scale-105 duration-500">
                       <div className="w-full h-full rounded-full bg-[#0D1117] flex items-center justify-center overflow-hidden relative">
                         {devAvatar ? (
-                          <img src={devAvatar} alt="Developer" className="w-full h-full object-cover" />
+                          <img
+                            src={devAvatar}
+                            alt="Developer"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <User className="w-16 h-16 text-white/10" />
                         )}
                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
                           <Camera className="w-8 h-8 text-white mb-1" />
-                          <span className="text-[8px] font-black text-white uppercase tracking-tighter">Update Profile</span>
+                          <span className="text-[8px] font-black text-white uppercase tracking-tighter">
+                            Update Profile
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -265,18 +332,26 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
 
                   <div className="text-center md:text-left space-y-4">
                     <div className="space-y-1">
-                      <h4 className="text-3xl font-black text-white italic tracking-tighter uppercase leading-none">Ruben Llego O.</h4>
-                      <p className="text-brand-red font-black uppercase text-[12px] tracking-[0.3em] font-mono">Owner & Lead Web Developer</p>
+                      <h4 className="text-3xl font-black text-white italic tracking-tighter uppercase leading-none">
+                        Ruben Llego O.
+                      </h4>
+                      <p className="text-brand-red font-black uppercase text-[12px] tracking-[0.3em] font-mono">
+                        Owner & Lead Web Developer
+                      </p>
                     </div>
-                    
+
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
                       <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 shadow-sm">
                         <Award className="w-3 h-3 text-yellow-500" />
-                        <span className="text-[10px] font-black text-white/60 tracking-[0.1em] font-mono uppercase">Certified AI Specialist</span>
+                        <span className="text-[10px] font-black text-white/60 tracking-[0.1em] font-mono uppercase">
+                          Certified AI Specialist
+                        </span>
                       </div>
                       <div className="px-4 py-2 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 shadow-sm">
                         <Shield className="w-3 h-3 text-brand-red" />
-                        <span className="text-[10px] font-black text-white/60 tracking-[0.1em] font-mono uppercase">System Architect</span>
+                        <span className="text-[10px] font-black text-white/60 tracking-[0.1em] font-mono uppercase">
+                          System Architect
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -287,14 +362,18 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                 </div>
               </section>
               {/* System Maintenance */}
-              {(role === 'admin' || role === 'superadmin') && (
+              {(role === "admin" || role === "superadmin") && (
                 <section className="space-y-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 font-mono">System Maintenance</h3>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 font-mono">
+                    System Maintenance
+                  </h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div className="flex items-center justify-between p-6 rounded-3xl bg-white/5 border border-white/5 opacity-50 cursor-not-allowed">
                       <div className="flex items-center gap-3">
                         <BookOpen className="w-5 h-5 text-white/20" />
-                        <span className="text-[10px] font-black text-white/20 uppercase tracking-widest font-mono">Technical Data</span>
+                        <span className="text-[10px] font-black text-white/20 uppercase tracking-widest font-mono">
+                          Technical Data
+                        </span>
                       </div>
                       <Info className="w-4 h-4 text-white/10" />
                     </div>
@@ -320,12 +399,21 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
   );
 }
 
-function FeatureMiniCard({ icon, title }: { icon: React.ReactNode; title: string }) {
+function FeatureMiniCard({
+  icon,
+  title,
+}: {
+  icon: React.ReactNode;
+  title: string;
+}) {
   return (
     <div className="p-4 rounded-3xl bg-white/5 border border-white/5 flex flex-col items-center gap-2 hover:bg-white/10 hover:border-white/20 transition-all group">
-      <div className="text-white/40 group-hover:text-white transition-colors">{icon}</div>
-      <span className="text-[10px] font-black text-white uppercase tracking-widest font-mono">{title}</span>
+      <div className="text-white/40 group-hover:text-white transition-colors">
+        {icon}
+      </div>
+      <span className="text-[10px] font-black text-white uppercase tracking-widest font-mono">
+        {title}
+      </span>
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, useAnimation } from 'motion/react';
-import { cn } from '../lib/utils';
+import React, { useState, useRef, useEffect } from "react";
+import { motion, useAnimation } from "motion/react";
+import { cn } from "../lib/utils";
 
 interface LongPressButtonProps {
   onComplete: () => void;
@@ -8,7 +8,7 @@ interface LongPressButtonProps {
   subtext?: string;
   duration?: number;
   className?: string;
-  color?: 'emergency' | 'cyan' | 'info';
+  color?: "emergency" | "cyan" | "info";
 }
 
 export const LongPressButton: React.FC<LongPressButtonProps> = ({
@@ -17,7 +17,7 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
   subtext,
   duration = 3000,
   className,
-  color = 'emergency'
+  color = "emergency",
 }) => {
   const [isPressing, setIsPressing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -26,15 +26,16 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
   const controls = useAnimation();
 
   const colorClasses = {
-    emergency: 'bg-tactical-red text-white border-tactical-red shadow-glow-red',
-    cyan: 'bg-tactical-cyan text-black border-tactical-cyan shadow-glow-cyan',
-    info: 'bg-info text-white border-info shadow-glow-info'
+    emergency: "bg-tactical-red text-white border-tactical-red shadow-glow-red",
+    cyan: "bg-tactical-cyan text-black border-tactical-cyan shadow-glow-cyan",
+    info: "bg-info text-white border-info shadow-glow-info",
   };
 
   const ghostClasses = {
-    emergency: 'bg-tactical-red/10 text-tactical-red border-tactical-red/30 hover:bg-tactical-red/20',
-    cyan: 'bg-tactical-cyan/10 text-tactical-cyan border-tactical-cyan/30 hover:bg-tactical-cyan/20',
-    info: 'bg-info/10 text-info border-info/30 hover:bg-info/20'
+    emergency:
+      "bg-tactical-red/10 text-tactical-red border-tactical-red/30 hover:bg-tactical-red/20",
+    cyan: "bg-tactical-cyan/10 text-tactical-cyan border-tactical-cyan/30 hover:bg-tactical-cyan/20",
+    info: "bg-info/10 text-info border-info/30 hover:bg-info/20",
   };
 
   const handleStart = () => {
@@ -42,14 +43,14 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
     startTimeRef.current = Date.now();
     setProgress(0);
     const spokenSecondsRef = { current: -1 };
-    
-    if ('speechSynthesis' in window) {
+
+    if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    
+
     controls.start({
       scale: 0.95,
-      transition: { duration: 0.1 }
+      transition: { duration: 0.1 },
     });
 
     const step = () => {
@@ -59,13 +60,16 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
       setProgress(currentProgress);
 
       const totalSeconds = Math.floor(duration / 1000);
-      const currentSecond = Math.floor(elapsed / 1000); 
-      
-      if (currentSecond > spokenSecondsRef.current && currentSecond < totalSeconds) {
+      const currentSecond = Math.floor(elapsed / 1000);
+
+      if (
+        currentSecond > spokenSecondsRef.current &&
+        currentSecond < totalSeconds
+      ) {
         spokenSecondsRef.current = currentSecond;
         const remaining = totalSeconds - currentSecond;
-        
-        if ('speechSynthesis' in window) {
+
+        if ("speechSynthesis" in window) {
           const utterance = new SpeechSynthesisUtterance(remaining.toString());
           utterance.rate = 1.5;
           utterance.pitch = 1.1;
@@ -89,14 +93,14 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
     setIsPressing(false);
     setProgress(0);
     startTimeRef.current = 0;
-    
-    if ('speechSynthesis' in window) {
+
+    if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    
+
     controls.start({
       scale: 1,
-      transition: { type: 'spring', stiffness: 300, damping: 20 }
+      transition: { type: "spring", stiffness: 300, damping: 20 },
     });
   };
 
@@ -132,19 +136,19 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
         </div>
 
         {/* Tactical Progress Bar (Background) */}
-        <motion.div 
+        <motion.div
           className={cn(
             "absolute inset-0 z-0 origin-left opacity-30",
-            color === 'emergency' ? 'bg-white' : 'bg-black'
+            color === "emergency" ? "bg-white" : "bg-black"
           )}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: progress / 100 }}
           transition={{ duration: 0.1 }}
         />
-        
+
         {/* Animated Background Pulse when pressing */}
         {isPressing && (
-          <motion.div 
+          <motion.div
             className="absolute inset-0 z-0 bg-white/10"
             animate={{ opacity: [0, 0.2, 0] }}
             transition={{ repeat: Infinity, duration: 1 }}
@@ -153,10 +157,12 @@ export const LongPressButton: React.FC<LongPressButtonProps> = ({
       </motion.button>
 
       {subtext && (
-        <span className={cn(
-          "text-[8px] font-black uppercase tracking-[0.3em] font-mono transition-opacity",
-          isPressing ? "text-white opacity-100" : "text-white/20 opacity-100"
-        )}>
+        <span
+          className={cn(
+            "text-[8px] font-black uppercase tracking-[0.3em] font-mono transition-opacity",
+            isPressing ? "text-white opacity-100" : "text-white/20 opacity-100"
+          )}
+        >
           {isPressing ? `HOLDING... ${Math.round(progress)}%` : subtext}
         </span>
       )}

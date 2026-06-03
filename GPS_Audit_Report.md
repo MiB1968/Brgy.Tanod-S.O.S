@@ -1,0 +1,12 @@
+# GPS Tracking System — Deep Logic & Schema Audit
+
+| Flaw | Severity | Impact | Fix Summary |
+| --- | --- | --- | --- |
+| 1. Dead Socket Event (`gpsService.ts`) | Critical | `gpsService.ts` was orphaned and useless, emitting events that the server never handled, meaning zero realtime tracking. | Deprecated `gpsService.ts` to push any legacy code towards the robust `tanodLocationService.ts` that relies on correct events. |
+| 2. Three Competing Tracking Implementations | High | Conflict across three logic sets (`gpsService`, `useLocationTracking`, `tanodLocationService`) led to buggy overwrites and duplicated resources. | Consolidated functionality. Citizen track and high-frequency checks merged into `useLocationTracking`, stripping away unnecessary redundancy. |
+| 3. Server Location State is In-Memory Without Persistence | Critical | Node restart, crash, or reboot immediately blanked out all Tanod positions from the map during an ongoing emergency. | Wrote history straight to the Postgres `location_history` table on every ping so data can be restored or re-hydrated if the application restarts. |
+| 4. Location stored as JSON string, not PostGIS Geometry | High | Could not natively leverage nearest-tanod spatial queries or distance limits seamlessly—full table scans were required. | Setup the PostGIS extension, converted `patrols.location` to `GEOMETRY`, and built GIST indexes for the new history table. |
+| 5. No GPS Trail / History for SOS Events | High | The system strictly held `ON CONFLICT DO UPDATE`, capturing only the latest ping. The system lost all forensic trails of approaches to SOS alerts. | Created `location_history` tracking each ping uniquely by UUID with a timestamp so exact movement timelines can be reconstructed. |
+| 6. Geofencing hits DB on every location update | Medium | O(N) database reads per tick per resident tracking. Rapid ping bursts flooded the CockroachDB pool. | Added a smart 10-minute in-memory cache TTL for the static `barangay_boundaries` boundary object. |
+| 7. No Dedicated SOS High-Frequency Tracking Pipeline | High | Active emergency streams were delivered at standard 8s+ patrol delays, lagging behind critical immediate response needs. | Added `sos_location_stream` listener and logic to bump citizen ping frequency down to true realtime (3s intervals). |
+| 8. Role Case Inconsistency in `useLocationTracking` | Medium | Roles with bad cases (e.g., `TANOD`, `Responder`) failed silently and quietly disabled their location tracking hook entirely. | Applied `normalizeRole` consistently. |

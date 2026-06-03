@@ -1,4 +1,4 @@
-import { pool } from '../db';
+import { pool } from '../server/db';
 
 let cachedBoundary: any = null;
 let cacheExpiry = 0;

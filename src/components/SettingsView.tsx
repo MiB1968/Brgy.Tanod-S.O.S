@@ -58,7 +58,7 @@ export default function SettingsView({
             fontWeight: "bold",
             fontFamily: "monospace",
           },
-        },
+        }
       );
     } catch (e) {
       console.error("Failed to update location preferences", e);
@@ -215,7 +215,7 @@ export default function SettingsView({
         </div>
 
         {/* Database Migration */}
-        {role === 'superadmin' && (
+        {role === "superadmin" && (
           <div className="md:col-span-2">
             <MigrationUtility />
           </div>
@@ -251,7 +251,7 @@ function ToggleRow({ icon: Icon, label, desc, active, onChange }: any) {
             "w-12 h-12 rounded-2xl flex items-center justify-center transition-all border",
             active
               ? "bg-info/20 text-info border-info/30"
-              : "bg-white/5 text-white/20 border-white/5",
+              : "bg-white/5 text-white/20 border-white/5"
           )}
         >
           <Icon className="w-5 h-5" />
@@ -272,13 +272,13 @@ function ToggleRow({ icon: Icon, label, desc, active, onChange }: any) {
           "w-12 h-6 rounded-full p-1 transition-all duration-300 relative",
           active
             ? "bg-info shadow-[0_0_15px_rgba(14,165,233,0.3)]"
-            : "bg-white/10",
+            : "bg-white/10"
         )}
       >
         <div
           className={cn(
             "w-4 h-4 rounded-full bg-white transition-all shadow-md",
-            active ? "translate-x-6" : "translate-x-0",
+            active ? "translate-x-6" : "translate-x-0"
           )}
         />
       </button>

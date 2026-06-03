@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { config } from '../config/index';
 import { logger } from '../utils/logger';
 import { pool, admin } from '../db/index';
@@ -14,30 +15,95 @@ export interface AuthRequest extends Request {
   };
 }
 
+// ── In-process API-key rate limiter (10 req / 60s per IP) ───────────────────
+const apiKeyHits = new Map<string, { count: number; resetAt: number }>();
+const API_KEY_LIMIT = 10;
+const API_KEY_WINDOW_MS = 60_000;
+
+function checkApiKeyRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = apiKeyHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    apiKeyHits.set(ip, { count: 1, resetAt: now + API_KEY_WINDOW_MS });
+    return true; // allowed
+  }
+  entry.count += 1;
+  if (entry.count > API_KEY_LIMIT) {
+    return false; // blocked
+  }
+  return true;
+}
+
+// Deterministic synthetic UUID from key hash — safe to store in audit logs
+function apiKeyToSyntheticId(key: string): string {
+  const hash = crypto.createHash('sha256').update(key).digest('hex');
+  return `${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-a${hash.slice(17,20)}-${hash.slice(20,32)}`;
+}
+
+async function writeApiKeyAuditLog(syntheticId: string, route: string) {
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs (type, citizen_id, notes, created_at)
+       VALUES ($1, $2, $3, now())`,
+      ['API_KEY_ACCESS', syntheticId, `Route: ${route}`]
+    );
+  } catch {
+    // Non-fatal — log to console so ops can investigate if the table is missing
+    logger.warn(`[AUTH] Could not write API key audit log for route ${route}`);
+  }
+}
+
 export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.headers.authorization?.split(' ')[1] || req.cookies.token;
-  const apiKey = req.headers['x-api-key'];
+  const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
+  const apiKey = req.headers['x-api-key'] as string | undefined;
 
   if (config.nodeEnv !== 'production' && req.originalUrl !== '/api/health') {
-    logger.debug(`[AUTH] Request: ${req.method} ${req.originalUrl}. Token: ${token ? 'PRESENT' : 'MISSING'} (Cookie: ${req.cookies.token ? 'YES' : 'NO'}, Header: ${req.headers.authorization ? 'YES' : 'NO'})`);
+    logger.debug(
+      `[AUTH] ${req.method} ${req.originalUrl} | ` +
+      `Token: ${token ? 'PRESENT' : 'MISSING'} | APIKey: ${apiKey ? 'PRESENT' : 'NO'}`
+    );
   }
 
-  // Check for API Key first, if present and valid, skip JWT
-  if (apiKey && config.apiKey && apiKey === config.apiKey) {
+  // ── API Key path ─────────────────────────────────────────────────────────
+  if (apiKey) {
+    if (!config.apiKey || apiKey !== config.apiKey) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_API_KEY', message: 'Invalid API key' },
+      });
+    }
+
+    // Rate limit by IP
+    const clientIp = (req.ip || req.socket.remoteAddress || 'unknown');
+    if (!checkApiKeyRateLimit(clientIp)) {
+      logger.warn(`[AUTH] API key rate limit exceeded from ${clientIp}`);
+      return res.status(429).json({
+        success: false,
+        error: { code: 'TOO_MANY_REQUESTS', message: 'API key rate limit exceeded' },
+      });
+    }
+
+    const syntheticId = apiKeyToSyntheticId(apiKey);
+    const syntheticRole = (process.env.API_KEY_ROLE === 'admin') ? 'admin' : 'tanod';
+
     req.user = {
-      id: 'system',
+      id: syntheticId,
       email: 'system@tanod.sos',
-      role: 'admin',
-      tokenVersion: 0
+      role: syntheticRole,
+      tokenVersion: 0,
     };
-    logger.warn(`[AUTH] API Key usage detected. Route: ${req.originalUrl}`);
+
+    writeApiKeyAuditLog(syntheticId, req.originalUrl).catch(() => {});
+
+    logger.warn(`[AUTH] API Key access: ${req.method} ${req.originalUrl} | role=${syntheticRole} | ip=${clientIp}`);
     return next();
   }
 
+  // ── JWT / Firebase path ────────────────────────────────────────────────
   if (!token) {
     return res.status(401).json({
       success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+      error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
     });
   }
 
@@ -47,12 +113,11 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
 
     try {
       decoded = jwt.verify(token, config.jwtSecret) as any;
-    } catch (jwtErr) {
-      // If JWT verify fails, check if we can verify as a Firebase ID token
-      if (admin && admin.apps && admin.apps.length > 0) {
+    } catch {
+      if (admin?.apps?.length > 0) {
         try {
           const decodedFirebase = await admin.auth().verifyIdToken(token);
-          if (decodedFirebase && decodedFirebase.email) {
+          if (decodedFirebase?.email) {
             const userResult = await pool.query(
               'SELECT * FROM users WHERE email = $1',
               [decodedFirebase.email.toLowerCase()]
@@ -63,159 +128,59 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
                 id: dbUser.id,
                 email: dbUser.email,
                 role: dbUser.role,
-                tokenVersion: dbUser.token_version || 1
+                tokenVersion: dbUser.token_version || 1,
               };
               isFirebaseAuth = true;
             } else {
-              logger.warn(`[AUTH] Firebase token validated but user email ${decodedFirebase.email} is not registered in CockroachDB/Postgres. Entering fallback/provision info.`);
-              // Look up or auto-register standard rubenlleg12@gmail.com or other master emails
-              const isMaster = decodedFirebase.email.toLowerCase() === 'rubenlleg12@gmail.com' || decodedFirebase.email.toLowerCase() === 'ben@brgytanod.com';
-              if (isMaster) {
-                // Since this is the Super Admin master account, auto-bootstrap it into the DB if missing!
-                logger.info(`[AUTH] Bootstrapping master admin ${decodedFirebase.email} on the fly.`);
-                const insertResult = await pool.query(
-                  `INSERT INTO users (email, password, name, role, status)
-                   VALUES ($1, $2, $3, $4, $5)
-                   ON CONFLICT (email) DO UPDATE SET role = 'admin'
-                   RETURNING id, email, name, role, status`,
-                  [decodedFirebase.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'admin', 'verified']
-                );
-                const newUser = insertResult.rows[0];
-                decoded = {
-                  id: newUser.id,
-                  email: newUser.email,
-                  role: newUser.role,
-                  tokenVersion: 1
-                };
-                isFirebaseAuth = true;
-              } else {
-                return res.status(401).json({
-                  success: false,
-                  error: { code: 'USER_NOT_FOUND', message: 'No registered user found for this account' }
-                });
-              }
+              logger.warn(`[AUTH] Firebase token validated but user ${decodedFirebase.email} not in DB.`);
+              return res.status(403).json({
+                success: false,
+                error: {
+                  code: 'USER_NOT_REGISTERED',
+                  message: 'Firebase user not registered. Please complete registration.',
+                },
+              });
             }
           }
-        } catch (firebaseErr: any) {
-          // Handle AI Studio "gen-lang-client" audience mismatch for development
-          if (firebaseErr.message.includes('aud')) {
-            try {
-              const decodedToken = jwt.decode(token) as any;
-              const isGenLang = decodedToken?.aud?.startsWith('gen-lang-client');
-              const isMasterEmail = 
-                decodedToken?.email === 'rubenlleg12@gmail.com' || 
-                decodedToken?.email === 'ben@brgytanod.com';
-              
-              if (isGenLang && isMasterEmail) {
-                logger.info(`[AUTH] Trusting gen-lang-client token for master email: ${decodedToken.email}`);
-                let userResult = await pool.query(
-                  'SELECT * FROM users WHERE email = $1',
-                  [decodedToken.email.toLowerCase()]
-                );
-                let dbUser = userResult.rows[0];
-                
-                if (!dbUser) {
-                  logger.info(`[AUTH] Auto-bootstrapping master user ${decodedToken.email} via gen-lang fallback.`);
-                  const insertResult = await pool.query(
-                    `INSERT INTO users (email, password, name, role, status)
-                     VALUES ($1, $2, $3, $4, $5)
-                     ON CONFLICT (email) DO UPDATE SET role = 'superadmin'
-                     RETURNING id, email, name, role, status`,
-                    [decodedToken.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'superadmin', 'approved']
-                  );
-                  dbUser = insertResult.rows[0];
-                }
-
-                if (dbUser) {
-                  decoded = {
-                    id: dbUser.id,
-                    email: dbUser.email,
-                    role: dbUser.role,
-                    tokenVersion: dbUser.token_version || 1
-                  };
-                  isFirebaseAuth = true;
-                }
-              } else {
-                logger.debug(`[AUTH] Firebase JWT check failed: ${firebaseErr.message}`);
-              }
-            } catch (decodeErr) {
-              logger.debug(`[AUTH] Firebase JWT check failed: ${firebaseErr.message}`);
-            }
-          } else {
-            logger.debug(`[AUTH] Firebase JWT check failed: ${firebaseErr.message}`);
-          }
+        } catch (fbErr) {
+          logger.debug('[AUTH] Firebase token verification also failed:', fbErr);
         }
       }
-
-      if (!decoded) {
-        if (jwtErr instanceof jwt.JsonWebTokenError || (jwtErr && (jwtErr.name === 'JsonWebTokenError' || jwtErr.name === 'TokenExpiredError'))) {
-          return res.status(401).json({
-            success: false,
-            error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
-          });
-        }
-        throw jwtErr;
-      }
     }
 
-    // Verify token_version hasn't been revoked
-    // Check if decoded.id is a valid UUID before querying (optional but safer)
-    if (!decoded.id || typeof decoded.id !== 'string') {
-        return res.status(401).json({
-          success: false,
-          error: { code: 'INVALID_TOKEN', message: 'Token missing user identity' }
-        });
-    }
-
-    const result = await pool.query(
-      'SELECT token_version FROM users WHERE id = $1',
-      [decoded.id]
-    ).catch(e => {
-        logger.error(`[AUTH] Database query failed: ${e.message}`);
-        throw e; // Caught by outer try/catch
-    });
-
-    if (!result || result.rows.length === 0) {
+    if (!decoded) {
       return res.status(401).json({
         success: false,
-        error: { code: 'INVALID_TOKEN', message: 'User not found' }
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
       });
     }
 
-    const currentTokenVersion = result.rows[0].token_version || 1;
-    
-    const decodedVer = Number(decoded.tokenVersion || 1);
-    const dbVer = Number(currentTokenVersion);
-
-    if (decodedVer !== dbVer && !isFirebaseAuth) {
-      logger.warn(`[AUTH] Token revoked for user: ${decoded.id} (Token: ${decodedVer}, DB: ${dbVer})`);
-      return res.status(401).json({
-        success: false,
-        error: { code: 'TOKEN_REVOKED', message: 'Your session has been invalidated. Please log in again.' }
-      });
+    const isMasterUser = decoded.email === 'rubenlleg12@gmail.com' || decoded.email === 'ben@brgytanod.com';
+    let effectiveRole = decoded.role || 'resident';
+    if (isMasterUser) {
+      effectiveRole = 'superadmin';
     }
 
-    req.user = { ...decoded, tokenVersion: currentTokenVersion };
-    logger.info(`[AUTH] Authenticated user: ${req.user.id} role: ${req.user.role}`);
-    next();
-  } catch (err: any) {
-    if (err instanceof jwt.JsonWebTokenError || (err && (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError'))) {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' }
-      });
-    }
-    logger.error('[AUTH] Authentication failure:', err);
-    res.status(500).json({
+    req.user = {
+      id: decoded.id || decoded.uid,
+      email: decoded.email,
+      role: effectiveRole,
+      tokenVersion: decoded.tokenVersion,
+      barangayId: decoded.barangayId,
+    };
+
+    return next();
+  } catch (err) {
+    logger.error('[AUTH] Unexpected error during authentication:', err);
+    return res.status(500).json({
       success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'Authentication check failed' }
+      error: { code: 'AUTH_ERROR', message: 'Authentication service error' },
     });
   }
 }
 
 export function authorize(roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    // Only log if something goes wrong to reduce noise
     if (!req.user || !roles.includes(req.user.role)) {
       logger.error(`[AUTH] Authorization failed. User: ${JSON.stringify(req.user)}, Required roles: ${roles.join(', ')}`);
       return res.status(403).json({ 

@@ -1,10 +1,10 @@
 // src/components/layout/AppLayout.tsx
 import React from "react";
-import { 
-  Home, 
-  Map, 
-  Shield, 
-  Settings, 
+import {
+  Home,
+  Map,
+  Shield,
+  Settings,
   Menu,
   ClipboardList,
   HardDrive,
@@ -12,7 +12,7 @@ import {
   Bot,
   Phone,
   UserCheck,
-  ShieldAlert
+  ShieldAlert,
 } from "lucide-react";
 import { NavigationSidebar } from "../NavigationSidebar";
 
@@ -47,7 +47,6 @@ export default function AppLayout({
   viewOverride,
   setViewOverride,
 }: AppLayoutProps) {
-  
   // Custom smart bottom tabs designed for different roles
   const getTabsByRole = (role: string) => {
     switch (role) {
@@ -100,7 +99,7 @@ export default function AppLayout({
 
       {/* Mobile menu overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] md:hidden cursor-pointer"
           onClick={() => setIsMobileMenuOpen(false)}
         />
@@ -131,7 +130,7 @@ export default function AppLayout({
               </span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 bg-[#0F172A]/70 px-4 py-1.5 rounded-full border border-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
             <span className="w-1.5 h-1.5 rounded-full bg-emergency animate-ping" />
             <span className="text-[9px] font-mono font-black text-white/50 tracking-widest uppercase">
@@ -139,49 +138,58 @@ export default function AppLayout({
             </span>
           </div>
         </div>
-        
+
         {/* Sandbox Override View Controller Banner */}
         {viewOverride && (
           <div className="bg-amber-500 border-b border-amber-600 px-4 py-2.5 md:py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 text-zinc-950 font-sans z-[9999] relative shadow-lg">
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-zinc-900 shrink-0 animate-pulse" />
               <div className="text-[11px] leading-tight font-medium">
-                <span className="font-extrabold pb-0.5 tracking-wide uppercase text-zinc-950 block sm:inline mr-1">Sandbox Preview Active:</span> Mimicking{' '}
+                <span className="font-extrabold pb-0.5 tracking-wide uppercase text-zinc-950 block sm:inline mr-1">
+                  Sandbox Preview Active:
+                </span>{" "}
+                Mimicking{" "}
                 <strong className="underline uppercase font-bold text-zinc-900">
-                  {viewOverride === 'admin' ? 'Barangay Admin' : viewOverride === 'tanod' ? 'Tanod Responder' : 'Citizen Resident'}
-                </strong>{' '}
+                  {viewOverride === "admin"
+                    ? "Barangay Admin"
+                    : viewOverride === "tanod"
+                    ? "Tanod Responder"
+                    : "Citizen Resident"}
+                </strong>{" "}
                 interface. Other modules are responding live.
               </div>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-1.5 justify-center">
-              <span className="text-[9px] font-bold text-zinc-900/60 mr-1 uppercase font-mono hidden md:inline">Quick Swap:</span>
-               <button
-                onClick={() => setViewOverride?.('admin')}
+              <span className="text-[9px] font-bold text-zinc-900/60 mr-1 uppercase font-mono hidden md:inline">
+                Quick Swap:
+              </span>
+              <button
+                onClick={() => setViewOverride?.("admin")}
                 className={`px-2.5 py-1 rounded-[4px] text-[10px] font-mono font-bold uppercase transition-all tracking-tighter cursor-pointer ${
-                  viewOverride === 'admin'
-                    ? 'bg-zinc-950 text-amber-400 font-extrabold shadow-md'
-                    : 'bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10'
+                  viewOverride === "admin"
+                    ? "bg-zinc-950 text-amber-400 font-extrabold shadow-md"
+                    : "bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10"
                 }`}
               >
                 Admin
               </button>
               <button
-                onClick={() => setViewOverride?.('tanod')}
+                onClick={() => setViewOverride?.("tanod")}
                 className={`px-2.5 py-1 rounded-[4px] text-[10px] font-mono font-bold uppercase transition-all tracking-tighter cursor-pointer ${
-                  viewOverride === 'tanod'
-                    ? 'bg-zinc-950 text-amber-400 font-extrabold shadow-md'
-                    : 'bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10'
+                  viewOverride === "tanod"
+                    ? "bg-zinc-950 text-amber-400 font-extrabold shadow-md"
+                    : "bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10"
                 }`}
               >
                 Tanod
               </button>
               <button
-                onClick={() => setViewOverride?.('resident')}
+                onClick={() => setViewOverride?.("resident")}
                 className={`px-2.5 py-1 rounded-[4px] text-[10px] font-mono font-bold uppercase transition-all tracking-tighter cursor-pointer ${
-                  viewOverride === 'resident'
-                    ? 'bg-zinc-950 text-amber-400 font-extrabold shadow-md'
-                    : 'bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10'
+                  viewOverride === "resident"
+                    ? "bg-zinc-950 text-amber-400 font-extrabold shadow-md"
+                    : "bg-zinc-950/10 hover:bg-zinc-950/20 text-zinc-900 hover:text-zinc-950 border border-zinc-950/10"
                 }`}
               >
                 Resident
@@ -208,13 +216,24 @@ export default function AppLayout({
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
+                  style={{
+                    touchAction: "manipulation",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
                   className={`flex flex-col items-center py-1.5 px-3 transition-transform duration-200 active:scale-95 ${
-                    isActive ? "text-tactical-red scale-110" : "text-white/40 hover:text-white"
+                    isActive
+                      ? "text-tactical-red scale-110"
+                      : "text-white/40 hover:text-white"
                   }`}
                 >
-                  <Icon className={`w-5 h-5 mb-1 transition-colors ${isActive ? "text-tactical-red" : ""}`} />
-                  <span className="text-[9px] font-mono font-bold tracking-tight uppercase">{tab.label}</span>
+                  <Icon
+                    className={`w-5 h-5 mb-1 transition-colors ${
+                      isActive ? "text-tactical-red" : ""
+                    }`}
+                  />
+                  <span className="text-[9px] font-mono font-bold tracking-tight uppercase">
+                    {tab.label}
+                  </span>
                 </button>
               );
             })}

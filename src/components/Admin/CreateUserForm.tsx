@@ -1,23 +1,39 @@
-import { useState } from 'react';
-import * as api from '../../lib/api';
-import { motion } from 'motion/react';
-import { UserPlus, Shield, UserCheck, Key, Mail, Check, AlertCircle, Phone, MapPin, Eye, EyeOff } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useState } from "react";
+import * as api from "../../lib/api";
+import { motion } from "motion/react";
+import {
+  UserPlus,
+  Shield,
+  UserCheck,
+  Key,
+  Mail,
+  Check,
+  AlertCircle,
+  Phone,
+  MapPin,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { toast } from "react-hot-toast";
 
-export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }) {
+export default function CreateUserForm({
+  onSuccess,
+}: {
+  onSuccess?: () => void;
+}) {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'tanod', // default to tanod
-    phone: '',
-    address: '',
-    houseNumber: '',
-    householdSize: '1',
-    bloodType: '',
-    medicalConditions: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
+    name: "",
+    email: "",
+    password: "",
+    role: "tanod", // default to tanod
+    phone: "",
+    address: "",
+    houseNumber: "",
+    householdSize: "1",
+    bloodType: "",
+    medicalConditions: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -25,30 +41,49 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
   const [autoGenerate, setAutoGenerate] = useState(true);
 
   const roles = [
-    { id: 'tanod', name: 'Tanod Patrol Officer', desc: 'Peacekeepers with active patrol logs', icon: Shield },
-    { id: 'resident', name: 'Citizen Resident', desc: 'Local barangay members with rescue alerts', icon: UserCheck },
-    { id: 'admin', name: 'Barangay Admin', desc: 'Central command dispatchers', icon: UserPlus },
+    {
+      id: "tanod",
+      name: "Tanod Patrol Officer",
+      desc: "Peacekeepers with active patrol logs",
+      icon: Shield,
+    },
+    {
+      id: "resident",
+      name: "Citizen Resident",
+      desc: "Local barangay members with rescue alerts",
+      icon: UserCheck,
+    },
+    {
+      id: "admin",
+      name: "Barangay Admin",
+      desc: "Central command dispatchers",
+      icon: UserPlus,
+    },
   ];
 
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInput = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) {
-      toast.error('Identity and communication details are required.');
+      toast.error("Identity and communication details are required.");
       return;
     }
 
     if (!autoGenerate) {
       if (!formData.password.trim()) {
-        toast.error('Passcode is required when auto-generation is disabled.');
+        toast.error("Passcode is required when auto-generation is disabled.");
         return;
       }
       if (formData.password.length < 6) {
-        toast.error('Passcode must be at least 6 characters.');
+        toast.error("Passcode must be at least 6 characters.");
         return;
       }
     }
@@ -66,12 +101,14 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
         payload.password = formData.password;
       }
 
-      if (formData.role === 'resident') {
+      if (formData.role === "resident") {
         payload.details = {
           phone: formData.phone.trim() || null,
           address: formData.address.trim() || null,
           houseNumber: formData.houseNumber.trim() || null,
-          householdSize: formData.householdSize ? Number(formData.householdSize) : 1,
+          householdSize: formData.householdSize
+            ? Number(formData.householdSize)
+            : 1,
           bloodType: formData.bloodType.trim() || null,
           medicalConditions: formData.medicalConditions.trim() || null,
           emergencyContactName: formData.emergencyContactName.trim() || null,
@@ -81,28 +118,32 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
 
       await api.admin.createUser(payload);
 
-      toast.success(`Committed successfully. Registered ${formData.name} as a verified ${formData.role}!`);
-      
+      toast.success(
+        `Committed successfully. Registered ${formData.name} as a verified ${formData.role}!`
+      );
+
       // Reset only key fields
       setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role: 'tanod',
-        phone: '',
-        address: '',
-        houseNumber: '',
-        householdSize: '1',
-        bloodType: '',
-        medicalConditions: '',
-        emergencyContactName: '',
-        emergencyContactPhone: '',
+        name: "",
+        email: "",
+        password: "",
+        role: "tanod",
+        phone: "",
+        address: "",
+        houseNumber: "",
+        householdSize: "1",
+        bloodType: "",
+        medicalConditions: "",
+        emergencyContactName: "",
+        emergencyContactPhone: "",
       });
       setAutoGenerate(true);
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      console.error('[AdminCreateUserForm] Error:', err);
-      toast.error(err.message || 'System fault: Failed to commit user registry.');
+      console.error("[AdminCreateUserForm] Error:", err);
+      toast.error(
+        err.message || "System fault: Failed to commit user registry."
+      );
     } finally {
       setLoading(false);
     }
@@ -136,27 +177,37 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
             System Classification Role
           </label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {roles.map(r => {
+            {roles.map((r) => {
               const Icon = r.icon;
               const isSelected = formData.role === r.id;
               return (
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, role: r.id }))}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, role: r.id }))
+                  }
                   className={`flex flex-col items-start p-5 rounded-2xl border text-left transition-all ${
                     isSelected
-                      ? 'bg-tactical-cyan/10 border-tactical-cyan text-white shadow-[0_0_15px_rgba(0,240,255,0.15)]'
-                      : 'bg-white/[0.01] border-white/5 text-white/40 hover:border-white/10 hover:bg-white/[0.03]'
+                      ? "bg-tactical-cyan/10 border-tactical-cyan text-white shadow-[0_0_15px_rgba(0,240,255,0.15)]"
+                      : "bg-white/[0.01] border-white/5 text-white/40 hover:border-white/10 hover:bg-white/[0.03]"
                   }`}
                 >
-                  <div className={`p-2.5 rounded-xl border mb-3.5 ${
-                    isSelected ? 'bg-tactical-cyan/20 border-tactical-cyan/30 text-tactical-cyan' : 'bg-white/5 border-white/5 text-white/45'
-                  }`}>
+                  <div
+                    className={`p-2.5 rounded-xl border mb-3.5 ${
+                      isSelected
+                        ? "bg-tactical-cyan/20 border-tactical-cyan/30 text-tactical-cyan"
+                        : "bg-white/5 border-white/5 text-white/45"
+                    }`}
+                  >
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-sm font-black font-mono uppercase text-white tracking-wide">{r.name}</span>
-                  <span className="text-[11px] text-white/40 font-mono mt-1 leading-relaxed">{r.desc}</span>
+                  <span className="text-sm font-black font-mono uppercase text-white tracking-wide">
+                    {r.name}
+                  </span>
+                  <span className="text-[11px] text-white/40 font-mono mt-1 leading-relaxed">
+                    {r.desc}
+                  </span>
                 </button>
               );
             })}
@@ -209,23 +260,26 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
                 checked={autoGenerate}
                 onChange={(e) => {
                   setAutoGenerate(e.target.checked);
-                  setFormData(prev => ({ ...prev, password: '' }));
+                  setFormData((prev) => ({ ...prev, password: "" }));
                 }}
                 className="w-5 h-5 accent-tactical-cyan cursor-pointer rounded border-white/10 bg-[#14171E]"
               />
-              <label htmlFor="autoGeneratePasswordCheck" className="text-xs font-black tracking-wider text-white uppercase cursor-pointer font-mono select-none">
+              <label
+                htmlFor="autoGeneratePasswordCheck"
+                className="text-xs font-black tracking-wider text-white uppercase cursor-pointer font-mono select-none"
+              >
                 Auto-generate secure temporary passcode & welcome email
               </label>
             </div>
             <p className="text-[11px] text-white/40 font-mono uppercase tracking-wider leading-relaxed pl-8">
-              {autoGenerate 
+              {autoGenerate
                 ? "💡 ACTIVE: The system will generate a secure 16-character credential and securely trigger an aesthetic HTML email notification."
                 : "⚠️ ACTIVE: Manual access passcode overrides are active. Ensure the credential is safe and communicated offline."}
             </p>
           </div>
 
           {!autoGenerate && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-2 md:col-span-2"
@@ -236,7 +290,7 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
               <div className="relative flex items-center">
                 <Key className="absolute left-4 w-4 h-4 text-white/20" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleInput}
@@ -250,7 +304,11 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 text-white/20 hover:text-white/60 transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -258,10 +316,10 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
         </div>
 
         {/* Conditional Resident Details */}
-        {formData.role === 'resident' && (
+        {formData.role === "resident" && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             className="space-y-6 pt-6 border-t border-white/5 overflow-hidden"
           >
             <div className="flex items-center gap-2 mb-3">
@@ -397,7 +455,10 @@ export default function CreateUserForm({ onSuccess }: { onSuccess?: () => void }
         {!navigator.onLine && (
           <div className="p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-xl text-sm text-yellow-400 font-mono flex items-center gap-3">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>⚠️ New user creation requires internet connection (Firebase Auth limitation).</span>
+            <span>
+              ⚠️ New user creation requires internet connection (Firebase Auth
+              limitation).
+            </span>
           </div>
         )}
         <div className="flex gap-4 pt-4 border-t border-white/5">

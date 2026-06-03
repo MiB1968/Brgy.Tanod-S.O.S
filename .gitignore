@@ -23,6 +23,7 @@ public/uploads/
 # Host Environment and Secrets
 .env
 .env.local
+firebase-applet-config.json
 .env.production
 .env.development
 .env.test

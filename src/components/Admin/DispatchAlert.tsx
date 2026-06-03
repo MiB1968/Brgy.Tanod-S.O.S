@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Shield, MapPin, Clock, User, CheckCircle } from 'lucide-react';
-import { Incident } from '../../types';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Shield, MapPin, Clock, User, CheckCircle } from "lucide-react";
+import { Incident } from "../../types";
 
 interface DispatchAlertProps {
   incident: Incident;
@@ -21,20 +21,22 @@ export const DispatchAlert = ({ incident, onDispatch }: DispatchAlertProps) => {
   };
 
   if (success) {
-      return (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-panel border-l-4 border-emerald-500 p-4 rounded-xl flex items-center gap-3 text-emerald-400"
-          >
-            <CheckCircle className="w-5 h-5" />
-            <span className="font-bold text-xs uppercase tracking-widest">Dispatched Successfully</span>
-          </motion.div>
-      );
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="glass-panel border-l-4 border-emerald-500 p-4 rounded-xl flex items-center gap-3 text-emerald-400"
+      >
+        <CheckCircle className="w-5 h-5" />
+        <span className="font-bold text-xs uppercase tracking-widest">
+          Dispatched Successfully
+        </span>
+      </motion.div>
+    );
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="glass-panel border-l-4 border-red-500 p-4 rounded-xl space-y-3"
@@ -52,18 +54,23 @@ export const DispatchAlert = ({ incident, onDispatch }: DispatchAlertProps) => {
           </div>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-4 text-xs text-white/60">
-        <div className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(incident.timestamp).toLocaleTimeString()}</div>
-        <div className="flex items-center gap-1"><User className="w-3 h-3" /> {incident.tanodName}</div>
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3" />{" "}
+          {new Date(incident.timestamp).toLocaleTimeString()}
+        </div>
+        <div className="flex items-center gap-1">
+          <User className="w-3 h-3" /> {incident.tanodName}
+        </div>
       </div>
 
-      <button 
+      <button
         onClick={handleDispatch}
         disabled={loading}
         className="w-full py-2 bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest rounded-lg transition-colors"
       >
-        {loading ? 'Dispatching...' : 'Dispatch Units Now'}
+        {loading ? "Dispatching..." : "Dispatch Units Now"}
       </button>
     </motion.div>
   );

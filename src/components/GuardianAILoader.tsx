@@ -2,7 +2,11 @@
 // Shows WebLLM model download/load progress in the Admin Dashboard
 
 import { useEffect, useRef, useState } from "react";
-import { getWebLLMEngine, isWebLLMReady, setWebLLMProgressCallback } from "../lib/webllm";
+import {
+  getWebLLMEngine,
+  isWebLLMReady,
+  setWebLLMProgressCallback,
+} from "../lib/webllm";
 import { motion } from "motion/react";
 
 type Variant = "admin" | "compact";
@@ -137,7 +141,9 @@ export function GuardianAILoader({ variant = "admin" }: GuardianAILoaderProps) {
           className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]"
         />
       </div>
-      <p className="text-[8px] font-mono text-gray-600 truncate italic tracking-tighter">{statusText}</p>
+      <p className="text-[8px] font-mono text-gray-600 truncate italic tracking-tighter">
+        {statusText}
+      </p>
     </div>
   );
 }

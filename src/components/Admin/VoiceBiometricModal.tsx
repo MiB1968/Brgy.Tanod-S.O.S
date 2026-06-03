@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
-import { Mic, ShieldCheck, X } from 'lucide-react';
+import { useState, useRef } from "react";
+import { Mic, ShieldCheck, X } from "lucide-react";
+import { micManager } from "../../lib/microphoneManager";
 
 export default function VoiceBiometricModal({
   isOpen,
@@ -13,14 +14,16 @@ export default function VoiceBiometricModal({
   actionType?: string;
 }) {
   const [isRecording, setIsRecording] = useState(false);
-  const [status, setStatus] = useState("Press the mic and say: 'I confirm this action'");
+  const [status, setStatus] = useState(
+    "Press the mic and say: 'I confirm this action'"
+  );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await micManager.acquire('biometric-modal', 'VoiceBiometricModal');
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunks.current = [];
@@ -30,10 +33,10 @@ export default function VoiceBiometricModal({
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunks.current, { type: "audio/webm" });
         setStatus("Submitting confirmation...");
         onVerified(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
+        micManager.release('biometric-modal');
       };
 
       mediaRecorder.start();
@@ -42,6 +45,7 @@ export default function VoiceBiometricModal({
     } catch (err) {
       console.error(err);
       setStatus("Microphone access denied or error occurred.");
+      micManager.release('biometric-modal');
     }
   };
 
@@ -64,7 +68,9 @@ export default function VoiceBiometricModal({
               CONFIRM ACTION
             </h3>
             <p className="text-sm text-gray-400">
-              {actionType ? `Action: ${actionType.replace(/_/g, ' ')}` : 'Action Confirmation'}
+              {actionType
+                ? `Action: ${actionType.replace(/_/g, " ")}`
+                : "Action Confirmation"}
             </p>
           </div>
         </div>
@@ -72,22 +78,29 @@ export default function VoiceBiometricModal({
         {/* Notice — honest about what this does */}
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2 mb-4">
           <p className="text-[11px] text-amber-300/70 font-mono text-center">
-            Your JWT role authorizes this action. Voice recording is logged for audit purposes only.
+            Your JWT role authorizes this action. Voice recording is logged for
+            audit purposes only.
           </p>
         </div>
 
         <div className="bg-zinc-900 border border-amber-500/20 rounded-2xl p-6 text-center mb-6">
-          <p className="text-sm mb-6 text-amber-200/80 font-mono tracking-wider h-6">{status}</p>
+          <p className="text-sm mb-6 text-amber-200/80 font-mono tracking-wider h-6">
+            {status}
+          </p>
 
           <button
-            onClick={isRecording
-              ? () => { mediaRecorderRef.current?.stop(); setIsRecording(false); }
-              : startRecording
+            onClick={
+              isRecording
+                ? () => {
+                    mediaRecorderRef.current?.stop();
+                    setIsRecording(false);
+                  }
+                : startRecording
             }
             className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] ${
               isRecording
-                ? 'bg-red-600/20 border border-red-500 text-red-400 animate-pulse'
-                : 'bg-amber-600/20 border border-amber-500 text-amber-400 hover:bg-amber-600/30 hover:scale-105'
+                ? "bg-red-600/20 border border-red-500 text-red-400 animate-pulse"
+                : "bg-amber-600/20 border border-amber-500 text-amber-400 hover:bg-amber-600/30 hover:scale-105"
             }`}
           >
             <Mic size={40} />

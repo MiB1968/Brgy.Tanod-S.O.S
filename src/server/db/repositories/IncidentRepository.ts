@@ -18,9 +18,9 @@ export class IncidentRepository {
           resident_id, type, description, location, status, 
           ai_analysis, severity_score, urgency_level, responder_recommendations,
           assigned_to, assigned_to_name, barangay_id,
-          created_at, updated_at
+          created_at, updated_at, client_uuid
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now()) RETURNING *`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), $13) RETURNING *`,
         [
           data.reporterId, 
           data.type, 
@@ -33,7 +33,8 @@ export class IncidentRepository {
           responderRecommendations,
           data.assignedTo || null,
           data.assignedToName || null,
-          data.barangayId || 'default'
+          data.barangayId || 'default',
+          data.clientUuid || null
         ]
       );
       const row = result.rows[0];

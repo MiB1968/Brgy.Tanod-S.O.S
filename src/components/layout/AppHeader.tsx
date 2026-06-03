@@ -42,22 +42,31 @@ export default function AppHeader({
           >
             <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          
+
           <TanodLogo size={42} className="hidden sm:block" />
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold tracking-tighter text-white leading-none">Brgy. Tanod</h1>
-            <p className="text-[8px] sm:text-[10px] text-red-500 font-mono mt-0.5 sm:mt-0 uppercase tracking-wider">S.O.S. SYSTEM</p>
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tighter text-white leading-none">
+              Brgy. Tanod
+            </h1>
+            <p className="text-[8px] sm:text-[10px] text-red-500 font-mono mt-0.5 sm:mt-0 uppercase tracking-wider">
+              S.O.S. SYSTEM
+            </p>
           </div>
         </div>
 
         {/* Role Badge */}
         <div className="hidden md:flex items-center gap-2">
-          <div className={`px-5 py-1.5 text-xs font-semibold rounded-full border capitalize transition-colors ${
-            effectiveRole === "superadmin" ? "border-red-500 bg-red-500/10 text-red-400" :
-            effectiveRole === "admin" ? "border-orange-500 bg-orange-500/10 text-orange-400" :
-            effectiveRole === "tanod" ? "border-blue-500 bg-blue-500/10 text-blue-400" :
-            "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-          }`}>
+          <div
+            className={`px-5 py-1.5 text-xs font-semibold rounded-full border capitalize transition-colors ${
+              effectiveRole === "superadmin"
+                ? "border-red-500 bg-red-500/10 text-red-400"
+                : effectiveRole === "admin"
+                ? "border-orange-500 bg-orange-500/10 text-orange-400"
+                : effectiveRole === "tanod"
+                ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                : "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+            }`}
+          >
             {effectiveRole}
           </div>
         </div>
@@ -76,7 +85,11 @@ export default function AppHeader({
           {(effectiveRole === "admin" || effectiveRole === "superadmin") && (
             <button
               onClick={toggleGlobalSiren}
-              className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl transition-all shrink-0 ${globalSirenActive ? "bg-red-600 animate-pulse shadow-red-600/50" : "bg-gray-800 hover:bg-gray-700"}`}
+              className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl transition-all shrink-0 ${
+                globalSirenActive
+                  ? "bg-red-600 animate-pulse shadow-red-600/50"
+                  : "bg-gray-800 hover:bg-gray-700"
+              }`}
               title="Toggle global alarm alarm"
             >
               <Siren className="w-5 h-5 text-white" />

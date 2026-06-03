@@ -57,6 +57,7 @@ export const barangayBoundaries = pgTable('barangay_boundaries', {
 
 export const alerts = pgTable('alerts', {
   id: uuid('id').primaryKey().defaultRandom(),
+  clientUuid: text('client_uuid').unique(),
   residentId: uuid('resident_id').references(() => users.id),
   type: text('type').notNull(),
   status: text('status').notNull().default('active'),

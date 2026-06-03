@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Download } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { Download } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export function InstallAppButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -12,31 +12,38 @@ export function InstallAppButton() {
       setDeferredPrompt(e);
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     // Initial check for display-mode
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia("(display-mode: standalone)").matches) {
       setIsInstalled(true);
     }
 
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () =>
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      );
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
-      toast.error("Installation protocol already engaged or unsupported by this browser.", {
-        icon: '⚠️',
-        duration: 4000
-      });
+      toast.error(
+        "Installation protocol already engaged or unsupported by this browser.",
+        {
+          icon: "⚠️",
+          duration: 4000,
+        }
+      );
       return;
     }
 
     toast.success("Initializing Secure Installation Protocol...");
-    
+
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
+
+    if (outcome === "accepted") {
       toast.success("Brgy. Tanod S.O.S. added to Home Screen");
       setIsInstalled(true);
       setDeferredPrompt(null);
@@ -49,11 +56,11 @@ export function InstallAppButton() {
 
   return (
     <div className="flex justify-center p-8">
-      <button 
+      <button
         onClick={handleInstall}
         className="flex items-center gap-2 px-6 py-4 bg-brand-bg border border-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all font-mono active:scale-95 shadow-xl group"
       >
-        <Download className="w-4 h-4 text-info group-hover:scale-110 transition-transform" /> 
+        <Download className="w-4 h-4 text-info group-hover:scale-110 transition-transform" />
         <span>ENCRYPTED SYSTEM INSTALL</span>
       </button>
     </div>

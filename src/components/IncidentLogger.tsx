@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { useAuthStore } from '../store/useAuthStore';
-import { db } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState } from "react";
+import { useAuthStore } from "../store/useAuthStore";
+import { db } from "../lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
+const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({
+  onComplete,
+}) => {
   const { profile: user } = useAuthStore();
-  const [type, setType] = useState('');
-  const [description, setDescription] = useState('');
+  const [type, setType] = useState("");
+  const [description, setDescription] = useState("");
   const [isLogging, setIsLogging] = useState(false);
 
   const saveIncident = async () => {
@@ -14,17 +16,17 @@ const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({ onComplete }) =
 
     setIsLogging(true);
     try {
-      await addDoc(collection(db, 'incidents'), {
+      await addDoc(collection(db, "incidents"), {
         type,
         description: description.trim(),
         timestamp: serverTimestamp(),
         reportedBy: user?.id,
-        status: 'reported',
+        status: "reported",
       });
 
       console.log("✅ Incident successfully logged.");
-      setDescription('');
-      setType('');
+      setDescription("");
+      setType("");
       if (onComplete) onComplete();
     } catch (err) {
       console.error(err);
@@ -36,9 +38,9 @@ const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({ onComplete }) =
   return (
     <div className="mt-6 p-6 bg-zinc-900 rounded-3xl border border-zinc-700">
       <h3 className="text-xl font-bold mb-4">📋 Incident Logger</h3>
-      
-      <select 
-        value={type} 
+
+      <select
+        value={type}
         onChange={(e) => setType(e.target.value)}
         className="w-full p-4 rounded-2xl bg-zinc-800 mb-4 text-white"
       >
@@ -62,7 +64,7 @@ const IncidentLogger: React.FC<{ onComplete?: () => void }> = ({ onComplete }) =
         disabled={isLogging || !type || !description.trim()}
         className="w-full mt-4 py-4 bg-red-600 hover:bg-red-700 rounded-2xl font-bold disabled:opacity-50"
       >
-        {isLogging ? 'Saving Report...' : 'Submit Incident Report'}
+        {isLogging ? "Saving Report..." : "Submit Incident Report"}
       </button>
     </div>
   );

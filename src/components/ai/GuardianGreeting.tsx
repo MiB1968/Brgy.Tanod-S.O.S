@@ -1,13 +1,14 @@
-
-import React, { useEffect } from 'react';
-import { useGuardian } from '../../hooks/useGuardian';
-import { useAuthStore } from '../../store/useAuthStore';
+import React, { useEffect } from "react";
+import { useGuardian } from "../../hooks/useGuardian";
+import { useAuthStore } from "../../store/useAuthStore";
 
 interface GuardianGreetingProps {
   delay?: number;
 }
 
-export const GuardianGreeting: React.FC<GuardianGreetingProps> = ({ delay = 1000 }) => {
+export const GuardianGreeting: React.FC<GuardianGreetingProps> = ({
+  delay = 1000,
+}) => {
   const { performGreeting } = useGuardian();
   const { profile } = useAuthStore();
 
@@ -16,7 +17,7 @@ export const GuardianGreeting: React.FC<GuardianGreetingProps> = ({ delay = 1000
       const timer = setTimeout(() => {
         performGreeting(profile.role, profile.name);
       }, delay);
-      
+
       return () => clearTimeout(timer);
     }
   }, [profile, performGreeting, delay]);

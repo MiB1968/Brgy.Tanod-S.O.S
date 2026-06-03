@@ -2,27 +2,27 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as api from "../lib/api";
 import { User, Alert, PatrolLocation, EmergencyType } from "../types";
 import { motion, AnimatePresence } from "motion/react";
-import { 
-  Zap, 
-  Camera, 
-  Image as ImageIcon, 
+import {
+  Zap,
+  Camera,
+  Image as ImageIcon,
   X,
-  Map as MapIcon, 
-  Activity, 
-  Calendar, 
-  Cpu, 
-  Settings as SettingsIcon, 
-  PhoneCall, 
+  Map as MapIcon,
+  Activity,
+  Calendar,
+  Cpu,
+  Settings as SettingsIcon,
+  PhoneCall,
   Shield,
   Grid,
-  Eye
+  Eye,
 } from "lucide-react";
 import { Howl } from "howler";
 import { toast } from "react-hot-toast";
 
 // Sub-components
 import { ResidentHero } from "./Resident/ResidentHero";
-import { SOSGuidance } from './Resident/SOSGuidance';
+import { SOSGuidance } from "./Resident/SOSGuidance";
 import { SOSButtonPanel } from "./Resident/SOSButtonPanel";
 import { SOSChat } from "./SOSChat";
 import { CitizenReportTracker } from "./CitizenReportTracker";
@@ -84,7 +84,7 @@ export default function ResidentDashboard({
     if (profile?.id && isOnline && !activeAlert) {
       api.generic
         .list(
-          `alerts?residentId=${profile.id}&status=pending,responding,active`,
+          `alerts?residentId=${profile.id}&status=pending,responding,active`
         )
         .then((res) => {
           if (res && res.length > 0) {
@@ -122,7 +122,7 @@ export default function ResidentDashboard({
 
   const handleSOS = async (
     type: EmergencyType = "OTHER",
-    description: string,
+    description: string
   ) => {
     if (activeAlert || isSending) return;
 
@@ -136,7 +136,7 @@ export default function ResidentDashboard({
           navigator.geolocation.getCurrentPosition(res, rej, {
             enableHighAccuracy: true,
             timeout: 5000,
-          }),
+          })
         );
         location = {
           lat: gpsPos.coords.latitude,
@@ -166,7 +166,7 @@ export default function ResidentDashboard({
           photosToProcess.map(async (f) => {
             const blob = await photoService.compressForSOS(f);
             return photoService.blobToBase64(blob);
-          }),
+          })
         );
 
         await createSOS(type, description, location, b64Photos);
@@ -182,13 +182,16 @@ export default function ResidentDashboard({
     }
   };
 
-  const handleShout = useCallback((reason: string) => {
-    toast.error(`GUARDIAN AI: ${reason.toUpperCase()}`, {
-      duration: 5000,
-      icon: "🛡️",
-    });
-    handleSOS("OTHER", `Auto-SOS triggered by Guardian AI: ${reason}`);
-  }, [handleSOS]);
+  const handleShout = useCallback(
+    (reason: string) => {
+      toast.error(`GUARDIAN AI: ${reason.toUpperCase()}`, {
+        duration: 5000,
+        icon: "🛡️",
+      });
+      handleSOS("OTHER", `Auto-SOS triggered by Guardian AI: ${reason}`);
+    },
+    [handleSOS]
+  );
 
   const { startListening, stopListening } = useShoutDetection(handleShout);
 
@@ -198,7 +201,7 @@ export default function ResidentDashboard({
       const service = await import("../services/StorageService");
       await service.uploadVideoChunk(activeAlert.id, chunk, Date.now());
     },
-    [activeAlert],
+    [activeAlert]
   );
 
   const { isRecording, startRecording, stopRecording } =
@@ -218,7 +221,9 @@ export default function ResidentDashboard({
       <div className="flex items-center justify-center min-h-screen p-8 text-zinc-400">
         <div className="text-center">
           <div className="animate-pulse w-12 h-12 border-2 border-zinc-800 rounded-full mx-auto mb-4" />
-          <p className="text-xs font-mono uppercase tracking-widest">Loading Tactical Profile...</p>
+          <p className="text-xs font-mono uppercase tracking-widest">
+            Loading Tactical Profile...
+          </p>
         </div>
       </div>
     );
@@ -255,11 +260,19 @@ export default function ResidentDashboard({
                       <Zap className="text-white w-5 h-5" />
                     </div>
                     <div>
-                      <h5 className="text-[10px] font-black uppercase tracking-widest text-info font-mono">Outbox Active</h5>
-                      <p className="text-[9px] text-white/40 font-bold uppercase font-mono">{queuedCount} SOS REPORTS QUEUED</p>
+                      <h5 className="text-[10px] font-black uppercase tracking-widest text-info font-mono">
+                        Outbox Active
+                      </h5>
+                      <p className="text-[9px] text-white/40 font-bold uppercase font-mono">
+                        {queuedCount} SOS REPORTS QUEUED
+                      </p>
                     </div>
                   </div>
-                  <button onClick={forceSync} disabled={isSyncing || !isOnline} className="px-4 py-2 bg-info/20 border border-info/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-info">
+                  <button
+                    onClick={forceSync}
+                    disabled={isSyncing || !isOnline}
+                    className="px-4 py-2 bg-info/20 border border-info/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-info"
+                  >
                     {isSyncing ? "SYNC..." : "SYNC NOW"}
                   </button>
                 </div>
@@ -287,13 +300,18 @@ export default function ResidentDashboard({
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="h-1.5 bg-brand-bg rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-emergency shadow-glow-red"
                         animate={{
-                          width: activeAlert.status === "pending" ? "33%" : activeAlert.status === "responding" ? "66%" : "100%"
+                          width:
+                            activeAlert.status === "pending"
+                              ? "33%"
+                              : activeAlert.status === "responding"
+                              ? "66%"
+                              : "100%",
                         }}
                       />
                     </div>
@@ -304,8 +322,12 @@ export default function ResidentDashboard({
                     </div>
                   </div>
 
-                  {activeAlert.status === "resolved" || activeAlert.status === "cancelled" ? (
-                    <button onClick={() => useSOSStore.getState().clearActiveAlert()} className="w-full py-4 bg-info/20 border border-info/30 rounded-2xl text-[10px] font-black uppercase tracking-widest text-info">
+                  {activeAlert.status === "resolved" ||
+                  activeAlert.status === "cancelled" ? (
+                    <button
+                      onClick={() => useSOSStore.getState().clearActiveAlert()}
+                      className="w-full py-4 bg-info/20 border border-info/30 rounded-2xl text-[10px] font-black uppercase tracking-widest text-info"
+                    >
                       ACKNOWLEDGE
                     </button>
                   ) : (
@@ -335,74 +357,129 @@ export default function ResidentDashboard({
 
           {/* Tactical Photo Evidence */}
           <div className="p-6 glass-panel border-white/5 rounded-[32px] space-y-4">
-             <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black uppercase tracking-widest text-white/30 font-mono">Incident Evidence</label>
-                <button onClick={() => photoInputRef.current?.click()} className="p-2 bg-white/5 rounded-xl text-white/60 hover:bg-white/10">
-                   <Camera className="w-4 h-4" />
-                </button>
-                <input type="file" ref={photoInputRef} className="hidden" accept="image/*" multiple onChange={(e) => {
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-white/30 font-mono">
+                Incident Evidence
+              </label>
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                className="p-2 bg-white/5 rounded-xl text-white/60 hover:bg-white/10"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <input
+                type="file"
+                ref={photoInputRef}
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
                   const files = Array.from(e.target.files || []);
                   setSelectedPhotos((prev) => [...prev, ...files].slice(0, 4));
-                }} />
-             </div>
-             {selectedPhotos.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {selectedPhotos.map((file, idx) => (
-                    <div key={idx} className="relative min-w-[80px] h-20 rounded-xl overflow-hidden border border-white/10">
-                       <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
-                       <button onClick={() => setSelectedPhotos(p => p.filter((_, i) => i !== idx))} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white">
-                          <X className="w-2 h-2" />
-                       </button>
-                    </div>
-                  ))}
-                </div>
-             )}
+                }}
+              />
+            </div>
+            {selectedPhotos.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {selectedPhotos.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="relative min-w-[80px] h-20 rounded-xl overflow-hidden border border-white/10"
+                  >
+                    <img
+                      src={URL.createObjectURL(file)}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() =>
+                        setSelectedPhotos((p) => p.filter((_, i) => i !== idx))
+                      }
+                      className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white"
+                    >
+                      <X className="w-2 h-2" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* CENTER/RIGHT COLUMN - INTEL MAP & TRACKER */}
         <div className="flex-1 w-full space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="space-y-4">
-                <h3 className="text-xs font-black uppercase tracking-widest text-tactical-cyan font-mono italic">Live Intel Grid</h3>
-                <div className="h-[400px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative">
-                   <ActiveMap alerts={[]} patrols={visiblePatrols} />
-                </div>
-             </div>
-             <div className="space-y-4">
-                <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 font-mono italic">Incident Telemetry</h3>
-                <CitizenReportTracker userId={profile?.id || ""} />
-             </div>
+            <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-tactical-cyan font-mono italic">
+                Live Intel Grid
+              </h3>
+              <div className="h-[400px] rounded-[32px] overflow-hidden glass-panel border border-white/5 relative">
+                <ActiveMap alerts={[]} patrols={visiblePatrols} />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 font-mono italic">
+                Incident Telemetry
+              </h3>
+              <CitizenReportTracker userId={profile?.id || ""} />
+            </div>
           </div>
 
           {/* Resident Console Links */}
           {onTabChange && (
             <div className="tactical-panel border-white/5 p-6 rounded-[32px] bg-black/20">
-               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[
-                    { id: "map", label: "Livemap", icon: MapIcon, color: "text-tactical-cyan" },
-                    { id: "tracker", label: "Tracker", icon: Activity, color: "text-emerald-400" },
-                    { id: "directory", label: "Hotlines", icon: PhoneCall, color: "text-rose-400" },
-                    { id: "guardian", label: "Guardian", icon: Cpu, color: "text-fuchsia-400" }
-                  ].map(mod => (
-                    <button key={mod.id} onClick={() => onTabChange(mod.id)} className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 group transition-all">
-                       <mod.icon className={`w-4 h-4 ${mod.color}`} />
-                       <span className="text-[10px] font-black uppercase font-mono text-white/60 group-hover:text-white">{mod.label}</span>
-                    </button>
-                  ))}
-               </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  {
+                    id: "map",
+                    label: "Livemap",
+                    icon: MapIcon,
+                    color: "text-tactical-cyan",
+                  },
+                  {
+                    id: "tracker",
+                    label: "Tracker",
+                    icon: Activity,
+                    color: "text-emerald-400",
+                  },
+                  {
+                    id: "directory",
+                    label: "Hotlines",
+                    icon: PhoneCall,
+                    color: "text-rose-400",
+                  },
+                  {
+                    id: "guardian",
+                    label: "Guardian",
+                    icon: Cpu,
+                    color: "text-fuchsia-400",
+                  },
+                ].map((mod) => (
+                  <button
+                    key={mod.id}
+                    onClick={() => onTabChange(mod.id)}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 group transition-all"
+                  >
+                    <mod.icon className={`w-4 h-4 ${mod.color}`} />
+                    <span className="text-[10px] font-black uppercase font-mono text-white/60 group-hover:text-white">
+                      {mod.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           <div className="space-y-4">
-             <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 font-mono italic">Voice Operations</h3>
-             <OfflineVoiceManager />
+            <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 font-mono italic">
+              Voice Operations
+            </h3>
+            <OfflineVoiceManager />
           </div>
 
           {activeAlert && (
-             <div className="mt-8">
-                <SOSChat alertId={activeAlert.id} currentUser={profile} />
-             </div>
+            <div className="mt-8">
+              <SOSChat alertId={activeAlert.id} currentUser={profile} />
+            </div>
           )}
         </div>
       </div>

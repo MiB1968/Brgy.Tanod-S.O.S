@@ -130,7 +130,7 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
                 "flex flex-col max-w-[85%]",
                 msg.senderId === currentUser.uid
                   ? "ml-auto items-end"
-                  : "mr-auto items-start",
+                  : "mr-auto items-start"
               )}
             >
               <div className="flex items-center gap-1.5 mb-1 px-1">
@@ -146,7 +146,7 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
                       "ml-1 opacity-50 px-1 border border-white/10 rounded",
                       msg.senderRole === "tanod"
                         ? "text-info border-info/30"
-                        : "text-white/40",
+                        : "text-white/40"
                     )}
                   >
                     {msg.senderRole}
@@ -158,7 +158,7 @@ export const SOSChat: React.FC<SOSChatProps> = ({ alertId, currentUser }) => {
                   "px-4 py-2 rounded-2xl text-xs font-medium leading-relaxed shadow-lg",
                   msg.senderId === currentUser.uid
                     ? "bg-info text-white rounded-tr-none"
-                    : "bg-white/5 text-white/90 border border-white/5 rounded-tl-none",
+                    : "bg-white/5 text-white/90 border border-white/5 rounded-tl-none"
                 )}
               >
                 {msg.message}

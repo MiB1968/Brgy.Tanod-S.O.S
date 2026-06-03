@@ -8,10 +8,18 @@ let firebaseAppletConfig: any = {};
 try {
   const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(configPath)) {
-    firebaseAppletConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (parsed.apiKey === 'AIzaSyCiRKS_NqYGHrY_kMz_mY4e0xwE3rUD5bI') {
+      throw new Error(
+        '[CONFIG] firebase-applet-config.json still contains the revoked API key. ' +
+        'Please rotate the key in Firebase Console and update your local file.'
+      );
+    }
+    firebaseAppletConfig = parsed;
   }
-} catch (e) {
+} catch (e: any) {
   // If not found, ignore
+  console.warn('[CONFIG] Failed to parse firebase-applet-config.json:', e.message);
 }
 
 // ── Check missing critical secrets ──────────────────────────────────────────────
@@ -43,8 +51,8 @@ export const config = {
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   geminiModel: (() => {
-    let m = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
-    if (m.startsWith('AIza')) m = 'gemini-3.5-flash';
+    let m = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    if (m.startsWith('AIza')) m = 'gemini-2.0-flash';
     return m.replace(/^models\//, '');
   })(),
 

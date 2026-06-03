@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { X, Download } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { X, Download } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
 export const PWAInstallPrompt = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
@@ -17,13 +18,16 @@ export const PWAInstallPrompt = () => {
       setShowPrompt(true);
     };
 
-    window.addEventListener('beforeinstallprompt', handler as EventListener);
+    window.addEventListener("beforeinstallprompt", handler as EventListener);
 
     // Auto-hide after 30 seconds if not interacted
     const timeout = setTimeout(() => setShowPrompt(false), 30000);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler as EventListener);
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handler as EventListener
+      );
       clearTimeout(timeout);
     };
   }, []);
@@ -34,10 +38,10 @@ export const PWAInstallPrompt = () => {
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
 
-    if (outcome === 'accepted') {
-      console.log('✅ User accepted PWA install');
+    if (outcome === "accepted") {
+      console.log("✅ User accepted PWA install");
     } else {
-      console.log('❌ User dismissed install');
+      console.log("❌ User dismissed install");
     }
 
     setDeferredPrompt(null);
@@ -47,7 +51,7 @@ export const PWAInstallPrompt = () => {
   const dismiss = () => {
     setShowPrompt(false);
     // Optional: Remember dismissal in localStorage
-    localStorage.setItem('pwa_prompt_dismissed', 'true');
+    localStorage.setItem("pwa_prompt_dismissed", "true");
   };
 
   if (!showPrompt) return null;
@@ -62,7 +66,8 @@ export const PWAInstallPrompt = () => {
         <div className="flex-1">
           <h3 className="font-semibold text-lg">Install Tanod SOS</h3>
           <p className="text-sm text-zinc-400 mt-1 leading-tight">
-            Add to home screen for quick SOS access, offline mode, and faster response even without browser tabs.
+            Add to home screen for quick SOS access, offline mode, and faster
+            response even without browser tabs.
           </p>
 
           <div className="flex gap-3 mt-5">
@@ -83,11 +88,13 @@ export const PWAInstallPrompt = () => {
           </div>
         </div>
 
-        <button onClick={dismiss} className="text-zinc-500 hover:text-zinc-400 -mt-1 -mr-1 p-2">
+        <button
+          onClick={dismiss}
+          className="text-zinc-500 hover:text-zinc-400 -mt-1 -mr-1 p-2"
+        >
           <X size={20} />
         </button>
       </div>
     </div>
   );
 };
-

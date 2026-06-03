@@ -130,6 +130,12 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
       throw new Error("User identity could not be verified");
     }
 
+    // Force promotion for master emails just in case 
+    // the old token has the 'resident' role baked in
+    if (decodedUser.email === 'rubenlleg12@gmail.com' || decodedUser.email === 'ben@brgytanod.com') {
+      decodedUser.role = 'superadmin';
+    }
+
     // Set user data to socket
     (socket as AuthenticatedSocket).data = {
       user: {

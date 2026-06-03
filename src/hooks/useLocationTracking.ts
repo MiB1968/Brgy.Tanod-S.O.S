@@ -21,7 +21,7 @@ export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
   const lastSentRef = useRef<number>(0);
 
   const role = profile ? normalizeRole(profile.role) : null;
-  const isTanod = role === 'tanod' || role === 'responder';
+  const isTanod = role === 'tanod';
   const isCitizenWithActiveSOS = role === 'resident' && !!activeAlert;
 
   // SOS: 3s, Patrol: 8s
