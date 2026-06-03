@@ -13,6 +13,7 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { getMessaging, isSupported } from 'firebase/messaging';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // ── Singleton init ────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ const firebaseApp: FirebaseApp =
   getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 export const auth: Auth = getAuth(firebaseApp);
+export const storage: FirebaseStorage = getStorage(firebaseApp);
 
 // Configure Auth persistence to browserLocalPersistence to prevent sessionStorage partitioning issues on mobile devices
 setPersistence(auth, browserLocalPersistence).catch((err) => {

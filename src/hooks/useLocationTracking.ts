@@ -1,71 +1,80 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSOSStore } from '../store/useSOSStore';
-import { watchLocation } from '../lib/gps';
+import { normalizeRole } from '../utils/roleUtils';
 import socket from '../lib/socket';
+import { LocationUpdate } from '../types';
 
-export function useLocationTracking() {
-  const { profile } = useAuthStore();
-  const { activeAlert } = useSOSStore();
+interface UseLocationTrackingOptions {
+  enabled?: boolean;
+  onLocationUpdate?: (location: LocationUpdate) => void;
+}
+
+export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
+  const { enabled = true, onLocationUpdate } = options;
+
+  const profile = useAuthStore((state) => state.profile);
+  const activeAlert = useSOSStore((state) => state.activeAlert);
+
+  const watchIdRef = useRef<number | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSentRef = useRef<number>(0);
+
+  const role = profile ? normalizeRole(profile.role) : null;
+  const isTanod = role === 'tanod' || role === 'responder';
+  const isCitizenWithActiveSOS = role === 'resident' && !!activeAlert;
+
+  // SOS: 3s, Patrol: 8s
+  const updateIntervalMs = isCitizenWithActiveSOS ? 3000 : 8000;
 
   useEffect(() => {
-    if (!profile) return;
+    if (!enabled || !profile || (!isTanod && !isCitizenWithActiveSOS)) return;
 
-    let stopWatching: () => void = () => {};
-    
-    // Adaptive Throttling: High accuracy/no delay if in an SOS, otherwise throttle
-    const isResponding = !!activeAlert;
-    const options: PositionOptions = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: isResponding ? 1000 : 30000 
+    const sendLocation = (coords: GeolocationCoordinates) => {
+      const now = Date.now();
+      if (now - lastSentRef.current < updateIntervalMs) return;
+      lastSentRef.current = now;
+
+      const payload: LocationUpdate = {
+        userId: profile.id,
+        role: role!,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy,
+        speed: coords.speed ?? undefined,
+        heading: coords.heading ?? undefined,
+        timestamp: new Date().toISOString(),
+        alertId: activeAlert?.id ?? null,
+      };
+
+      socket.emit('location_update', payload);
+      onLocationUpdate?.(payload);
     };
 
-    if (profile.role === 'tanod' || (profile.role as string) === 'responder') {
-      console.log("[useLocationTracking] Starting GPS tracking for Responder, Responding:", isResponding);
-      stopWatching = watchLocation(
-        (loc) => {
-          if (socket.connected) {
-            socket.emit('location_update', {
-              user_id: profile.id,
-              role: profile.role,
-              lat: loc.lat,
-              lng: loc.lng,
-              name: profile.name,
-              accuracy: loc.accuracy,
-              status: isResponding ? 'responding' : 'patrolling'
-            });
-          }
-        },
-        (err) => {
-          console.warn('[useLocationTracking] GPS tracking error:', err.message);
-        },
-        options
-      );
-    } else {
-      stopWatching = watchLocation(
-        (loc) => {
-          if (socket.connected) {
-            socket.emit('location_update', {
-              user_id: profile.id,
-              role: 'citizen',
-              lat: loc.lat,
-              lng: loc.lng,
-              name: profile.name,
-              accuracy: loc.accuracy,
-              status: isResponding ? 'active' : 'idle'
-            });
-          }
-        },
-        (err) => {
-          // Normal for citizens to deny GPS until SOS is triggered
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    if ('geolocation' in navigator) {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => sendLocation(position.coords),
+        (error) => console.error('[useLocationTracking] Geolocation error:', error),
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
     }
 
+    intervalRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => sendLocation(position.coords),
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 10000 }
+      );
+    }, updateIntervalMs);
+
     return () => {
-      stopWatching();
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [profile, activeAlert]);
+  }, [enabled, profile, isTanod, isCitizenWithActiveSOS, activeAlert?.id, updateIntervalMs, role, onLocationUpdate]);
+
+  return {
+    isTracking: enabled && (isTanod || isCitizenWithActiveSOS),
+    isHighFrequency: isCitizenWithActiveSOS,
+  };
 }

@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTanodStore } from "../store/useTanodStore";
+import { MAMBURAO_CENTER } from "../constants";
 
 // Custom red icon for Tanods
 const tanodIcon = new L.Icon({
@@ -67,7 +68,7 @@ export default function LiveMap() {
         id: 'demo-tanod-1',
         tanodId: 'demo-tanod-1',
         tanodName: 'Bgy. Patrol 01',
-        location: { lat: 14.5760, lng: 121.0850 },
+        location: { lat: MAMBURAO_CENTER[0], lng: MAMBURAO_CENTER[1] },
         isActive: true,
         status: 'patrolling',
         lastUpdate: new Date().toISOString()
@@ -78,7 +79,7 @@ export default function LiveMap() {
   return (
     <div ref={containerRef} className="relative w-full h-[70vh] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-950">
       <MapContainer
-        center={[14.5760, 121.0850]}
+        center={MAMBURAO_CENTER}
         zoom={13}
         className="h-full w-full"
         zoomControl={false}

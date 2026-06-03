@@ -61,6 +61,8 @@ export const isRuben = (uid?: string, email?: string) => {
 
 export const PATROL_TIMEOUT = 1000 * 60 * 5; // 5 minutes
 
+export const MAMBURAO_CENTER: [number, number] = [13.2236, 120.5960];
+
 export const navItems = [
   { id: 'home', label: '📡 Command', icon: IconRadar },
   { id: 'logs', label: '📋 Activity Logs', icon: ClipboardList },

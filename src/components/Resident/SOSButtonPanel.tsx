@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { TacticalCard } from '../Tactical/TacticalCard';
 import { GuardianButton } from './GuardianButton';
 
+import { useGuardianPassive } from '../../hooks/useGuardianPassive';
 import { VoiceSOSButton } from './VoiceSOSButton';
 
 interface SOSButtonPanelProps {
@@ -16,6 +17,14 @@ interface SOSButtonPanelProps {
 }
 
 export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onInitiateSOS }: SOSButtonPanelProps) {
+  const { isPassiveActive, isRecording, recordingDuration } = useGuardianPassive(
+    guardianMode,
+    (type, desc) => onInitiateSOS(type, desc)
+  );
+
+  const formatDuration = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
   const triggerSOS = (type: EmergencyType, desc: string) => {
     if (isSending) return;
     
@@ -53,6 +62,15 @@ export function SOSButtonPanel({ isSending, guardianMode, setGuardianMode, onIni
               <div className={cn("w-5 h-5 rounded-full bg-white transition-all shadow-[0_0_10px_white]", guardianMode ? 'translate-x-7 bg-tactical-cyan' : 'translate-x-0 bg-white/50')} />
            </button>
         </div>
+
+        {guardianMode && (
+          <div className="flex items-center gap-2 px-4 py-1.5 -mt-2 mb-4 rounded-xl bg-black/30 border border-tactical-cyan/10 text-[11px] font-mono">
+            <span className={`w-2 h-2 rounded-full animate-pulse ${isRecording ? 'bg-red-500' : 'bg-emerald-400'}`} />
+            <span className={isRecording ? 'text-red-400' : 'text-emerald-400/80'}>
+              {isRecording ? `Nire-record... ${formatDuration(recordingDuration)}` : 'Nakikinig...'}
+            </span>
+          </div>
+        )}
 
         <div className="relative flex flex-col items-center">
             {/* Rotating Ring Container */}

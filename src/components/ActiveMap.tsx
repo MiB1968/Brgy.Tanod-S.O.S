@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Circle, Polyline } from
 import L from 'leaflet';
 import { Alert, PatrolLocation } from '../types';
 import React, { useEffect, useState, useCallback } from 'react';
+import { MAMBURAO_CENTER } from '../constants';
 import { downloadRegion, OCCIDENTAL_MINDORO_BOUNDS } from '../lib/mapDownloader';
 import { getCachedTile, cacheTile } from '../lib/mapDb';
 import { HardDrive, Download, CheckCircle2 } from 'lucide-react';
@@ -229,7 +230,7 @@ export default function ActiveMap({
   // 1. First active alert
   // 2. Provided prop center
   // 3. Default center
-  const [mapCenter, setMapCenter] = useState<[number, number]>(propCenter || [13.2236, 120.5960]); // Mamburao, Occidental Mindoro
+  const [mapCenter, setMapCenter] = useState<[number, number]>(propCenter || MAMBURAO_CENTER); // Mamburao, Occidental Mindoro
   const [zoom, setZoom] = useState(15);
 
   useEffect(() => {
