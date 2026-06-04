@@ -6,14 +6,19 @@ import { sosService, SOSReport } from '../services/sosService';
 import { useRBAC } from '../context/AuthContext';
 
 export const useSOS = () => {
-  const { user } = useRBAC();
+  const { user, role } = useRBAC();
   const [activeSOS, setActiveSOS] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [myActiveSOS, setMyActiveSOS] = useState<any | null>(null);
 
   // Listen to active SOS alerts
   useEffect(() => {
-    // Index-free query: query by status only, sort locally to prevent Firestore index requirements
+    if (!user || !role || role === 'resident') {
+      setActiveSOS([]);
+      setLoading(false);
+      return;
+    }
+
     const q = query(
       collection(db, 'alerts'),
       where('status', 'in', ['pending', 'responding']),
@@ -45,7 +50,7 @@ export const useSOS = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user, role]);
 
   // Track user's own active SOS
   useEffect(() => {

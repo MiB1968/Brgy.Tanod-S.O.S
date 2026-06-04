@@ -8,7 +8,8 @@ import {
   doublePrecision, 
   jsonb,
   serial,
-  varchar
+  varchar,
+  index
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -24,7 +25,11 @@ export const users = pgTable('users', {
   firebaseUid: text('firebase_uid'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastActive: timestamp('last_active', { withTimezone: true }).defaultNow()
-});
+}, (table) => [
+  index('users_firebase_uid_idx').on(table.firebaseUid),
+  index('users_role_idx').on(table.role),
+  index('users_status_idx').on(table.status)
+]);
 
 export const residents = pgTable('residents', {
   id: uuid('id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -81,7 +86,12 @@ export const alerts = pgTable('alerts', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   reviewReason: text('review_reason')
-});
+}, (table) => [
+  index('alerts_status_idx').on(table.status),
+  index('alerts_created_at_idx').on(table.createdAt),
+  index('alerts_assigned_to_idx').on(table.assignedTo),
+  index('alerts_resident_id_idx').on(table.residentId)
+]);
 
 export const patrols = pgTable('patrols', {
   tanodId: uuid('tanod_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
