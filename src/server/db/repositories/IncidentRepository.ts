@@ -18,9 +18,9 @@ export class IncidentRepository {
           resident_id, type, description, location, status, 
           ai_analysis, severity_score, urgency_level, responder_recommendations,
           assigned_to, assigned_to_name, barangay_id,
-          created_at, updated_at, client_uuid
+          created_at, updated_at, client_uuid, review_reason
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), $13) RETURNING *`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), $13, $14) RETURNING *`,
         [
           data.reporterId, 
           data.type, 
@@ -34,7 +34,8 @@ export class IncidentRepository {
           data.assignedTo || null,
           data.assignedToName || null,
           data.barangayId || 'default',
-          data.clientUuid || null
+          data.clientUuid || null,
+          data.reviewReason || null
         ]
       );
       const row = result.rows[0];
@@ -52,7 +53,8 @@ export class IncidentRepository {
         assignedTo: row.assigned_to,
         assignedToName: row.assigned_to_name,
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        reviewReason: row.review_reason
       } as Incident;
     } catch (err) {
       console.error("[IncidentRepository] Create error:", err);
@@ -77,7 +79,7 @@ export class IncidentRepository {
     const result = await pool.query(`
       SELECT * FROM alerts 
       WHERE (barangay_id = $1 OR barangay_id IS NULL)
-      AND status IN ('pending', 'active', 'responding') 
+      AND status IN ('pending', 'active', 'responding', 'needs_review')
       ORDER BY created_at DESC 
       LIMIT $2`, [barangayId, limit]
     );
@@ -93,7 +95,8 @@ export class IncidentRepository {
       longitude: row.location?.lng,
       aiAnalysis: row.ai_analysis,
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      reviewReason: row.review_reason
     } as Incident));
   }
 
@@ -114,7 +117,8 @@ export class IncidentRepository {
       longitude: row.location?.lng,
       aiAnalysis: row.ai_analysis,
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      reviewReason: row.review_reason
     } as Incident));
   }
 
@@ -136,7 +140,8 @@ export class IncidentRepository {
       longitude: row.location?.lng,
       aiAnalysis: row.ai_analysis,
       createdAt: row.created_at,
-      updatedAt: row.updated_at
+      updatedAt: row.updated_at,
+      reviewReason: row.review_reason
     } as Incident));
   }
 }

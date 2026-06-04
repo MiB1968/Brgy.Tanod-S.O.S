@@ -32,7 +32,7 @@ export function AlertsFeed({
 
   const isActiveAlert = (alert: Alert) => {
     const status = alert.status?.toLowerCase();
-    return status === "pending" || status === "active";
+    return status === "pending" || status === "active" || status === "needs_review";
   };
   const isRespondedAlert = (alert: Alert) =>
     alert.status?.toLowerCase() === "responding";
@@ -109,6 +109,7 @@ export function AlertsFeed({
               <option value="ALL">STATUS: ALL_INTEL</option>
               <option value="PENDING">STATUS: PENDING</option>
               <option value="RESPONDING">STATUS: RESPONDING</option>
+              <option value="NEEDS_REVIEW">STATUS: NEEDS_REVIEW</option>
               <option value="RESOLVED">STATUS: ARCHIVED</option>
             </select>
 
@@ -183,6 +184,8 @@ export function AlertsFeed({
                                   ? "bg-tactical-red/20 text-tactical-red border border-tactical-red/30"
                                   : alert.status === "responding"
                                   ? "bg-tactical-blue/20 text-tactical-blue border border-tactical-blue/30"
+                                  : alert.status === "needs_review"
+                                  ? "bg-amber-500/20 text-amber-500 border border-amber-500/30"
                                   : "bg-tactical-cyan/20 text-tactical-cyan border border-tactical-cyan/30"
                               )}
                             >
@@ -196,13 +199,28 @@ export function AlertsFeed({
                         </div>
                       </div>
 
-                      <div className="bg-tactical-dark p-4 rounded-xl border border-tactical-cyan/10">
-                        <p className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">
-                          Incident Type
-                        </p>
-                        <p className="text-sm font-bold text-white uppercase italic font-display">
-                          {alert.type}
-                        </p>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-tactical-dark p-4 rounded-xl border border-tactical-cyan/10">
+                          <p className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] mb-1 font-mono">
+                            Incident Type
+                          </p>
+                          <p className="text-sm font-bold text-white uppercase italic font-display">
+                            {alert.type}
+                          </p>
+                        </div>
+                        {alert.status === "needs_review" && (
+                          <div className="flex-1 bg-amber-500/10 p-4 rounded-xl border border-amber-500/30 flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+                            <div>
+                              <p className="text-[8px] font-black text-amber-500 uppercase tracking-[0.2em] mb-1 font-mono">
+                                Security Flag
+                              </p>
+                              <p className="text-[10px] font-bold text-white uppercase font-mono">
+                                ⚠ {alert.reviewReason || "Review Required"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -39,7 +39,10 @@ export const validateSOSGeofence = onDocumentCreate(
 
     if (!sos?.latitude || !sos?.longitude || !sos?.barangayId) {
       console.error(`Invalid SOS data for ${sosId}`);
-      await admin.firestore().collection("sos_alerts").doc(sosId).delete();
+      await admin.firestore().collection("sos_alerts").doc(sosId).update({
+        status: "needs_review",
+        reviewReason: "Invalid SOS data: missing location or barangayId"
+      });
       return;
     }
 
@@ -51,7 +54,10 @@ export const validateSOSGeofence = onDocumentCreate(
 
       if (!barangaySnap.exists) {
         console.error(`Invalid barangayId: ${sos.barangayId}`);
-        await admin.firestore().collection("sos_alerts").doc(sosId).delete();
+        await admin.firestore().collection("sos_alerts").doc(sosId).update({
+          status: "needs_review",
+          reviewReason: `Invalid barangayId: ${sos.barangayId}`
+        });
         return;
       }
 
@@ -67,8 +73,11 @@ export const validateSOSGeofence = onDocumentCreate(
           const maxRadius = barangay.radiusKm || 5.0;
 
           if (distanceKm > maxRadius) {
-            console.warn(`SOS ${sosId} rejected - outside barangay boundary (${distanceKm.toFixed(2)}km > ${maxRadius}km)`);
-            await admin.firestore().collection("sos_alerts").doc(sosId).delete();
+            console.warn(`SOS ${sosId} flagged - outside barangay boundary (${distanceKm.toFixed(2)}km > ${maxRadius}km)`);
+            await admin.firestore().collection("sos_alerts").doc(sosId).update({
+              status: "needs_review",
+              reviewReason: "Outside Barangay Boundary"
+            });
             return;
           }
       }
@@ -76,7 +85,10 @@ export const validateSOSGeofence = onDocumentCreate(
       console.log(`✅ SOS ${sosId} passed geofence validation`);
     } catch (error) {
       console.error("Geofence validation error:", error);
-      await admin.firestore().collection("sos_alerts").doc(sosId).delete();
+      await admin.firestore().collection("sos_alerts").doc(sosId).update({
+        status: "needs_review",
+        reviewReason: "Geofence validation error"
+      });
     }
   }
 );
