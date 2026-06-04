@@ -10,6 +10,21 @@ import { doc, setDoc, onSnapshot, collection, query, where } from 'firebase/fire
 import { db as firebaseDb } from '../lib/firebase';
 import { TanodLocation, TanodStatus } from '../types/tanod';
 
+/**
+ * TanodLocationService
+ * 
+ * SINGLE SOURCE OF TRUTH for real-time location tracking in Brgy.Tanod-S.O.S.
+ *
+ * Responsibilities:
+ * - Handles both Tanod patrol tracking and high-frequency SOS tracking (3s interval)
+ * - Writes location data to PostGIS (location_history table)
+ * - Broadcasts location updates via Socket.io
+ * - Supports offline queuing via Dexie
+ *
+ * IMPORTANT:
+ * This service replaced the old useLocationTracking.ts and gpsService.ts.
+ * Those files are now deprecated and should not be used for new development.
+ */
 export class TanodLocationService {
   private watchId: number | null = null;
   private lastSent = 0;
@@ -24,6 +39,10 @@ export class TanodLocationService {
       TanodLocationService.instance = new TanodLocationService();
     }
     return TanodLocationService.instance;
+  }
+
+  getIsTracking(): boolean {
+    return this.isTracking;
   }
 
   async startTracking(uid?: string, onUpdate?: (location: any) => void) {

@@ -164,6 +164,15 @@ export const GuardianVoiceAssistant: React.FC = () => {
   useEffect(() => {
     const handleToggle = () => {
       audioUtils.kickstartAudio();
+
+      // Only preload WebLLM when user actually wants to use voice
+      if (!isListening) {
+        // Lazy load WebLLM only on user action
+        import("../../lib/webllm").then(({ preloadWebLLM }) => {
+          preloadWebLLM();
+        });
+      }
+
       if (isListening) {
         stopListening();
       } else {

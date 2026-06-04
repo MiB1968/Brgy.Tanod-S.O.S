@@ -17,19 +17,21 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const finalFirebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey || "mock-key-for-local-build-only",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain || "demo-project.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId || "demo-project",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket || "demo-project.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId || "123456789",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId || "1:123456789:web:mockappid",
+// Support safe fallback to Vite environment variables if JSON fields are empty or placeholder.
+const finalConfig = {
+  apiKey: firebaseConfig.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: firebaseConfig.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: firebaseConfig.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: firebaseConfig.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: firebaseConfig.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: firebaseConfig.appId || import.meta.env.VITE_FIREBASE_APP_ID || "",
+  firestoreDatabaseId: firebaseConfig.firestoreDatabaseId || "(default)"
 };
 
 // ── Singleton init ────────────────────────────────────────────────────────────
 // getApps().length prevents "App already exists" crash when HMR re-runs this module.
 const firebaseApp: FirebaseApp =
-  getApps().length > 0 ? getApp() : initializeApp(finalFirebaseConfig);
+  getApps().length > 0 ? getApp() : initializeApp(finalConfig);
 
 export const auth: Auth = getAuth(firebaseApp);
 export const storage: FirebaseStorage = getStorage(firebaseApp);
@@ -43,7 +45,7 @@ export const db: Firestore = initializeFirestore(firebaseApp, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
   }),
-}, firebaseConfig.firestoreDatabaseId || "(default)");
+}, finalConfig.firestoreDatabaseId);
 
 export let messaging: any = null;
 isSupported().then(supported => {

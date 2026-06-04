@@ -2,11 +2,9 @@
  * @file useLocationTracking.ts
  * @deprecated — Being phased out
  *
- * This file is old. The new GPS system is in:
- * - src/services/tanodLocationService.ts
- *
- * For now, we keep this file so the app doesn't break.
- * Later we will remove it.
+ * SAFETY GUARD ADDED:
+ * This hook will now automatically disable itself if tanodLocationService
+ * is already active. This prevents duplicate location tracking.
  */
 
 import { useEffect, useRef } from 'react';
@@ -15,6 +13,7 @@ import { useSOSStore } from '../store/useSOSStore';
 import { normalizeRole } from '../utils/roleUtils';
 import socket from '../lib/socket';
 import { LocationUpdate } from '../types';
+import { tanodLocationService } from '../services/tanodLocationService';
 
 interface UseLocationTrackingOptions {
   enabled?: boolean;
@@ -40,7 +39,15 @@ export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
   useEffect(() => {
     if (!enabled || !profile || (!isTanod && !isCitizenWithActiveSOS)) return;
 
-    console.warn('[useLocationTracking] This file is old. We are moving to tanodLocationService.ts');
+    // === SAFETY GUARD ===
+    if (tanodLocationService.getIsTracking()) {
+      console.warn(
+        '[useLocationTracking] DISABLED: tanodLocationService is active. Using new GPS system instead.'
+      );
+      return; // Stop old hook from running
+    }
+
+    console.warn('[useLocationTracking] DEPRECATED — migrate to tanodLocationService.ts');
 
     const sendLocation = (coords: GeolocationCoordinates) => {
       const now = Date.now();
@@ -66,7 +73,7 @@ export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
     if ('geolocation' in navigator) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => sendLocation(position.coords),
-        (error) => console.error('[useLocationTracking] Error:', error),
+        (error) => console.error('[useLocationTracking] Geolocation error:', error),
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
     }

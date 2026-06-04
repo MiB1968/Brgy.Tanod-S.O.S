@@ -13,6 +13,9 @@ export function setWebLLMProgressCallback(cb: ProgressCb) {
   _progressCb = cb;
 }
 
+/**
+ * Returns true if WebLLM is currently downloading or initializing.
+ */
 export function isWebLLMLoading(): boolean {
   return _loading;
 }
@@ -21,7 +24,6 @@ export async function getWebLLMEngine(): Promise<webllm.MLCEngine> {
   if (_engine) return _engine;
 
   if (_loading) {
-    // Wait for current loading to finish
     while (_loading) {
       await new Promise((r) => setTimeout(r, 400));
     }
@@ -35,13 +37,11 @@ export async function getWebLLMEngine(): Promise<webllm.MLCEngine> {
     _engine = await webllm.CreateMLCEngine(MODEL_ID, {
       initProgressCallback: (report) => {
         const pct = Math.round(report.progress * 100);
-        
-        // Only update if progress actually changed (reduces spam)
+
         if (pct !== _lastProgress) {
           _lastProgress = pct;
           _progressCb?.(pct, report.text);
 
-          // Send event so GuardianVoiceAssistant can show it
           window.dispatchEvent(
             new CustomEvent("guardian-ai-event", {
               detail: {
@@ -54,7 +54,6 @@ export async function getWebLLMEngine(): Promise<webllm.MLCEngine> {
       },
     });
 
-    // Signal that model is ready
     window.dispatchEvent(
       new CustomEvent("guardian-ai-event", {
         detail: { type: "ready" },
@@ -74,9 +73,12 @@ export async function getWebLLMEngine(): Promise<webllm.MLCEngine> {
   return _engine!;
 }
 
+/**
+ * Only call this when you want to start loading the model.
+ * Do NOT call on app startup or component mount.
+ */
 export function preloadWebLLM(onProgress?: ProgressCb) {
   if (onProgress) setWebLLMProgressCallback(onProgress);
-  
   getWebLLMEngine().catch((e) => {
     console.warn("[WebLLM] Preload failed:", e);
   });

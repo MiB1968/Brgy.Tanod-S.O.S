@@ -122,18 +122,45 @@ export function VoiceSOSButton({ onSOSReady, onPreview }: VoiceSOSButtonProps) {
   const isDone = status === "done";
   const isError = status === "error";
 
-  // Preload model silently on mount
+  // Listen for model status and synchronized updates without forcing download on mount
   useEffect(() => {
-    preloadModel((pct) => {
-      setModelPct(pct);
-      if (pct >= 100) setModelReady(true);
-    });
-    // Check if already loaded (from guardianAIService)
-    if (voiceSOSAgent.isModelReady()) setModelReady(true);
+    // Check if already loaded
+    if (voiceSOSAgent.isModelReady()) {
+      setModelReady(true);
+      setModelPct(100);
+    }
+
+    const handleGuardianEvent = (e: any) => {
+      const { type, payload } = e.detail || {};
+
+      if (type === "progress") {
+        const progress = payload.progress || 0;
+        setModelPct(progress);
+        if (progress >= 100) {
+          setModelReady(true);
+        }
+      } else if (type === "ready") {
+        setModelReady(true);
+        setModelPct(100);
+      }
+    };
+
+    window.addEventListener("guardian-ai-event", handleGuardianEvent);
+    return () => {
+      window.removeEventListener("guardian-ai-event", handleGuardianEvent);
+    };
   }, []);
 
   const handleMicPress = async () => {
     if (isListening || isProcessing) return;
+
+    // Lazy load model on demand if not already preloaded or ready
+    if (!modelReady && !voiceSOSAgent.isModelReady()) {
+      preloadModel((pct) => {
+        setModelPct(pct);
+        if (pct >= 100) setModelReady(true);
+      });
+    }
 
     setPayload(null);
     setStatus("idle");
