@@ -62,6 +62,7 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
     responding: "text-info bg-info/10 border-info/20",
     resolved: "text-success bg-success/10 border-success/20",
     cancelled: "text-white/50 bg-white/5 border-white/10",
+    needs_review: "text-amber-500 bg-amber-500/10 border-amber-500/20",
   };
 
   const TYPE_COLORS: Record<string, string> = {
@@ -263,6 +264,20 @@ export function AlertDetailsModal({ alert, onClose }: AlertDetailsModalProps) {
                     <p className="text-sm text-white/90 italic">
                       "{alert.description}"
                     </p>
+                  </div>
+                )}
+
+                {alert.status === "needs_review" && (
+                  <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] text-amber-500 uppercase tracking-widest mb-1 font-bold">
+                        Security Review Required
+                      </p>
+                      <p className="text-sm text-white/90 font-mono">
+                        ⚠ {alert.reviewReason || "System flagged for administrative review."}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

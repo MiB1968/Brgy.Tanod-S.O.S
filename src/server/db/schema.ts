@@ -77,7 +77,8 @@ export const alerts = pgTable('alerts', {
   responderNotes: text('responder_notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-  resolvedAt: timestamp('resolved_at', { withTimezone: true })
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  reviewReason: text('review_reason')
 });
 
 export const patrols = pgTable('patrols', {
@@ -209,7 +210,8 @@ export const incidents = pgTable('incidents', {
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   resolutionNotes: text('resolution_notes'),
   responderNotes: text('responder_notes'),
-  adminOnDuty: uuid('admin_on_duty') // Added missing column too based on postSync query
+  adminOnDuty: uuid('admin_on_duty'), // Added missing column too based on postSync query
+  reviewReason: text('review_reason')
 });
 
 export const patrolSessions = pgTable('patrol_sessions', {

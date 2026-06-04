@@ -83,6 +83,9 @@ export const incidentService = {
     }, 60_000);
 
     // 3. Geofencing Validation (Backported from Firebase Functions)
+    let geofenceStatus: any = null;
+    let geofenceReviewReason: string | null = null;
+
     try {
       const barangayIdToUse = barangayId || 'default';
       const barangaySnap = await pool.query("SELECT data FROM system_config WHERE key = $1", [`barangay_${barangayIdToUse}`]);
@@ -97,9 +100,9 @@ export const incidentService = {
           );
           
           if (distanceMetres > barangay.radiusKm * 1000) {
-            console.warn(`[SOS] Geofence warning: Outside boundary (${(distanceMetres/1000).toFixed(2)}km > ${barangay.radiusKm}km). Automatically aligning coordinates to barangay center for system testing/robustness in sandbox preview.`);
-            latitude = barangay.center.lat;
-            longitude = barangay.center.lng;
+            console.warn(`[SOS] Geofence warning: Outside boundary (${(distanceMetres/1000).toFixed(2)}km > ${barangay.radiusKm}km). Marking for review.`);
+            geofenceStatus = 'needs_review';
+            geofenceReviewReason = 'Outside Barangay Boundary';
           }
         }
       }
@@ -151,13 +154,14 @@ export const incidentService = {
       description: description || '',
       latitude,
       longitude,
-      status: autoAssignedTanodId ? 'responding' : 'pending' as any,
+      status: geofenceStatus || (autoAssignedTanodId ? 'responding' : 'pending') as any,
       aiAnalysis,
       photos: data.photos || [],
       voiceClip: data.voiceClip,
       assignedTo: autoAssignedTanodId,
       assignedToName: autoAssignedTanodName,
       clientUuid: data.clientUuid,
+      reviewReason: geofenceReviewReason
     };
 
     let incident;
@@ -360,8 +364,8 @@ export const incidentService = {
 
   async getActiveAlerts(barangayId?: string) {
     const query = barangayId 
-      ? [`SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.status IN ('pending', 'active', 'responding') AND (a.barangay_id = $1 OR a.barangay_id IS NULL) ORDER BY a.created_at DESC`, [barangayId]]
-      : [`SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.status IN ('pending', 'active', 'responding') ORDER BY a.created_at DESC`, []];
+      ? [`SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.status IN ('pending', 'active', 'responding', 'needs_review') AND (a.barangay_id = $1 OR a.barangay_id IS NULL) ORDER BY a.created_at DESC`, [barangayId]]
+      : [`SELECT a.*, u.name as "residentName" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.status IN ('pending', 'active', 'responding', 'needs_review') ORDER BY a.created_at DESC`, []];
 
     const result = await pool.query(query[0] as string, query[1] as any[]);
     

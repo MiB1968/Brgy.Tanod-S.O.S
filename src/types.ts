@@ -20,8 +20,8 @@ export const RolePermissions: Record<UserRole, string[]> = {
   dispatcher: ["view_map", "create_sos", "respond_alerts", "manage_users", "view_all_alerts", "broadcast", "view_reports", "manage_roster"],
 };
 export type RegistryStatus = 'pending' | 'approved' | 'rejected' | 'Available' | 'On Patrol' | 'Responding' | 'Off-Duty' | 'Break' | 'Offline';
-export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';
-export type IncidentStatus = 'pending' | 'ongoing' | 'resolved' | 'referred';
+export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled' | 'needs_review';
+export type IncidentStatus = 'pending' | 'ongoing' | 'resolved' | 'referred' | 'needs_review';
 export type EmergencyType = 'MEDICAL' | 'FIRE' | 'CRIME' | 'NATURAL_DISASTER' | 'OTHER' | 'VIOLENCE' | 'FLOOD' | 'DISTURBANCE';
 
 export interface User {
@@ -100,6 +100,7 @@ export interface Alert {
   resolvedAt?: string;
   resolutionNotes?: string;
   responderNotes?: string;
+  reviewReason?: string;
   // ── Offline queue flag ────────────────────────────────────────────────────
   // Set to true when the SOS was saved to the local outbox because the device
   // was offline. Cleared once the server confirms receipt.
@@ -131,6 +132,7 @@ export interface Incident {
   respondedAt?: string;
   resolvedAt?: string;
   adminOnDuty?: string;
+  reviewReason?: string;
 }
 
 export interface PatrolLocation {

@@ -526,6 +526,8 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         'resolution_notes': 'resolution_notes',
         'responderNotes': 'responder_notes',
         'responder_notes': 'responder_notes',
+        'reviewReason': 'review_reason',
+        'review_reason': 'review_reason',
         'description': 'description',
         'location': 'location',
         'type': 'type'
@@ -563,6 +565,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
            resolutionNotes: alert.resolution_notes,
            responderNotes: alert.responder_notes,
            severityScore: alert.severity_score,
+           reviewReason: alert.review_reason,
            aiAnalysis: typeof alert.ai_analysis === 'string' ? JSON.parse(alert.ai_analysis) : alert.ai_analysis,
            location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
            timestamp: alert.created_at
