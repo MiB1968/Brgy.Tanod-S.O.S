@@ -7,6 +7,7 @@ import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAdminAction } from '../services/auditService';
 import { sendWelcomeEmail } from '../services/emailService';
+import { encryptField } from '../utils/crypto';
 
 export const createUser = async (req: AuthRequest, res: Response) => {
   const { email, password, name, role, details, autoGeneratePassword } = req.body;
@@ -51,15 +52,18 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       await client.query(
         `INSERT INTO residents
            (id, name, status, phone, address, house_number, household_size,
-            blood_type, medical_conditions,
+            blood_type, medical_conditions, allergies, medications,
             emergency_contact_name, emergency_contact_phone)
-         VALUES ($1, $2, 'approved', $3, $4, $5, $6, $7, $8, $9, $10)
+         VALUES ($1, $2, 'approved', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (id) DO NOTHING`,
         [
           user.id, name,
           details?.phone || null, details?.address || null, details?.houseNumber || null,
           details?.householdSize !== undefined ? Number(details.householdSize) : 1,
-          details?.bloodType || null, details?.medicalConditions || null,
+          encryptField(details?.bloodType || null),
+          encryptField(details?.medicalConditions || null),
+          encryptField(details?.allergies || null),
+          encryptField(details?.medications || null),
           details?.emergencyContactName || null, details?.emergencyContactPhone || null
         ]
       );

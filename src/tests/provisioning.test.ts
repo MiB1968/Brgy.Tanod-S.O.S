@@ -28,7 +28,10 @@ vi.mock('../server/services/auditService', () => ({
 }));
 
 vi.mock('../server/config/index', () => ({
-  config: { jwtSecret: 'test-secret' }
+  config: {
+    jwtSecret: 'test-secret',
+    encryptionKey: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+  }
 }));
 
 const mockRes = () => {

@@ -29,6 +29,10 @@ if (process.env.NODE_ENV === 'production') {
     console.error('FATAL: JWT_SECRET environment variable is missing.');
     process.exit(1);
   }
+  if (!process.env.ENCRYPTION_KEY) {
+    console.error('FATAL: ENCRYPTION_KEY environment variable is missing.');
+    process.exit(1);
+  }
   if (!process.env.DATABASE_URL && !process.env.COCKROACH_URL) {
     console.error('FATAL: DATABASE_URL/COCKROACH_URL environment variable is missing.');
     process.exit(1);
@@ -48,6 +52,15 @@ export const config = {
       throw new Error('FATAL: JWT_SECRET environment variable is required in production.');
     }
     return crypto.randomBytes(32).toString('hex');
+  })(),
+
+  encryptionKey: (() => {
+    if (process.env.ENCRYPTION_KEY) return process.env.ENCRYPTION_KEY;
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: ENCRYPTION_KEY environment variable is required in production.');
+    }
+    // Use a stable key for development to avoid issues with persistent data
+    return '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
   })(),
 
   databaseUrl: (process.env.COCKROACH_URL || process.env.DATABASE_URL || '')

@@ -6,6 +6,7 @@ import * as response from '../utils/response';
 import { ShiftRepository } from '../db/repositories/ShiftRepository';
 import { z } from 'zod';
 import { config } from '../config/index';
+import { encryptField, decryptField } from '../utils/crypto';
 
 const auditLogArchiveSchema = z.object({
   session_date: z.string().min(1),
@@ -132,7 +133,20 @@ export const getSync = async (req: AuthRequest, res: Response) => {
         const user = result.rows[0];
         if (user && collection === 'residents') {
            const resInfo = await pool.query("SELECT * FROM residents WHERE id = $1", [id]);
-           return res.json({ ...user, ...resInfo.rows[0] });
+           const residentData = resInfo.rows[0];
+           if (residentData) {
+              residentData.blood_type = decryptField(residentData.blood_type);
+              residentData.medical_conditions = decryptField(residentData.medical_conditions);
+              residentData.allergies = decryptField(residentData.allergies);
+              residentData.medications = decryptField(residentData.medications);
+
+              // Map to camelCase for frontend consistency if needed, but sync usually keeps snake_case
+              residentData.bloodType = residentData.blood_type;
+              residentData.medicalConditions = residentData.medical_conditions;
+              residentData.allergies = residentData.allergies;
+              residentData.medications = residentData.medications;
+           }
+           return res.json({ ...user, ...residentData });
         }
         return res.json(user || null);
       }
@@ -140,7 +154,15 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       if (!isTanod) return response.error(res, "Forbidden", "FORBIDDEN", 403);
       if (collection === 'residents') {
         const result = await pool.query("SELECT u.id, u.email, u.name, u.role, u.status, r.* FROM users u JOIN residents r ON u.id = r.id WHERE u.role = 'resident'");
-        return res.json(result.rows);
+        return res.json(result.rows.map(r => ({
+          ...r,
+          blood_type: decryptField(r.blood_type),
+          medical_conditions: decryptField(r.medical_conditions),
+          allergies: decryptField(r.allergies),
+          medications: decryptField(r.medications),
+          bloodType: decryptField(r.blood_type),
+          medicalConditions: decryptField(r.medical_conditions)
+        })));
       }
       const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE role = 'resident'");
       return res.json(result.rows);
@@ -346,10 +368,13 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         name: 'name', phone: 'phone', address: 'address', status: 'status',
         houseNumber: 'house_number', householdSize: 'household_size',
         bloodType: 'blood_type', medicalConditions: 'medical_conditions',
+        allergies: 'allergies', medications: 'medications',
         emergencyContactName: 'emergency_contact_name', emergencyContactPhone: 'emergency_contact_phone',
         gpsLat: 'gps_lat', gpsLng: 'gps_lng', isVerified: 'is_verified',
         verificationDate: 'verification_date', rejectionReason: 'rejection_reason'
       };
+
+      const encryptedFields = ['blood_type', 'medical_conditions', 'allergies', 'medications'];
 
       // Prevent non-admins from verifying or rejecting
       if (!isTanod) {
@@ -362,7 +387,9 @@ export const postSync = async (req: AuthRequest, res: Response) => {
       const safeData: Record<string, any> = {};
       Object.keys(data).forEach(key => {
          const mapped = fieldMapping[key] || fieldMapping[key.replace(/([A-Z])/g, "_$1").toLowerCase()];
-         if (mapped) safeData[mapped] = data[key];
+         if (mapped) {
+           safeData[mapped] = encryptedFields.includes(mapped) ? encryptField(data[key]) : data[key];
+         }
       });
 
       const safeFields = Object.keys(safeData);
@@ -385,12 +412,18 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         }
       }
 
+      // Decrypt for the response/socket
+      const responseData = { ...safeData };
+      encryptedFields.forEach(f => {
+        if (responseData[f]) responseData[f] = decryptField(responseData[f]);
+      });
+
       socketService.emitToAll("resident_update", { 
         id: docId, 
-        ...safeData,
+        ...responseData,
         is_outside_barangay: isOutsideBarangay,
       });
-      return res.json({ success: true, is_outside_barangay: isOutsideBarangay });
+      return res.json({ success: true, is_outside_barangay: isOutsideBarangay, data: responseData });
     }
 
     if (collection === 'patrols') {

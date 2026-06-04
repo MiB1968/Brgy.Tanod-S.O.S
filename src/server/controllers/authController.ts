@@ -6,6 +6,7 @@ import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from '../services/auditService';
+import { encryptField, decryptField } from '../utils/crypto';
 
 // Ensure Firebase Admin is initialized
 initDatabase();
@@ -127,9 +128,9 @@ export const register = async (req: Request, res: Response) => {
         await client.query(
           `INSERT INTO residents 
              (id, name, status, phone, address, house_number, household_size, 
-              blood_type, medical_conditions, emergency_contact_name, 
-              emergency_contact_phone, gps_lat, gps_lng, selfie_url)
-           VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+              blood_type, medical_conditions, allergies, medications,
+              emergency_contact_name, emergency_contact_phone, gps_lat, gps_lng, selfie_url)
+           VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            ON CONFLICT (id) DO NOTHING`,
           [
             user.id,
@@ -138,8 +139,10 @@ export const register = async (req: Request, res: Response) => {
             details?.address || null,
             details?.houseNumber || null,
             details?.householdSize !== undefined ? Number(details.householdSize) : 1,
-            details?.bloodType || null,
-            details?.medicalConditions || null,
+            encryptField(details?.bloodType || null),
+            encryptField(details?.medicalConditions || null),
+            encryptField(details?.allergies || null),
+            encryptField(details?.medications || null),
             details?.emergencyContactName || null,
             details?.emergencyContactPhone || null,
             details?.gpsLat !== undefined && details?.gpsLat !== null ? Number(details.gpsLat) : null,
