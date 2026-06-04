@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import { z } from 'zod';
 
 const UserStatusSchema = z.enum(['pending', 'verified', 'active', 'suspended', 'inactive']);
-const UserRoleSchema = z.enum(['resident', 'tanod', 'admin', 'superadmin', 'captain']);
+const UserRoleSchema = z.enum(['resident', 'tanod', 'admin', 'super_admin', 'captain']);
 
 export class UserRepository {
   async findById(id: string) {

@@ -70,7 +70,7 @@ export default function PatrolScheduler({ profile }: { profile: any }) {
       !profile ||
       (profile.role !== "admin" &&
         profile.role !== "tanod" &&
-        profile.role !== "superadmin")
+        profile.role !== "super_admin")
     )
       return;
 

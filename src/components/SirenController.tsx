@@ -36,7 +36,7 @@ export default function SirenController({
       !profile ||
       (profile.role !== "tanod" &&
         profile.role !== "admin" &&
-        profile.role !== "superadmin")
+        profile.role !== "super_admin")
     ) {
       siren.stop();
       return;

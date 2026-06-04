@@ -35,7 +35,7 @@ export function JarvisVoice() {
   useEffect(() => {
     const role = profile?.role;
     if (
-      !["admin", "superadmin", "captain"].includes(role?.toLowerCase() || "")
+      !["admin", "super_admin", "captain"].includes(role?.toLowerCase() || "")
     ) {
       setJarvisReply(
         "Voice command access restricted. Admin privileges required."
@@ -267,7 +267,7 @@ export function JarvisVoice() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const isAdmin = ["admin", "superadmin", "captain"].includes(
+  const isAdmin = ["admin", "super_admin", "captain"].includes(
     profile?.role?.toLowerCase() || ""
   );
 

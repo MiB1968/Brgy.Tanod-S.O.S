@@ -64,13 +64,13 @@ const App: React.FC = () => {
 
   // FIX: Gate viewOverride — only admin/superadmin may use it.
   const canUseViewOverride = useMemo(
-    () => user?.role === "admin" || user?.role === "superadmin",
+    () => user?.role === "admin" || user?.role === "super_admin",
     [user?.role]
   );
 
   const effectiveRole = useMemo(() => {
     if (canUseViewOverride && viewOverride) return viewOverride;
-    if (isMasterAdmin) return "superadmin";
+    if (isMasterAdmin) return "super_admin";
     return user?.role || "resident";
   }, [isMasterAdmin, viewOverride, canUseViewOverride, user?.role]);
 

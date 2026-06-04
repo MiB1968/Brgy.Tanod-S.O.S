@@ -362,7 +362,7 @@ export default function AboutModal({ isOpen, onClose, role }: AboutModalProps) {
                 </div>
               </section>
               {/* System Maintenance */}
-              {(role === "admin" || role === "superadmin") && (
+              {(role === "admin" || role === "super_admin") && (
                 <section className="space-y-4">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 font-mono">
                     System Maintenance

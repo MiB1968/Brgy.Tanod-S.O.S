@@ -38,7 +38,7 @@ export const getSync = async (req: AuthRequest, res: Response) => {
 
   try {
     const userRole = req.user?.role;
-    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
     if (collection === 'system') {
@@ -266,7 +266,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
 
   try {
     const userRole = req.user?.role;
-    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
     if (collection === 'system') {
@@ -656,7 +656,7 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
 
   try {
     const userRole = req.user?.role;
-    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const isAdmin = userRole === 'admin' || userRole === 'super_admin';
     const isTanod = userRole === 'tanod' || isAdmin;
 
     const DELETABLE_COLLECTIONS: Record<string, string> = {

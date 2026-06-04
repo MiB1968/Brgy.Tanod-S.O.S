@@ -32,7 +32,7 @@ export default function ManageUsers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<
-    "all" | "admin" | "superadmin" | "tanod" | "resident"
+    "all" | "admin" | "super_admin" | "tanod" | "resident"
   >("all");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "pending" | "verified" | "suspended"
@@ -220,7 +220,7 @@ export default function ManageUsers() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case "superadmin":
+      case "super_admin":
         return <Shield className="w-4.5 h-4.5 text-rose-500 animate-glow" />;
       case "admin":
         return <Shield className="w-4 h-4 text-tactical-cyan" />;
@@ -234,7 +234,7 @@ export default function ManageUsers() {
 
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
-      case "superadmin":
+      case "super_admin":
         return "bg-rose-500/10 text-rose-500 border-rose-500/20";
       case "admin":
         return "bg-tactical-cyan/10 text-tactical-cyan border-tactical-cyan/20";
@@ -413,7 +413,7 @@ export default function ManageUsers() {
 
                     {/* Role clearance update tier column */}
                     <td className="py-5 px-4">
-                      {user.role === "superadmin" ? (
+                      {user.role === "super_admin" ? (
                         <span
                           className={`px-2.5 py-1 rounded-lg text-[8.5px] font-mono font-black uppercase border ${getRoleBadgeClass(
                             user.role

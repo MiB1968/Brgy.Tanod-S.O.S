@@ -600,7 +600,7 @@ export default function AdminDashboard(props: {
               </h3>
               <TanodActivityLogs />
             </div>
-            {(profile?.role === "admin" || profile?.role === "superadmin") && (
+            {(profile?.role === "admin" || profile?.role === "super_admin") && (
               <AdminAnalytics profile={profile} />
             )}
             <ManageBroadcasts />

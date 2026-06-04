@@ -5,12 +5,21 @@ import { config } from '../config/index';
 import { logger } from '../utils/logger';
 import { pool, admin } from '../db/index';
 
+export type UserRole =
+  | 'resident'
+  | 'tanod'
+  | 'dispatcher'
+  | 'captain'
+  | 'admin'
+  | 'super_admin';
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: string;
+    role: UserRole;
     tokenVersion?: number;
+    barangayId?: string;
     [key: string]: any;
   };
 }
@@ -156,9 +165,13 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
     }
 
     const isMasterUser = decoded.email === 'rubenlleg12@gmail.com' || decoded.email === 'ben@brgytanod.com';
-    let effectiveRole = decoded.role || 'resident';
+    let effectiveRole = (decoded.role || 'resident') as UserRole;
+
+    // Normalize roles to match new RBAC requirements if they come from old DB/tokens
+    if (effectiveRole === 'super_admin' as any) effectiveRole = 'super_admin';
+
     if (isMasterUser) {
-      effectiveRole = 'superadmin';
+      effectiveRole = 'super_admin';
     }
 
     req.user = {
@@ -179,10 +192,23 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
   }
 }
 
-export function authorize(roles: string[]) {
+export function requireRole(role: UserRole) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user || req.user.role !== role) {
+      logger.error(`[RBAC] Access denied. User: ${req.user?.email} (${req.user?.role}), Required role: ${role}`);
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: `Requires ${role} role` }
+      });
+    }
+    next();
+  };
+}
+
+export function requireAnyRole(roles: UserRole[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      logger.error(`[AUTH] Authorization failed. User: ${JSON.stringify(req.user)}, Required roles: ${roles.join(', ')}`);
+      logger.error(`[RBAC] Access denied. User: ${req.user?.email} (${req.user?.role}), Required one of: ${roles.join(', ')}`);
       return res.status(403).json({ 
         success: false, 
         error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } 
@@ -191,6 +217,9 @@ export function authorize(roles: string[]) {
     next();
   };
 }
+
+// Deprecated: use requireAnyRole instead
+export const authorize = requireAnyRole;
 
 export async function revokeUserSessions(userId: string): Promise<void> {
   await pool.query(

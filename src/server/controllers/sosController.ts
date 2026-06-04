@@ -98,7 +98,7 @@ export const updateSOS = async (req: AuthRequest, res: Response) => {
   const { status, notes, assignedTo } = req.body;
   const user = req.user!;
 
-  const updated = await incidentService.updateSOSStatus(id, status, notes, assignedTo);
+  const updated = await incidentService.updateSOSStatus(id, status, notes, assignedTo, user.id);
 
   return res.json({
     success: true,

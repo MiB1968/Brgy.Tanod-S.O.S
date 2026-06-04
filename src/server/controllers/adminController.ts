@@ -154,7 +154,7 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   const { role } = req.body;
 
-  const allowedRoles = ['resident', 'tanod', 'admin', 'superadmin'];
+  const allowedRoles = ['resident', 'tanod', 'admin', 'super_admin'];
   if (!allowedRoles.includes(role)) {
     return response.error(res, 'Invalid role specified.', 'BAD_REQUEST', 400);
   }
@@ -212,7 +212,7 @@ export const updateUserStatus = async (req: AuthRequest, res: Response) => {
 
     await logAdminAction({
       adminId: req.user!.id,
-      action: 'ADMIN_UPDATE_STATUS',
+      action: status === 'suspended' ? 'USER_SUSPENSION' : 'ADMIN_UPDATE_STATUS',
       targetTable: 'users',
       targetId: id,
       details: {

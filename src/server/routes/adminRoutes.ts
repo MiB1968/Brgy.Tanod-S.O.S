@@ -9,7 +9,7 @@ const router = Router();
 
 // All admin routes require authentication + admin/superadmin role
 router.use(authenticate);
-router.use(authorize(['admin', 'superadmin']));
+router.use(authorize(['admin', 'super_admin']));
 
 // POST /api/admin/users — create any role including admin
 router.post(

@@ -39,7 +39,7 @@ export default function AdminResidents({ profile }: { profile: any }) {
       !profile ||
       (profile.role !== "admin" &&
         profile.role !== "tanod" &&
-        profile.role !== "superadmin")
+        profile.role !== "super_admin")
     ) {
       setLoading(false);
       return;

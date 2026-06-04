@@ -6,7 +6,7 @@
  * that caused silent authorization failures in sockets and location handlers.
  */
 
-export type AppRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'captain';
+export type AppRole = 'resident' | 'tanod' | 'admin' | 'super_admin' | 'captain';
 
 /** Normalize any role string to lowercase AppRole. Falls back to 'resident'. */
 export function normalizeRole(role: string): AppRole {
@@ -19,7 +19,7 @@ export function normalizeRole(role: string): AppRole {
  */
 export function isTanodOrAbove(role: string): boolean {
   const r = normalizeRole(role);
-  return ['tanod', 'admin', 'superadmin', 'captain'].includes(r);
+  return ['tanod', 'admin', 'super_admin', 'captain'].includes(r);
 }
 
 /**
@@ -28,5 +28,5 @@ export function isTanodOrAbove(role: string): boolean {
  */
 export function isAdminOrAbove(role: string): boolean {
   const r = normalizeRole(role);
-  return ['admin', 'superadmin', 'captain'].includes(r);
+  return ['admin', 'super_admin', 'captain'].includes(r);
 }

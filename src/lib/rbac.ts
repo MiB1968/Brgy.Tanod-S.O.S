@@ -1,7 +1,7 @@
 import { UserRole } from '../types';
 
 export const ROLES = {
-  SUPERADMIN: 'superadmin' as UserRole,
+  SUPERADMIN: 'super_admin' as UserRole,
   ADMIN: 'admin' as UserRole,
   TANOD: 'tanod' as UserRole,
   RESIDENT: 'resident' as UserRole,

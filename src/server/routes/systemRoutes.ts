@@ -11,7 +11,7 @@ const router = Router();
 
 const PatchUserSchema = z.object({
   status: z.enum(['pending', 'verified', 'active', 'suspended']).optional(),
-  role: z.enum(['resident', 'tanod', 'admin', 'superadmin', 'captain']).optional(),
+  role: z.enum(['resident', 'tanod', 'admin', 'super_admin', 'captain']).optional(),
 });
 
 const smsLimiter = rateLimit({
@@ -22,7 +22,7 @@ const smsLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-router.post('/siren', authenticate, authorize(['admin', 'superadmin', 'tanod']), async (req, res) => {
+router.post('/siren', authenticate, authorize(['admin', 'super_admin', 'tanod']), async (req, res) => {
   const { sirenActive } = req.body;
   try {
     await pool.query(
@@ -36,7 +36,7 @@ router.post('/siren', authenticate, authorize(['admin', 'superadmin', 'tanod']),
   }
 });
 
-router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), async (req, res) => {
+router.patch('/users/:id', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
   try {
     const validated = PatchUserSchema.parse(req.body);
     const { status, role } = validated;
@@ -71,7 +71,7 @@ router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), asy
   }
 });
 
-router.post('/sms', authenticate, authorize(['admin', 'superadmin']), smsLimiter, async (req, res) => {
+router.post('/sms', authenticate, authorize(['admin', 'super_admin']), smsLimiter, async (req, res) => {
   const { to, message } = req.body ?? {};
 
   if (!to || !message) {
@@ -110,7 +110,7 @@ router.post('/sms', authenticate, authorize(['admin', 'superadmin']), smsLimiter
   }
 });
 
-router.post('/tts', authenticate, authorize(['resident', 'admin', 'superadmin', 'captain', 'tanod']), async (req, res) => {
+router.post('/tts', authenticate, authorize(['resident', 'admin', 'super_admin', 'captain', 'tanod']), async (req, res) => {
   const { text, options } = req.body;
   if (!text) {
     return response.error(res, "Text is required", "BAD_REQUEST", 400);

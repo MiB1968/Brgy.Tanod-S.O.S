@@ -60,7 +60,7 @@ export default function DashboardView({
       />
     );
   }
-  if (profile.role === "admin" || profile.role === "superadmin") {
+  if (profile.role === "admin" || profile.role === "super_admin") {
     return (
       <AdminDashboard
         profile={profile}

@@ -39,7 +39,7 @@ export default function AdminAnalytics({ profile }: { profile: User | null }) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const fetchAnalytics = async (silent = false) => {
-    if (!profile || !["admin", "superadmin", "tanod"].includes(profile.role))
+    if (!profile || !["admin", "super_admin", "tanod"].includes(profile.role))
       return;
 
     if (!silent) setLoading(true);

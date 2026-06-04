@@ -38,7 +38,7 @@ export default function ScheduleView({
     };
   }, [profile]);
 
-  if (role === "admin" || role === "superadmin")
+  if (role === "admin" || role === "super_admin")
     return <PatrolScheduler profile={profile} />;
 
   return (

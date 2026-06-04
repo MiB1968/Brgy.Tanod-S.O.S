@@ -215,7 +215,7 @@ export default function SettingsView({
         </div>
 
         {/* Database Migration */}
-        {role === "superadmin" && (
+        {role === "super_admin" && (
           <div className="md:col-span-2">
             <MigrationUtility />
           </div>

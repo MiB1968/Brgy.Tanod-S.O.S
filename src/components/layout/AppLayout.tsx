@@ -51,7 +51,7 @@ export default function AppLayout({
   const getTabsByRole = (role: string) => {
     switch (role) {
       case "admin":
-      case "superadmin":
+      case "super_admin":
         return [
           { id: "home", label: "Command", icon: Home },
           { id: "map", label: "Live Intel", icon: Map },

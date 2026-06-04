@@ -49,7 +49,7 @@ export const adminCreateUserSchema = z.object({
   password: z.string().min(6).optional(),
   autoGeneratePassword: z.boolean().optional(),
   name: z.string().min(2).max(100),
-  role: z.enum(['resident', 'tanod', 'admin', 'superadmin']),
+  role: z.enum(['resident', 'tanod', 'admin', 'super_admin']),
   details: z
     .object({
       phone: z.string().nullable().optional(),

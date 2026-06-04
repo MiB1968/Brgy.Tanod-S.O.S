@@ -153,7 +153,7 @@ export function initSocket(server: HttpServer): Server {
     // Map normalized role to VoicePermissionLevel
     const getPermissionLevel = (r: string): VoicePermissionLevel => {
       const normalized = normalizeRole(r);
-      if (normalized === 'admin' || normalized === 'captain' || normalized === 'superadmin') {
+      if (normalized === 'admin' || normalized === 'captain' || normalized === 'super_admin') {
         return VoicePermissionLevel.ADMIN;
       }
       if (normalized === 'tanod') return VoicePermissionLevel.TANOD;

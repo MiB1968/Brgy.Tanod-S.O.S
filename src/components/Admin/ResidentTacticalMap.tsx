@@ -78,7 +78,7 @@ export default function ResidentTacticalMap({
   useEffect(() => {
     const loadResidents = async () => {
       // Security: only allow admin/tanod
-      if (!profile || !["admin", "superadmin", "tanod"].includes(profile.role))
+      if (!profile || !["admin", "super_admin", "tanod"].includes(profile.role))
         return;
 
       try {

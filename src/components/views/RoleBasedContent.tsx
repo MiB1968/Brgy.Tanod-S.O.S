@@ -248,7 +248,7 @@ export function RoleBasedContent({
       case "home":
       default:
         // Default dashboards based on role
-        if (effectiveRole === "admin" || effectiveRole === "superadmin") {
+        if (effectiveRole === "admin" || effectiveRole === "super_admin") {
           return (
             <AdminDashboard
               profile={effectiveProfile}

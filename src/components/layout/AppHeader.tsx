@@ -58,7 +58,7 @@ export default function AppHeader({
         <div className="hidden md:flex items-center gap-2">
           <div
             className={`px-5 py-1.5 text-xs font-semibold rounded-full border capitalize transition-colors ${
-              effectiveRole === "superadmin"
+              effectiveRole === "super_admin"
                 ? "border-red-500 bg-red-500/10 text-red-400"
                 : effectiveRole === "admin"
                 ? "border-orange-500 bg-orange-500/10 text-orange-400"
@@ -82,7 +82,7 @@ export default function AppHeader({
             <span className="hidden sm:inline">New Incident</span>
           </button>
 
-          {(effectiveRole === "admin" || effectiveRole === "superadmin") && (
+          {(effectiveRole === "admin" || effectiveRole === "super_admin") && (
             <button
               onClick={toggleGlobalSiren}
               className={`p-2.5 sm:p-3 rounded-xl sm:rounded-2xl transition-all shrink-0 ${
@@ -107,7 +107,7 @@ export default function AppHeader({
               className="bg-gray-900 border border-gray-700 rounded-xl sm:rounded-2xl px-2.5 py-2 sm:px-4 sm:py-3 text-[10px] sm:text-sm font-mono font-bold uppercase tracking-wider text-white focus:outline-none focus:border-tactical-cyan/40 hover:border-gray-500 transition-colors cursor-pointer shrink-0 max-w-[85px] xs:max-w-[120px] sm:max-w-none"
             >
               <option value="">Normal</option>
-              <option value="superadmin">Super Admin</option>
+              <option value="super_admin">Super Admin</option>
               <option value="admin">Admin</option>
               <option value="tanod">Tanod</option>
               <option value="resident">Resident</option>

@@ -1,19 +1,23 @@
-export type UserRole = 'resident' | 'tanod' | 'admin' | 'superadmin' | 'guest';
+export type UserRole = 'resident' | 'tanod' | 'admin' | 'super_admin' | 'guest' | 'captain' | 'dispatcher';
 
 export const RoleHierarchy: Record<UserRole, number> = {
   resident: 1,
   tanod: 2,
   admin: 3,
-  superadmin: 4,
+  super_admin: 4,
   guest: 0,
+  captain: 3,
+  dispatcher: 3,
 };
 
 export const RolePermissions: Record<UserRole, string[]> = {
   resident: ["view_map", "create_sos", "view_own_alerts"],
   tanod: ["view_map", "create_sos", "respond_alerts", "update_location", "view_own_alerts"],
   admin: ["view_map", "create_sos", "respond_alerts", "manage_users", "view_all_alerts", "broadcast", "view_reports", "manage_roster"],
-  superadmin: ["*"],
+  super_admin: ["*"],
   guest: [],
+  captain: ["view_map", "create_sos", "respond_alerts", "manage_users", "view_all_alerts", "broadcast", "view_reports", "manage_roster"],
+  dispatcher: ["view_map", "create_sos", "respond_alerts", "manage_users", "view_all_alerts", "broadcast", "view_reports", "manage_roster"],
 };
 export type RegistryStatus = 'pending' | 'approved' | 'rejected' | 'Available' | 'On Patrol' | 'Responding' | 'Off-Duty' | 'Break' | 'Offline';
 export type AlertStatus = 'pending' | 'responding' | 'resolved' | 'cancelled';

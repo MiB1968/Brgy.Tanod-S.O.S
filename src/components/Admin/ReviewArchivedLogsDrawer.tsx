@@ -16,7 +16,7 @@ export function ReviewArchivedLogsDrawer({
   const [isLoading, setIsLoading] = useState(false);
 
   // GUARD: Admin only — fully unmounted for non-admin roles
-  if (profile?.role !== "admin" && profile?.role !== "superadmin") return null;
+  if (profile?.role !== "admin" && profile?.role !== "super_admin") return null;
 
   const fetchArchives = async () => {
     setIsLoading(true);

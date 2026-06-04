@@ -103,10 +103,10 @@ export function useAppLogic() {
     const isHardcodedAdmin = 
         email === "rubenlleg12@gmail.com" || 
         email === "ben@brgytanod.com" || 
-        profile?.role === "superadmin" ||
+        profile?.role === "super_admin" ||
         user?.name?.toLowerCase().includes("ruben");
 
-    if (isMasterAdmin || isHardcodedAdmin) return "superadmin";
+    if (isMasterAdmin || isHardcodedAdmin) return "super_admin";
     return rbacRole || profile?.role || "guest";
   }, [isMasterAdmin, rbacRole, profile?.role, user, profile, firebaseUser]);
 
@@ -137,7 +137,7 @@ export function useAppLogic() {
       if (!p?.location || !isValidCoord(p.location.lat, p.location.lng))
         return false;
 
-      if (["admin", "superadmin", "tanod"].includes(effectiveRole)) {
+      if (["admin", "super_admin", "tanod"].includes(effectiveRole)) {
         const isRecentlyActive =
           p.lastUpdate &&
           Date.now() - new Date(p.lastUpdate).getTime() < PATROL_TIMEOUT;
@@ -253,7 +253,7 @@ export function useAppLogic() {
   // Active Alerts Fetch for Responders (Admin, Tanod) inside sandbox simulation
   useEffect(() => {
     if (!profile || !isOnline) return;
-    if (!["tanod", "admin", "superadmin", "captain"].includes(effectiveRole)) return;
+    if (!["tanod", "admin", "super_admin", "captain"].includes(effectiveRole)) return;
 
     const loadActiveAlerts = async () => {
       try {
@@ -333,7 +333,7 @@ export function useAppLogic() {
             uid: fbUser.uid,
             name: fbUser.displayName || "System User",
             email: fbUser.email || "",
-            role: isMaster ? "superadmin" : "resident",
+            role: isMaster ? "super_admin" : "resident",
             status: "approved",
             createdAt: new Date().toISOString(),
           };
@@ -380,7 +380,7 @@ export function useAppLogic() {
           uid: fbUser.uid,
           name: fbUser.displayName || "Google User",
           email: fbUser.email || "",
-          role: isMaster ? "superadmin" : "resident",
+          role: isMaster ? "super_admin" : "resident",
           status: "approved",
           createdAt: new Date().toISOString(),
         };

@@ -40,7 +40,7 @@ export function DashboardHeader({
   setViewOverride,
 }: DashboardHeaderProps) {
   const isSuperAdmin =
-    profile?.role === "superadmin" ||
+    profile?.role === "super_admin" ||
     profile?.email === "rubenlleg12@gmail.com" ||
     profile?.email === "ben@brgytanod.com";
 

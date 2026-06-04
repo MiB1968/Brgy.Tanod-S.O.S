@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -24,10 +25,13 @@ try {
 
 // ── Check missing critical secrets ──────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  const REQUIRED = ['JWT_SECRET', 'DATABASE_URL'];
-  const missing = REQUIRED.filter((k) => !process.env[k]);
-  if (missing.length > 0) {
-    console.warn(`[WARNING] Missing recommended environment variables: ${missing.join(', ')}`);
+  if (!process.env.JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is missing.');
+    process.exit(1);
+  }
+  if (!process.env.DATABASE_URL && !process.env.COCKROACH_URL) {
+    console.error('FATAL: DATABASE_URL/COCKROACH_URL environment variable is missing.');
+    process.exit(1);
   }
 }
 
@@ -37,11 +41,14 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || (process.argv[1]?.includes('dist') ? 'production' : 'development'),
 
   // NO unsafe fallback. Dev gets a long random string; prod fails above if unset.
-  jwtSecret:
-    process.env.JWT_SECRET ||
-    (process.env.NODE_ENV !== 'production'
-      ? 'DEV_ONLY_jwt_secret_change_before_deploy_32chars'
-      : ''),
+  jwtSecret: (() => {
+    if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+    if (process.env.NODE_ENV === 'production') {
+      // Should have been caught by the check above, but for safety:
+      throw new Error('FATAL: JWT_SECRET environment variable is required in production.');
+    }
+    return crypto.randomBytes(32).toString('hex');
+  })(),
 
   databaseUrl: (process.env.COCKROACH_URL || process.env.DATABASE_URL || '')
     .trim()
