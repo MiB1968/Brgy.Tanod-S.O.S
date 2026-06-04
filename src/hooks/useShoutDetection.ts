@@ -23,10 +23,10 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
       const audioContext = micManager.getAudioContext();
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
-      
+
       source.connect(analyser);
       analyser.fftSize = 256;
-      
+
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
       setIsListening(true);
@@ -40,7 +40,7 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
           sum += dataArray[i];
         }
         const average = sum / dataArray.length;
-        
+
         // Threshold: 100 for high volume
         if (average > 110) {
           if (peakDuration.current === 0) {
@@ -58,10 +58,10 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
           peakDuration.current = 0;
           isSustainedPeak.current = false;
         }
-        
+
         animationFrameRef.current = requestAnimationFrame(checkVolume);
       };
-      
+
       checkVolume();
 
       // 2. Keyword Detection (Web Speech API)

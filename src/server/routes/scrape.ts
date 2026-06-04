@@ -14,6 +14,7 @@ router.post("/", authenticate, async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // SECURITY FIX: Switched from VITE_ to server-side process.env
         Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       },
       body: JSON.stringify({
@@ -32,7 +33,7 @@ router.post("/", authenticate, async (req, res) => {
       success: true,
       data: {
         content: data.data?.markdown || data.data?.html,
-        title: data.data?.title,
+        title: data.metadata?.title,
         url: data.data?.url,
       },
     });
@@ -51,6 +52,7 @@ router.post("/search", authenticate, async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // SECURITY FIX: Switched from VITE_ to server-side process.env
         Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       },
       body: JSON.stringify({ query, limit: 6 }),

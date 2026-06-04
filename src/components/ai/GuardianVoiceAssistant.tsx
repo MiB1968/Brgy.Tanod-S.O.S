@@ -38,25 +38,16 @@ export const GuardianVoiceAssistant: React.FC = () => {
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Monitor for global worker-centric progress changes (improved)
+  // Monitor for global worker-centric progress changes
   useEffect(() => {
     const handleGuardianEvent = (e: any) => {
       const { type, payload } = e.detail || {};
       if (type === "progress") {
         setIsLoadingLocalAI(true);
         setLocalAIProgress(payload.progress || 0);
-        setLoaderMessage(payload.text || "Downloading AI model...");
-      } else if (type === "ready") {
-        setLocalAIProgress(100);
-        setLoaderMessage("AI model ready");
-        
-        // Auto hide after 1.5 seconds
-        setTimeout(() => {
-          setIsLoadingLocalAI(false);
-        }, 1500);
-      } else if (type === "error") {
+        setLoaderMessage(payload.text || "Downloading model weights...");
+      } else if (type === "ready" || type === "error") {
         setIsLoadingLocalAI(false);
-        console.error("[WebLLM] Model loading failed:", payload);
       }
     };
 
@@ -164,15 +155,6 @@ export const GuardianVoiceAssistant: React.FC = () => {
   useEffect(() => {
     const handleToggle = () => {
       audioUtils.kickstartAudio();
-
-      // Only preload WebLLM when user actually wants to use voice
-      if (!isListening) {
-        // Lazy load WebLLM only on user action
-        import("../../lib/webllm").then(({ preloadWebLLM }) => {
-          preloadWebLLM();
-        });
-      }
-
       if (isListening) {
         stopListening();
       } else {

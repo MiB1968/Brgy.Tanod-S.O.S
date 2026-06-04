@@ -44,20 +44,27 @@ export class KnowledgeService {
   // Scrape using Firecrawl API
   async scrapeSource(url: string, category: LocalKnowledge['category'], retries = 3) {
     let attempt = 0;
-    
+
     while (attempt < retries) {
       try {
-        const { fetchAPI } = await import('./apiBase');
-        const data = await fetchAPI('scrape', {
+        // SECURITY WARNING: Using client-side environment variable VITE_FIRECRAWL_API_KEY
+        // exposes this key in browser DevTools. Ensure this is acceptable or proxy through a server-side route.
+        const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_FIRECRAWL_API_KEY}`,
+          },
           body: JSON.stringify({
             url,
             formats: ['markdown'],
             onlyMainContent: true,
-          })
+          }),
         });
 
-        if (data.success === false) throw new Error("Scrape failed server-side");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const data = await response.json();
 
         const knowledge: LocalKnowledge = {
           source: new URL(url).hostname,
@@ -78,7 +85,7 @@ export class KnowledgeService {
           console.error(`❌ Firecrawl scrape failed after ${retries} attempts:`, url, error);
           return null;
         }
-        
+
         const delayMs = Math.pow(2, attempt) * 1000;
         console.warn(`⚠️ Scraping failed for ${url}. Retrying in ${delayMs}ms (attempt ${attempt}/${retries})...`);
         await this.delay(delayMs);
@@ -89,7 +96,7 @@ export class KnowledgeService {
 
   async getRelevantKnowledge(query: string, limit = 3): Promise<string> {
     const allItems = await db.localKnowledge.toArray();
-    
+
     // Simple relevance scoring (keyword + recency)
     const scored = allItems.map(item => {
       const queryWords = query.toLowerCase().split(' ');
@@ -110,7 +117,7 @@ export class KnowledgeService {
 
   async askWithLocalKnowledge(question: string) {
     const context = await this.getRelevantKnowledge(question);
-    
+
     const prompt = `You are Guardian AI for Mamburao, Occidental Mindoro.
 Use ONLY the following local knowledge to give accurate, actionable answers:
 

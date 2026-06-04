@@ -46,7 +46,7 @@ async function loadConfigAndIndexer(basePath = '/models/supertonic') {
     const res = await fetch(`${basePath}/tts.json`).then(r => r.json()).catch(() => ({}));
     config = res;
   }
-  
+
   try {
     const res = await fetch(`${basePath}/quantized/unicode_indexer.json`).then(r => r.json());
     unicodeIndexer = new Map(Object.entries(res).map(([k, v]) => [k, Number(v)]));
@@ -225,5 +225,3 @@ ctx.onmessage = async (e: MessageEvent) => {
     });
   }
 };
-
-
