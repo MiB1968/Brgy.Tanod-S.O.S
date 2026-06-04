@@ -119,7 +119,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
           const decodedFirebase = await admin.auth().verifyIdToken(token);
           if (decodedFirebase?.email) {
             const userResult = await pool.query(
-              'SELECT * FROM users WHERE email = $1',
+              'SELECT id, email, role, token_version FROM users WHERE email = $1',
               [decodedFirebase.email.toLowerCase()]
             );
             const dbUser = userResult.rows[0];

@@ -16,7 +16,7 @@ export interface Patrol {
 export class PatrolRepository {
   async findByTanodId(tanodId: string) {
     const result = await pool.query(
-      'SELECT * FROM patrols WHERE tanod_id = $1',
+      'SELECT tanod_id, tanod_name, is_active, location, status, last_ping FROM patrols WHERE tanod_id = $1',
       [tanodId]
     );
     return result.rows[0];
@@ -44,7 +44,7 @@ export class PatrolRepository {
            is_active = $3,
            assigned_incident_id = $5,
            status = $6
-       RETURNING *`,
+       RETURNING tanod_id, tanod_name, is_active, location, status, last_ping`,
       [
         data.tanod_id,
         data.tanod_name,
@@ -61,7 +61,7 @@ export class PatrolRepository {
     const result = await pool.query(
       `UPDATE patrols 
        SET assigned_incident_id = $1, status = 'on-duty' 
-       WHERE tanod_id = $2 RETURNING *`,
+       WHERE tanod_id = $2 RETURNING tanod_id, tanod_name, is_active, location, status, last_ping`,
       [incidentId, tanodId]
     );
     return result.rows[0];

@@ -51,7 +51,7 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
           
           // Must query DB to get the actual UUID used in CockroachDB
           const userResult = await pool.query(
-            'SELECT * FROM users WHERE email = $1',
+            'SELECT id, email, name, role, barangay_id FROM users WHERE email = $1',
             [decodedToken.email?.toLowerCase()]
           );
           const dbUser = userResult.rows[0];
@@ -88,7 +88,7 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
                 
                 // Lookup master user in DB to get real UUID
                 const userResult = await pool.query(
-                  'SELECT * FROM users WHERE email = $1',
+                  'SELECT id, email, name, role, barangay_id FROM users WHERE email = $1',
                   [decodedToken.email.toLowerCase()]
                 );
                 let dbUser = userResult.rows[0];

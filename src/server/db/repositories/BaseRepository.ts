@@ -8,10 +8,11 @@ export abstract class BaseRepository<T extends { id: string }> {
     this.tableName = tableName;
   }
 
-  async getById(id: string): Promise<T | null> {
+  async getById(id: string, columns?: string[]): Promise<T | null> {
     try {
+      const cols = columns ? columns.join(', ') : '*';
       const result = await pool.query(
-        `SELECT * FROM ${this.tableName} WHERE id = $1`,
+        `SELECT ${cols} FROM ${this.tableName} WHERE id = $1`,
         [id]
       );
       if (result.rows.length === 0) return null;

@@ -23,7 +23,7 @@ export class TanodLocationRepository {
          location = $3,
          is_active = true,
          last_ping = now()
-       RETURNING *`,
+       RETURNING tanod_id, tanod_name, is_active, location, last_ping`,
       [
         data.userId,
         data.role, // temporary, better to join with users later

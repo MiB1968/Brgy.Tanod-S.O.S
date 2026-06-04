@@ -52,7 +52,7 @@ router.patch('/users/:id', authenticate, authorize(['admin', 'superadmin']), asy
     values.push(req.params.id);
 
     const result = await pool.query(
-      `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, email, name, role, status`,
       values
     );
     

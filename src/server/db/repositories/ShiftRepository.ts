@@ -5,7 +5,7 @@ import { Shift } from '../../../types';
 
 export class ShiftRepository {
   static async getAll(): Promise<Shift[]> {
-    const results = await db.select().from(shifts).orderBy(desc(shifts.createdAt)).limit(100);
+    const results = await db.select({ id: shifts.id, tanodId: shifts.tanodId, tanodName: shifts.tanodName, startTime: shifts.startTime, endTime: shifts.endTime, sector: shifts.sector, status: shifts.status, tanodResponse: shifts.tanodResponse, notes: shifts.notes, createdAt: shifts.createdAt }).from(shifts).orderBy(desc(shifts.createdAt)).limit(100);
     return results.map(s => ({
       id: s.id,
       tanodId: s.tanodId as string,
@@ -21,7 +21,7 @@ export class ShiftRepository {
   }
 
   static async getById(id: string): Promise<Shift | null> {
-    const [result] = await db.select().from(shifts).where(eq(shifts.id, id));
+    const [result] = await db.select({ id: shifts.id, tanodId: shifts.tanodId, tanodName: shifts.tanodName, startTime: shifts.startTime, endTime: shifts.endTime, sector: shifts.sector, status: shifts.status, tanodResponse: shifts.tanodResponse, notes: shifts.notes, createdAt: shifts.createdAt }).from(shifts).where(eq(shifts.id, id));
     if (!result) return null;
     return {
       id: result.id,

@@ -20,7 +20,8 @@ export class IncidentRepository {
           assigned_to, assigned_to_name, barangay_id,
           created_at, updated_at, client_uuid
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), $13) RETURNING *`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now(), now(), $13)
+        RETURNING id, resident_id, type, description, location, status, ai_analysis, severity_score, urgency_level, responder_recommendations, assigned_to, assigned_to_name, barangay_id, created_at, updated_at, client_uuid`,
         [
           data.reporterId, 
           data.type, 
@@ -75,7 +76,7 @@ export class IncidentRepository {
 
   async findActiveByBarangay(barangayId: string, limit = 30): Promise<Incident[]> {
     const result = await pool.query(`
-      SELECT * FROM alerts 
+      SELECT id, resident_id, barangay_id, type, status, description, location, ai_analysis, created_at, updated_at FROM alerts
       WHERE (barangay_id = $1 OR barangay_id IS NULL)
       AND status IN ('pending', 'active', 'responding') 
       ORDER BY created_at DESC 
@@ -99,7 +100,7 @@ export class IncidentRepository {
 
   async findByReporter(reporterId: string, limit = 10): Promise<Incident[]> {
     const result = await pool.query(
-      `SELECT * FROM alerts WHERE resident_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      `SELECT id, resident_id, barangay_id, type, status, description, location, ai_analysis, created_at, updated_at FROM alerts WHERE resident_id = $1 ORDER BY created_at DESC LIMIT $2`,
       [reporterId, limit]
     );
     return result.rows.map(row => ({
@@ -120,8 +121,8 @@ export class IncidentRepository {
 
   async findByStatus(status: string, barangayId?: string) {
     const query = barangayId 
-      ? [`SELECT * FROM alerts WHERE status = $1 AND (barangay_id = $2 OR barangay_id IS NULL) ORDER BY created_at DESC`, [status, barangayId]]
-      : [`SELECT * FROM alerts WHERE status = $1 ORDER BY created_at DESC`, [status]];
+      ? [`SELECT id, resident_id, barangay_id, type, status, description, location, ai_analysis, created_at, updated_at FROM alerts WHERE status = $1 AND (barangay_id = $2 OR barangay_id IS NULL) ORDER BY created_at DESC`, [status, barangayId]]
+      : [`SELECT id, resident_id, barangay_id, type, status, description, location, ai_analysis, created_at, updated_at FROM alerts WHERE status = $1 ORDER BY created_at DESC`, [status]];
     
     const result = await pool.query(query[0] as string, query[1] as any[]);
     return result.rows.map(row => ({

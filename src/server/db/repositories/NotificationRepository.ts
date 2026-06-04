@@ -13,7 +13,7 @@ export class NotificationRepository {
   }) {
     const result = await pool.query(
       `INSERT INTO notifications (user_id, type, title, message, incident_id, read)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, type, title, message, incident_id, read, created_at`,
       [
         notification.user_id,
         notification.type,
@@ -29,7 +29,7 @@ export class NotificationRepository {
 
   async getByUserId(userId: string, limit = 20) {
     const result = await pool.query(
-      `SELECT * FROM notifications 
+      `SELECT id, user_id, type, title, message, incident_id, read, created_at FROM notifications
        WHERE user_id = $1 
        ORDER BY created_at DESC LIMIT $2`,
       [userId, limit]

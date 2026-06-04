@@ -18,7 +18,7 @@ export class AuditLogRepository {
         incident_id, type, status, citizen_id, 
         tanod_assigned, location_lat, location_lng, notes
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-      RETURNING *`,
+      RETURNING id, incident_id, type, status, citizen_id, tanod_assigned, location_lat, location_lng, created_at, notes`,
       [
         log.incident_id,
         log.type,
@@ -37,7 +37,7 @@ export class AuditLogRepository {
 
   async getByIncident(incidentId: string) {
     const result = await pool.query(
-      'SELECT * FROM audit_logs WHERE incident_id = $1 ORDER BY created_at DESC',
+      'SELECT id, incident_id, type, status, citizen_id, tanod_assigned, location_lat, location_lng, created_at, notes, admin_id, action, target_table, target_id, details FROM audit_logs WHERE incident_id = $1 ORDER BY created_at DESC',
       [incidentId]
     );
     return result.rows;
@@ -45,7 +45,7 @@ export class AuditLogRepository {
 
   async getRecentLogs(limit = 100) {
     const result = await pool.query(
-      'SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT $1',
+      'SELECT id, incident_id, type, status, citizen_id, tanod_assigned, location_lat, location_lng, created_at, notes, admin_id, action, target_table, target_id, details FROM audit_logs ORDER BY created_at DESC LIMIT $1',
       [limit]
     );
     return result.rows;

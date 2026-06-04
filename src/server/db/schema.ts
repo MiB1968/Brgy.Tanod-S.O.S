@@ -8,7 +8,8 @@ import {
   doublePrecision, 
   jsonb,
   serial,
-  varchar
+  varchar,
+  index
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -24,7 +25,11 @@ export const users = pgTable('users', {
   firebaseUid: text('firebase_uid'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   lastActive: timestamp('last_active', { withTimezone: true }).defaultNow()
-});
+}, (table) => ({
+  usersFirebaseUidIdx: index('users_firebase_uid_idx').on(table.firebaseUid),
+  usersRoleIdx: index('users_role_idx').on(table.role),
+  usersStatusIdx: index('users_status_idx').on(table.status),
+}));
 
 export const residents = pgTable('residents', {
   id: uuid('id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -58,7 +63,7 @@ export const barangayBoundaries = pgTable('barangay_boundaries', {
 export const alerts = pgTable('alerts', {
   id: uuid('id').primaryKey().defaultRandom(),
   clientUuid: text('client_uuid').unique(),
-  residentId: uuid('resident_id').references(() => users.id),
+  residentId: uuid('resident_id').references(() => users.id, { onDelete: 'set null' }),
   type: text('type').notNull(),
   status: text('status').notNull().default('active'),
   barangayId: text('barangay_id').default('default'),
@@ -78,7 +83,12 @@ export const alerts = pgTable('alerts', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true })
-});
+}, (table) => ({
+  alertsStatusIdx: index('alerts_status_idx').on(table.status),
+  alertsCreatedAtIdx: index('alerts_created_at_idx').on(table.createdAt),
+  alertsAssignedToIdx: index('alerts_assigned_to_idx').on(table.assignedTo),
+  alertsResidentIdIdx: index('alerts_resident_id_idx').on(table.residentId),
+}));
 
 export const patrols = pgTable('patrols', {
   tanodId: uuid('tanod_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
@@ -107,7 +117,7 @@ export const systemConfig = pgTable('system_config', {
 
 export const systemBroadcasts = pgTable('system_broadcasts', {
   id: uuid('id').primaryKey().defaultRandom(),
-  incidentId: uuid('incident_id').references(() => alerts.id),
+  incidentId: uuid('incident_id').references(() => alerts.id, { onDelete: 'no action' }),
   message: text('message').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow(),
   isActive: boolean('isactive').default(false),
@@ -150,7 +160,7 @@ export const auditLogs = pgTable('audit_logs', {
   locationLng: doublePrecision('location_lng'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   notes: text('notes'),
-  adminId: uuid('admin_id').references(() => users.id),
+  adminId: uuid('admin_id').references(() => users.id, { onDelete: 'no action' }),
   action: varchar('action', { length: 100 }),
   targetTable: varchar('target_table', { length: 50 }),
   targetId: varchar('target_id', { length: 100 }),

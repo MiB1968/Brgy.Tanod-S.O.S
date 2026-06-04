@@ -166,7 +166,7 @@ export const incidentService = {
       if (err.code === '23505' && err.constraint?.includes('client_uuid')) {
         console.log(`[SOS] DB-level duplicate blocked for clientUuid=${clientUuid}`);
         const existing = await pool.query(
-          'SELECT * FROM alerts WHERE client_uuid = $1',
+          'SELECT id, client_uuid, resident_id, type, status, barangay_id, location, description, severity_score, urgency_level, responder_recommendations, ai_analysis, assigned_to, assigned_to_name, responded_by, responded_by_name, responded_at, resolution_notes, responder_notes, created_at, updated_at, resolved_at FROM alerts WHERE client_uuid = $1',
           [clientUuid]
         );
         if (existing.rows[0]) return existing.rows[0];
@@ -318,7 +318,7 @@ export const incidentService = {
     }
 
     const result = await pool.query(
-      "UPDATE alerts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING *",
+      "UPDATE alerts SET status = 'cancelled', updated_at = now() WHERE id = $1 RETURNING id, updated_at",
       [incidentId]
     );
 
@@ -375,7 +375,7 @@ export const incidentService = {
            responder_notes = COALESCE($2, responder_notes), 
            assigned_to = COALESCE($3, assigned_to),
            updated_at = now() 
-       WHERE id = $4 RETURNING *`,
+       WHERE id = $4 RETURNING id, status, responder_notes, assigned_to, updated_at`,
       [status.toLowerCase(), notes || null, assignedTo || null, sosId]
     );
 

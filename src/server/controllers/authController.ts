@@ -249,7 +249,7 @@ export const login = async (req: Request, res: Response) => {
 
       // Look up the user in our DB by verified email
       let userRes = await pool.query(
-        'SELECT * FROM users WHERE email = $1',
+        'SELECT id, email, password, name, role, status, barangay_id, token_version, firebase_uid, created_at, last_active FROM users WHERE email = $1',
         [normalizedEmail]
       );
       let user = userRes.rows[0];
@@ -258,7 +258,7 @@ export const login = async (req: Request, res: Response) => {
 
       if (user && isMaster && user.role !== 'superadmin') {
         const promoteRes = await pool.query(
-          'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
+          'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING id, email, name, role, status, token_version, created_at, last_active',
           ['superadmin', 'approved', user.id]
         );
         user = promoteRes.rows[0];
@@ -271,7 +271,7 @@ export const login = async (req: Request, res: Response) => {
           const provisionRes = await pool.query(
             `INSERT INTO users (email, name, role, status, password)
              VALUES ($1, $2, $3, $4, $5)
-             RETURNING *`,
+             RETURNING id, email, name, role, status, token_version, created_at, last_active`,
             [normalizedEmail, decodedToken.name || 'Master Admin', 'superadmin', 'approved', 'google-auth-no-pass']
           );
           user = provisionRes.rows[0];
@@ -305,7 +305,7 @@ export const login = async (req: Request, res: Response) => {
 
     // ── Standard email/password login ─────────────────────────────────────────
     let result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT id, email, password, name, role, status, barangay_id, token_version, firebase_uid, created_at, last_active FROM users WHERE email = $1',
       [normalizedEmail]
     );
     let user = result.rows[0];
@@ -314,7 +314,7 @@ export const login = async (req: Request, res: Response) => {
 
     if (user && isMaster && user.role !== 'superadmin') {
       const promoteRes = await pool.query(
-        'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING *',
+        'UPDATE users SET role = $1, status = $2 WHERE id = $3 RETURNING id, email, name, role, status, token_version, created_at, last_active',
         ['superadmin', 'approved', user.id]
       );
       user = promoteRes.rows[0];
@@ -351,7 +351,7 @@ export const login = async (req: Request, res: Response) => {
         const provisionRes = await pool.query(
           `INSERT INTO users (email, name, role, status, password)
            VALUES ($1, $2, $3, $4, $5)
-           RETURNING *`,
+           RETURNING id, email, name, role, status, token_version, created_at, last_active`,
           [normalizedEmail, 'Demo User', role, 'approved', hashedPass]
         );
         currentUser = provisionRes.rows[0];

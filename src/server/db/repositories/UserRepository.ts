@@ -18,7 +18,7 @@ export class UserRepository {
 
   async findByEmail(email: string) {
     const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT id, email, password, name, role, status, barangay_id, token_version, firebase_uid, created_at, last_active FROM users WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -66,7 +66,7 @@ export class UserRepository {
     }
 
     const result = await pool.query(
-      'UPDATE users SET status = $1, last_active = now() WHERE id = $2 RETURNING *',
+      'UPDATE users SET status = $1, last_active = now() WHERE id = $2 RETURNING id, email, name, role, status, created_at, last_active',
       [status, id]
     );
     return result.rows[0];
@@ -80,7 +80,7 @@ export class UserRepository {
     }
 
     const result = await pool.query(
-      'UPDATE users SET role = $1, last_active = now() WHERE id = $2 RETURNING *',
+      'UPDATE users SET role = $1, last_active = now() WHERE id = $2 RETURNING id, email, name, role, status, created_at, last_active',
       [role, id]
     );
     return result.rows[0];

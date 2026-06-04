@@ -28,7 +28,7 @@ export class ReportRepository {
 
   async getIncidentsByBarangay(barangayId: string, limit = 50) {
     const result = await pool.query(
-      'SELECT * FROM alerts WHERE barangay_id = $1 ORDER BY created_at DESC LIMIT $2',
+      'SELECT id, client_uuid, resident_id, type, status, barangay_id, location, description, severity_score, urgency_level, responder_recommendations, ai_analysis, assigned_to, assigned_to_name, responded_by, responded_by_name, responded_at, resolution_notes, responder_notes, created_at, updated_at, resolved_at FROM alerts WHERE barangay_id = $1 ORDER BY created_at DESC LIMIT $2',
       [barangayId, limit]
     );
     return result.rows;

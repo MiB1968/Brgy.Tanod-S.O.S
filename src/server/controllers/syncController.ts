@@ -20,7 +20,7 @@ const auditLogArchiveSchema = z.object({
 });
 
 export const getSync = async (req: AuthRequest, res: Response) => {
-  const { path: fullPath } = req.query;
+  const { path: fullPath, limit, offset, before } = req.query;
   console.log(`[SYNC] getSync requested: ${fullPath} from user: ${req.user?.id} role: ${req.user?.role}`);
 
   if (!fullPath) return response.error(res, "Path required", "BAD_REQUEST", 400);
@@ -35,6 +35,11 @@ export const getSync = async (req: AuthRequest, res: Response) => {
   if (id === 'undefined' || id === 'null') {
     return response.error(res, "Invalid ID parameter", "BAD_REQUEST", 400);
   }
+
+  // Pagination & Limits
+  const queryLimit = Math.min(parseInt(limit as string) || 50, 100);
+  const queryOffset = parseInt(offset as string) || 0;
+  const queryBefore = before as string;
 
   try {
     const userRole = req.user?.role;
@@ -62,59 +67,114 @@ export const getSync = async (req: AuthRequest, res: Response) => {
 
     if (collection === 'alerts' || collection === 'active_alerts') {
       if (id && subCollection === 'messages') {
-        const result = await pool.query(
-          "SELECT * FROM alert_messages WHERE alert_id = $1 ORDER BY timestamp ASC",
-          [id]
-        );
-        return res.json(result.rows);
+        let q = `SELECT id, alert_id AS "alertId", sender_id AS "senderId", sender_name AS "senderName",
+                        message, type, timestamp
+                 FROM alert_messages WHERE alert_id = $1`;
+        const params: any[] = [id];
+
+        if (queryBefore) {
+          q += " AND timestamp < $2";
+          params.push(queryBefore);
+        }
+
+        q += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(queryLimit, queryOffset);
+
+        const result = await pool.query(q, params);
+        return res.json(result.rows.reverse());
       }
       
       // Residents can only see their own alerts, Tanods/Admins see all
       if (id) {
         const result = await pool.query(
-          "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1", 
+          `SELECT a.id, a.client_uuid AS "clientUuid", a.resident_id AS "residentId", a.type, a.status,
+                  a.barangay_id AS "barangayId", a.location, a.description, a.severity_score AS "severityScore",
+                  a.urgency_level AS "urgencyLevel", a.responder_recommendations AS "responderRecommendations",
+                  a.ai_analysis AS "aiAnalysis", a.assigned_to AS "assignedTo", a.assigned_to_name AS "assignedToName",
+                  a.responded_by AS "respondedBy", a.responded_by_name AS "respondedByName",
+                  a.responded_at AS "respondedAt", a.resolution_notes AS "resolutionNotes",
+                  a.responder_notes AS "responderNotes", a.created_at AS "createdAt",
+                  a.updated_at AS "updatedAt", a.resolved_at AS "resolvedAt", u.name as "residentName"
+           FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1`,
           [id]
         );
         const alert = result.rows[0];
         if (!alert) return response.error(res, "Alert not found", "NOT_FOUND", 404);
         
-        if (!isTanod && alert.resident_id !== req.user?.id) {
+        if (!isTanod && alert.residentId !== req.user?.id) {
           return response.error(res, "Unauthorized access to alert details", "FORBIDDEN", 403);
         }
 
         return res.json({
           ...alert,
-          aiAnalysis: typeof alert.ai_analysis === 'string' ? JSON.parse(alert.ai_analysis) : alert.ai_analysis,
+          aiAnalysis: typeof alert.aiAnalysis === 'string' ? JSON.parse(alert.aiAnalysis) : alert.aiAnalysis,
           location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
-          timestamp: alert.created_at
+          timestamp: alert.createdAt
         });
       } else {
-        let query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id ORDER BY a.created_at DESC LIMIT 100";
-        let params: any[] = [];
+        let q = `SELECT a.id, a.client_uuid AS "clientUuid", a.resident_id AS "residentId", a.type, a.status,
+                        a.barangay_id AS "barangayId", a.location, a.description, a.severity_score AS "severityScore",
+                        a.urgency_level AS "urgencyLevel", a.responder_recommendations AS "responderRecommendations",
+                        a.ai_analysis AS "aiAnalysis", a.assigned_to AS "assignedTo", a.assigned_to_name AS "assignedToName",
+                        a.responded_by AS "respondedBy", a.responded_by_name AS "respondedByName",
+                        a.responded_at AS "respondedAt", a.resolution_notes AS "resolutionNotes",
+                        a.responder_notes AS "responderNotes", a.created_at AS "createdAt",
+                        a.updated_at AS "updatedAt", a.resolved_at AS "resolvedAt", u.name as "residentName"
+                 FROM alerts a LEFT JOIN users u ON a.resident_id = u.id`;
+        const params: any[] = [];
 
         if (!isTanod) {
-          query = "SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.resident_id = $1 ORDER BY a.created_at DESC LIMIT 100";
-          params = [req.user?.id];
+          q += " WHERE a.resident_id = $1";
+          params.push(req.user?.id);
         }
 
-        const result = await pool.query(query, params);
+        if (queryBefore) {
+          q += params.length > 0 ? " AND" : " WHERE";
+          q += ` a.created_at < $${params.length + 1}`;
+          params.push(queryBefore);
+        }
+
+        q += ` ORDER BY a.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(queryLimit, queryOffset);
+
+        const result = await pool.query(q, params);
         return res.json(result.rows.map(a => ({
           ...a,
-          aiAnalysis: typeof a.ai_analysis === 'string' ? JSON.parse(a.ai_analysis) : a.ai_analysis,
+          aiAnalysis: typeof a.aiAnalysis === 'string' ? JSON.parse(a.aiAnalysis) : a.aiAnalysis,
           location: typeof a.location === 'string' ? JSON.parse(a.location) : a.location,
-          timestamp: a.created_at
+          timestamp: a.createdAt
         })));
       }
     }
 
     if (collection === 'incidents') {
       if (!isTanod) return response.error(res, "Unauthorized", "FORBIDDEN", 403);
-      const result = await pool.query("SELECT * FROM incidents ORDER BY timestamp DESC LIMIT 100");
+
+      let q = `SELECT id, alert_id AS "alertId", tanod_id AS "tanodId", tanod_name AS "tanodName",
+                      timestamp, type, location, gps_location AS "gpsLocation",
+                      description, persons_involved AS "personsInvolved", actions_taken AS "actionsTaken",
+                      status, citizen_name AS "citizenName", barangay_id AS "barangayId",
+                      assigned_to AS "assignedTo", assigned_to_name AS "assignedToName",
+                      responded_by AS "respondedBy", responded_by_name AS "respondedByName",
+                      responded_at AS "respondedAt", resolved_at AS "resolvedAt",
+                      resolution_notes AS "resolutionNotes", responder_notes AS "responderNotes",
+                      admin_on_duty AS "adminOnDuty"
+               FROM incidents`;
+      const params: any[] = [];
+
+      if (queryBefore) {
+        q += " WHERE timestamp < $1";
+        params.push(queryBefore);
+      }
+
+      q += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows.map(i => ({ 
         id: i.id, 
         ...i,
-        tanodName: i.tanod_name,
-        citizen: i.citizen_name || 'Citizen',
+        citizen: i.citizenName || 'Citizen',
         date: i.timestamp ? new Date(i.timestamp).toISOString().split('T')[0] : 'Unknown',
         time: i.timestamp ? new Date(i.timestamp).toLocaleTimeString() : 'Unknown'
       })));
@@ -122,16 +182,30 @@ export const getSync = async (req: AuthRequest, res: Response) => {
 
     if (collection === 'users' || collection === 'residents') {
       if (searchParams?.includes('role=tanod')) {
-        const result = await pool.query("SELECT id, email, name, role, status, last_active FROM users WHERE role = 'tanod'");
+        const result = await pool.query(`SELECT id, email, name, role, status, last_active AS "lastActive"
+                                        FROM users WHERE role = 'tanod' LIMIT 100`);
         return res.json(result.rows);
       }
       if (id) {
         // Residents can only see their own profile
         if (!isTanod && id !== req.user?.id) return response.error(res, "Forbidden", "FORBIDDEN", 403);
-        const result = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+        const result = await pool.query(`SELECT id, email, name, role, status, barangay_id AS "barangayId",
+                                                token_version AS "tokenVersion", firebase_uid AS "firebaseUid",
+                                                created_at AS "createdAt", last_active AS "lastActive"
+                                         FROM users WHERE id = $1`, [id]);
         const user = result.rows[0];
         if (user && collection === 'residents') {
-           const resInfo = await pool.query("SELECT * FROM residents WHERE id = $1", [id]);
+           const resInfo = await pool.query(
+             `SELECT id, name, phone, address, house_number AS "houseNumber", household_size AS "householdSize",
+                     blood_type AS "bloodType", medical_conditions AS "medicalConditions",
+                     emergency_contact_name AS "emergencyContactName",
+                     emergency_contact_phone AS "emergencyContactPhone", gps_lat AS "gpsLat",
+                     gps_lng AS "gpsLng", selfie_url AS "selfieUrl", status,
+                     is_verified AS "isVerified", verification_date AS "verificationDate",
+                     rejection_reason AS "rejectionReason", is_outside_barangay AS "isOutsideBarangay",
+                     last_location_check AS "lastLocationCheck"
+              FROM residents WHERE id = $1`, [id]
+           );
            return res.json({ ...user, ...resInfo.rows[0] });
         }
         return res.json(user || null);
@@ -139,52 +213,121 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       // Only Admins/Tanods can list residents
       if (!isTanod) return response.error(res, "Forbidden", "FORBIDDEN", 403);
       if (collection === 'residents') {
-        const result = await pool.query("SELECT u.id, u.email, u.name, u.role, u.status, r.* FROM users u JOIN residents r ON u.id = r.id WHERE u.role = 'resident'");
+        const result = await pool.query(
+          `SELECT u.id, u.email, u.name, u.role, u.status, r.phone, r.address, r.house_number AS "houseNumber",
+                  r.household_size AS "householdSize", r.blood_type AS "bloodType",
+                  r.medical_conditions AS "medicalConditions", r.emergency_contact_name AS "emergencyContactName",
+                  r.emergency_contact_phone AS "emergencyContactPhone", r.gps_lat AS "gpsLat", r.gps_lng AS "gpsLng",
+                  r.selfie_url AS "selfieUrl", r.status as resident_status, r.is_verified AS "isVerified",
+                  r.verification_date AS "verificationDate", r.rejection_reason AS "rejectionReason",
+                  r.is_outside_barangay AS "isOutsideBarangay", r.last_location_check AS "lastLocationCheck"
+           FROM users u JOIN residents r ON u.id = r.id WHERE u.role = 'resident' LIMIT $1 OFFSET $2`,
+          [queryLimit, queryOffset]
+        );
         return res.json(result.rows);
       }
-      const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE role = 'resident'");
+      const result = await pool.query("SELECT id, email, name, role, status FROM users WHERE role = 'resident' LIMIT $1 OFFSET $2", [queryLimit, queryOffset]);
       return res.json(result.rows);
     }
 
     if (collection === 'patrols') {
-      const result = await pool.query("SELECT * FROM patrols");
+      const result = await pool.query(`SELECT tanod_id AS "tanodId", tanod_name AS "tanodName",
+                                              is_active AS "isActive", location, status,
+                                              last_ping AS "lastPing"
+                                       FROM patrols LIMIT 100`);
       return res.json(result.rows.map(p => ({
-        id: p.tanod_id,
-        tanodId: p.tanod_id,
-        tanodName: p.tanod_name,
-        isActive: p.is_active,
+        id: p.tanodId,
+        tanodId: p.tanodId,
+        tanodName: p.tanodName,
+        isActive: p.isActive,
         status: p.status,
         location: typeof p.location === 'string' ? JSON.parse(p.location) : p.location,
-        lastUpdate: p.last_ping
+        lastUpdate: p.lastPing
       })));
     }
 
     if (collection === 'system_broadcasts' || collection === 'broadcasts') {
-      const query = (searchParams?.includes('isActive=true'))
-        ? "SELECT * FROM system_broadcasts WHERE isactive = true ORDER BY timestamp DESC"
-        : "SELECT * FROM system_broadcasts ORDER BY timestamp DESC LIMIT 100";
-      const result = await pool.query(query);
+      let q = `SELECT id, incident_id AS "incidentId", message, timestamp, isactive AS "isActive",
+                      admin_id AS "adminId", admin_name AS "adminName", type,
+                      approval_status AS "approvalStatus", ai_recommendation AS "aiRecommendation"
+               FROM system_broadcasts`;
+      const params: any[] = [];
+      const conditions: string[] = [];
+
+      if (searchParams?.includes('isActive=true')) {
+        conditions.push("isactive = true");
+      }
+
+      if (queryBefore) {
+        conditions.push(`timestamp < $${params.length + 1}`);
+        params.push(queryBefore);
+      }
+
+      if (conditions.length > 0) {
+        q += " WHERE " + conditions.join(" AND ");
+      }
+
+      q += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows);
     }
 
     if (collection === 'audit_logs') {
       if (!isAdmin) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
-      const result = await pool.query("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
+      let q = `SELECT id, incident_id AS "incidentId", type, status, citizen_id AS "citizenId",
+                      tanod_assigned AS "tanodAssigned", location_lat AS "locationLat",
+                      location_lng AS "locationLng", created_at AS "createdAt", notes,
+                      admin_id AS "adminId", action, target_table AS "targetTable",
+                      target_id AS "targetId", details
+               FROM audit_logs`;
+      const params: any[] = [];
+
+      if (queryBefore) {
+        q += " WHERE created_at < $1";
+        params.push(queryBefore);
+      }
+
+      q += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows);
     }
 
     if (collection === 'audit_log_archives') {
       if (!isAdmin) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
-      const result = await pool.query("SELECT * FROM audit_log_archives ORDER BY archived_at DESC LIMIT 50");
+      const result = await pool.query(
+        `SELECT id, session_date AS "sessionDate", archived_at AS "archivedAt",
+                archived_by AS "archivedBy", log_count AS "logCount",
+                total_incidents AS "totalIncidents", resolved_count AS "resolvedCount",
+                unresolved_count AS "unresolvedCount", log_entries AS "logEntries", notes
+         FROM audit_log_archives ORDER BY archived_at DESC LIMIT $1 OFFSET $2`,
+        [queryLimit, queryOffset]
+      );
       return res.json(result.rows.map(row => ({
          ...row,
-         log_entries: typeof row.log_entries === 'string' ? JSON.parse(row.log_entries) : (row.log_entries || [])
+         log_entries: typeof row.logEntries === 'string' ? JSON.parse(row.logEntries) : (row.logEntries || [])
       })));
     }
 
     if (collection === 'tanod_activity_logs') {
       if (!isTanod) return response.error(res, "Tanod/Admin Access Required", "FORBIDDEN", 403);
-      const result = await pool.query("SELECT * FROM tanod_activity_logs ORDER BY timestamp DESC LIMIT 100");
+      let q = `SELECT id, tanod_id AS "tanodId", tanod_name AS "tanodName", type, timestamp,
+                      details, location
+               FROM tanod_activity_logs`;
+      const params: any[] = [];
+
+      if (queryBefore) {
+        q += " WHERE timestamp < $1";
+        params.push(queryBefore);
+      }
+
+      q += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows.map(l => ({
         id: l.id,
         ...l,
@@ -193,16 +336,18 @@ export const getSync = async (req: AuthRequest, res: Response) => {
     }
 
     if (collection === 'witness_invites') {
-      let query = "SELECT * FROM witness_invites";
+      let q = `SELECT id, alert_id AS "alertId", witness_user_id AS "witnessUserId",
+                      status, timestamp
+               FROM witness_invites`;
       let params: any[] = [];
-      
+      const conditions: string[] = [];
+
       if (searchParams) {
         const urlParams = new URLSearchParams(searchParams);
         const witnessUserId = urlParams.get('witnessUserId');
         const alertId = urlParams.get('alertId');
         const status = urlParams.get('status');
         
-        const conditions = [];
         if (witnessUserId) {
           conditions.push(`witness_user_id = $${params.length + 1}`);
           params.push(witnessUserId);
@@ -215,24 +360,45 @@ export const getSync = async (req: AuthRequest, res: Response) => {
           conditions.push(`status = $${params.length + 1}`);
           params.push(status);
         }
-        
-        if (conditions.length > 0) {
-          query += " WHERE " + conditions.join(' AND ');
-        }
+      }
+
+      if (queryBefore) {
+        conditions.push(`timestamp < $${params.length + 1}`);
+        params.push(queryBefore);
       }
       
-      const result = await pool.query(query, params);
+      if (conditions.length > 0) {
+        q += " WHERE " + conditions.join(' AND ');
+      }
+
+      q += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows.map(r => ({
         id: r.id,
-        alertId: r.alert_id,
-        witnessUserId: r.witness_user_id,
+        alertId: r.alertId,
+        witnessUserId: r.witnessUserId,
         status: r.status,
         timestamp: r.timestamp
       })));
     }
 
     if (collection === 'patrol_sessions') {
-      const result = await pool.query("SELECT * FROM patrol_sessions ORDER BY start_time DESC LIMIT 50");
+      let q = `SELECT id, tanod_id AS "tanodId", tanod_name AS "tanodName",
+                      start_time AS "startTime", end_time AS "endTime", route
+               FROM patrol_sessions`;
+      const params: any[] = [];
+
+      if (queryBefore) {
+        q += " WHERE start_time < $1";
+        params.push(queryBefore);
+      }
+
+      q += ` ORDER BY start_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+      params.push(queryLimit, queryOffset);
+
+      const result = await pool.query(q, params);
       return res.json(result.rows.map(s => ({
         id: s.id,
         ...s,
@@ -434,12 +600,21 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         const setClause = updateFields.map((f, i) => `${fieldMapping[f]} = $${i + 2}`).join(', ');
         await pool.query(`UPDATE system_broadcasts SET ${setClause} WHERE id = $1`, [docId, ...updateFields.map(f => data[f])]);
         
-        const result = await pool.query("SELECT * FROM system_broadcasts WHERE id = $1", [docId]);
+        const result = await pool.query(`SELECT id, incident_id AS "incidentId", message, timestamp,
+                                                isactive AS "isActive", admin_id AS "adminId",
+                                                admin_name AS "adminName", type,
+                                                approval_status AS "approvalStatus",
+                                                ai_recommendation AS "aiRecommendation"
+                                         FROM system_broadcasts WHERE id = $1`, [docId]);
         socketService.emitToAll("broadcast_update", result.rows[0]);
         return res.json({ success: true, broadcast: result.rows[0] });
       } else {
         const result = await pool.query(
-          "INSERT INTO system_broadcasts (admin_id, admin_name, message, type, isactive, timestamp, approval_status, ai_recommendation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+          `INSERT INTO system_broadcasts (admin_id, admin_name, message, type, isactive, timestamp, approval_status, ai_recommendation)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING id, admin_id AS "adminId", admin_name AS "adminName", message, type,
+                     isactive AS "isActive", timestamp, approval_status AS "approvalStatus",
+                     ai_recommendation AS "aiRecommendation"`,
           [data.adminId, data.adminName, data.message, data.type, data.isActive ?? false, data.timestamp || new Date().toISOString(), data.approvalStatus || 'pending', data.aiRecommendation ? JSON.stringify(data.aiRecommendation) : null]
         );
         socketService.emitToAll("broadcast_update", result.rows[0]);
@@ -489,7 +664,10 @@ export const postSync = async (req: AuthRequest, res: Response) => {
     if (collection === 'alerts') {
       if (subCollection === 'messages') {
         const result = await pool.query(
-          "INSERT INTO alert_messages (alert_id, sender_id, sender_name, message, type, timestamp) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+          `INSERT INTO alert_messages (alert_id, sender_id, sender_name, message, type, timestamp)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, alert_id AS "alertId", sender_id AS "senderId", sender_name AS "senderName",
+                     message, type, timestamp`,
           [docId, req.user?.id, data.senderName || 'User', data.message, data.type || 'text', data.timestamp || new Date().toISOString()]
         );
         socketService.emitToRoom(`incident_${docId}`, "new_message", result.rows[0]);
@@ -548,24 +726,24 @@ export const postSync = async (req: AuthRequest, res: Response) => {
         });
         await pool.query(`UPDATE alerts SET ${setClause}, updated_at = now() WHERE id = $1`, [docId, ...values]);
         
-        const result = await pool.query("SELECT a.*, u.name as \"residentName\" FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1", [docId]);
+        const result = await pool.query(
+          `SELECT a.id, a.client_uuid AS "clientUuid", a.resident_id AS "residentId", a.type, a.status,
+                  a.barangay_id AS "barangayId", a.location, a.description, a.severity_score AS "severityScore",
+                  a.urgency_level AS "urgencyLevel", a.responder_recommendations AS "responderRecommendations",
+                  a.ai_analysis AS "aiAnalysis", a.assigned_to AS "assignedTo", a.assigned_to_name AS "assignedToName",
+                  a.responded_by AS "respondedBy", a.responded_by_name AS "respondedByName",
+                  a.responded_at AS "respondedAt", a.resolution_notes AS "resolutionNotes",
+                  a.responder_notes AS "responderNotes", a.created_at AS "createdAt",
+                  a.updated_at AS "updatedAt", a.resolved_at AS "resolvedAt", u.name as "residentName"
+           FROM alerts a LEFT JOIN users u ON a.resident_id = u.id WHERE a.id = $1`, [docId]
+        );
         const alert = result.rows[0];
         // Remap snake_case to camelCase for websocket
         const formattedAlert = {
            ...alert,
-           residentId: alert.resident_id,
-           assignedTo: alert.assigned_to,
-           assignedToName: alert.assigned_to_name,
-           respondedAt: alert.responded_at,
-           respondedBy: alert.responded_by,
-           respondedByName: alert.responded_by_name,
-           resolvedAt: alert.resolved_at,
-           resolutionNotes: alert.resolution_notes,
-           responderNotes: alert.responder_notes,
-           severityScore: alert.severity_score,
-           aiAnalysis: typeof alert.ai_analysis === 'string' ? JSON.parse(alert.ai_analysis) : alert.ai_analysis,
+           aiAnalysis: typeof alert.aiAnalysis === 'string' ? JSON.parse(alert.aiAnalysis) : alert.aiAnalysis,
            location: typeof alert.location === 'string' ? JSON.parse(alert.location) : alert.location,
-           timestamp: alert.created_at
+           timestamp: alert.createdAt
         };
         socketService.emitToAll("alert_update", { 
           type: 'update', 
@@ -657,7 +835,7 @@ export const deleteSync = async (req: AuthRequest, res: Response) => {
   try {
     const userRole = req.user?.role;
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-    const isTanod = userRole === 'tanod' || isAdmin;
+    const isTanod = userRole?.toLowerCase() === 'tanod' || isAdmin;
 
     const DELETABLE_COLLECTIONS: Record<string, string> = {
       alerts: 'alerts',
