@@ -1,10 +1,21 @@
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin 
+// Initialize Firebase Admin safely
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+    });
+  } catch (err: any) {
+    console.warn("[PushService] Failed to initialize Firebase Admin with applicationDefault (likely unconfigured credentials in sandbox), falling back: ", err.message);
+    try {
+      admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID || 'demo-project'
+      });
+    } catch (innerErr: any) {
+      console.error("[PushService] Backup initialization failed:", innerErr.message);
+    }
+  }
 }
 
 export class ServerPushService {

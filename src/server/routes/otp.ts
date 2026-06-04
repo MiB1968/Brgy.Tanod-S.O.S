@@ -1,7 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import twilio from "twilio";
-import { logger } from "../utils/logger.js";
+import { logger } from "../utils/logger";
 
 const router = express.Router();
 const getTwilioClient = () => {

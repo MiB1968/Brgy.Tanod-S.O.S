@@ -13,6 +13,10 @@ export function setWebLLMProgressCallback(cb: ProgressCb) {
   _progressCb = cb;
 }
 
+export function isWebLLMLoading(): boolean {
+  return _loading;
+}
+
 export async function getWebLLMEngine(): Promise<webllm.MLCEngine> {
   if (_engine) return _engine;
 
