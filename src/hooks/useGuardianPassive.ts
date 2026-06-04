@@ -88,34 +88,29 @@ export function useGuardianPassive(
   const createSOS = useSOSStore((state: any) => state.createSOS);
   const profile = useAuthStore((state: any) => state.profile);
 
-  // ==================== GPS WATCH ====================
-  const startGeoWatch = useCallback(() => {
-    if (!('geolocation' in navigator) || geoWatchId.current !== null) return;
-
-    geoWatchId.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        lastKnownPosition.current = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        };
-      },
-      (err) => console.warn('[GuardianPassive] watchPosition error', err),
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-    );
-  }, []);
-
-  const stopGeoWatch = useCallback(() => {
-    if (geoWatchId.current !== null) {
-      navigator.geolocation.clearWatch(geoWatchId.current);
-      geoWatchId.current = null;
-    }
-  }, []);
+  // ==================== GPS SYSTEM ====================
+  // Battery Optimization for low-end Androids: Removed continuous watchPosition.
+  // Instead, fetch coordinate snapshot ONLY when trigger happens.
+  const startGeoWatch = useCallback(() => {}, []);
+  const stopGeoWatch = useCallback(() => {}, []);
 
   // ==================== TRIGGER SOS ====================
   const triggerSOS = useCallback(async (phrase: string) => {
     const description = `AI Guardian: Distress keyword detected — "${phrase}"`;
-    const location = lastKnownPosition.current || { lat: 14.409, lng: 120.94 };
+    
+    // Quick location fetch for SOS
+    let location = { lat: 14.409, lng: 120.94 };
+    try {
+      if ('geolocation' in navigator) {
+        location = await new Promise((resolve) => {
+           navigator.geolocation.getCurrentPosition(
+             pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+             () => resolve({ lat: 14.409, lng: 120.94 }),
+             { timeout: 5000, maximumAge: 60000 }
+           );
+        });
+      }
+    } catch {}
 
     // Correct positional signature for your createSOS
     const alertId = await createSOS(

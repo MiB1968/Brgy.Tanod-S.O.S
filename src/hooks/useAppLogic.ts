@@ -13,7 +13,7 @@ import { workspaceAuth } from "../services/googleWorkspaceService";
 import { useSocketListeners } from "./useSocketListeners";
 import { useAudioInitializer } from "./useAudioInitializer";
 import { useGeolocation } from "./useGeolocation";
-import { useTanodLocation } from "./useTanodLocation";
+import { tanodLocationService } from "../services/tanodLocationService";
 
 import {
   createUserWithEmailAndPassword,
@@ -198,18 +198,14 @@ export function useAppLogic() {
     setActiveTab,
   });
 
-  const { startBackgroundTracking, stopTracking } = useTanodLocation(
-    socketHelpers.emitLocationUpdate,
-  );
-
   // Start background tracking when user is Tanod
   useEffect(() => {
     if (effectiveRole === "tanod") {
-      startBackgroundTracking();
+      tanodLocationService.startTracking();
     } else {
-      stopTracking();
+      tanodLocationService.stopTracking();
     }
-  }, [effectiveRole, startBackgroundTracking, stopTracking]);
+  }, [effectiveRole]);
 
   // Auth Persistence + Workspace
   useEffect(() => {

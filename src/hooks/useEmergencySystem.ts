@@ -27,27 +27,18 @@ export const useEmergencySystem = (isResponding: boolean) => {
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
 
-    // Mas mabilis ang update (5s) kung reresponde, mas mabagal (30s) kung patrol lang
-    const updateFrequency = isResponding ? 5000 : 30000;
+    // GPS is handled centrally by tanodLocationService now.
+    // We only fetch a quick single fix when needed for UI/SOS initialization.
+    if (!("geolocation" in navigator)) return;
 
-    const watchId = navigator.geolocation.watchPosition(
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(coords);
-        
-        if (navigator.onLine) {
-          sendLocationToServer(coords); // Push to Socket.IO
-        }
       },
       (err) => console.error("GPS Error:", err),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: isResponding ? 1000 : 20000 // Mas tipid sa battery
-      }
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
     );
-
-    return () => navigator.geolocation.clearWatch(watchId);
   }, [isResponding]);
 
   // 3. OFFLINE SYNC LOGIC

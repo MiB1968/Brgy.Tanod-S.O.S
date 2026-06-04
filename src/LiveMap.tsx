@@ -968,42 +968,25 @@ export default function LiveMap({
     };
   }, []);
 
-  // Auto map preloading around user's GPS locator pin
+  // Auto map preloading around user's GPS locator pin (DEACTIVATED for redeployment constraint - battery & data optimization)
   useEffect(() => {
+    /* 
     if (userPos && isOnline) {
-      console.log(
-        "[AutoPreload] Triggering map preloading around coordinate:",
-        userPos.lat,
-        userPos.lng
-      );
-      offlineTileService
-        .autoPreloadAroundLocation(userPos.lat, userPos.lng, 1.5)
-        .then((success) => {
-          if (success) {
-            console.log(
-              "[AutoPreload] GPS local map precaching successful:",
-              userPos.lat,
-              userPos.lng
-            );
-          }
-        });
+      console.log("[AutoPreload] Triggering map preloading around coordinate...");
+      offlineTileService.autoPreloadAroundLocation(userPos.lat, userPos.lng, 1.5);
     }
+    */
   }, [userPos?.lat, userPos?.lng, isOnline]);
 
-  // Implicit background pre-loading of central Mamburao area on initial dashboard load
+  // Implicit background pre-loading of central Mamburao area on initial dashboard load 
+  // (DEACTIVATED for redeployment constraint - battery & data optimization)
   useEffect(() => {
+    /*
     if (isOnline) {
-      console.log(
-        "[AutoPreload] Pre-caching Core Mamburao area tiles to MapDatabase as an automatic safety fallback..."
-      );
-      offlineTileService
-        .autoPreloadAroundLocation(CENTER[0], CENTER[1], 1.2)
-        .then((success) => {
-          if (success) {
-            console.log("[AutoPreload] Mamburao town center buffer cached.");
-          }
-        });
+      console.log("[AutoPreload] Pre-caching Core Mamburao area tiles to MapDatabase as an automatic safety fallback...");
+      offlineTileService.autoPreloadAroundLocation(CENTER[0], CENTER[1], 1.2);
     }
+    */
   }, [isOnline]);
 
   const activePatrols = patrols.filter(

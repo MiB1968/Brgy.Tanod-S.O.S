@@ -18,7 +18,9 @@ export class ModelProfiler {
     const startMemory = perf?.memory?.usedJSHeapSize || 0;
 
     // Trigger local service worker verification
-    guardianAI.init();
+    // guardianAI.init(); // DEACTIVATED: Prevents immediate WebLLM WebWorker load battery drain on low-end devices on boot.
+    
+    // Fallback: Just let the system lazy load it when the user clicks the Voice Assistant.
 
     const endMemory = perf?.memory?.usedJSHeapSize || 0;
     const diff = (endMemory - startMemory) / (1024 * 1024); // Convert bytes to MB
