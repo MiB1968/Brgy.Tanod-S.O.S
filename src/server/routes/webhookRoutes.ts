@@ -2,18 +2,33 @@ import { Router } from 'express';
 import twilio from 'twilio';
 import { telegramService } from '../services/telegramService';
 import { getMessaging } from 'firebase-admin/messaging';
+import { authenticate } from '../middleware/auth';
+import { config } from '../config/index';
 
 const router = Router();
 
-router.post('/fcm/subscribe', async (req, res) => {
+// Allowed FCM topics depending on role
+const ALLOWED_TOPICS = ['all_residents', 'tanod_alerts', 'emergency_broadcasts'];
+
+router.post('/fcm/subscribe', authenticate, async (req, res) => {
   try {
     const { token, topic } = req.body;
-    if (token && topic) {
-      await getMessaging().subscribeToTopic(token, topic);
-      res.status(200).send('OK');
-    } else {
-      res.status(400).send('Missing token or topic');
+    
+    if (!token || !topic) {
+      return res.status(400).send('Missing token or topic');
     }
+
+    if (!ALLOWED_TOPICS.includes(topic)) {
+      return res.status(403).send('Invalid topic');
+    }
+
+    // Role restrictions for sensitive topics
+    if ((topic === 'tanod_alerts' || topic === 'emergency_broadcasts') && req.user?.role === 'resident') {
+      return res.status(403).send('Unauthorized for sensitive topics');
+    }
+
+    await getMessaging().subscribeToTopic(token, topic);
+    res.status(200).send('OK');
   } catch (err: any) {
     const errMsg = String(err);
     if (
@@ -47,7 +62,10 @@ router.post('/telegram', async (req, res) => {
   }
 });
 
-const twilioWebhook = twilio.webhook({ validate: false }); // Set to true in prod if URL is accessible
+const twilioWebhook = twilio.webhook({ 
+  validate: config.nodeEnv === 'production',
+  protocol: 'https'
+}); // Enable true validation in production
 
 router.post('/sms-status', twilioWebhook, async (req, res) => {
   const { MessageSid, MessageStatus, To } = req.body;

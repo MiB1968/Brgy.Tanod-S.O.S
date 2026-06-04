@@ -74,52 +74,7 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
             };
           }
         } catch (fbErr: any) {
-          // Handle AI Studio "gen-lang-client" audience mismatch
-          if (fbErr.message.includes('aud')) {
-            try {
-              const decodedToken = jwt.decode(token) as any;
-              const isGenLang = decodedToken?.aud?.startsWith('gen-lang-client');
-              const isMasterEmail = 
-                decodedToken?.email === 'rubenlleg12@gmail.com' || 
-                decodedToken?.email === 'ben@brgytanod.com';
-              
-              if (isGenLang && isMasterEmail) {
-                console.log(`[SocketAuth] Trusting gen-lang-client token for master: ${decodedToken.email}`);
-                
-                // Lookup master user in DB to get real UUID
-                const userResult = await pool.query(
-                  'SELECT * FROM users WHERE email = $1',
-                  [decodedToken.email.toLowerCase()]
-                );
-                let dbUser = userResult.rows[0];
-
-                if (!dbUser) {
-                  // Provision if missing
-                  const insertResult = await pool.query(
-                    `INSERT INTO users (email, password, name, role, status)
-                     VALUES ($1, $2, $3, $4, $5)
-                     ON CONFLICT (email) DO UPDATE SET role = 'super_admin'
-                     RETURNING id, email, name, role, status`,
-                    [decodedToken.email.toLowerCase(), '$2a$12$bootstrapfakehashedpasswordskipthis', 'Super Admin', 'super_admin', 'approved']
-                  );
-                  dbUser = insertResult.rows[0];
-                }
-
-                decodedUser = {
-                  id: dbUser.id,
-                  role: dbUser.role,
-                  email: dbUser.email,
-                  name: dbUser.name
-                };
-              } else {
-                throw fbErr;
-              }
-            } catch (decodeErr) {
-              throw fbErr;
-            }
-          } else {
-            throw fbErr;
-          }
+          throw fbErr;
         }
       } else {
         throw jwtErr;
@@ -130,17 +85,15 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Error) =
       throw new Error("User identity could not be verified");
     }
 
-    // Force promotion for master emails just in case 
-    // the old token has the 'resident' role baked in
-    if (decodedUser.email === 'rubenlleg12@gmail.com' || decodedUser.email === 'ben@brgytanod.com') {
-      decodedUser.role = 'super_admin';
-    }
-
     // Set user data to socket
+    const rawRole = decodedUser.role || "resident";
+    let normalizedRole = rawRole.toLowerCase();
+    if (normalizedRole === 'citizen') normalizedRole = 'resident';
+
     (socket as AuthenticatedSocket).data = {
       user: {
         id: decodedUser.id,
-        role: (decodedUser.role || "CITIZEN").toUpperCase(),
+        role: normalizedRole,
         barangayId: decodedUser.barangayId || "default",
         name: decodedUser.name,
         phone: decodedUser.phone

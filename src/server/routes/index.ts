@@ -14,9 +14,10 @@ import smsRoutes from "./sms";
 import otpRoutes from "./otp";
 import scrapeRoutes from "./scrape";
 import residentRoutes from "./residentRoutes";
+import { requireAppCheck } from "../middleware/requireAppCheck";
 
 export const setupRoutes = (app: Express): void => {
-  // Health check - Detailed for System Audit
+  // Health check - Detailed for System Audit (No App Check required)
   app.get("/api/health", async (req, res) => {
     const { checkConnection } = await import('../db/index');
     const { backgroundTasksService } = await import('../services/backgroundTasksService');
@@ -25,36 +26,35 @@ export const setupRoutes = (app: Express): void => {
     res.json({
       success: true,
       status: dbConnected ? 'operational' : 'degraded',
-      services: {
-        database: dbConnected ? 'connected' : 'disconnected',
-        backgroundTasks: backgroundTasksService.getStatus().isRunning ? 'active' : 'inactive',
-      },
-      system: {
-        uptime: process.uptime(),
-        memoryUsage: process.memoryUsage(),
-        nodeEnv: process.env.NODE_ENV || 'development',
-      },
       timestamp: new Date().toISOString(),
       message: "Brgy. Tanod S.O.S. Operations Center Backend",
     });
   });
 
-  // Feature routes
-  app.use("/api/auth", authRoutes);
-  app.use("/api/sos", sosRoutes);
-  app.use("/api/intelligence", intelligenceRoutes);
-  app.use("/api/sync", syncRoutes);
-  app.use("/api/system", systemRoutes);
-  app.use("/api/voice", voiceRoutes);
-  app.use("/api/ai", aiRoutes);
-  app.use("/api/admin", adminRoutes);
-  app.use("/api/tts", ttsRoutes);
-  app.use("/api/storage", storageRoutes);
-  app.use("/api/webhooks", webhookRoutes);
+  // Apply App Check Middleware globally to most API routes
+  // (Webhooks should bypass if they come from external services, e.g. Twilio)
+  // Let's add it carefully.
+  app.use("/api/auth", requireAppCheck, authRoutes);
+  app.use("/api/sos", requireAppCheck, sosRoutes);
+  app.use("/api/intelligence", requireAppCheck, intelligenceRoutes);
+  app.use("/api/sync", requireAppCheck, syncRoutes);
+  app.use("/api/system", requireAppCheck, systemRoutes);
+  app.use("/api/voice", requireAppCheck, voiceRoutes);
+  app.use("/api/ai", requireAppCheck, aiRoutes);
+  app.use("/api/admin", requireAppCheck, adminRoutes);
+  app.use("/api/tts", requireAppCheck, ttsRoutes);
+  app.use("/api/storage", requireAppCheck, storageRoutes);
+  
+  // Exclude webhooks or apply individually if needed. Twilio won't have Firebase App Check tokens.
+  app.use("/api/webhooks", webhookRoutes); 
+  
+  // Exclude SMS fallback or endpoints hit from external/Twilio. Let's keep sms routes open or appCheck them? 
+  // Normally /api/sms might be webhook callbacks or internal, let's just leave it for now or rely on API key
   app.use("/api/sms", smsRoutes);
-  app.use("/api/otp", otpRoutes);
-  app.use("/api/scrape", scrapeRoutes);
-  app.use("/api/residents", residentRoutes);
+  
+  app.use("/api/otp", requireAppCheck, otpRoutes);
+  app.use("/api/scrape", requireAppCheck, scrapeRoutes);
+  app.use("/api/residents", requireAppCheck, residentRoutes);
 
   // 404 catch-all for unmatched API routes
   app.all("/api/*", (req, res) => {

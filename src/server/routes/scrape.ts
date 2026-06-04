@@ -14,7 +14,7 @@ router.post("/", authenticate, async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.VITE_FIRECRAWL_API_KEY}`,
+        Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       },
       body: JSON.stringify({
         url,
@@ -51,7 +51,7 @@ router.post("/search", authenticate, async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.VITE_FIRECRAWL_API_KEY}`,
+        Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       },
       body: JSON.stringify({ query, limit: 6 }),
     });

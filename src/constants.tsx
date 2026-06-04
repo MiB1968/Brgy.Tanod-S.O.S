@@ -75,17 +75,15 @@ export const itemVariants = {
 };
 
 export const isRuben = (uid?: string, email?: string) => {
-  // Check against env variables and hardcoded bootstrap admin
-  const masterEmail = (import.meta.env.VITE_MASTER_EMAIL || "").toLowerCase();
+  // Check against env variables
+  const masterEmailsRaw = (import.meta.env.VITE_MASTER_EMAILS || "").toLowerCase();
   const normalizedEmail = email?.toLowerCase() || "";
 
   if (!uid && !normalizedEmail) return false;
+  if (!masterEmailsRaw) return false;
 
-  return (
-    (masterEmail && normalizedEmail === masterEmail) ||
-    normalizedEmail === "rubenlleg12@gmail.com" ||
-    normalizedEmail === "ben@brgytanod.com"
-  );
+  const validEmails = masterEmailsRaw.split(",").map((e: string) => e.trim());
+  return validEmails.includes(normalizedEmail);
 };
 
 export const PATROL_TIMEOUT = 1000 * 60 * 5; // 5 minutes

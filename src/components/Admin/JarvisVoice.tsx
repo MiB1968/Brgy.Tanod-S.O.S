@@ -3,6 +3,7 @@ import { Mic, MicOff, Power, Settings } from "lucide-react";
 import socket from "../../lib/socket";
 import { useAuthStore } from "../../store/useAuthStore";
 import * as safeStorage from "../../lib/safeStorage";
+import { fetchAPI } from "../../services/apiBase";
 import {
   JarvisSettingsPanel,
   VoiceSettings,
@@ -198,12 +199,24 @@ export function JarvisVoice() {
 
     try {
       const token = safeStorage.getItem("token");
+      
+      let appCheckTokenString = '';
+      try {
+        const { appCheck } = await import('../../lib/firebase');
+        const { getToken } = await import('firebase/app-check');
+        if (appCheck) {
+          const appCheckTokenObj = await getToken(appCheck, false);
+          appCheckTokenString = appCheckTokenObj.token;
+        }
+      } catch (err) {}
+
       // Single canonical TTS endpoint — admin/super_admin/captain only
       const response = await fetch("/api/system/tts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(appCheckTokenString ? { 'X-Firebase-AppCheck': appCheckTokenString } : {}),
         },
         body: JSON.stringify({
           text,

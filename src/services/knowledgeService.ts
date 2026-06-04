@@ -47,23 +47,17 @@ export class KnowledgeService {
     
     while (attempt < retries) {
       try {
-        // In a real environment, this might proxy through a backend route
-        const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+        const { fetchAPI } = await import('./apiBase');
+        const data = await fetchAPI('scrape', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_FIRECRAWL_API_KEY}`,
-          },
           body: JSON.stringify({
             url,
             formats: ['markdown'],
             onlyMainContent: true,
-          }),
+          })
         });
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const data = await response.json();
+        if (data.success === false) throw new Error("Scrape failed server-side");
 
         const knowledge: LocalKnowledge = {
           source: new URL(url).hostname,

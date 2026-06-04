@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { getMessaging, isSupported } from 'firebase/messaging';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -32,6 +33,26 @@ const finalConfig = {
 // getApps().length prevents "App already exists" crash when HMR re-runs this module.
 const firebaseApp: FirebaseApp =
   getApps().length > 0 ? getApp() : initializeApp(finalConfig);
+
+export let appCheck: AppCheck | null = null;
+
+if (typeof window !== 'undefined') {
+  // Use a debug token in development, or standard reCAPTCHA for production
+  if (import.meta.env.DEV) {
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  
+  try {
+    appCheck = initializeAppCheck(firebaseApp, {
+      provider: new ReCaptchaV3Provider(
+        import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' // Public sandbox key if not provided
+      ),
+      isTokenAutoRefreshEnabled: true
+    });
+  } catch (err) {
+    console.warn('[Firebase] App Check initialization failed:', err);
+  }
+}
 
 export const auth: Auth = getAuth(firebaseApp);
 export const storage: FirebaseStorage = getStorage(firebaseApp);

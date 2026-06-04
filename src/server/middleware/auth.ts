@@ -164,15 +164,26 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       });
     }
 
-    const isMasterUser = decoded.email === 'rubenlleg12@gmail.com' || decoded.email === 'ben@brgytanod.com';
+    if (!isFirebaseAuth) {
+      const userRow = await pool.query(
+        'SELECT token_version, status FROM users WHERE id = $1',
+        [decoded.id]
+      );
+      const dbUser = userRow.rows[0];
+
+      if (!dbUser || dbUser.status === 'suspended') {
+        return res.status(401).json({ success: false, error: { code: 'REVOKED', message: 'Session revoked or user suspended' } });
+      }
+
+      if (decoded.tokenVersion && dbUser.token_version !== decoded.tokenVersion) {
+        return res.status(401).json({ success: false, error: { code: 'REVOKED', message: 'Token revoked. Please login again.' } });
+      }
+    }
+
     let effectiveRole = (decoded.role || 'resident') as UserRole;
 
     // Normalize roles to match new RBAC requirements if they come from old DB/tokens
     if (effectiveRole === 'super_admin' as any) effectiveRole = 'super_admin';
-
-    if (isMasterUser) {
-      effectiveRole = 'super_admin';
-    }
 
     req.user = {
       id: decoded.id || decoded.uid,
@@ -192,13 +203,31 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
   }
 }
 
+const roleHierarchy: Record<UserRole, number> = {
+  super_admin: 4,
+  admin: 3,
+  tanod: 2,
+  citizen: 1,
+  resident: 1
+};
+
 export function requireRole(role: UserRole) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || req.user.role !== role) {
-      logger.error(`[RBAC] Access denied. User: ${req.user?.email} (${req.user?.role}), Required role: ${role}`);
+    if (!req.user) {
       return res.status(403).json({
         success: false,
         error: { code: 'FORBIDDEN', message: `Requires ${role} role` }
+      });
+    }
+
+    const userLevel = roleHierarchy[req.user.role] || 0;
+    const requiredLevel = roleHierarchy[role] || 0;
+
+    if (userLevel < requiredLevel) {
+      logger.error(`[RBAC] Access denied. User: ${req.user.email} (${req.user.role}), Required minimum role: ${role}`);
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: `Requires ${role} role or higher` }
       });
     }
     next();

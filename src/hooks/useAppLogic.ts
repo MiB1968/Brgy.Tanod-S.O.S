@@ -99,16 +99,8 @@ export function useAppLogic() {
   // ── Computed Values ────────────────────────────────────────────────
 
   const baseRole = useMemo(() => {
-    const email = (user?.email || profile?.email || firebaseUser?.email || "").toLowerCase();
-    const isHardcodedAdmin = 
-        email === "rubenlleg12@gmail.com" || 
-        email === "ben@brgytanod.com" || 
-        profile?.role === "super_admin" ||
-        user?.name?.toLowerCase().includes("ruben");
-
-    if (isMasterAdmin || isHardcodedAdmin) return "super_admin";
     return rbacRole || profile?.role || "guest";
-  }, [isMasterAdmin, rbacRole, profile?.role, user, profile, firebaseUser]);
+  }, [rbacRole, profile?.role]);
 
   const effectiveRole = viewOverride || baseRole;
 
@@ -322,14 +314,12 @@ export function useAppLogic() {
 
           safeStorage.setItem("token", token);
 
-          const isMaster = fbUser.email === 'rubenlleg12@gmail.com' || fbUser.email === 'ben@brgytanod.com';
-
           const localProfile: User = {
             id: fbUser.uid,
             uid: fbUser.uid,
             name: fbUser.displayName || "System User",
             email: fbUser.email || "",
-            role: isMaster ? "super_admin" : "resident",
+            role: "resident",
             status: "approved",
             createdAt: new Date().toISOString(),
           };
@@ -369,14 +359,12 @@ export function useAppLogic() {
 
         safeStorage.setItem("token", token);
 
-        const isMaster = fbUser.email === 'rubenlleg12@gmail.com' || fbUser.email === 'ben@brgytanod.com';
-
         const localProfile: User = {
           id: fbUser.uid,
           uid: fbUser.uid,
           name: fbUser.displayName || "Google User",
           email: fbUser.email || "",
-          role: isMaster ? "super_admin" : "resident",
+          role: "resident",
           status: "approved",
           createdAt: new Date().toISOString(),
         };

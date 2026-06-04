@@ -5,15 +5,29 @@
 
 import * as safeStorage from '../lib/safeStorage';
 import * as ReactSentry from '@sentry/react';
+import { getToken } from 'firebase/app-check';
+import { appCheck } from '../lib/firebase';
 
 const API_BASE = '/api';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> {
   const token = safeStorage.getItem('token');
+  
+  let appCheckTokenString = '';
+  if (appCheck) {
+    try {
+      const appCheckTokenObj = await getToken(appCheck, false); // false = don't force refresh
+      appCheckTokenString = appCheckTokenObj.token;
+    } catch (err) {
+      console.warn('[API] Could not retrieve Firebase App Check token:', err);
+    }
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     ...(token && token !== 'cookie-auth' ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(appCheckTokenString ? { 'X-Firebase-AppCheck': appCheckTokenString } : {}),
     ...options.headers,
   };
 

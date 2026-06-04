@@ -2,8 +2,10 @@ import express from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import twilio from "twilio";
+import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
+
 const getTwilioClient = () => {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -24,7 +26,7 @@ const schema = z.object({
   message: z.string().min(10).max(300),
 });
 
-router.post("/emergency", smsLimiter, async (req, res) => {
+router.post("/emergency", authenticate, authorize(["admin", "super_admin", "tanod"]), smsLimiter, async (req, res) => {
   try {
     const { phone, message } = schema.parse(req.body);
     const client = getTwilioClient();

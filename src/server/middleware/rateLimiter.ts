@@ -11,7 +11,7 @@ import { rateLimit } from "express-rate-limit";
 
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 5000, // Increased significantly for development and production reliability
+  limit: 1000, 
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === "/api/health", // health checks don't count
@@ -55,7 +55,7 @@ export const apiKeyAuthLimiter = rateLimit({
 
 export const sosLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  limit: 20, // 20 SOS per minute per IP
+  limit: 5, // 5 SOS per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: {

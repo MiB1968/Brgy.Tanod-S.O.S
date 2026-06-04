@@ -39,10 +39,7 @@ export function DashboardHeader({
   viewOverride,
   setViewOverride,
 }: DashboardHeaderProps) {
-  const isSuperAdmin =
-    profile?.role === "super_admin" ||
-    profile?.email === "rubenlleg12@gmail.com" ||
-    profile?.email === "ben@brgytanod.com";
+  const isSuperAdmin = profile?.role === "super_admin";
 
   return (
     <motion.div

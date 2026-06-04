@@ -109,14 +109,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (userDoc.exists()) {
         let userData = userDoc.data() as User;
 
-        const isMasterEmail =
-          userData.email === "rubenlleg12@gmail.com" ||
-          userData.email === "ben@brgytanod.com";
-        if (isMasterEmail && userData.role !== "super_admin") {
-          userData.role = "super_admin";
-          await setDoc(userRef, { role: "super_admin" }, { merge: true });
-        }
-
         setProfile(userData);
         setStoreProfile(userData);
         safeStorage.setItem("brgy_user_profile", JSON.stringify(userData));
@@ -131,13 +123,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const cachedDoc = await getDocFromCache(userRef);
       if (cachedDoc.exists()) {
         let userData = cachedDoc.data() as User;
-
-        const isMasterEmail =
-          userData.email === "rubenlleg12@gmail.com" ||
-          userData.email === "ben@brgytanod.com";
-        if (isMasterEmail && userData.role !== "super_admin") {
-          userData.role = "super_admin";
-        }
 
         setProfile(userData);
         setStoreProfile(userData);
@@ -157,10 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
-    const isMasterEmail =
-      firebaseUser?.email === "rubenlleg12@gmail.com" ||
-      firebaseUser?.email === "ben@brgytanod.com";
-    const initialRole = isMasterEmail ? "super_admin" : "resident";
+    const initialRole = "resident";
 
     // Default: create a minimal resident profile.
     const userData: User = {

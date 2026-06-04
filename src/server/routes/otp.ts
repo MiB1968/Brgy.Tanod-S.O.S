@@ -2,8 +2,17 @@ import express from "express";
 import { z } from "zod";
 import twilio from "twilio";
 import { logger } from "../utils/logger";
+import rateLimit from "express-rate-limit";
+import { authenticate } from "../middleware/auth";
 
 const router = express.Router();
+
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, 
+  max: 3, 
+  message: { error: "Too many OTP requests, please try again later" },
+});
+
 const getTwilioClient = () => {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -20,7 +29,7 @@ const phoneSchema = z.object({
 });
 
 // Send OTP
-router.post("/send", async (req, res) => {
+router.post("/send", otpLimiter, async (req, res) => {
   try {
     const { phone } = phoneSchema.parse(req.body);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -43,7 +52,7 @@ router.post("/send", async (req, res) => {
 });
 
 // Verify OTP
-router.post("/verify", async (req, res) => {
+router.post("/verify", authenticate, async (req, res) => {
   try {
     const { phone, otp } = req.body;
     const record = otpStore.get(phone);
