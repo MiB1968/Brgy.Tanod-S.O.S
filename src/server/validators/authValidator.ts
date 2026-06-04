@@ -16,7 +16,7 @@ export const loginSchema = z.object({
 });
 
 // ── SECURITY: Only public-facing roles allowed on self-registration ──────────
-// Admin and superadmin accounts must be created by an existing admin
+// Admin and super_admin accounts must be created by an existing admin
 // through the admin panel, NEVER through this public endpoint.
 export const registerSchema = z.object({
   email: z.string().email(),

@@ -351,7 +351,7 @@ export class SecureVoiceAssistantService {
     const upper = transcript.toUpperCase();
     const escalationPatterns = [
       'SUPER ADMIN',
-      'SUPERADMIN',
+      'SUPER_ADMIN',
       'FULL ACCESS',
       'FULL POWER',
       'UNLOCK ALL',

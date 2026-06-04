@@ -7,7 +7,7 @@ import * as adminController from '../controllers/adminController';
 
 const router = Router();
 
-// All admin routes require authentication + admin/superadmin role
+// All admin routes require authentication + admin/super_admin role
 router.use(authenticate);
 router.use(authorize(['admin', 'super_admin']));
 

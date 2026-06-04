@@ -31,7 +31,7 @@ export function useGuardian() {
   // Listen for monitoring events (for responders)
   useEffect(() => {
     const handleMonitor = (data: any) => {
-      if (['ADMIN', 'SUPERADMIN', 'CAPTAIN', 'TANOD'].includes(profile?.role?.toUpperCase() || '')) {
+      if (['ADMIN', 'SUPER_ADMIN', 'CAPTAIN', 'TANOD'].includes(profile?.role?.toUpperCase() || '')) {
         toast(`Guardian: ${data.userName} - ${data.transcript}`, { 
           icon: '🎧',
           id: `monitor-${data.userId}`,
@@ -177,7 +177,7 @@ export function useGuardian() {
     const hour = new Date().getHours();
     const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     
-    if (['ADMIN', 'SUPERADMIN', 'CAPTAIN', 'TANOD', 'RESIDENT'].includes(role.toUpperCase())) {
+    if (['ADMIN', 'SUPER_ADMIN', 'CAPTAIN', 'TANOD', 'RESIDENT'].includes(role.toUpperCase())) {
       const isResident = role.toUpperCase() === 'RESIDENT';
       if (isResident) {
         speak(`Magandang ${hour < 12 ? 'umaga' : hour < 18 ? 'hapon' : 'gabi'}, ${name}. Nakabantay ang Guardian AI para sa iyong kaligtasan.`);

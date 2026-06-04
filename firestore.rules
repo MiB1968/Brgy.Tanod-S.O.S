@@ -27,11 +27,11 @@ service cloud.firestore {
     }
 
     function isAdminOrAbove() {
-      return hasRole(['admin', 'superadmin']);
+      return hasRole(['admin', 'super_admin']);
     }
 
     function isTanodOrAbove() {
-      return hasRole(['tanod', 'admin', 'superadmin']);
+      return hasRole(['tanod', 'admin', 'super_admin']);
     }
 
     // FIX: Prevent clients from writing the `role` field.
@@ -75,7 +75,7 @@ service cloud.firestore {
                     request.resource.data.reportedBy == request.auth.uid &&
                     request.resource.data.location is map &&
                     request.resource.data.type is string &&
-                    (request.auth.token.email_verified == true || request.auth.token.role in ['resident', 'tanod', 'admin', 'superadmin']);
+                    (request.auth.token.email_verified == true || request.auth.token.role in ['resident', 'tanod', 'admin', 'super_admin']);
 
       allow read: if isAuthenticated() &&
                   (isTanodOrAbove() || resource.data.reportedBy == request.auth.uid);
