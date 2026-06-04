@@ -1,3 +1,14 @@
+/**
+ * @file useLocationTracking.ts
+ * @deprecated — Being phased out
+ *
+ * This file is old. The new GPS system is in:
+ * - src/services/tanodLocationService.ts
+ *
+ * For now, we keep this file so the app doesn't break.
+ * Later we will remove it.
+ */
+
 import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSOSStore } from '../store/useSOSStore';
@@ -24,11 +35,12 @@ export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
   const isTanod = role === 'tanod';
   const isCitizenWithActiveSOS = role === 'resident' && !!activeAlert;
 
-  // SOS: 3s, Patrol: 8s
   const updateIntervalMs = isCitizenWithActiveSOS ? 3000 : 8000;
 
   useEffect(() => {
     if (!enabled || !profile || (!isTanod && !isCitizenWithActiveSOS)) return;
+
+    console.warn('[useLocationTracking] This file is old. We are moving to tanodLocationService.ts');
 
     const sendLocation = (coords: GeolocationCoordinates) => {
       const now = Date.now();
@@ -54,7 +66,7 @@ export function useLocationTracking(options: UseLocationTrackingOptions = {}) {
     if ('geolocation' in navigator) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => sendLocation(position.coords),
-        (error) => console.error('[useLocationTracking] Geolocation error:', error),
+        (error) => console.error('[useLocationTracking] Error:', error),
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
     }
