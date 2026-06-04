@@ -7,6 +7,18 @@ const TAG_LENGTH = 16;
 const KEY = Buffer.from(config.encryptionKey, 'hex');
 
 /**
+ * Robust detection of AES-256-GCM format iv:tag:ciphertext
+ */
+export function isEncrypted(value: any): boolean {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(':');
+  if (parts.length !== 3) return false;
+  const [iv, tag, ciphertext] = parts;
+  // IV is 12 bytes (24 hex chars), Tag is 16 bytes (32 hex chars)
+  return /^[0-9a-f]{24}$/i.test(iv) && /^[0-9a-f]{32}$/i.test(tag) && /^[0-9a-f]+$/i.test(ciphertext);
+}
+
+/**
  * Encrypts a field value.
  * Supports strings and JSON-serializable objects/arrays.
  * Returns a colon-separated string: iv:authTag:encryptedContent
@@ -38,7 +50,7 @@ export function encryptField(value: any): string | null {
  * Attempts to parse the decrypted string as JSON if possible.
  */
 export function decryptField(encryptedValue: string | null): any {
-  if (!encryptedValue || typeof encryptedValue !== 'string' || !encryptedValue.includes(':')) {
+  if (!isEncrypted(encryptedValue)) {
     return encryptedValue;
   }
 
