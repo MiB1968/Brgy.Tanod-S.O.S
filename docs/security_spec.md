@@ -4,7 +4,7 @@
 - **Identity Integrity**: All writes to `alerts`, `incidents`, and `users` must be tied to the authenticated `req.user.id`.
 - **Alert Sovereignty**: A resident can only update or cancel their own active SOS alerts.
 - **Tanod Authority**: Only users with the `tanod` or `admin` role can respond to alerts or create incident reports.
-- **Admin Supremacy**: Only `admin` or `superadmin` roles can approve new residents or change user roles.
+- **Admin Supremacy**: Only `admin` or `super_admin` roles can approve new residents or change user roles.
 - **Temporal Strictness**: Audit logs and activity logs use DB-side `now()` for timestamps to prevent forgery.
 - **Relational Consistency**: Foreign keys exist between `alerts` and `users` to prevent orphaned records.
 

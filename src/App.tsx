@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Suspense, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRBAC } from "./context/AuthContext";
 import { GlobalErrorBoundary } from "./components/GlobalErrorBoundary";
 import KeepAppOpenBanner from "./components/KeepAppOpenBanner";
@@ -6,7 +6,6 @@ import TrackingStatusPanel from "./components/TrackingStatusPanel";
 import NotificationPermission from "./components/NotificationPermission";
 import { GuardianVoiceAssistant } from "./components/ai/GuardianVoiceAssistant";
 import TacticalDock from "./components/layout/TacticalDock";
-import LiveMap from "./components/LiveMap";
 import AppLayout from "./components/layout/AppLayout";
 import { RoleBasedContent } from "./components/views/RoleBasedContent";
 import { useTanodStore } from "./store/useTanodStore";
@@ -62,7 +61,7 @@ const App: React.FC = () => {
   const emergencyAudio = useEmergencyAudio();
   const { startSiren, stopSiren } = emergencyAudio;
 
-  // FIX: Gate viewOverride — only admin/superadmin may use it.
+  // FIX: Gate viewOverride — only admin/super_admin may use it.
   const canUseViewOverride = useMemo(
     () => user?.role === "admin" || user?.role === "super_admin",
     [user?.role]

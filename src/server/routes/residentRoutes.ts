@@ -6,8 +6,17 @@ import { checkAndUpdateGeofence } from '../services/geofencingService';
 const router = Router();
 
 // PATCH /api/residents/:id/location
-router.patch('/:id/location', authenticate, async (req, res) => {
+router.patch('/:id/location', authenticate, async (req: any, res) => {
   const { id } = req.params;
+
+  // Security: Only allow users to update their own location unless they are admin/tanod
+  const isAdminOrTanod = ['admin', 'super_admin', 'tanod', 'captain'].includes(req.user?.role || '');
+  if (!isAdminOrTanod && req.user?.id !== id) {
+    return res.status(403).json({
+      success: false,
+      message: 'Unauthorized: Cannot update location for another resident'
+    });
+  }
   const { lat, lng } = req.body;
 
   if (lat === undefined || lng === undefined) {

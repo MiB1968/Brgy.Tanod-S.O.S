@@ -127,7 +127,7 @@ export function useAppLogic() {
       ...p,
       role: effectiveRole as UserRole,
       name: checkIsRuben(user?.id, user?.email)
-        ? `${p.name} (SuperAdmin)`
+        ? `${p.name} (Super Admin)`
         : p.name,
     } as User;
   }, [profile, effectiveRole, user]);

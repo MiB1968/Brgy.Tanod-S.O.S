@@ -15,11 +15,11 @@ export const bootstrapSuperAdmin = onCall(async (request: any) => {
   const user = await admin.auth().getUserByEmail(email);
   
   // Set custom claim
-  await admin.auth().setCustomUserClaims(user.uid, { role: 'superadmin' });
+  await admin.auth().setCustomUserClaims(user.uid, { role: 'super_admin' });
   
   // Update Firestore
   await admin.firestore().collection('users').doc(user.uid).update({
-    role: 'superadmin',
+    role: 'super_admin',
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
 

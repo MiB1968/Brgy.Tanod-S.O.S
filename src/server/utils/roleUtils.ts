@@ -14,7 +14,7 @@ export function normalizeRole(role: string): AppRole {
 }
 
 /**
- * Returns true for tanod, admin, superadmin, captain.
+ * Returns true for tanod, admin, super_admin, captain.
  * These roles can see the live map, respond to alerts, and join the responders room.
  */
 export function isTanodOrAbove(role: string): boolean {
@@ -23,7 +23,7 @@ export function isTanodOrAbove(role: string): boolean {
 }
 
 /**
- * Returns true for admin, superadmin, captain only.
+ * Returns true for admin, super_admin, captain only.
  * These roles can manage users, view audit logs, and change system settings.
  */
 export function isAdminOrAbove(role: string): boolean {

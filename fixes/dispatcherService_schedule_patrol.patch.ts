@@ -38,7 +38,7 @@
       };
     }
     const tanodUser = userCheck.rows[0];
-    if (!['tanod', 'admin', 'superadmin'].includes(tanodUser.role)) {
+    if (!['tanod', 'admin', 'super_admin'].includes(tanodUser.role)) {
       return {
         status: 'error',
         message: `User ${tanodUser.name} does not have a Tanod role.`,

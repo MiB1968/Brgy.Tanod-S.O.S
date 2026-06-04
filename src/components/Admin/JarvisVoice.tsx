@@ -198,7 +198,7 @@ export function JarvisVoice() {
 
     try {
       const token = safeStorage.getItem("token");
-      // Single canonical TTS endpoint — admin/superadmin/captain only
+      // Single canonical TTS endpoint — admin/super_admin/captain only
       const response = await fetch("/api/system/tts", {
         method: "POST",
         headers: {

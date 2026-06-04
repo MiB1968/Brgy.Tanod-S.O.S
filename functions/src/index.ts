@@ -354,14 +354,14 @@ async function sendEmergencySMS(sos: any) {
 
 // 5. Set User Role (Custom Claims)
 export const setUserRole = onCall(async (request: any) => {
-  // Only superadmin can set roles
-  if (!request.auth || !["superadmin"].includes(request.auth.token.role)) {
-    throw new HttpsError('permission-denied', 'Only superadmins can assign roles');
+  // Only super_admin can set roles
+  if (!request.auth || !["super_admin"].includes(request.auth.token.role)) {
+    throw new HttpsError('permission-denied', 'Only super_admins can assign roles');
   }
 
   const { uid, role, barangayId } = request.data || {};
 
-  if (!["resident", "tanod", "admin", "superadmin"].includes(role)) {
+  if (!["resident", "tanod", "admin", "super_admin"].includes(role)) {
     throw new HttpsError('invalid-argument', 'Invalid role');
   }
 

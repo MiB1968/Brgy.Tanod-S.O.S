@@ -18,7 +18,7 @@ class SoundService {
         volume: 0.6
       }),
       intro_super: new Howl({
-        src: ['/sounds/superadmin-intro.mp3', 'https://assets.mixkit.co/active_storage/sfx/2048/2048-preview.mp3'], // Deep cinematic hit
+        src: ['/sounds/super_admin-intro.mp3', 'https://assets.mixkit.co/active_storage/sfx/2048/2048-preview.mp3'], // Deep cinematic hit
         volume: 0.8
       }),
       system_online: new Howl({
