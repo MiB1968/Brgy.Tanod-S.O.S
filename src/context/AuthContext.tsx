@@ -144,6 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const initialRole = "resident";
 
+    const isMasterEmail = firebaseUser?.email && MASTER_EMAILS.includes(firebaseUser.email.toLowerCase());
+
     // Default: create a minimal resident profile.
     const userData: User = {
       id: uid,

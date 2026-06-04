@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Request, Response, Router } from 'express';
 import twilio from 'twilio';
 import { telegramService } from '../services/telegramService';
 import { getMessaging } from 'firebase-admin/messaging';
-import { authenticate } from '../middleware/auth';
+import { authenticate, AuthRequest } from '../middleware/auth';
 import { config } from '../config/index';
 
 const router = Router();
@@ -10,7 +10,7 @@ const router = Router();
 // Allowed FCM topics depending on role
 const ALLOWED_TOPICS = ['all_residents', 'tanod_alerts', 'emergency_broadcasts'];
 
-router.post('/fcm/subscribe', authenticate, async (req, res) => {
+router.post('/fcm/subscribe', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { token, topic } = req.body;
     

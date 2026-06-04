@@ -4,14 +4,7 @@ import crypto from 'crypto';
 import { config } from '../config/index';
 import { logger } from '../utils/logger';
 import { pool, admin } from '../db/index';
-
-export type UserRole =
-  | 'resident'
-  | 'tanod'
-  | 'dispatcher'
-  | 'captain'
-  | 'admin'
-  | 'super_admin';
+import { UserRole } from '../../types';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -207,8 +200,10 @@ const roleHierarchy: Record<UserRole, number> = {
   super_admin: 4,
   admin: 3,
   tanod: 2,
-  citizen: 1,
-  resident: 1
+  resident: 1,
+  dispatcher: 3,
+  captain: 3,
+  guest: 0
 };
 
 export function requireRole(role: UserRole) {

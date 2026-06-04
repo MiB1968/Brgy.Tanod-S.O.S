@@ -6,7 +6,7 @@ import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from '../services/auditService';
-import { encryptField, decryptField } from '../utils/crypto';
+import { encryptField, decryptField } from '../../utils/crypto';
 
 // Ensure Firebase Admin is initialized
 initDatabase();
@@ -274,41 +274,6 @@ export const login = async (req: Request, res: Response) => {
     let user = result.rows[0];
 
     let passwordMatch = false;
-
-    // AUTO-PROVISION demo users if they don't exist
-    let currentUser = user;
-    const isDemo = normalizedEmail === 'resident@brgytanod.com' || 
-                   normalizedEmail === 'admin@brgytanod.com' ||
-                   normalizedEmail === 'super_admin@brgy.gov';
-    if (!currentUser && isDemo) {
-        console.log(`[Auth] Auto-provisioning demo user account: ${normalizedEmail}`);
-        let role = 'resident';
-        if (normalizedEmail === 'admin@brgytanod.com') role = 'admin';
-        else if (normalizedEmail === 'super_admin@brgy.gov') role = 'super_admin';
-        
-        // Provision in Firebase Auth
-        try {
-            await admin.auth().createUser({
-                email: normalizedEmail,
-                password: 'tanod123',
-                displayName: 'Demo User'
-            });
-        } catch (err: any) {
-            if (err.code !== 'auth/email-already-exists') {
-                console.error(`[Auth] Firebase provision error: ${err.message}`);
-            }
-        }
-        
-        const hashedPass = await bcrypt.hash('tanod123', 12);
-        
-        const provisionRes = await pool.query(
-          `INSERT INTO users (email, name, role, status, password)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING *`,
-          [normalizedEmail, 'Demo User', role, 'approved', hashedPass]
-        );
-        currentUser = provisionRes.rows[0];
-    }
 
     if (!currentUser) {
         console.warn(`[Auth] User not found for email: ${normalizedEmail}`);

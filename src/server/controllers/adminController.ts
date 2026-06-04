@@ -7,7 +7,7 @@ import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAdminAction } from '../services/auditService';
 import { sendWelcomeEmail } from '../services/emailService';
-import { encryptField } from '../utils/crypto';
+import { encryptField } from '../../utils/crypto';
 
 export const createUser = async (req: AuthRequest, res: Response) => {
   const { email, password, name, role, details, autoGeneratePassword } = req.body;

@@ -6,7 +6,7 @@ import * as response from '../utils/response';
 import { ShiftRepository } from '../db/repositories/ShiftRepository';
 import { z } from 'zod';
 import { config } from '../config/index';
-import { encryptField, decryptField } from '../utils/crypto';
+import { encryptField, decryptField } from '../../utils/crypto';
 
 const auditLogArchiveSchema = z.object({
   session_date: z.string().min(1),
