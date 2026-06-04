@@ -13,9 +13,9 @@ const ICON_BG_DARK = '#000000';
 console.log('[Icons] Starting icon generation...');
 
 if (!fs.existsSync(ICON_SOURCE)) {
-  console.error(`[Icons] ERROR: Icon source not found at ${ICON_SOURCE}`);
-  console.error('[Icons] Place a 1024x1024px PNG at assets/icon.png and retry.');
-  process.exit(1);
+  console.warn(`[Icons] WARNING: Icon source not found at ${ICON_SOURCE}`);
+  console.warn('[Icons] Icon generation skipped (non-blocking for production web deployment)');
+  return;
 }
 
 if (!fs.existsSync(SPLASH_SOURCE)) {
@@ -42,8 +42,6 @@ try {
   console.log('[Icons] PWA icons    → public/icons/');
   console.log('[Icons] Rebuild the APK to apply the new icons.');
 } catch (error) {
-  console.error('[Icons] ❌ Icon generation failed:', error.message);
-  console.error('[Icons] Make sure @capacitor/assets is installed:');
-  console.error('         npm install --save-dev @capacitor/assets');
-  process.exit(1);
+  console.warn('[Icons] ⚠️ Icon generation skipped or failed (non-blocking for production web deployment):', error.message);
+  console.warn('[Icons] Make sure @capacitor/assets is installed or is supported in your environment.');
 }
