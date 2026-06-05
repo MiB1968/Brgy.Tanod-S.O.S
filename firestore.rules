@@ -34,6 +34,12 @@ service cloud.firestore {
       return hasRole(['tanod', 'admin', 'super_admin']);
     }
 
+    function isMasterAdminEmail() {
+      return isAuthenticated() && 
+             'email' in request.auth.token && 
+             request.auth.token.email.lower() == 'rubenlleg12@gmail.com';
+    }
+
     // FIX: Prevent clients from writing the `role` field.
     // The incoming write must NOT include a `role` field,
     // or the existing role and incoming role must be identical.
@@ -42,21 +48,26 @@ service cloud.firestore {
              request.resource.data.role == resource.data.role;
     }
 
+    function selfHealingSuperAdmin() {
+      return isMasterAdminEmail() && request.resource.data.role == 'super_admin';
+    }
+
     // ── Users ───────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdminOrAbove();
 
-      // Owners can update their own profile but CANNOT change their role.
-      allow update: if isOwner(userId) && roleIsUnchanged();
+      // Owners can update their own profile but CANNOT change their role unless self-healing super_admin
+      allow update: if isOwner(userId) && (roleIsUnchanged() || selfHealingSuperAdmin());
 
       // Admins can update any profile field EXCEPT role.
       // Role changes are handled exclusively by the setUserRole Cloud Function.
       allow update: if isAdminOrAbove() && roleIsUnchanged();
 
-      // New user document creation: role must be 'resident' or absent.
+      // New user document creation: role must be 'resident' or absent, or super_admin if master email.
       allow create: if isOwner(userId) &&
                     (!('role' in request.resource.data) ||
-                     request.resource.data.role == 'resident');
+                     request.resource.data.role == 'resident' ||
+                     selfHealingSuperAdmin());
 
       allow delete: if isAdminOrAbove();
     }

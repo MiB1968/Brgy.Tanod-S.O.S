@@ -29,8 +29,14 @@ class TTSService {
     if (process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY) {
        try {
          return await this.generateGeminiTTS(text);
-       } catch (err) {
-         console.warn('[TTS] Gemini TTS failed, falling back:', err);
+       } catch (err: any) {
+         const errMsg = err.message || String(err);
+         const isKeyError = errMsg.includes('API key expired') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key');
+         if (isKeyError) {
+           console.warn('[TTS] Gemini TTS failed: API key has expired or is invalid. Falling back to edge/local TTS.');
+         } else {
+           console.warn('[TTS] Gemini TTS failed, falling back:', err);
+         }
        }
     }
 

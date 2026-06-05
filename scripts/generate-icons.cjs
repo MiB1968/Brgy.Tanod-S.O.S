@@ -15,7 +15,7 @@ console.log('[Icons] Starting icon generation...');
 if (!fs.existsSync(ICON_SOURCE)) {
   console.warn(`[Icons] WARNING: Icon source not found at ${ICON_SOURCE}`);
   console.warn('[Icons] Icon generation skipped (non-blocking for production web deployment)');
-  return;
+  process.exit(0);
 }
 
 if (!fs.existsSync(SPLASH_SOURCE)) {

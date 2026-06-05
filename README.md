@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/icon.png" alt="Brgy. Tanod S.O.S Logo" width="160"/>
+<img src="./docs/screenshoots/icon.png" alt="Brgy. Tanod S.O.S Logo" width="160"/>
 
 # 🚨 BRGY. TANOD S.O.S
 
@@ -25,11 +25,11 @@
 
 | Client View | Tactical GPS | Responder Portal |
 |:-----------:|:------------:|:----------------:|
-| ![Client View](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/Screenshot_20260530_010400_com_android_chrome_ChromeTabbedActivity.jpg) | ![Tactical GPS](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/Screenshot_20260530_011004_com_android_chrome_ChromeTabbedActivity.jpg) | ![Responder Portal](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/Screenshot_20260530_081340_com_android_chrome_ChromeTabbedActivity.jpg) |
+| ![Client View](./docs/screenshoots/Screenshot_20260530_010400_com_android_chrome_ChromeTabbedActivity.jpg) | ![Tactical GPS](./docs/screenshoots/Screenshot_20260530_011004_com_android_chrome_ChromeTabbedActivity.jpg) | ![Responder Portal](./docs/screenshoots/Screenshot_20260530_081340_com_android_chrome_ChromeTabbedActivity.jpg) |
 
 | Command Center | Tanod Roster | Super Admin |
 |:--------------:|:------------:|:-----------:|
-| ![Command Center](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/Screenshot_20260531_064843_com_android_chrome_ChromeTabbedActivity.jpg) | ![Tanod Roster](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/Screenshot_20260602_134326_com_brgytanod_sos_MainActivity.jpg) | ![Super Admin](https://raw.githubusercontent.com/MiB1968/Brgy.Tanod-S.O.S/main/docs/screenshoots/SuperAdmin-bg.png) |
+| ![Command Center](./docs/screenshoots/Screenshot_20260531_064843_com_android_chrome_ChromeTabbedActivity.jpg) | ![Tanod Roster](./docs/screenshoots/Screenshot_20260602_134326_com_brgytanod_sos_MainActivity.jpg) | ![Super Admin](./docs/screenshoots/SuperAdmin-bg.png) |
 
 ---
 

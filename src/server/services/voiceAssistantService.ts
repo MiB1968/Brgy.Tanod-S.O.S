@@ -331,22 +331,37 @@ export class SecureVoiceAssistantService {
       console.log(`[JARVIS] Processed in ${Date.now() - startTime}ms`);
       return response;
     } catch (err: any) {
-      console.error('[JARVIS] Primary Voice processing failed, executing resilient programmatic fallback:', err);
+      const errStr = JSON.stringify(err) || String(err.message || err);
+      const isApiKeyError = errStr.includes('API key expired') || errStr.includes('API_KEY_INVALID') || errStr.includes('API key not valid');
+      
+      if (isApiKeyError) {
+        console.error('\n========================================================================\n' +
+                      '[CRITICAL WARNING] GEMINI API KEY HAS EXPIRED OR IS INVALID!\n' +
+                      'Please renew or replace your API key via Google AI Studio Settings.\n' +
+                      '========================================================================\n');
+      } else {
+        console.error('[JARVIS] Primary Voice processing failed, executing resilient programmatic fallback:', err);
+      }
       
       // Determine a highly context-aware fallback response based on transcript keywords
       let replyText = "Naka-alerto ang ating command center sa inyong ulat. Huwag mag-alala, nakabantay at handang tumulong ang mga Barangay Tanod.";
-      const lowerT = (transcript || '').toLowerCase();
       
-      if (lowerT.includes("siren") || lowerT.includes("sirena") || lowerT.includes("pito") || lowerT.includes("alarm")) {
-        replyText = "Nakikipag-ugnayan na ako sa command center. Maaari ninyong gamitin ang emergency alarm o sirena sa inyong panel kung kailangan.";
-      } else if (lowerT.includes("tulong") || lowerT.includes("saklolo") || lowerT.includes("emergency") || lowerT.includes("medical") || lowerT.includes("doktor") || lowerT.includes("sugat")) {
-        replyText = "Naka-proseso na ang inyong emergency report. Manatiling ligtas sa inyong lokasyon, parating na ang tactical patrol.";
-      } else if (lowerT.includes("patrol") || lowerT.includes("tanod") || lowerT.includes("asan") || lowerT.includes("nasaan") || lowerT.includes("bantay")) {
-        replyText = "Kasalukuyang nagpapatrolya ang ating Barangay Tanod sa bawat sektor upang masiguro ang inyong kaligtasan.";
-      } else if (lowerT.includes("baha") || lowerT.includes("bagyo") || lowerT.includes("ulan") || lowerT.includes("lindol") || lowerT.includes("apoy") || lowerT.includes("sunog")) {
-        replyText = "Minomonitor ng patrol teams ang mga apektadong zone. Mangyaring mag-ingat para sa inyong kaligtasan at sundin ang utos ng pamunuan.";
-      } else if (lowerT.includes("report") || lowerT.includes("lista") || lowerT.includes("sulat") || lowerT.includes("pasa")) {
-        replyText = "Naitatala na po ang ulat sa ating local tactical logs. Kukumpirmahin ito ng naka-duty na Tanod sa lalong madaling panahon.";
+      if (isApiKeyError) {
+        replyText = "Paumanhin po, expired o hindi wasto ang inyong Google AI Studio API Key sa system. Mangyaring pumunta sa 'Settings' sa Google AI Studio upang i-renew o palitan ang inyong API key para sa Brgy. Tanod S.O.S.";
+      } else {
+        const lowerT = (transcript || '').toLowerCase();
+        
+        if (lowerT.includes("siren") || lowerT.includes("sirena") || lowerT.includes("pito") || lowerT.includes("alarm")) {
+          replyText = "Nakikipag-ugnayan na ako sa command center. Maaari ninyong gamitin ang emergency alarm o sirena sa inyong panel kung kailangan.";
+        } else if (lowerT.includes("tulong") || lowerT.includes("saklolo") || lowerT.includes("emergency") || lowerT.includes("medical") || lowerT.includes("doktor") || lowerT.includes("sugat")) {
+          replyText = "Naka-proseso na ang inyong emergency report. Manatiling ligtas sa inyong lokasyon, parating na ang tactical patrol.";
+        } else if (lowerT.includes("patrol") || lowerT.includes("tanod") || lowerT.includes("asan") || lowerT.includes("nasaan") || lowerT.includes("bantay")) {
+          replyText = "Kasalukuyang nagpapatrolya ang ating Barangay Tanod sa bawat sektor upang masiguro ang inyong kaligtasan.";
+        } else if (lowerT.includes("baha") || lowerT.includes("bagyo") || lowerT.includes("ulan") || lowerT.includes("lindol") || lowerT.includes("apoy") || lowerT.includes("sunog")) {
+          replyText = "Minomonitor ng patrol teams ang mga apektadong zone. Mangyaring mag-ingat para sa inyong kaligtasan at sundin ang utos ng pamunuan.";
+        } else if (lowerT.includes("report") || lowerT.includes("lista") || lowerT.includes("sulat") || lowerT.includes("pasa")) {
+          replyText = "Naitatala na po ang ulat sa ating local tactical logs. Kukumpirmahin ito ng naka-duty na Tanod sa lalong madaling panahon.";
+        }
       }
 
       let audioBase64: string | undefined;
