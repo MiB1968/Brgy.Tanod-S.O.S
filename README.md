@@ -1,14 +1,7 @@
-�
-
-�
 ￼
 🚨 BRGY. TANOD S.O.S
 Real-time Emergency Response System for Philippine Barangays
-�
-�
-�
-�
-�
+
 Load image
 Load image
 Load image
