@@ -1,114 +1,146 @@
-# Brgy.Tanod-S.O.S 🚨🇵🇭
+�
 
-**Real-time Emergency Response System for Philippine Barangays**
+�
+￼
+🚨 BRGY. TANOD S.O.S
+Real-time Emergency Response System for Philippine Barangays
+�
+�
+�
+�
+�
+Load image
+Load image
+Load image
+Load image
+Load image
+A responsive, offline-first, PWA-first SOS alert system designed for Local Government Units (Barangays).
+It connects citizens directly to Barangay Tanods with reliable performance even in low-connectivity and typhoon-prone areas.
+🚀 Quick Start • ✨ Features • 🛠 Tech Stack • 🛡 Security • 📸 Screenshots
+�
 
-A responsive, **offline-first**, **PWA-first** SOS alert system designed for local government units (Barangays). It connects citizens directly to Barangay Tanods with reliable performance even in low-connectivity and typhoon-prone areas.
-
-![Hero Banner](https://via.placeholder.com/800x300/15803d/ffffff?text=Brgy+Tanod+S.O.S) <!-- Replace with actual screenshot -->
-
-## ✨ Key Features
-
-### Core Emergency Features
-- **Floating SOS Button** — Long-press activation with one-tap emergency alert
-- **Real-time Tanod Tracking** — Live location with direction indicators and heatmap
-- **Offline-First SOS** — Queued alerts with auto-sync when connection returns
-- **Multi-Channel Fallback** — Firebase + Twilio SMS during network outages
-- **Hybrid TTS (Tagalog Support)** — Multiple voice options including local dialects
-
-### 🛡️ AI Guardian Mode (Highlight Feature)
-**AI Guardian Mode** is an intelligent, privacy-first voice assistant powered by **WebLLM** (local AI running directly in the browser).
-
-**Capabilities**:
-- **Voice-activated SOS** — Speak naturally in Tagalog or English ("Tulong! May sunog!" or "Help, emergency!")
-- **Context-aware assistance** — Answers common barangay queries offline (e.g., "Saan ang pinakamalapit na health center?")
-- **Real-time guidance during emergencies** — Step-by-step instructions while waiting for Tanods
-- **Local AI Processing** — Runs entirely on-device (no cloud dependency, better privacy & works offline)
-- **Hybrid Fallback** — Switches to cloud AI (Gemini) when available for more complex queries
-- **Super Admin Greeting** — Personalized voice welcome for barangay officials
-
+✨ Key Features
+🆘 Core Emergency Features
+Feature
+Description
+Floating SOS Button
+Long-press activation with one-tap emergency alert
+Real-time Tanod Tracking
+Live location with direction indicators and heatmap
+Offline-First SOS
+Queued alerts with auto-sync when connection returns
+Multi-Channel Fallback
+Firebase + Twilio SMS during network outages
+Hybrid TTS (Tagalog Support)
+Multiple voice options including local dialects
+🛡 AI Guardian Mode (Highlight Feature)
+AI Guardian Mode is an intelligent, privacy-first voice assistant powered by WebLLM — a local AI engine running entirely in the browser.
+🎙 Voice-activated SOS — Speak naturally in Tagalog or English
+(e.g., "Tulong! May sunog!" or "Help, emergency!")
+🧠 Context-aware assistance — Answers common barangay queries offline
+(e.g., "Saan ang pinakamalapit na health center?")
+📋 Real-time emergency guidance — Step-by-step instructions while waiting for Tanods
+🔒 Local AI Processing — Runs entirely on-device (no cloud dependency, better privacy, works offline)
+☁️ Hybrid Fallback — Switches to Google Gemini when online for complex queries
+👋 Super Admin Greeting — Personalized voice welcome for barangay officials
 This feature makes the app accessible to elderly residents and users with limited literacy.
+⚙️ Advanced Capabilities
+PWA + Aggressive Offline Map Tiles — Installable app with cached Leaflet maps
+Role-Based Dashboards — Citizen, Tanod, Admin, and Super Admin views
+Patrol Logging & Broadcast System — Tanod activity logs and system-wide announcements
+Geofencing Ready — Future hotspot alerts (background tracking via Capacitor)
+Tactical GPS — Real-time Tanod-to-Citizen streaming via WebSockets/Firebase
+Patrol Scheduler — Manage officer shifts and patrol sectors
+Live Emergency Feed — Command center with live incident monitoring
+📸 Screenshots
+Client View
+Command Center
+Tanod Roster
+(SOS + Live Map)
+(Admin Dashboard)
+(Patrol Management)
+📷 Replace placeholders above with actual screenshots from /docs/screenshots/
+🛠 Tech Stack
+Frontend
+Technology
+Purpose
+React 19 + TypeScript + Vite
+Core framework
+Tailwind CSS
+Styling
+Zustand
+State management
+Leaflet + react-leaflet + Heatmap
+Maps & visualization
+vite-plugin-pwa (Workbox + Background Sync)
+PWA & offline support
+@mlc-ai/web-llm + ONNX Runtime
+Local AI (AI Guardian Mode)
+Framer Motion
+Animations
+Backend & Services
+Technology
+Purpose
+Firebase (Auth, Firestore, Functions, Storage)
+Auth, database, real-time
+Express + Socket.io
+Real-time communications
+Drizzle ORM
+PostgreSQL / CockroachDB
+Twilio
+SMS fallback during outages
+Google Gemini
+Cloud AI fallback
+Mobile
+Technology
+Purpose
+Progressive Web App (PWA)
+Primary delivery
+Capacitor
+Native Android/iOS builds
+🚀 Quick Start
+Bash
+⚠️ Never commit your .env file. It's included in .gitignore by default.
+🚨 Background Tanod Tracking
+Real-time location tracking for Tanods with background support, offline queuing, and geofencing.
+Location updates transmitted via WebSockets + Firebase
+Continues tracking when the app is minimized (via Capacitor background plugin)
+Offline GPS positions are queued locally and synced when connectivity resumes
+Heatmap overlay shows high-incident zones for patrol prioritization
+🛡 Security
+This project has undergone a structured security audit covering authentication, data encryption, and API access control.
+Key hardened areas:
+✅ JWT token revocation properly enforced
+✅ Resident PII encrypted at rest
+✅ Audit logging for sensitive actions
+✅ Role-based access control (Citizen / Tanod / Admin / Super Admin)
+✅ Database indexing for performance and integrity
+✅ OTP endpoint authentication enforced
+For responsible disclosure of security vulnerabilities, please contact the maintainer directly rather than opening a public issue.
+👥 Role-Based Access
+Role
+Access
+Citizen / Resident
+SOS alerts, AI Guardian, live patrol map, emergency hotlines
+Tanod
+Responder portal, duty status, GPS broadcast, intel reports
+Admin
+Full dashboard, resident management, broadcast system
+Super Admin
+System config, all admin capabilities, personalized AI greeting
+🤝 Contributing
+Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+Fork the repo
+Create your feature branch: git checkout -b feature/your-feature
+Commit your changes: git commit -m 'Add your feature'
+Push to the branch: git push origin feature/your-feature
+Open a Pull Request
+📄 License
+This project is licensed under the MIT License.
+�
 
-### Advanced Capabilities
-- **PWA + Aggressive Offline Map Tiles** — Installable app with cached Leaflet maps
-- **Role-Based Dashboards** — Citizen, Tanod, Admin, and Super Admin views
-- **Patrol Logging & Broadcast System** — Tanod activity logs and system-wide announcements
-- **Geofencing Ready** — Future hotspot alerts (background tracking via Capacitor)
-- **Local AI Voice Assistant** — WebLLM + multiple TTS engines
-
-## 🛠️ Tech Stack
-
-**Frontend**:
-- React 19 + TypeScript + Vite + Tailwind CSS
-- State: Zustand
-- Maps: Leaflet + react-leaflet + Heatmap Layer
-- PWA: vite-plugin-pwa (with Workbox + Background Sync)
-- Local AI: @mlc-ai/web-llm + ONNX Runtime
-- Animations: Framer Motion
-
-**Backend & Services**:
-- Firebase (Auth, Firestore, Functions, Storage)
-- Express + Socket.io (real-time)
-- Drizzle ORM (PostgreSQL / Firebase compatible)
-- Twilio (SMS fallback)
-- Hybrid AI (WebLLM local + Google Gemini)
-
-**Mobile**:
-- Progressive Web App (Primary)
-- Capacitor-ready for native Android/iOS builds
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/MiB1968/Brgy.Tanod-S.O.S.git
-cd Brgy.Tanod-S.O.S
-npm install
-cp .env.example .env
-npm run dev
-```
-
-## 🚨 Background Tanod Tracking
-
-Real-time location tracking for Tanods with **background support**, **offline queuing**, and **geofencing**.
-
-### Key Capabilities
-- Persistent background location on Android/iOS (even when app is closed)
-- Offline queuing via Dexie + auto-sync when online
-- Geofence-triggered alerts for barangay hotspots
-- Battery-optimized with distance filtering (30m)
-- Persistent notification + high-priority SOS wake-up
-
-### Setup for Capacitor Build
-1. Install plugin: `npm install @capgo/background-geolocation`
-2. Follow permissions in `capacitor.config.ts`, `Info.plist`, and `AndroidManifest.xml` (see docs/).
-3. Tanods toggling tracking handles everything automatically.
-
-## 🌐 PWA (Progressive Web App)
-
-**Primary deployment target** — Works great on any smartphone browser.
-
-### Offline Capabilities
-- Full SOS queuing with Dexie IndexedDB
-- Aggressive caching of map tiles
-- Local AI (WebLLM) + Tagalog TTS
-- Service Worker for asset caching
-
-**Install Instructions**:
-1. Open in Chrome/Safari on mobile
-2. Tap "Add to Home Screen"
-3. Use as native-like app
-
-**Note**: For background location, use Capacitor build. PWA version supports foreground tracking + notifications via Firebase.
-
-## Deployment
-- Firebase Hosting + Functions
-- Docker + Nginx (included)
-- Android/iOS via Capacitor (recommended for background tracking)
-
-## Security
-Firestore rules are **granular and role-based**. Never use open rules in production.
-
-## Cost Estimates
-- Firebase: Free tier sufficient for small barangays
-- Twilio SMS: ~₱1.30–₱12 per message (PH rates)
-
-**Made with ❤️ for Philippine Barangays**
+Powering Safer Communities Through Tactical Intelligence
+Brgy. Tanod S.O.S — Secure Response Framework
+Built with ❤️ by Ruben Llego O. — Owner & Lead Web Developer
+Certified AI Specialist · System Architect
+�
