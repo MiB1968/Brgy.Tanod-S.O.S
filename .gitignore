@@ -4,8 +4,7 @@ node_modules/
 package-lock.json.log
 
 # Build outputs and compilation folders
-dist/
-**/dist/
+# (dist/ removed to ensure artifacts upload)
 functions/lib/
 .firebase/
 .ready/
