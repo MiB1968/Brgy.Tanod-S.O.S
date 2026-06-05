@@ -5,6 +5,7 @@ import { config } from '../config/index';
 import { logger } from '../utils/logger';
 import { pool, admin } from '../db/index';
 import { UserRole } from '../../types';
+import { normalizeRole } from '../../utils/roleUtils';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -173,10 +174,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       }
     }
 
-    let effectiveRole = (decoded.role || 'resident') as UserRole;
-
-    // Normalize roles to match new RBAC requirements if they come from old DB/tokens
-    if (effectiveRole === 'super_admin' as any) effectiveRole = 'super_admin';
+    const effectiveRole = normalizeRole(decoded.role || 'resident');
 
     req.user = {
       id: decoded.id || decoded.uid,
@@ -196,8 +194,9 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
   }
 }
 
-const roleHierarchy: Record<UserRole, number> = {
+const roleHierarchy: Record<string, number> = {
   super_admin: 4,
+  superadmin: 4,
   admin: 3,
   tanod: 2,
   resident: 1,
@@ -215,7 +214,7 @@ export function requireRole(role: UserRole) {
       });
     }
 
-    const userLevel = roleHierarchy[req.user.role] || 0;
+    const userLevel = roleHierarchy[req.user.role] || roleHierarchy[req.user.role as any] || 0;
     const requiredLevel = roleHierarchy[role] || 0;
 
     if (userLevel < requiredLevel) {

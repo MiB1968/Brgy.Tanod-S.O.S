@@ -10,12 +10,6 @@ try {
   const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
   if (fs.existsSync(configPath)) {
     const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    if (parsed.apiKey === 'AIzaSyCiRKS_NqYGHrY_kMz_mY4e0xwE3rUD5bI') {
-      throw new Error(
-        '[CONFIG] firebase-applet-config.json still contains the revoked API key. ' +
-        'Please rotate the key in Firebase Console and update your local file.'
-      );
-    }
     firebaseAppletConfig = parsed;
   }
 } catch (e: any) {

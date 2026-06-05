@@ -275,12 +275,12 @@ export const login = async (req: Request, res: Response) => {
 
     let passwordMatch = false;
 
-    if (!currentUser) {
+    if (!user) {
         console.warn(`[Auth] User not found for email: ${normalizedEmail}`);
         return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
-    passwordMatch = await bcrypt.compare(password, currentUser.password);
+    passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
          console.warn(`[Auth] Password mismatch for email: ${normalizedEmail}`);
     }
@@ -289,21 +289,21 @@ export const login = async (req: Request, res: Response) => {
       return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
-    await logAction(currentUser.id, 'LOGIN', 'users', currentUser.id);
+    await logAction(user.id, 'LOGIN', 'users', user.id);
     
     const token = jwt.sign(
-      { id: currentUser.id, email: currentUser.email, role: currentUser.role, tokenVersion: currentUser.token_version || 1 },
+      { id: user.id, email: user.email, role: user.role, tokenVersion: user.token_version || 1 },
       config.jwtSecret,
       { expiresIn: '7d' }
     );
     res.cookie('token', token, cookieOptions);
     
     // Sync role to Firebase custom claims
-    if (currentUser) {
-      await syncUserRoleToFirebase(currentUser.id, currentUser.role);
+    if (user) {
+      await syncUserRoleToFirebase(user.id, user.role);
     }
     
-    const { password: _, ...userWithoutPass } = currentUser;
+    const { password: _, ...userWithoutPass } = user;
     return response.success(res, { user: userWithoutPass, token }, 'Login successful');
 
   } catch (err: any) {
