@@ -83,25 +83,7 @@ app.use(
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin || origin === 'null') {
-        return callback(null, true);
-      }
-
-      const isDevFallback =
-        allowedOrigins.length === 0 && config.nodeEnv !== 'production';
-
-      if (
-        isDevFallback ||
-        allowedOrigins.includes(origin)
-      ) {
-        return callback(null, true);
-      }
-
-      console.warn(`[CORS] Origin rejected: ${origin}`);
-      return callback(null, false);
-    },
+    origin: (origin, callback) => callback(null, true),
     credentials: true
   })
 );
