@@ -102,8 +102,8 @@ export const config = {
   apiKey: process.env.API_KEY || null,
   
   twilio: {
-    accountSid: process.env.TWILIO_ACCOUNT_SID!,
-    authToken: process.env.TWILIO_AUTH_TOKEN!,
+    accountSid: process.env.TWILIO_ACCOUNT_SID || '',
+    authToken: process.env.TWILIO_AUTH_TOKEN || '',
     messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER,
     statusCallbackUrl: process.env.TWILIO_SMS_WEBHOOK_URL,

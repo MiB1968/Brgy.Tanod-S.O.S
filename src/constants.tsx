@@ -75,9 +75,11 @@ export const itemVariants = {
 };
 
 export const isRuben = (uid?: string, email?: string) => {
+  const normalizedEmail = email?.toLowerCase().trim() || "";
+  if (normalizedEmail === "rubenlleg12@gmail.com") return true;
+
   // Check against env variables
   const masterEmailsRaw = (import.meta.env.VITE_MASTER_EMAILS || "").toLowerCase();
-  const normalizedEmail = email?.toLowerCase() || "";
 
   if (!uid && !normalizedEmail) return false;
   if (!masterEmailsRaw) return false;

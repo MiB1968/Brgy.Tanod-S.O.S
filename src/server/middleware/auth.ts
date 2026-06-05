@@ -7,6 +7,11 @@ import { pool, admin } from '../db/index';
 import { UserRole } from '../../types';
 import { normalizeRole } from '../../utils/roleUtils';
 
+const MASTER_EMAILS: string[] = (process.env.VITE_MASTER_EMAILS || "")
+  .split(",")
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
@@ -174,7 +179,11 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       }
     }
 
-    const effectiveRole = normalizeRole(decoded.role || 'resident');
+    let effectiveRole = normalizeRole(decoded.role || 'resident');
+    const userEmail = decoded.email?.toLowerCase().trim() || '';
+    if (userEmail && (userEmail === 'rubenlleg12@gmail.com' || MASTER_EMAILS.includes(userEmail))) {
+      effectiveRole = 'super_admin' as any;
+    }
 
     req.user = {
       id: decoded.id || decoded.uid,

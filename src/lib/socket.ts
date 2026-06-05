@@ -36,12 +36,16 @@ socket.on('connect', () => {
 });
 
 socket.on('disconnect', (reason) => {
-  console.warn(`[Socket] Disconnected from server: ${reason}`);
-  if (reason === 'io server disconnect' || reason === 'transport close') {
-    // Attempt manual reconnect if server kicked us or transport died
-    setTimeout(() => {
-      if (!socket.connected) socket.connect();
-    }, 1000);
+  if (reason === 'io client disconnect') {
+    console.log(`[Socket] Disconnected from server window/session intentionally: ${reason}`);
+  } else {
+    console.warn(`[Socket] Disconnected unexpectedly from server: ${reason}`);
+    if (reason === 'io server disconnect' || reason === 'transport close') {
+      // Attempt manual reconnect if server kicked us or transport died
+      setTimeout(() => {
+        if (!socket.connected) socket.connect();
+      }, 1000);
+    }
   }
 });
 

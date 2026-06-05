@@ -18,8 +18,16 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
     try {
       const appCheckTokenObj = await getToken(appCheck, false); // false = don't force refresh
       appCheckTokenString = appCheckTokenObj.token;
-    } catch (err) {
-      console.warn('[API] Could not retrieve Firebase App Check token:', err);
+    } catch (err: any) {
+      if (typeof window !== 'undefined') {
+        const lastWarnKey = '__last_app_check_warn__';
+        const now = Date.now();
+        const lastWarn = (window as any)[lastWarnKey] || 0;
+        if (now - lastWarn > 60000) { // Log at most once per minute
+          (window as any)[lastWarnKey] = now;
+          console.warn('[API] Could not retrieve Firebase App Check token (throttled):', err.message || err);
+        }
+      }
     }
   }
 

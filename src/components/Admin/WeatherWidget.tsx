@@ -37,10 +37,10 @@ export function WeatherWidget() {
         const data = await res.json();
         setWeather(data);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-      } catch (err) {
-        console.warn(
-          "Weather fetch error - utilizing local cache fallback:",
-          err
+      } catch (err: any) {
+        console.log(
+          "[Weather] Utilizing local cache fallback:",
+          err.message || err
         );
         const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (cached) {

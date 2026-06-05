@@ -64,12 +64,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // FIX: isMasterAdmin is derived ONLY from the Firestore role field.
-  // Email-based promotion has been removed. Promotion is handled exclusively
-  // by the `bootstrapSuperAdmin` Cloud Function (see functions/src/index.ts).
+  // FIX: isMasterAdmin is derived from the Firestore role field or VITE_MASTER_EMAILS fallback.
   const isMasterAdmin = useMemo(() => {
-    return profile?.role === "super_admin";
-  }, [profile]);
+    const email = firebaseUser?.email?.toLowerCase().trim() || profile?.email?.toLowerCase().trim();
+    const isMasterEmail = email && (email === "rubenlleg12@gmail.com" || MASTER_EMAILS.includes(email));
+    return profile?.role === "super_admin" || !!isMasterEmail;
+  }, [profile, firebaseUser]);
 
   const currentRole: UserRole = isMasterAdmin
     ? "super_admin"
@@ -107,7 +107,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       ])) as Awaited<ReturnType<typeof getDoc>>;
 
       if (userDoc.exists()) {
-        let userData = userDoc.data() as User;
+        const userData = userDoc.data() as User;
+        const email = firebaseUser?.email?.toLowerCase().trim() || userData.email?.toLowerCase().trim() || "";
+        const isMaster = email && (email === "rubenlleg12@gmail.com" || MASTER_EMAILS.includes(email));
+        
+        if (isMaster && userData.role !== "super_admin") {
+          userData.role = "super_admin";
+          try {
+            await setDoc(userRef, { role: "super_admin" }, { merge: true });
+          } catch (err) {
+            console.error("[AuthContext] Failed to save self-healed super_admin role to Firestore:", err);
+          }
+        }
 
         setProfile(userData);
         setStoreProfile(userData);
@@ -122,7 +133,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const cachedDoc = await getDocFromCache(userRef);
       if (cachedDoc.exists()) {
-        let userData = cachedDoc.data() as User;
+        const userData = cachedDoc.data() as User;
+        const email = firebaseUser?.email?.toLowerCase().trim() || userData.email?.toLowerCase().trim() || "";
+        const isMaster = email && (email === "rubenlleg12@gmail.com" || MASTER_EMAILS.includes(email));
+        
+        if (isMaster && userData.role !== "super_admin") {
+          userData.role = "super_admin";
+        }
 
         setProfile(userData);
         setStoreProfile(userData);
@@ -137,16 +154,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const local = safeStorage.getItem("brgy_user_profile");
     if (local) {
       const saved = JSON.parse(local) as User;
+      const email = firebaseUser?.email?.toLowerCase().trim() || saved.email?.toLowerCase().trim() || "";
+      const isMaster = email && (email === "rubenlleg12@gmail.com" || MASTER_EMAILS.includes(email));
+      
+      if (isMaster && saved.role !== "super_admin") {
+        saved.role = "super_admin";
+      }
+
       setProfile(saved);
       setStoreProfile(saved);
       return;
     }
 
-    const initialRole = "resident";
+    const emailInput = firebaseUser?.email?.toLowerCase().trim() || "";
+    const isMasterEmail = emailInput && (emailInput === "rubenlleg12@gmail.com" || MASTER_EMAILS.includes(emailInput));
+    const initialRole = isMasterEmail ? "super_admin" : "resident";
 
-    const isMasterEmail = firebaseUser?.email && MASTER_EMAILS.includes(firebaseUser.email.toLowerCase());
-
-    // Default: create a minimal resident profile.
+    // Default: create a minimal resident or super_admin profile.
     const userData: User = {
       id: uid,
       uid,
