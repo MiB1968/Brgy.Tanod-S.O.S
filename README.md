@@ -2,11 +2,10 @@
 🚨 BRGY. TANOD S.O.S
 Real-time Emergency Response System for Philippine Barangays
 
-Load image
-Load image
-Load image
-Load image
-Load image
+
+
+
+
 A responsive, offline-first, PWA-first SOS alert system designed for Local Government Units (Barangays).
 It connects citizens directly to Barangay Tanods with reliable performance even in low-connectivity and typhoon-prone areas.
 🚀 Quick Start • ✨ Features • 🛠 Tech Stack • 🛡 Security • 📸 Screenshots
