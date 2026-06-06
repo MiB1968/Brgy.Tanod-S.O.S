@@ -2,106 +2,37 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "User profile document containing authentication and role metadata",
+      "description": "System user account",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "uid": { "type": "string" },
-        "name": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string" },
-        "fcmToken": { "type": "string" },
-        "lastActive": { "type": "string" }
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["resident", "tanod", "admin"] }
       },
-      "required": ["id", "uid", "name", "email", "role", "status"]
+      "required": ["id", "email", "role"]
     },
     "Alert": {
       "title": "Alert",
-      "description": "SOS emergency alert report",
-      "type": "object",
-      "properties": {
-        "residentId": { "type": "string" },
-        "residentName": { "type": "string" },
-        "type": { "type": "string" },
-        "description": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" },
-            "accuracy": { "type": "number" }
-          },
-          "required": ["lat", "lng"]
-        },
-        "status": { "type": "string", "enum": ["pending", "resolved", "acknowledged"] },
-        "timestamp": { "type": "string" },
-        "photos": { "type": "array" },
-        "updatedAt": { "type": "string" },
-        "assignedTo": { "type": "string" },
-        "assignedToName": { "type": "string" }
-      },
-      "required": ["residentId", "residentName", "type", "description", "location", "status"]
-    },
-    "Incident": {
-      "title": "Incident",
-      "description": "Logged incident reports primarily for historical logs",
-      "type": "object",
-      "properties": {
-        "type": { "type": "string" },
-        "description": { "type": "string" },
-        "timestamp": { "type": "string" },
-        "reportedBy": { "type": "string" },
-        "status": { "type": "string" }
-      },
-      "required": ["type", "description", "reportedBy", "status"]
-    },
-    "Barangay": {
-      "title": "Barangay",
-      "description": "Barangay geographical boundaries and centroids",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "location": { "type": "object" },
-        "status": { "type": "string", "enum": ["active", "inactive"] },
-        "updatedAt": { "type": "string" }
-      },
-      "required": ["name", "location", "status"]
-    },
-    "EmergencyProtocol": {
-      "title": "EmergencyProtocol",
-      "description": "Local offline resilience emergency response procedures",
+      "description": "Emergency SOS alert",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "title": { "type": "string" },
-        "steps": { "type": "array" },
-        "updatedAt": { "type": "string" }
+        "residentId": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "resolved", "pending"] },
+        "description": { "type": "string" }
       },
-      "required": ["title", "steps"]
+      "required": ["id", "residentId", "type", "status"]
     }
   },
   "firestore": {
-    "users/{userId}": {
+    "/users/{userId}": {
       "schema": "User",
-      "description": "Main collection for synchronized user profiles"
+      "description": "User profiles"
     },
-    "alerts/{alertId}": {
+    "/alerts/{alertId}": {
       "schema": "Alert",
-      "description": "Real-time emergency SOS alerts submitted by residents"
-    },
-    "incidents/{incidentId}": {
-      "schema": "Incident",
-      "description": "Persistent incident logger reports"
-    },
-    "barangays/{barangayId}": {
-      "schema": "Barangay",
-      "description": "Managed geographic barangay sectors"
-    },
-    "emergency_protocols/{protocolId}": {
-      "schema": "EmergencyProtocol",
-      "description": "Standard operating procedures and resilience guidelines"
+      "description": "Emergency alerts"
     }
   }
 }

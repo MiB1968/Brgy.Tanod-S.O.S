@@ -333,6 +333,4 @@ export const useAuth = (): RBACContextType => {
   return context;
 };
 
-export const useRBAC = useAuth;
-
 export default AuthContext;

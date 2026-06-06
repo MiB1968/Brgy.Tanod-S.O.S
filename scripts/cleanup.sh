@@ -6,7 +6,7 @@ mkdir -p tests/archive scripts docs public/sounds public/icons src/components/co
 
 # Move test/experimental files
 echo "Moving test and experimental files..."
-mv test*.mjs test*.cjs test*.ts check_boot* setup-onnx* reqs.txt keys.txt metadata.json 2>/dev/null || true
+mv test*.mjs test*.cjs test*.ts check_boot* setup-onnx* reqs.txt keys.txt tests/archive/ 2>/dev/null || true
 mv app/applet tests/archive/ 2>/dev/null || true
 
 # Move scripts

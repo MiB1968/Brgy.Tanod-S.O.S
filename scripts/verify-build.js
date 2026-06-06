@@ -9,7 +9,7 @@ console.log('🔍 Build Verification Starting...');
 
 const requiredFiles = [
   'index.html',
-  'server.js',
+  'server.cjs', // Accept server.cjs as the compiled target
   'assets'
 ];
 

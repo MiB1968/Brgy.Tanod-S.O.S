@@ -113,6 +113,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
+    "adm-zip": "^0.5.17",
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",

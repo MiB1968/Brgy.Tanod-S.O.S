@@ -74,19 +74,18 @@ export const itemVariants = {
   show: { opacity: 1, y: 0 },
 };
 
-export const isRuben = (uid?: string, email?: string) => {
-  const normalizedEmail = email?.toLowerCase().trim() || "";
-  if (normalizedEmail === "rubenlleg12@gmail.com") return true;
+export const isMasterAdmin = (uid?: string, email?: string): boolean => {
+  const normalizedEmail = email?.toLowerCase().trim() || '';
+  if (!normalizedEmail) return false;
 
-  // Check against env variables
-  const masterEmailsRaw = (import.meta.env.VITE_MASTER_EMAILS || "").toLowerCase();
-
-  if (!uid && !normalizedEmail) return false;
+  const masterEmailsRaw = (import.meta.env.VITE_MASTER_EMAILS || '').toLowerCase();
   if (!masterEmailsRaw) return false;
 
-  const validEmails = masterEmailsRaw.split(",").map((e: string) => e.trim());
+  const validEmails = masterEmailsRaw.split(',').map((e: string) => e.trim()).filter(Boolean);
   return validEmails.includes(normalizedEmail);
 };
+
+export const isRuben = isMasterAdmin;
 
 export const PATROL_TIMEOUT = 1000 * 60 * 5; // 5 minutes
 

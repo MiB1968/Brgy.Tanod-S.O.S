@@ -72,9 +72,8 @@ router.post("/", authenticate, scrapeAccess, async (req: AuthRequest, res) => {
 
   const validation = validateScrapableUrl(rawUrl);
   if (!validation.ok) {
-    const errorVal = validation as { ok: false; reason: string };
-    logger.warn(`[Scrape] Blocked invalid URL from ${req.user?.email}: ${rawUrl} — ${errorVal.reason}`);
-    return res.status(400).json({ error: errorVal.reason });
+    logger.warn(`[Scrape] Blocked invalid URL from ${req.user?.email}: ${rawUrl} — ${validation.reason}`);
+    return res.status(400).json({ error: validation.reason });
   }
 
   const url = validation.url.href; // Use the normalized URL

@@ -43,6 +43,20 @@
       "when": 1780546106603,
       "tag": "0005_loving_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780685478864,
+      "tag": "0006_harden_audit_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780685578864,
+      "tag": "0007_add_client_uuid_dedup",
+      "breakpoints": true
     }
   ]
 }
