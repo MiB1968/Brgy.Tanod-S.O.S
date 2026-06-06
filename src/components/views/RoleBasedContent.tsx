@@ -32,6 +32,7 @@ const ReportsView = lazy(() => import("../ReportsView"));
 const DigitalRecordsView = lazy(() => import("../DigitalRecordsView"));
 const DirectoryView = lazy(() => import("../DirectoryView"));
 const GuardianAIChat = lazy(() => import("../GuardianAIChat"));
+const NotesComponent = lazy(() => import("../NotesComponent"));
 const SettingsView = lazy(() => import("../SettingsView"));
 const OpsIntegrations = lazy(() => import("../Admin/OpsIntegrations"));
 const TanodActivityLogs = lazy(() =>
@@ -221,6 +222,9 @@ export function RoleBasedContent({
             </div>
           </div>
         );
+
+      case "notes":
+        return <NotesComponent />;
 
       case "settings":
         return (

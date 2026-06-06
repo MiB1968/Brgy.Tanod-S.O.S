@@ -16,6 +16,7 @@ import {
   Shield,
   Grid,
   Eye,
+  BookOpen,
 } from "lucide-react";
 import { Howl } from "howler";
 import { toast } from "react-hot-toast";
@@ -452,6 +453,12 @@ export default function ResidentDashboard({
                     label: "Guardian",
                     icon: Cpu,
                     color: "text-fuchsia-400",
+                  },
+                  {
+                    id: "notes",
+                    label: "Notes",
+                    icon: BookOpen,
+                    color: "text-emerald-300",
                   },
                 ].map((mod) => (
                   <button

@@ -157,6 +157,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── User Notes ──────────────────────────────────────────────────────────
+    match /notes/{noteId} {
+      allow read, create, update, delete: if isAuthenticated() && request.auth.uid == (resource != null ? resource.data.userId : request.resource.data.userId);
+    }
+
     // ── Deny-all fallback ───────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
