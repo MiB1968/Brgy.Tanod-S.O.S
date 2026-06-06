@@ -89,28 +89,37 @@ service cloud.firestore {
     // ── Residents ───────────────────────────────────────────────────────────
     match /residents/{residentId} {
       allow read: if isOwner(residentId) || isTanodOrAbove();
+      // Only the resident owner can create or update their own profile, preventing spoofing
+      allow create: if isOwner(residentId);
       allow update: if isOwner(residentId) || isAdminOrAbove();
-      allow create: if isAuthenticated();
       allow delete: if isAdminOrAbove();
     }
 
     // ── Alerts ──────────────────────────────────────────────────────────────
     match /alerts/{alertId} {
+      // Hardened Create: Verify exact field structure, author uid consistency, and enforce initial status to be 'pending'.
       allow create: if isAuthenticated() &&
                     request.resource.data.reportedBy == request.auth.uid &&
+                    request.resource.data.status == 'pending' &&
                     request.resource.data.location is map &&
                     request.resource.data.type is string &&
+                    request.resource.data.type.size() <= 100 &&
+                    request.resource.data.description is string &&
+                    request.resource.data.description.size() <= 2000 &&
+                    request.resource.data.keys().hasAll(['reportedBy', 'type', 'location', 'status', 'description', 'timestamp']) &&
                     (request.auth.token.email_verified == true || request.auth.token.role in ['resident', 'tanod', 'admin', 'super_admin']);
 
       allow read: if isAuthenticated() &&
                   (isTanodOrAbove() || resource.data.reportedBy == request.auth.uid);
 
-      // Only assigned Tanod, Admins, or any Tanod (if accepting a pending alert) can update
+      // Hardened Update: Partition updates into strict allowed field changes based on roles (Tanod or Admin) to prevent tampering.
       allow update: if isAuthenticated() && (
                     isAdminOrAbove() ||
                     (hasRole(['tanod']) && (
-                      resource.data.status == 'pending' ||
-                      resource.data.assignedTo == request.auth.uid
+                      // Action 1: Tanod claiming a pending alert
+                      (resource.data.status == 'pending' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'assignedTo'])) ||
+                      // Action 2: Assigned Tanod updating triage/status
+                      (resource.data.assignedTo == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'notes', 'updatedAt', 'aiAnalysis']))
                     ))
                   );
       allow delete: if isAdminOrAbove();

@@ -71,12 +71,12 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
              throw apiError; 
           }
           console.warn("[SOS] API call failed, falling back to outbox queue", apiError);
-          // Only re-throw if it came from sync (already has a clientUuid provided initially)
-          if (clientUuid) throw apiError;
+          // Force fallback to outbox
+          throw new Error("OFFLINE_MODE");
         }
       } else {
         // Explicitly offline
-        if (clientUuid) throw new Error("OFFLINE_MODE");
+        throw new Error("OFFLINE_MODE");
       }
     } catch (error) {
       if (clientUuid) throw error; // Let sync orchestrator handle logic
@@ -87,8 +87,21 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
       // Add to professional outbox
       const photoBlobs = await Promise.all(
         photos.map(async (p) => {
-          const res = await fetch(p);
-          return await res.blob();
+          try {
+            const res = await fetch(p);
+            return await res.blob();
+          } catch (e) {
+            // Fallback for data URLs
+            if (p.startsWith('data:')) {
+              try {
+                const res = await fetch(p);
+                return await res.blob();
+              } catch (inner) {
+                return new Blob();
+              }
+            }
+            return new Blob();
+          }
         }),
       );
 
@@ -106,7 +119,9 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
 
       // Optimistic update for UI tracking
       set({ activeAlert: { ...alertData, id: tempId, isOfflineQueued: true } });
-      return tempId;
+      
+      // Throw OFFLINE_MODE so that useAppLogic sendSOS knows it was queued offline
+      throw new Error("OFFLINE_MODE");
     } finally {
       set({ isSending: false });
     }

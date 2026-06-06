@@ -143,7 +143,26 @@ export class TanodLocationService {
 
   private async handlePosition(position: GeolocationPosition) {
     const now = Date.now();
-    if (now - this.lastSent < 8000) return; // Throttle to ~8 seconds
+    
+    // Dynamic battery-aware adaptive GPS ping throttling
+    let throttleInterval = 8000; // default 8 seconds for real-time tracking
+    try {
+      if ('getBattery' in navigator) {
+        const battery = await (navigator as any).getBattery();
+        const level = (battery.level || 1) * 100;
+        if (level < 15) {
+          throttleInterval = 90000; // slow down to 90 seconds if critically low (<15%)
+          console.warn('[BatteryGuard] Critical power (<15%). GPS throttle interval locked at 90s.');
+        } else if (level < 30) {
+          throttleInterval = 30000; // slow down to 30 seconds if low (<30%)
+          console.log('[BatteryGuard] Low power (<30%). GPS throttle interval locked at 30s.');
+        }
+      }
+    } catch (e) {
+      // standard fallback
+    }
+
+    if (now - this.lastSent < throttleInterval) return;
 
     const { profile } = useAuthStore.getState();
     if (!profile) return;

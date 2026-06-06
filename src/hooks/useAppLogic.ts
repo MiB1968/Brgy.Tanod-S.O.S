@@ -273,7 +273,7 @@ export function useAppLogic() {
     const handleOnline = () => {
       setIsOnline(true);
       triggerSync();
-      toast.success("Connection Restored — Syncing queued incidents...");
+      toast.success("Connection Restored — Syncing queued incidents... / Naibalik ang Koneksyon — Ina-sync ang mga nakapilang insidente...");
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -328,7 +328,7 @@ export function useAppLogic() {
           setUser(localProfile);
           setProfile(localProfile);
 
-          toast.success("Unit Authenticated", { icon: "🔑" });
+          toast.success("Unit Authenticated / Na-authenticate na ang Unit", { icon: "🔑" });
         }
       } catch (err: any) {
         console.error("AUTH_FAULT:", err);
@@ -336,7 +336,7 @@ export function useAppLogic() {
           err.code?.includes("invalid") || err.code?.includes("wrong-password")
             ? "INVALID IDENTIFICATION PROTOCOL"
             : err.message;
-        toast.error(`AUTH FAILURE: ${msg}`);
+        toast.error(`BIGO ANG PAG-AUTHENTICATE / AUTH FAILURE: ${msg}`);
       } finally {
         setIsLoggingIn(false);
       }
@@ -422,7 +422,7 @@ export function useAppLogic() {
     // Implementation from original
     const nextState = !globalSirenActive;
     setGlobalSirenActive(nextState);
-    toast.success(nextState ? "GLOBAL SIREN ACTIVE" : "Siren Deactivated");
+    toast.success(nextState ? "GLOBAL SIREN ACTIVE / AKTIBO ANG SIRENA NG BARANGAY" : "Siren Deactivated / Napatay na ang Sirena");
   }, [globalSirenActive]);
 
   const { getCurrentLocation } = useGeolocation();
@@ -445,7 +445,7 @@ export function useAppLogic() {
           finalData.description || "",
           finalData.location || { lat: 14.5995, lng: 120.9842 }, // Fallback to Manila for testing
         );
-        toast.success("SOS Alert Sent with Location!", { icon: "🚨" });
+        toast.success("SOS Alert Sent with Location! / Naipadalang SOS Alert na may Lokasyon!", { icon: "🚨" });
 
         if (socketHelpers && socketHelpers.emitSOS) {
           socketHelpers.emitSOS({
@@ -457,7 +457,7 @@ export function useAppLogic() {
         }
       } catch (error: any) {
         if (error?.message === "OFFLINE_MODE") {
-          toast.error("Saved offline (with location). Will send when online.", {
+          toast.error("Saved offline (with location). Will send when online. / Naka-save offline (may lokasyon). Ipadadala kapag may internet na.", {
             icon: "📍",
           });
         } else {
