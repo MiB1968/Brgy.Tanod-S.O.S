@@ -23,6 +23,23 @@
         "description": { "type": "string" }
       },
       "required": ["id", "residentId", "type", "status"]
+    },
+    "TanodLocation": {
+      "title": "TanodLocation",
+      "description": "Real-time location and status of a patrolling Tanod",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "accuracy": { "type": "number" },
+        "speed": { "type": "number" },
+        "heading": { "type": "number" },
+        "timestamp": { "type": "number" },
+        "status": { "type": "string", "enum": ["available", "on_patrol", "responding", "offline"] },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["uid", "lat", "lng", "timestamp", "status"]
     }
   },
   "firestore": {
@@ -33,6 +50,10 @@
     "/alerts/{alertId}": {
       "schema": "Alert",
       "description": "Emergency alerts"
+    },
+    "/tanod_locations/{userId}": {
+      "schema": "TanodLocation",
+      "description": "Real-time Tanod GPS location and status logs"
     }
   }
 }

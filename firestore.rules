@@ -117,12 +117,13 @@ service cloud.firestore {
     }
 
     // ── Tanod Locations ─────────────────────────────────────────────────────
-    match /locations/{userId} {
+    match /tanod_locations/{userId} {
       // Tanod can only write their OWN location document.
       allow write: if isAuthenticated() &&
                    request.auth.uid == userId &&
                    isTanodOrAbove();
-      allow read: if isTanodOrAbove();
+      // Authenticated users (residents and tanods) can read active locations to view responders on the live map.
+      allow read: if isAuthenticated();
     }
 
     // ── Patrols & Logs ──────────────────────────────────────────────────────

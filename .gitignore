@@ -22,7 +22,7 @@ public/uploads/
 # Host Environment and Secrets
 .env
 .env.local
-firebase-applet-config.json
+# firebase-applet-config.json (tracked to persist integration states in AI Studio)
 .env.production
 .env.development
 .env.test
