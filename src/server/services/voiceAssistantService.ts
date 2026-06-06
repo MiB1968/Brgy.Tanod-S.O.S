@@ -106,7 +106,7 @@ export class SecureVoiceAssistantService {
           typeof i.location === 'string'
             ? i.location
             : `${i.latitude},${i.longitude}`,
-        severity: (i.status === 'RESPONDING' ? 'high' : 'medium') as any,
+        severity: (i.status === 'responding' ? 'high' : 'medium') as any,
         reportedAt: i.createdAt,
       })),
       availableTanods: availableTanods.slice(0, 20).map((t) => ({ // Increased from 8

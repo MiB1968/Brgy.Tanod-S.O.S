@@ -68,13 +68,6 @@ export function initSocket(server: HttpServer): Server {
       },
     });
 
-    // Send COEP headers to appease Vite COEP requirements
-    io.engine.on('headers', (headers, req) => {
-      
-      
-      
-    });
-
     console.log('[Socket] Server instance created.');
   } catch (err) {
     console.error('[Socket] FAILED to create Server instance:', err);

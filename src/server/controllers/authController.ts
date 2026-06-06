@@ -1,15 +1,12 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool, admin, initDatabase, getClient } from '../db/index';
+import { pool, admin, getClient } from '../db/index';
 import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { logAction } from '../services/auditService';
 import { encryptField, decryptField } from '../../utils/crypto';
-
-// Ensure Firebase Admin is initialized
-initDatabase();
 
 // Helper to sync role to Firebase custom claims (exported for administrative syncing)
 export async function syncUserRoleToFirebase(userIdOrEmail: string, role: string) {
@@ -79,12 +76,12 @@ export async function syncUserRoleToFirebase(userIdOrEmail: string, role: string
 }
 
 // ── Cookie options (single source of truth) ──────────────────────────────────
-const isProduction = true; // Force production-style cookies for better cross-origin compatibility
+const isProduction = config.nodeEnv === 'production';
 
 const cookieOptions = {
   httpOnly: true,
-  secure: true, // Always secure in production/run.app environment
-  sameSite: 'none' as const, // Must be 'none' for cross-site/cross-origin cookies
+  secure: isProduction,
+  sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax' | 'strict',
   maxAge: 7 * 24 * 60 * 60 * 1000,   // 7 days
 };
 
@@ -317,11 +314,7 @@ export const logout = async (req: AuthRequest, res: Response) => {
   if (req.user) {
     await logAction(req.user.id, 'LOGOUT', 'users', req.user.id);
   }
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-  });
+  res.clearCookie('token', cookieOptions);
   return response.success(res, null, 'Logged out successfully');
 };
 

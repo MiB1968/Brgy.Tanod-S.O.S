@@ -97,39 +97,16 @@ export function routeToModel(hint: RoutingHint): ModelConfig {
  * Checks if we should upgrade from a cheaper model to a more capable one
  * based on the initial analysis result. Call AFTER a flash/pro response.
  */
-export function shouldUpgradeModel(
-  usedTier: AITier,
-  result: any,
-  resultUrgency?: string
-): ModelConfig | null {
-  if (usedTier === 'critical') return null; // already at max
+export function shouldUpgradeModel(currentTier: AITier, analysis: any): boolean {
+  if (currentTier === 'critical') return false;
 
-  let severity = 0;
-  let urgency = 'LOW';
-  let incidentType = 'OTHER';
+  const severity = analysis?.severityScore ?? 0;
+  const urgency = analysis?.urgency ?? 'LOW';
 
-  if (typeof result === 'object' && result !== null) {
-    severity = result.severityScore ?? 0;
-    urgency = result.urgency ?? 'LOW';
-    incidentType = result.incidentType ?? 'OTHER';
-  } else if (typeof result === 'number') {
-    severity = result;
-    urgency = resultUrgency ?? 'LOW';
-  }
-
-  const needsUpgrade =
+  return (
     urgency === 'CRITICAL' ||
     severity >= 8 ||
-    incidentType === 'MEDICAL' ||
-    incidentType === 'FIRE' ||
-    (usedTier === 'flash' && severity >= 5);
-
-  if (needsUpgrade) {
-    const upgradeTo = severity >= 8 || incidentType === 'MEDICAL' || incidentType === 'FIRE' ? 'critical' : 'pro';
-    if (upgradeTo !== usedTier) {
-      return AI_MODELS[upgradeTo];
-    }
-  }
-
-  return null;
+    analysis?.incidentType === 'MEDICAL' ||
+    analysis?.incidentType === 'FIRE'
+  );
 }
