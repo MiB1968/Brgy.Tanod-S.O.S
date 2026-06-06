@@ -11,9 +11,10 @@ export const useRealtimeData = (
 ) => {
   const { setAlerts, addAlert } = useIncidentStore();
   const { setPatrols, updatePatrol } = useTanodStore();
+  const userId = user?.uid || user?.id;
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
     const handleSiren = (data: any) => {
       setGlobalSirenActive(data?.sirenActive || false);
@@ -41,5 +42,5 @@ export const useRealtimeData = (
       socket.off("alert_update", handleAlert);
       socket.off("patrol_update", handlePatrol);
     };
-  }, [user, addAlert, setAlerts, setPatrols, setGlobalSirenActive]);
+  }, [userId, addAlert, setAlerts, setPatrols, setGlobalSirenActive]);
 };

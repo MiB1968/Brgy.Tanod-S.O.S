@@ -55,6 +55,23 @@ export class SecureVoiceAssistantService {
   private auditQueue: any[] = [];
   private auditFlushTimer?: NodeJS.Timeout;
 
+  // FIX HIGH-01: Tool-name → VoiceCommandType mapping.
+  // Previously extractProposedActions had no awareness of tool names; now
+  // every tool call is mapped to a typed command so the UI confirmation
+  // dialog shows the correct action category and icon.
+  private readonly TOOL_TO_COMMAND: Record<string, VoiceCommandType> = {
+    find_nearest_tanod:      VoiceCommandType.EMERGENCY_DISPATCH,
+    update_sos_status:       VoiceCommandType.INCIDENT_UPDATE,
+    create_incident_report:  VoiceCommandType.REPORT_GENERATION,
+    generate_formal_report:  VoiceCommandType.REPORT_GENERATION,
+    get_active_sos:          VoiceCommandType.STATUS_INQUIRY,
+    get_tanod_list:          VoiceCommandType.STATUS_INQUIRY,
+    schedule_patrol:         VoiceCommandType.PATROL_ASSIGNMENT,
+    send_push_notification:  VoiceCommandType.EMERGENCY_DISPATCH,
+    broadcast_to_responders: VoiceCommandType.BROADCAST_ALERT,
+    system_check:            VoiceCommandType.SYSTEM_CHECK,
+  };
+
   constructor() {
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
     console.log(`[JARVIS] AI Service initialized. Model: ${config.geminiModel || AI_MODELS.flash.name}. API Key present: ${!!(config.geminiApiKey || process.env.GEMINI_API_KEY)}`);
@@ -246,6 +263,12 @@ export class SecureVoiceAssistantService {
       }
     }));
 
+    // FIX HIGH-01: Capture first-round functionCalls BEFORE the tool
+    // execution loop runs. These represent the actions Gemini decided to
+    // take. We pass them to extractProposedActions so the UI gets
+    // structured, high-confidence ProposedActions instead of text guesses.
+    const firstRoundFunctionCalls = result.functionCalls ?? [];
+
     // Handle tool execution loop if needed
     if (result.functionCalls && result.functionCalls.length > 0) {
       console.log(`[JARVIS] Model requested ${result.functionCalls.length} tool calls`);
@@ -297,7 +320,10 @@ export class SecureVoiceAssistantService {
 
       console.log('[JARVIS] Gemini result received');
       const replyText = this.sanitizeAIResponse(result.text || "Paki-ulit, hindi ko naintindihan.");
-      const proposedActions = this.extractProposedActions(replyText);
+
+      // FIX HIGH-01: Pass firstRoundFunctionCalls so structured tool use is
+      // captured even when the second Gemini call returns a plain-text summary.
+      const proposedActions = this.extractProposedActions(replyText, firstRoundFunctionCalls);
 
       this.queueAuditLog(userId, input.transcript, replyText, proposedActions);
 
@@ -516,7 +542,50 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
     return VoiceResponseTone.AUTHORITATIVE;
   }
 
-  private extractProposedActions(text: string): ProposedAction[] {
+  /**
+   * Derives proposed actions from the model's response.
+   *
+   * Priority order:
+   *   1. Structured tool/function calls (authoritative — Gemini decided to act)
+   *   2. Text keyword fallback (used only when no tool calls were made)
+   *
+   * FIX HIGH-01: Previously this only accepted `text: string` and used keyword
+   * matching. Now it accepts the first-round functionCalls array so that
+   * confirmed tool use surfaces as high-confidence (0.95) ProposedActions
+   * with real payloads instead of text-inferred (0.65) guesses.
+   */
+  private extractProposedActions(
+    text: string,
+    functionCalls?: any[]
+  ): ProposedAction[] {
+    // ── 1. Structured path ───────────────────────────────────────────────────
+    if (functionCalls && functionCalls.length > 0) {
+      return functionCalls
+        .filter((call) => !!call.name)
+        .map((call): ProposedAction => {
+          const callName = call.name;
+          const commandType =
+            this.TOOL_TO_COMMAND[callName] ?? VoiceCommandType.UNKNOWN;
+
+          // Actions that modify state require confirmation; read-only ones don't
+          const readOnlyTools = new Set([
+            'get_active_sos',
+            'get_tanod_list',
+            'find_nearest_tanod',
+          ]);
+          const requiresConfirmation = !readOnlyTools.has(callName);
+
+          return {
+            type: commandType,
+            description: this.describeToolCall(callName, call.args),
+            confidence: 0.95, // High confidence — model explicitly chose this tool
+            requiresConfirmation,
+            payload: call.args ?? {},
+          };
+        });
+    }
+
+    // ── 2. Text fallback (for conversational replies with no tool calls) ─────
     const actions: ProposedAction[] = [];
     const lower = text.toLowerCase();
 
@@ -528,12 +597,47 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
       actions.push({
         type: VoiceCommandType.EMERGENCY_DISPATCH,
         description: 'Dispatch nearest Tanods to the reported location',
-        confidence: 0.85,
+        confidence: 0.65, // Lower — inferred from text, not structured
         requiresConfirmation: true,
+        payload: {},
       });
     }
 
     return actions;
+  }
+
+  /**
+   * Human-readable description for a tool call, used in the UI confirmation dialog.
+   */
+  private describeToolCall(
+    name: string,
+    args?: Record<string, any>
+  ): string {
+    switch (name) {
+      case 'find_nearest_tanod':
+        return `Find nearest Tanod at (${args?.lat?.toFixed(4)}, ${args?.lng?.toFixed(4)})`;
+      case 'update_sos_status':
+        return `Update SOS #${args?.sos_id} → ${args?.status}${
+          args?.assigned_to ? ` (assign to ${args.assigned_to})` : ''
+        }`;
+      case 'schedule_patrol':
+        return `Schedule patrol: ${args?.tanod_id} → ${args?.area} (${
+          args?.duration_hours ?? 4
+        }h)`;
+      case 'broadcast_to_responders':
+        return `Broadcast to all responders: "${args?.title}"`;
+      case 'send_push_notification':
+        return `Push notification → ${args?.title}`;
+      case 'create_incident_report':
+      case 'generate_formal_report':
+        return `Generate incident report for SOS #${args?.sos_id}`;
+      case 'get_active_sos':
+        return 'Retrieve active SOS alerts';
+      case 'get_tanod_list':
+        return `List ${args?.only_available ? 'available' : 'all'} Tanod units`;
+      default:
+        return `Execute ${name}`;
+    }
   }
 
   private emitVoiceResponse(userId: string, response: VoiceResponse) {
@@ -668,6 +772,9 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
         }
       }));
 
+      // FIX HIGH-01: Capture first-round functionCalls for multimodal path too.
+      const firstRoundFunctionCalls = result.functionCalls ?? [];
+
       // Handle tool execution loop if needed for multimodal
       if (result.functionCalls && result.functionCalls.length > 0) {
         console.log(`[JARVIS] Multimodal requested ${result.functionCalls.length} tool calls`);
@@ -717,7 +824,9 @@ STRICT CONSTRAINTS: No medical advice. No legal advice. No long intros.`;
       }
 
       const replyText = this.sanitizeAIResponse(result.text || "Audio received. Processing.");
-      const proposedActions = this.extractProposedActions(replyText);
+
+      // FIX HIGH-01: Pass firstRoundFunctionCalls for multimodal path.
+      const proposedActions = this.extractProposedActions(replyText, firstRoundFunctionCalls);
 
       this.queueAuditLog(userId, "[Audio Input]", replyText, proposedActions);
 

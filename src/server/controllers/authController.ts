@@ -264,40 +264,33 @@ export const login = async (req: Request, res: Response) => {
     }
 
     // ── Standard email/password login ─────────────────────────────────────────
-    let result = await pool.query(
+    const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
       [normalizedEmail]
     );
-    let user = result.rows[0];
+    const user = result.rows[0];
 
-    // Automatically provision missing demo accounts (resident@brgytanod.com and admin@brgytanod.com)
-    // as expected by the integrated test suite.
-    const demoEmails = ['resident@brgytanod.com', 'admin@brgytanod.com'];
-    if (!user && demoEmails.includes(normalizedEmail)) {
-      const demoRole = normalizedEmail === 'admin@brgytanod.com' ? 'admin' : 'resident';
-      const hashedPass = await bcrypt.hash(password, 12);
-      const insertResult = await pool.query(
-        `INSERT INTO users (email, name, role, status, password)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [normalizedEmail, 'Demo User', demoRole, 'approved', hashedPass]
-      );
-      user = insertResult?.rows?.[0];
-    }
-
-    let passwordMatch = false;
+    // FIX: REMOVED demo account auto-provisioning block.
+    //
+    // The original code auto-created accounts for resident@brgytanod.com and
+    // admin@brgytanod.com with auto-approved status using whatever password the
+    // caller supplied. This allowed anyone who knew these email addresses to
+    // create accounts on the production server, bypassing the admin approval
+    // flow. The admin account would be created with role='admin'.
+    //
+    // If these accounts are needed for automated tests, seed them via:
+    //   - ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_PASSWORD env vars, or
+    //   - The `scripts/firebase-migration.js` seeding script, or
+    //   - The admin panel's Create User form.
 
     if (!user) {
-        console.warn(`[Auth] User not found for email: ${normalizedEmail}`);
-        return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
+      console.warn(`[Auth] User not found for email: ${normalizedEmail}`);
+      return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
-    passwordMatch = await bcrypt.compare(password, user.password);
+    const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
-         console.warn(`[Auth] Password mismatch for email: ${normalizedEmail}`);
-    }
-
-    if (!passwordMatch) {
+      console.warn(`[Auth] Password mismatch for email: ${normalizedEmail}`);
       return response.error(res, 'Invalid email or password.', 'UNAUTHORIZED', 401);
     }
 
