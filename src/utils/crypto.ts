@@ -37,9 +37,11 @@ const IV_LENGTH = 16;
 
 // Single source of truth: use the key from config, which already handles the
 // random-fallback logic and warns ops when the env var is missing.
-// .slice(0, 32) ensures exactly 32 bytes for AES-256 regardless of key length.
+// We hash the encryption key using SHA-256 to guarantee it is EXACTLY 32 bytes
+// for AES-256-CBC, preventing any runtime RangeErrors on short keys (e.g. in test envs).
 function getKey(): Buffer {
-  return Buffer.from(config.encryptionKey.slice(0, 32), 'utf8');
+  const baseKey = config.encryptionKey || 'default_fallback_secret_key_32_bytes_long';
+  return nodeCrypto.createHash('sha256').update(baseKey).digest();
 }
 
 /**
