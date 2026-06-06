@@ -11,7 +11,7 @@ export function BroadcastReview() {
 
   const loadPending = async () => {
     try {
-      const data = await api.generic.list("broadcasts");
+      const data = await api.generic.list("system_messages");
       setPendingBroadcasts(
         data.filter((b: any) => b.approval_status === "pending")
       );
@@ -30,7 +30,7 @@ export function BroadcastReview() {
 
   const approveBroadcast = async (b: SystemBroadcast) => {
     try {
-      await api.generic.update(`system_broadcasts/${b.id}`, {
+      await api.generic.update(`system_messages/${b.id}`, {
         approvalStatus: "approved",
         isActive: true,
       });
@@ -41,7 +41,7 @@ export function BroadcastReview() {
 
   const rejectBroadcast = async (b: SystemBroadcast) => {
     try {
-      await api.generic.update(`system_broadcasts/${b.id}`, {
+      await api.generic.update(`system_messages/${b.id}`, {
         approvalStatus: "rejected",
       });
     } catch (err) {

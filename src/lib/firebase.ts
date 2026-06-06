@@ -20,14 +20,18 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 // Support safe fallback to Vite environment variables if JSON fields are empty or placeholder.
 const finalConfig = {
-  apiKey: firebaseConfig.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: firebaseConfig.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: firebaseConfig.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: firebaseConfig.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: firebaseConfig.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: firebaseConfig.appId || import.meta.env.VITE_FIREBASE_APP_ID || "",
+  apiKey: firebaseConfig.apiKey || import.meta.env.VITE_FIREBASE_API_KEY || "MISSING_API_KEY",
+  authDomain: firebaseConfig.authDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "missing-domain.firebaseapp.com",
+  projectId: firebaseConfig.projectId || import.meta.env.VITE_FIREBASE_PROJECT_ID || "missing-project-id",
+  storageBucket: firebaseConfig.storageBucket || import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "missing-bucket.appspot.com",
+  messagingSenderId: firebaseConfig.messagingSenderId || import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+  appId: firebaseConfig.appId || import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:0000000000000000000000",
   firestoreDatabaseId: firebaseConfig.firestoreDatabaseId || "(default)"
 };
+
+if (finalConfig.apiKey === "MISSING_API_KEY") {
+  console.error("🚨 CRITICAL: Firebase configuration is missing! Ensure all VITE_FIREBASE_* environment variables are set in your deployment dashboard.");
+}
 
 // ── Singleton init ────────────────────────────────────────────────────────────
 // getApps().length prevents "App already exists" crash when HMR re-runs this module.

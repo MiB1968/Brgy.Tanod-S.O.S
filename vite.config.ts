@@ -74,13 +74,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      'process.env.VITE_FIREBASE_VAPID_KEY': JSON.stringify(env.VITE_FIREBASE_VAPID_KEY),
+      'process.env.VITE_FIREBASE_VAPID_KEY': JSON.stringify(env.VITE_FIREBASE_VAPID_KEY || ''),
     },
     server: {
       hmr: false,
     },
     build: {
       sourcemap: mode !== 'production',
+      chunkSizeWarningLimit: 10000,
     },
   };
 });

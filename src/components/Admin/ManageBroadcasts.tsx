@@ -16,7 +16,7 @@ export function ManageBroadcasts() {
   useEffect(() => {
     const loadBroadcasts = async () => {
       try {
-        const data = await api.generic.list("broadcasts");
+        const data = await api.generic.list("system_messages");
         setBroadcasts(data);
       } catch (err) {
         console.error("Failed to load broadcasts", err);
@@ -34,7 +34,7 @@ export function ManageBroadcasts() {
   const handleAdd = async () => {
     if (!message) return;
     try {
-      await api.generic.create("broadcasts", {
+      await api.generic.create("system_messages", {
         adminId: profile?.id || "00000000-0000-0000-0000-000000000000",
         adminName: profile?.name || "Admin",
         message,
@@ -51,7 +51,7 @@ export function ManageBroadcasts() {
 
   const toggleBroadcast = async (broadcast: SystemBroadcast) => {
     try {
-      await api.generic.update(`broadcasts/${broadcast.id}`, {
+      await api.generic.update(`system_messages/${broadcast.id}`, {
         isActive: !broadcast.isActive,
       });
     } catch (err) {

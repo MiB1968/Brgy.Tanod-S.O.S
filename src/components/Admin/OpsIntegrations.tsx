@@ -15,12 +15,15 @@ import {
   Zap,
   PhoneCall,
   Radio,
+  FileSpreadsheet,
+  Mail
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
 import { generic } from "../../lib/api";
 import SMSFallbackSettings from "./SMSFallbackSettings";
 import GSMModemIntegration from "./GSMModemIntegration";
+import { googleSignIn, logout, getAccessToken, initWorkspaceAuth } from "../../lib/workspaceAuth";
 
 interface Integration {
   id: string;
@@ -120,6 +123,15 @@ const INITIAL_INTEGRATIONS: Integration[] = [
     status: "disconnected",
     color: "text-pink-400 bg-pink-400/10 border-pink-400/20",
   },
+  {
+    id: "google-workspace",
+    name: "Google Workspace API",
+    description:
+      "Sync emergency records to Google Forms and push broadcast dispatches via Gmail.",
+    icon: Mail,
+    status: "disconnected",
+    color: "text-blue-400 bg-blue-400/10 border-blue-400/20",
+  },
 ];
 
 export default function OpsIntegrations() {
@@ -133,6 +145,30 @@ export default function OpsIntegrations() {
   });
 
   useEffect(() => {
+    // Check initial Workspace Auth state
+    const unsubscribe = initWorkspaceAuth(
+      (user, token) => {
+        setIntegrations((prev) =>
+          prev.map((int) => {
+            if (int.id === "google-workspace") {
+              return { ...int, status: "connected", lastSync: "Authorized" };
+            }
+            return int;
+          })
+        );
+      },
+      () => {
+        setIntegrations((prev) =>
+          prev.map((int) => {
+            if (int.id === "google-workspace") {
+              return { ...int, status: "disconnected", lastSync: undefined };
+            }
+            return int;
+          })
+        );
+      }
+    );
+
     generic
       .get("system/twilio")
       .then((res) => {
@@ -159,9 +195,29 @@ export default function OpsIntegrations() {
       .catch((err) => {
         console.error("Failed to load Twilio settings", err);
       });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const toggleStatus = async (id: string) => {
+    if (id === "google-workspace") {
+      const integration = integrations.find(i => i.id === "google-workspace");
+      if (integration?.status === "connected") {
+        await logout();
+        toast.success("Google Workspace disconnected");
+      } else {
+        try {
+          await googleSignIn();
+          toast.success("Google Workspace connected successfully");
+        } catch (err) {
+          toast.error("Failed to authenticate with Google");
+        }
+      }
+      return;
+    }
+
     if (id === "twilio") {
       const updatedEnabled = !twilioSettings.enabled;
       try {

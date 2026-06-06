@@ -181,7 +181,7 @@ export const getSync = async (req: AuthRequest, res: Response) => {
       })));
     }
 
-    if (collection === 'system_broadcasts' || collection === 'broadcasts') {
+    if (collection === 'system_broadcasts' || collection === 'broadcasts' || collection === 'system_messages') {
       const query = (searchParams?.includes('isActive=true'))
         ? "SELECT * FROM system_broadcasts WHERE isactive = true ORDER BY timestamp DESC"
         : "SELECT * FROM system_broadcasts ORDER BY timestamp DESC LIMIT 100";
@@ -451,7 +451,7 @@ export const postSync = async (req: AuthRequest, res: Response) => {
       return res.json({ success: true });
     }
 
-    if (collection === 'system_broadcasts' || collection === 'broadcasts') {
+    if (collection === 'system_broadcasts' || collection === 'broadcasts' || collection === 'system_messages') {
       if (!isTanod) return response.error(res, "Admin Access Required", "FORBIDDEN", 403);
       if (docId) {
         const fieldMapping: Record<string, string> = {

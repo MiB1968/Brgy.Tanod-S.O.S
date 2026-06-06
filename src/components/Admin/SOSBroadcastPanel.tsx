@@ -32,7 +32,7 @@ export function SOSBroadcastPanel({ profile }: { profile: any }) {
               if (!message) return;
 
               try {
-                await api.generic.create("system_broadcasts", {
+                await api.generic.create("system_messages", {
                   adminId: profile?.id,
                   adminName: profile?.name,
                   type: "security",
@@ -54,7 +54,7 @@ export function SOSBroadcastPanel({ profile }: { profile: any }) {
             onClick={async () => {
               try {
                 const broadcasts = await api.generic.list(
-                  "system_broadcasts?isActive=true"
+                  "system_messages?isActive=true"
                 );
                 if (broadcasts.length === 0) {
                   toast.error("NO ACTIVE BROADCASTS FOUND");
@@ -62,7 +62,7 @@ export function SOSBroadcastPanel({ profile }: { profile: any }) {
                 }
 
                 const batchPromises = broadcasts.map((b: any) =>
-                  api.generic.update(`system_broadcasts/${b.id}`, {
+                  api.generic.update(`system_messages/${b.id}`, {
                     isActive: false,
                   })
                 );
