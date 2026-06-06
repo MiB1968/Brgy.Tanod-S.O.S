@@ -2,23 +2,27 @@ import Dexie, { type Table } from "dexie";
 import type { Protocol, CachedAudio } from "../types/guardian";
 
 export interface QueuedSOS {
-  localId?: number; // Auto-incrementing primary key
+  localId?: number;
   type: string;
   description: string;
   location: { lat: number; lng: number };
-  timestamp: string; // ISO String
+  timestamp: string;
   userId: string;
   userName: string;
-  photos: Blob[]; // Stored as efficient binaries
-  status: "pending" | "syncing" | "failed" | "synced";
+  photos: Blob[];
+  audioBlobs?: Blob[];
+  status: "pending" | "syncing" | "failed" | "synced" | "dead";
   attempts: number;
   lastError?: string;
-  clientUuid: string; // Used for deduplication on server
+  clientUuid: string;
   smsFallback?: boolean;
+  nextAttemptAt?: number;
+  lockedAt?: number;
+  createdAt?: number;
 }
 
 export interface SyncedReport {
-  id: string; // Server ID
+  id: string;
   localId: number;
   syncedAt: string;
   type: string;
@@ -34,7 +38,10 @@ export interface PendingLocation {
   accuracy?: number;
   speed?: number;
   heading?: number;
-  status: "pending" | "synced";
+  status: "pending" | "syncing" | "synced" | "failed";
+  attempts?: number;
+  nextAttemptAt?: number;
+  lastError?: string;
 }
 
 export interface AIChatMessage {
@@ -59,10 +66,15 @@ export interface QueuedAction {
   payload: any;
   timestamp: number;
   retryCount: number;
+  nextAttemptAt?: number;
+  status?: "pending" | "syncing" | "failed" | "dead";
+  lastError?: string;
+  clientUuid?: string;
 }
 
 export class SOSDatabase extends Dexie {
   outbox!: Table<QueuedSOS>;
+  // ... (rest of class)
   synced!: Table<SyncedReport>;
   pendingLocations!: Table<PendingLocation>;
   aiChatHistory!: Table<AIChatMessage>;
@@ -73,66 +85,42 @@ export class SOSDatabase extends Dexie {
   constructor() {
     super("BrgyTanodSOS_DB");
 
-    // SCHEMA VERSION 1
-    this.version(1).stores({
-      outbox: "++localId, status, userId, timestamp",
-    });
-
-    // SCHEMA VERSION 2: Added compound indexes for fast history lookups
+    // ── v1–v7 (existing) ────────────────────────────────────────────────
+    this.version(1).stores({ outbox: "++localId, status, userId, timestamp" });
     this.version(2).stores({
-      outbox:
-        "++localId, status, userId, timestamp, [userId+timestamp], [status+timestamp]",
+      outbox: "++localId, status, userId, timestamp, [userId+timestamp], [status+timestamp]",
     });
-
-    // SCHEMA VERSION 3: Synced History & Data Integrity
     this.version(3)
       .stores({
-        outbox:
-          "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
+        outbox: "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
         synced: "id, localId, userId, syncedAt",
       })
-      .upgrade(async (trans) => {
-        // DATA MIGRATION: Ensure all existing records have a clientUuid
-        return trans
-          .table("outbox")
-          .toCollection()
-          .modify((report) => {
-            if (!report.clientUuid) report.clientUuid = crypto.randomUUID();
-          });
-      });
-
-    // SCHEMA VERSION 4: Pending GPS locations for batch synchronizer & offline logs
+      .upgrade(async (trans) =>
+        trans.table("outbox").toCollection().modify((r) => {
+          if (!r.clientUuid) r.clientUuid = crypto.randomUUID();
+        })
+      );
     this.version(4).stores({
-      outbox:
-        "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
+      outbox: "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
       synced: "id, localId, userId, syncedAt",
       pendingLocations: "id, userId, timestamp, status",
     });
-
-    // SCHEMA VERSION 5: Persistent AI Chat History (Dexie)
     this.version(5).stores({
-      outbox:
-        "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
+      outbox: "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
       synced: "id, localId, userId, syncedAt",
       pendingLocations: "id, userId, timestamp, status",
       aiChatHistory: "++id, sessionId, timestamp",
     });
-
-    // SCHEMA VERSION 6: Added protocols and audioCache for local AI grounding and voice caching
     this.version(6).stores({
-      outbox:
-        "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
+      outbox: "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
       synced: "id, localId, userId, syncedAt",
       pendingLocations: "id, userId, timestamp, status",
       aiChatHistory: "++id, sessionId, timestamp",
       protocols: "id, type, keywords",
       audioCache: "key, timestamp",
     });
-
-    // SCHEMA VERSION 7: Added queuedActions for Background Sync API
     this.version(7).stores({
-      outbox:
-        "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
+      outbox: "++localId, status, userId, timestamp, clientUuid, [userId+timestamp], [status+timestamp]",
       synced: "id, localId, userId, syncedAt",
       pendingLocations: "id, userId, timestamp, status",
       aiChatHistory: "++id, sessionId, timestamp",
@@ -140,6 +128,39 @@ export class SOSDatabase extends Dexie {
       audioCache: "key, timestamp",
       queuedActions: "++id, type, timestamp, retryCount",
     });
+
+    // ── v8: backoff + lease + dead-letter (NEW) ─────────────────────────
+    this.version(8)
+      .stores({
+        outbox:
+          "++localId, status, userId, timestamp, clientUuid, nextAttemptAt, " +
+          "[userId+timestamp], [status+timestamp], [status+nextAttemptAt]",
+        synced: "id, localId, userId, syncedAt",
+        pendingLocations:
+          "id, userId, timestamp, status, nextAttemptAt, [status+nextAttemptAt]",
+        aiChatHistory: "++id, sessionId, timestamp",
+        protocols: "id, type, keywords",
+        audioCache: "key, timestamp",
+        queuedActions:
+          "++id, type, timestamp, retryCount, status, nextAttemptAt, clientUuid, " +
+          "[status+nextAttemptAt]",
+      })
+      .upgrade(async (trans) => {
+        const now = Date.now();
+        await trans.table("outbox").toCollection().modify((r: any) => {
+          if (r.nextAttemptAt == null) r.nextAttemptAt = now;
+          if (r.createdAt == null) r.createdAt = new Date(r.timestamp).getTime() || now;
+          if (r.status === "syncing") r.status = "pending";
+        });
+        await trans.table("pendingLocations").toCollection().modify((l: any) => {
+          if (l.nextAttemptAt == null) l.nextAttemptAt = now;
+          if (l.attempts == null) l.attempts = 0;
+        });
+        await trans.table("queuedActions").toCollection().modify((q: any) => {
+          if (q.status == null) q.status = "pending";
+          if (q.nextAttemptAt == null) q.nextAttemptAt = now;
+        });
+      });
   }
 }
 

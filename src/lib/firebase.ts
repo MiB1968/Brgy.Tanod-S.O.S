@@ -46,15 +46,21 @@ if (typeof window !== 'undefined') {
     (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
   
-  try {
-    appCheck = initializeAppCheck(firebaseApp, {
-      provider: new ReCaptchaV3Provider(
-        import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI' // Public sandbox key if not provided
-      ),
-      isTokenAutoRefreshEnabled: true
-    });
-  } catch (err) {
-    console.warn('[Firebase] App Check initialization failed:', err);
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  if (!siteKey) {
+    console.error(
+      '[Firebase] 🚨 VITE_RECAPTCHA_SITE_KEY is missing — App Check will NOT initialize. ' +
+      'Set this secret in your deployment environment.'
+    );
+  } else {
+    try {
+      appCheck = initializeAppCheck(firebaseApp, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (err) {
+      console.warn('[Firebase] App Check initialization failed:', err);
+    }
   }
 }
 

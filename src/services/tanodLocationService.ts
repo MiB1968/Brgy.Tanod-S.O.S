@@ -64,9 +64,16 @@ export class TanodLocationService {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // Use Capacitor Background Geolocation
-        console.log('📱 Starting native background geolocation tracking...');
-        await BackgroundGeolocation.start(
+        const { requestAllTrackingPermissions, openBatteryOptimizationSettings } =
+          await import('../lib/permissions');
+        const perms = await requestAllTrackingPermissions();
+        if (!perms.fineLocation) {
+          console.warn('[TanodTracking] Fine location denied — cannot start');
+          return;
+        }
+
+        console.log('📱 Starting @capgo/background-geolocation watcher…');
+        const watcherId = await BackgroundGeolocation.addWatcher(
           {
             backgroundMessage: "Tanod tracking active for community safety.",
             backgroundTitle: "Brgy Tanod SOS Background Protocol",
@@ -79,14 +86,14 @@ export class TanodLocationService {
               if ((error as any).code === "NOT_AUTHORIZED") {
                 console.warn("📍 Background location not authorized. Prompting settings.");
                 if (window.confirm("Location is required for tracking. Open Settings?")) {
-                  BackgroundGeolocation.openSettings();
+                  await BackgroundGeolocation.openSettings();
+                  await openBatteryOptimizationSettings();
                 }
               }
               console.error('[TanodTracking] Native Error:', error);
               return;
             }
             if (location) {
-              // Convert to the fallback Position format to pass to our handler
               const syntheticPosition = {
                 coords: {
                   latitude: location.latitude,
@@ -104,6 +111,7 @@ export class TanodLocationService {
             }
           }
         );
+        (this as any).nativeWatcherId = watcherId;
       } else {
         // Fallback to standard web API
         if ('permissions' in navigator) {
@@ -261,13 +269,18 @@ export class TanodLocationService {
   }
 
   async stopTracking() {
-    if (Capacitor.isNativePlatform()) {
-      await BackgroundGeolocation.stop();
+    try {
+      if (Capacitor.isNativePlatform() && (this as any).nativeWatcherId) {
+        await BackgroundGeolocation.removeWatcher({ id: (this as any).nativeWatcherId });
+        (this as any).nativeWatcherId = null;
+      }
+      if (typeof this.watchId === 'number') {
+        navigator.geolocation.clearWatch(this.watchId);
+      }
+      this.watchId = null;
+    } catch (e) {
+      console.warn('[TanodTracking] stop error', e);
     }
-    if (typeof this.watchId === 'number') {
-      navigator.geolocation.clearWatch(this.watchId);
-    }
-    this.watchId = null;
     this.isTracking = false;
     console.log('⏹️ Tanod background tracking stopped');
   }

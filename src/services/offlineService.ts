@@ -1,114 +1,135 @@
-import { db, type QueuedSOS } from '../db/offlineDB';
+import { db, type QueuedSOS, type PendingLocation } from '../db/offlineDB';
 import { toast } from 'react-hot-toast';
 import { photoService } from './photoService';
 import { generic as api } from '../lib/api';
+import { Capacitor } from '@capacitor/core';
+
+const MAX_ATTEMPTS = 5;
+
+const computeBackoff = (attempts: number) => Math.min(Math.pow(2, attempts) * 1000, 3600000); // Max 1hr
+
+async function withSyncLock(name: string, fn: () => Promise<T>): Promise<T | null> {
+  if (typeof navigator === "undefined" || !(navigator as any).locks) {
+    return fn();
+  }
+  return await (navigator as any).locks.request(
+    name,
+    { ifAvailable: true },
+    async (lock: any) => {
+      if (!lock) return null;
+      return fn();
+    }
+  );
+}
 
 export const offlineService = {
-  /**
-   * Primary entry point for SOS submission in any state
-   */
-  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts'>): Promise<number> {
-    const clientUuid = data.clientUuid || crypto.randomUUID();
-    
-    console.log('[Outbox] Queuing tactical report:', data.type);
+  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts' | 'clientUuid'>): Promise<number> {
+    const clientUuid = crypto.randomUUID();
+    const now = Date.now();
     
     const localId = await db.outbox.add({
       ...data,
       clientUuid,
       status: 'pending',
-      attempts: 0
-    });
+      attempts: 0,
+      createdAt: now,
+      nextAttemptAt: now,
+    } as QueuedSOS);
 
-    // Notify PWA Background Sync
-    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    if ("serviceWorker" in navigator && "SyncManager" in window) {
       try {
         const registration = await navigator.serviceWorker.ready;
         // @ts-ignore
-        await registration.sync.register('sos-sync');
+        await registration.sync.register("sos-sync");
       } catch (err) {
-        console.warn('[Sync] Background registration failed:', err);
+        console.warn("[Sync] Background registration failed:", err);
       }
     }
 
     return localId;
   },
 
-  /**
-   * Synchronizes all queued reports using exponential backoff logic
-   */
-  async syncPending(apiSyncFn: (data: any) => Promise<any>): Promise<{ success: number; failed: number }> {
-    const pending = await db.outbox
-      .where('status')
-      .anyOf(['pending', 'failed'])
-      .toArray();
+  async syncPending(
+    apiSyncFn: (data: any) => Promise<any>
+  ): Promise<{ success: number; failed: number; skipped: number }> {
+    const result = await withSyncLock("sos-outbox-sync", async () => {
+      const now = Date.now();
+      let success = 0, failed = 0, skipped = 0;
 
-    if (pending.length === 0) return { success: 0, failed: 0 };
+      const candidates: QueuedSOS[] = await db.outbox
+        .where("status").anyOf(["pending", "failed"])
+        .and((r) => (r.nextAttemptAt ?? 0) <= now)
+        .toArray();
 
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const report of pending) {
-      if (!report.localId) continue;
-
-      try {
-        // Exponential Backoff: Don't retry too fast
-        const delay = Math.pow(2, report.attempts) * 1000;
-        const lastAttemptTime = new Date(report.timestamp).getTime(); // Simplification
+      for (const report of candidates) {
+        if (!report.localId) continue;
         
-        await db.outbox.update(report.localId, { status: 'syncing' });
+        await db.outbox.update(report.localId, { status: "syncing", lockedAt: now });
 
-        // Convert Blobs to Base64 for the API call
-        const photoData = await Promise.all(
-          report.photos.map(p => photoService.blobToBase64(p))
-        );
+        try {
+          const photoData = await Promise.all(
+            report.photos.map(p => photoService.blobToBase64(p))
+          );
+          const audioData = await Promise.all(
+            (report.audioBlobs || []).map(a => photoService.blobToBase64(a))
+          );
 
-        await apiSyncFn({
-          ...report,
-          photos: photoData,
-          isOfflineRecovered: true
-        });
+          await apiSyncFn({
+            ...report,
+            photos: photoData,
+            audio: audioData,
+            isOfflineRecovered: true,
+          });
 
-        // Record history and remove from outbox
-        await db.synced.add({
-          id: report.clientUuid,
-          localId: report.localId,
-          userId: report.userId,
-          syncedAt: new Date().toISOString(),
-          type: report.type
-        });
-
-        await db.outbox.delete(report.localId);
-        successCount++;
-        
-      } catch (err: any) {
-        failCount++;
-        const attempts = (report.attempts || 0) + 1;
-        
-        await db.outbox.update(report.localId, {
-          status: attempts >= 5 ? 'failed' : 'pending',
-          attempts,
-          lastError: err.message
-        });
-        
-        console.error(`[Sync] Report ${report.localId} failed. Attempt ${attempts}/5`);
+          await db.synced.add({
+            id: report.clientUuid,
+            localId: report.localId,
+            userId: report.userId,
+            syncedAt: new Date().toISOString(),
+            type: report.type,
+          });
+          await db.outbox.delete(report.localId);
+          success++;
+        } catch (err: any) {
+          const attempts = (report.attempts || 0) + 1;
+          const isDead = attempts >= MAX_ATTEMPTS;
+          await db.outbox.update(report.localId, {
+            status: isDead ? "dead" : "failed",
+            attempts,
+            lastError: String(err?.message || err).slice(0, 500),
+            lockedAt: undefined,
+            nextAttemptAt: Date.now() + computeBackoff(attempts),
+          });
+          failed++;
+        }
       }
-    }
+      return { success, failed, skipped };
+    });
 
-    return { success: successCount, failed: failCount };
+    return result ?? { success: 0, failed: 0, skipped: 0 };
   },
 
-  /**
-   * Synchronizes queued background GPS coordinates
-   */
+  async queueLocation(loc: Omit<PendingLocation, 'id' | 'status' | 'attempts' | 'nextAttemptAt'>) {
+    const now = Date.now();
+    await db.pendingLocations.put({
+      ...loc,
+      status: "pending",
+      attempts: 0,
+      nextAttemptAt: now,
+    } as PendingLocation);
+  },
+
   async syncPendingLocations(): Promise<{ success: number; failed: number }> {
-    try {
-      const pending = await db.pendingLocations.where('status').equals('pending').toArray();
-      if (pending.length === 0) return { success: 0, failed: 0 };
+    const result = await withSyncLock("location-sync", async () => {
+      const now = Date.now();
+      let success = 0, failed = 0;
 
-      let successCount = 0;
-      let failCount = 0;
+      const due: PendingLocation[] = await db.pendingLocations
+        .where("status").equals("pending")
+        .and((l: any) => (l.nextAttemptAt ?? 0) <= now)
+        .toArray();
 
-      for (const loc of pending) {
+      for (const loc of due) {
         try {
           await api.update('gps/heartbeat', {
             id: loc.userId,
@@ -122,120 +143,72 @@ export const offlineService = {
           });
 
           await db.pendingLocations.delete(loc.id);
-          successCount++;
-        } catch (err) {
-          failCount++;
-          console.error(`[Sync] Location update ${loc.id} failed:`, err);
+          success++;
+        } catch (err: any) {
+          const attempts = (loc.attempts || 0) + 1;
+          const isDead = attempts >= MAX_ATTEMPTS;
+          await db.pendingLocations.update(loc.id, {
+            status: isDead ? "failed" : "pending",
+            attempts,
+            lastError: String(err?.message || err).slice(0, 300),
+            nextAttemptAt: Date.now() + computeBackoff(attempts),
+          });
+          failed++;
         }
       }
-
-      return { success: successCount, failed: failCount };
-    } catch (err) {
-      console.error('[Sync] error syncing pending locations:', err);
-      return { success: 0, failed: 0 };
-    }
-  },
-
-  /**
-   * Synchronizes queued activities/audit actions
-   */
-  async syncPendingQueuedActions(): Promise<{ success: number; failed: number }> {
-    try {
-      const pending = await db.queuedActions.toArray();
-      if (pending.length === 0) return { success: 0, failed: 0 };
-
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const action of pending) {
-        if (!action.id) continue;
-        try {
-          if (action.type === 'activity_log') {
-            const { path, entry } = action.payload;
-            if (path === 'audit_logs') {
-              await api.create('audit_logs', entry);
-            } else if (path === 'tanod_activity_logs') {
-              const { logs: apiLogs } = await import('../lib/api');
-              await apiLogs.create(entry);
-            }
-          } else if (action.type === 'status_update') {
-            const { residentId, status } = action.payload;
-            await api.update(`residents/${residentId}`, { status });
-          } else if (action.type === 'update_role') {
-            const { admin: apiAdmin } = await import('../lib/api');
-            const { userId, role } = action.payload;
-            await apiAdmin.updateUserRole(userId, role);
-          } else if (action.type === 'update_status') {
-            const { admin: apiAdmin } = await import('../lib/api');
-            const { userId, status } = action.payload;
-            await apiAdmin.updateUserStatus(userId, status);
-          } else if (action.type === 'revoke_access') {
-             const { admin: apiAdmin } = await import('../lib/api');
-             const { userId } = action.payload;
-             await apiAdmin.deleteUser(userId);
-          }
-          await db.queuedActions.delete(action.id);
-          successCount++;
-        } catch (err) {
-          failCount++;
-          await db.queuedActions.update(action.id, {
-            retryCount: (action.retryCount || 0) + 1,
-          });
-          console.error(`[Sync] queuedAction ${action.id} upload failed:`, err);
-        }
-      }
-
-      return { success: successCount, failed: failCount };
-    } catch (err) {
-      console.error('[Sync] error syncing queued actions:', err);
-      return { success: 0, failed: 0 };
-    }
-  },
-
-  /**
-   * Process all offline queues
-   */
-  async processOfflineQueue(): Promise<{ success: number; failed: number }> {
-    let success = 0;
-    let failed = 0;
-    const locations = await this.syncPendingLocations();
-    const actions = await this.syncPendingQueuedActions();
-    success += locations.success + actions.success;
-    failed += locations.failed + actions.failed;
-    // Note: You must also handle SOS sync somehow if needed, but for now we do locations & actions
-    return { success, failed };
-  },
-
-  /**
-   * Registers a window-level online listener to immediately trigger queues and SOS reports upload.
-   */
-  setupSyncOnReconnection() {
-    if (typeof window === 'undefined') return;
-
-    window.addEventListener('online', async () => {
-      console.log('[OfflineService] Network restored. Starting automatic sync...');
-      toast.success('Internet connection restored! Syncing offline reports...');
-
-      try {
-        const { sosService } = await import('./sosService');
-        const sosResult = await this.syncPending(async (data) => {
-          await sosService.triggerSOS({
-            type: data.type,
-            description: data.description,
-            location: {
-              lat: data.location.lat,
-              lng: data.location.lng,
-            },
-            reportedBy: data.userId,
-            reportedByName: data.userName,
-          });
-        });
-
-        const otherResult = await this.processOfflineQueue();
-        console.log(`[OfflineService] Sync completed. SOS: ${sosResult.success} synced. Actions/Locations: ${otherResult.success} synced.`);
-      } catch (err: any) {
-        console.error('[OfflineService] Sync on reconnection failed:', err);
-      }
+      return { success, failed };
     });
-  }
+
+    return result ?? { success: 0, failed: 0 };
+  },
+
+  async getQueueStats() {
+    const [pending, failed, dead, syncing, locs] = await Promise.all([
+      db.outbox.where("status").equals("pending").count(),
+      db.outbox.where("status").equals("failed").count(),
+      db.outbox.where("status").equals("dead").count(),
+      db.outbox.where("status").equals("syncing").count(),
+      db.pendingLocations.where("status").equals("pending").count(),
+    ]);
+    return { pending, failed, dead, syncing, pendingLocations: locs };
+  },
+
+  async syncAll(apiSyncFn: (data: any) => Promise<any>) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const [sos, locs] = await Promise.all([
+      offlineService.syncPending(apiSyncFn),
+      offlineService.syncPendingLocations(),
+    ]);
+    if (sos.success > 0 || locs.success > 0) {
+      toast.success(
+        `✅ Synced ${sos.success} report(s), ${locs.success} location(s)`,
+        { duration: 3000 }
+      );
+    }
+    return { sos, locs };
+  },
 };
+
+if (typeof window !== "undefined") {
+  let retryTimer: any = null;
+  const kick = async () => {
+    try {
+      const { sosService } = await import("./sosService");
+      const apiFn = async (payload: any) => {
+        const { generic } = await import("../lib/api");
+        return generic.create("sos", payload);
+      };
+      await offlineService.syncAll(apiFn);
+    } catch (e) {
+      console.warn("[OfflineService] kick failed", e);
+    }
+  };
+  window.addEventListener("online", () => {
+    console.log("[OfflineService] back online, syncing");
+    kick();
+  });
+  retryTimer = setInterval(() => {
+    if (navigator.onLine) kick();
+  }, 60_000);
+  window.addEventListener("beforeunload", () => clearInterval(retryTimer));
+}
