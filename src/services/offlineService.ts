@@ -8,7 +8,7 @@ const MAX_ATTEMPTS = 5;
 
 const computeBackoff = (attempts: number) => Math.min(Math.pow(2, attempts) * 1000, 3600000); // Max 1hr
 
-async function withSyncLock(name: string, fn: () => Promise<T>): Promise<T | null> {
+async function withSyncLock<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
   if (typeof navigator === "undefined" || !(navigator as any).locks) {
     return fn();
   }
@@ -186,6 +186,44 @@ export const offlineService = {
       );
     }
     return { sos, locs };
+  },
+
+  setupSyncOnReconnection() {
+    if (typeof window === "undefined") return;
+    window.addEventListener("online", () => {
+      console.log("[OfflineService] back online, syncing");
+      this.syncAll(async (data) => {
+        const { generic } = await import("../lib/api");
+        return generic.create("sos", data);
+      });
+    });
+  },
+
+  async syncPendingQueuedActions() {
+    return await withSyncLock("queued-actions-sync", async () => {
+      const now = Date.now();
+      const dueActions = await db.queuedActions
+        .where("status").anyOf(['pending', 'failed'])
+        .and(q => (q.nextAttemptAt ?? 0) <= now)
+        .toArray();
+
+      for (const action of dueActions) {
+        try {
+          // Implement appropriate API call based on action.type
+          await api.create(action.type, action.payload);
+          await db.queuedActions.delete(action.id!);
+        } catch (err: any) {
+          const retryCount = (action.retryCount || 0) + 1;
+          await db.queuedActions.update(action.id!, {
+            status: 'failed',
+            retryCount,
+            lastError: String(err),
+            nextAttemptAt: now + computeBackoff(retryCount)
+          });
+        }
+      }
+      return { success: dueActions.length };
+    });
   },
 };
 

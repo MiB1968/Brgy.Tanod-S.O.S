@@ -1,7 +1,7 @@
 import * as http from "http";
 import * as Sentry from "@sentry/node";
 import { initSentry } from "./server/lib/sentry";
-initSentry();
+initSentry().catch(console.error);
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

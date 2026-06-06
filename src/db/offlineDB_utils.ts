@@ -1,3 +1,4 @@
+import { SOSDatabase } from "./offlineDB";
 // Mock for Incognito / restricted environments
 class MockSOSDatabase {
   private chain = () => ({
