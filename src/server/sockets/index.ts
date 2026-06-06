@@ -45,19 +45,24 @@ function isVoiceAllowed(userId: string): boolean {
 export function initSocket(server: HttpServer): Server {
   console.log('[Socket] Initializing Socket.IO with server...');
   try {
+    // 1. ADD THIS ALLOWED ORIGINS BLOCK
+    const allowedOrigins: string[] = config.corsOrigin
+      ? config.corsOrigin
+          .split(',')
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : [];
+
     io = new Server(server, {
       path: '/socket.io',
       pingTimeout: 60000,
-      pingInterval: 10000,
-      connectTimeout: 45000,
-      maxHttpBufferSize: 2 * 1024 * 1024, // 2MB for voice packets
-      cookie: false,
+      pingInterval: 25000,
       cors: {
-        origin: true,
+        // 2. UPDATE THE ORIGIN LINE HERE
+        origin: allowedOrigins.length > 0 ? allowedOrigins : false, 
+        methods: ['GET', 'POST'],
         credentials: true,
-        methods: ['GET', 'POST', 'OPTIONS'],
       },
-    });
 
     // Send COEP headers to appease Vite COEP requirements
     io.engine.on('headers', (headers, req) => {
