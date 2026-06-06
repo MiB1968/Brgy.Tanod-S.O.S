@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool, admin, initDatabase } from '../db/index';
+import { pool, admin, initDatabase, getClient } from '../db/index';
 import { config } from '../config/index';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
@@ -97,7 +97,7 @@ export const register = async (req: Request, res: Response) => {
   const allowedPublicRoles = ['resident', 'tanod'];
   const role = allowedPublicRoles.includes(rawRole) ? rawRole : 'resident';
 
-  const client = await pool.connect();
+  const client = await getClient();
   try {
     await client.query('BEGIN');
 

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { pool, admin } from '../db/index';
+import { pool, admin, getClient } from '../db/index';
 import { syncUserRoleToFirebase } from './authController';
 import * as response from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
@@ -17,7 +17,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
     ? crypto.randomBytes(8).toString('hex')
     : password;
 
-  const client = await pool.connect();
+  const client = await getClient();
   try {
     await client.query('BEGIN');
 
@@ -359,7 +359,7 @@ export const approveResident = async (req: AuthRequest, res: Response) => {
     return response.error(res, 'residentId is required', 'BAD_REQUEST', 400);
   }
 
-  const client = await pool.connect();
+  const client = await getClient();
   try {
     await client.query('BEGIN');
 

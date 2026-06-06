@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
 
 export async function initDb(retries = 3) {
+  if (!config.databaseUrl) {
+    logger.warn('DB_INIT: Skipping SQL database initialization because DATABASE_URL is not set.');
+    return;
+  }
+
   for (let i = 0; i < retries; i++) {
     let client;
     try {
