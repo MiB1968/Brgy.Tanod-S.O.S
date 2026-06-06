@@ -6,8 +6,10 @@ import { micManager } from '../lib/microphoneManager';
 // Uses volume peaks + duration + keyword probability (simulated)
 export const useShoutDetection = (onShout: (reason: string) => void) => {
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef<boolean>(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -17,6 +19,10 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
   const isSustainedPeak = useRef<boolean>(false);
 
   const startListening = useCallback(async () => {
+    if (isListeningRef.current) return;
+    isListeningRef.current = true;
+    setIsListening(true);
+
     try {
       // 1. Audio Level Analysis
       const stream = await micManager.acquire('shout-detection', 'useShoutDetection');
@@ -29,11 +35,12 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
 
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
-      setIsListening(true);
+      sourceRef.current = source;
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
       const checkVolume = () => {
+        if (!isListeningRef.current) return;
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
@@ -41,7 +48,7 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
         }
         const average = sum / dataArray.length;
 
-        // Threshold: 100 for high volume
+        // Threshold: 110 for high volume
         if (average > 110) {
           if (peakDuration.current === 0) {
             lastPeakTime.current = Date.now();
@@ -70,7 +77,7 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'en-US'; // Basic support, can add filters for Tagalog
+        recognition.lang = 'fil-PH'; // Tagalog/Filipino language engine localization
 
         recognition.onresult = (event: any) => {
           const keywords = ['help', 'tulong', 'pakiusap', 'tama na', 'wag po', 'save me', 'emergency'];
@@ -78,13 +85,32 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
             const transcript = event.results[i][0].transcript.toLowerCase();
             if (keywords.some(k => transcript.includes(k))) {
               onShout(`Keyword detected: "${transcript.trim()}"`);
-              recognition.stop(); // Stop to prevent double triggering
+              recognition.stop(); // Stop to prevent double triggering (which triggers onend to restart)
             }
           }
         };
 
         recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event.error);
+          if (event.error === 'language-not-supported' || event.error === 'language-unavailable') {
+            console.warn(`Speech recognition language ${recognition.lang} not supported. Falling back to en-US.`);
+            recognition.lang = 'en-US';
+          } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            console.error('Speech recognition permission or service not allowed:', event.error);
+            stopListening();
+            toast.error("Guardian AI microphone access was revoked or unavailable.", { icon: '🚨' });
+          } else {
+            console.warn('Speech recognition error:', event.error);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListeningRef.current) {
+            try {
+              recognition.start();
+            } catch (e) {
+              console.warn('Speech recognition auto-restart failed:', e);
+            }
+          }
         };
 
         recognition.start();
@@ -93,6 +119,8 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
 
     } catch (err: any) {
       console.error('Guardian AI Listener failed:', err);
+      isListeningRef.current = false;
+      setIsListening(false);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         toast.error("Guardian AI requires microphone permissions.", { icon: '🚨' });
       }
@@ -100,14 +128,41 @@ export const useShoutDetection = (onShout: (reason: string) => void) => {
   }, [onShout]);
 
   const stopListening = useCallback(() => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    isListeningRef.current = false;
+    setIsListening(false);
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    if (sourceRef.current) {
+      try {
+        sourceRef.current.disconnect();
+      } catch (e) {
+        console.warn('Failed to disconnect source node:', e);
+      }
+      sourceRef.current = null;
+    }
+
+    if (analyserRef.current) {
+      try {
+        analyserRef.current.disconnect();
+      } catch (e) {
+        console.warn('Failed to disconnect analyser node:', e);
+      }
+      analyserRef.current = null;
+    }
+
     micManager.release('shout-detection');
+
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.onend = null; // Clean up handler to prevent restart loop
         recognitionRef.current.stop();
       } catch (e) {}
+      recognitionRef.current = null;
     }
-    setIsListening(false);
   }, []);
 
   return { isListening, startListening, stopListening };
