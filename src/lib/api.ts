@@ -8,9 +8,10 @@ import { emergencyService as alerts } from '../services/emergencyService';
 import { systemService as system } from '../services/systemService';
 import { incidentService as incidents, logService as logs } from '../services/incidentService';
 import { chatService as chat } from '../services/chatService';
+import { aiService as ai } from '../services/aiService';
 import { fetchAPI } from '../services/apiBase';
 
-export { auth, alerts, system, incidents, logs, chat, fetchAPI };
+export { auth, alerts, system, incidents, logs, chat, ai, fetchAPI };
 
 export const residents = {
   getAll: () => fetchAPI('/sync?path=residents'),

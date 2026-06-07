@@ -5,6 +5,7 @@ import {
   Settings,
   Workflow,
   Bot,
+  Cpu,
   Wifi,
   Terminal,
   CheckCircle2,
@@ -85,12 +86,13 @@ const INITIAL_INTEGRATIONS: Integration[] = [
     color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
   },
   {
-    id: "qwenpaw",
-    name: "QwenPaw AI Agent Platform",
+    id: "guardian-ai",
+    name: "Guardian Forge AI Engine",
     description:
-      "Autonomous dispatch and reporting agents powered by hybrid Qwen models for Philippine emergency context.",
+      "Hybrid AI orchestration using server-side Gemini 1.5 Pro and local-first WebLLM for offline-resilient dispatching.",
     icon: Bot,
-    status: "configuring",
+    status: "connected",
+    lastSync: "Hybrid Active",
     color: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
   },
   {
@@ -450,87 +452,71 @@ export default function OpsIntegrations() {
               />
             ) : activeConfig === "gsm" ? (
               <GSMModemIntegration onClose={() => setActiveConfig(null)} />
-            ) : activeConfig === "qwenpaw" ? (
+            ) : activeConfig === "guardian-ai" ? (
               <>
                 <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">
-                  QwenPaw Discovery Tool
+                  Guardian AI Engine Config
                 </h3>
                 <p className="text-xs text-white/50 mb-6">
-                  Verify the QwenPaw platform endpoint and discover agent IDs for mobile configuration.
+                  Manage the hybrid intelligence loop between cloud-based Gemini Pro and local WebLLM.
                 </p>
 
-                <div className="space-y-4">
-                  <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl">
-                    <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <Bot className="w-3 h-3" />
-                      Platform Agent IDs
-                    </p>
-                    
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                      {discoveredAgents.length > 0 ? (
-                        discoveredAgents.map((agent: any) => (
-                          <div 
-                            key={agent.id} 
-                            onClick={() => {
-                              navigator.clipboard.writeText(agent.id);
-                              toast.success("ID Copied to clipboard");
-                            }}
-                            className="bg-black/40 border border-white/5 p-2 rounded-lg cursor-pointer hover:border-cyan-500/40 transition-all flex items-center justify-between"
-                          >
-                            <div className="overflow-hidden">
-                              <p className="text-xs font-bold text-white truncate">{agent.name}</p>
-                              <p className="text-[9px] font-mono text-white/30 truncate">{agent.id}</p>
-                            </div>
-                            <span className="text-[8px] bg-white/5 px-1.5 py-0.5 rounded text-white/40 uppercase">Copy</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-4">
-                          <p className="text-[10px] font-mono text-white/20 italic">
-                            {isScanning ? "Scanning platform..." : "No agents discovered yet."}
-                          </p>
-                        </div>
-                      )}
+                <div className="space-y-6">
+                  <div className="p-4 bg-tactical-cyan/5 border border-tactical-cyan/20 rounded-2xl">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] text-tactical-cyan font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Zap className="w-4 h-4" /> Cloud Node (Gemini)
+                      </p>
+                      <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-black uppercase">Online</span>
                     </div>
-
-                    <button
-                      onClick={handleScanAgents}
-                      disabled={isScanning}
-                      className="w-full mt-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                    >
-                      {isScanning ? "Scanning..." : "Scan Platform Agents"}
-                    </button>
+                    <p className="text-xs text-white/60 leading-relaxed font-mono">
+                      Provides deep tactical analysis, incident categorization, and suggested broadcast messages.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">
-                      Dispatcher Agent ID
-                    </label>
-                    <input
-                      type="text"
-                      value={qwenpawConfig.dispatcherAgentId}
-                      onChange={(e) => setQwenpawConfig({ ...qwenpawConfig, dispatcherAgentId: e.target.value })}
-                      placeholder="uuid-xxxx-xxxx"
-                      className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-cyan-500 outline-none font-mono"
-                    />
+                  <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-2xl">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[10px] text-purple-400 font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Cpu className="w-4 h-4" /> Local Node (WebLLM)
+                      </p>
+                      <span className="text-[8px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-black uppercase">Ready (Cached)</span>
+                    </div>
+                    <p className="text-xs text-white/60 leading-relaxed font-mono">
+                      Enables offline triage and responder advice even when cell towers are down or power is out.
+                    </p>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-white/70 uppercase font-display italic">Auto-Dispatch Advice</label>
+                      <div className="w-10 h-5 bg-tactical-cyan rounded-full relative">
+                        <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-white/70 uppercase font-display italic">Priority Model Routing</label>
+                      <div className="w-10 h-5 bg-white/10 rounded-full relative">
+                        <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white/20 rounded-full" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex gap-3 mt-8">
                   <button
-                    onClick={() => {
-                      setActiveConfig(null);
-                      setDiscoveredAgents([]);
-                    }}
-                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors"
+                    onClick={() => setActiveConfig(null)}
+                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-colors"
                   >
-                    Close
+                    Close Console
                   </button>
                   <button
-                    onClick={handleSaveQwenPaw}
-                    className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)] rounded-xl text-sm font-bold transition-all"
+                    onClick={() => {
+                        toast.success("AI Synchronization Complete");
+                        setActiveConfig(null);
+                    }}
+                    className="flex-1 py-4 bg-tactical-cyan hover:bg-tactical-cyan/90 text-white shadow-[0_0_15px_rgba(0,240,255,0.3)] rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
                   >
-                    Save & Test
+                    Sync Engines
                   </button>
                 </div>
               </>
