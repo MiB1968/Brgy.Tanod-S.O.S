@@ -8,7 +8,7 @@ const MAX_ATTEMPTS = 5;
 
 const computeBackoff = (attempts: number) => Math.min(Math.pow(2, attempts) * 1000, 3600000); // Max 1hr
 
-async function withSyncLock(name: string, fn: () => Promise<T>): Promise<T | null> {
+async function withSyncLock<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
   if (typeof navigator === "undefined" || !(navigator as any).locks) {
     return fn();
   }
@@ -23,8 +23,8 @@ async function withSyncLock(name: string, fn: () => Promise<T>): Promise<T | nul
 }
 
 export const offlineService = {
-  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts' | 'clientUuid'>): Promise<number> {
-    const clientUuid = crypto.randomUUID();
+  async queueSOS(data: Omit<QueuedSOS, 'localId' | 'status' | 'attempts' | 'clientUuid'> & { clientUuid?: string }): Promise<number> {
+    const clientUuid = data.clientUuid || crypto.randomUUID();
     const now = Date.now();
     
     const localId = await db.outbox.add({
@@ -47,6 +47,23 @@ export const offlineService = {
     }
 
     return localId;
+  },
+
+  async updatePendingSOS(clientUuid: string, data: Partial<QueuedSOS>) {
+    await db.outbox.where("clientUuid").equals(clientUuid).modify(data);
+  },
+
+  async queueAction(type: string, payload: any, clientUuid?: string) {
+    const now = Date.now();
+    return await db.queuedActions.add({
+      type: type as any,
+      payload,
+      timestamp: now,
+      retryCount: 0,
+      status: "pending",
+      nextAttemptAt: now,
+      clientUuid: clientUuid || crypto.randomUUID(),
+    });
   },
 
   async syncPending(
@@ -207,11 +224,13 @@ export const offlineService = {
         .and(q => (q.nextAttemptAt ?? 0) <= now)
         .toArray();
 
+      let success = 0, failed = 0;
       for (const action of dueActions) {
         try {
           // Implement appropriate API call based on action.type
           await api.create(action.type, action.payload);
           await db.queuedActions.delete(action.id!);
+          success++;
         } catch (err: any) {
           const retryCount = (action.retryCount || 0) + 1;
           await db.queuedActions.update(action.id!, {
@@ -220,9 +239,10 @@ export const offlineService = {
             lastError: String(err),
             nextAttemptAt: now + computeBackoff(retryCount)
           });
+          failed++;
         }
       }
-      return { success: dueActions.length };
+      return { success, failed };
     });
   },
 };

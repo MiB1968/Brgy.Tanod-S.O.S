@@ -54,7 +54,8 @@ export const config = {
     .trim()
     .replace(/[\u200B-\u200D\uFEFF]/g, ''),
 
-  geminiApiKey: (process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
+  geminiApiKey:
+    (process.env.GEMINI_API_KEY_NEW || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   guardianAiKey:
     (process.env.GUARDIAN_AI_KEY || process.env.MY_GEMINI_SECRET || process.env.GEMINI_API_KEY)?.trim() || null,
   geminiModel: (() => {

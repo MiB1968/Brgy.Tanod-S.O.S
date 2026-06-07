@@ -1,6 +1,8 @@
-// Mock for Incognito / restricted environments
+import { SOSDatabase } from './offlineDB';
+
+// Fallback mock database for incognito / restricted environments
 class MockSOSDatabase {
-  private chain = () => ({
+  chain = () => ({
     anyOf: () => this.chain(),
     equals: () => this.chain(),
     below: () => this.chain(),
@@ -10,10 +12,11 @@ class MockSOSDatabase {
     modify: async () => 0,
     count: async () => 0,
     first: async () => undefined,
+    sortBy: async () => [],
   });
   outbox = { add: async () => 1, where: () => this.chain(), update: async () => 1, delete: async () => 1, get: async () => undefined, count: async () => 0 };
   synced = { add: async () => 1, where: () => this.chain() };
-  pendingLocations = { add: async () => 1, where: () => this.chain(), update: async () => 1, delete: async () => 1, count: async () => 0 };
+  pendingLocations = { add: async () => 1, where: () => this.chain(), update: async () => 1, delete: async () => 1, count: async () => 0, put: async () => "" };
   aiChatHistory = { add: async () => 1, where: () => this.chain(), delete: async () => 1 };
   queuedActions = { add: async () => 1, where: () => this.chain(), update: async () => 1, delete: async () => 1, orderBy: () => ({ toArray: async () => [] }) };
   protocols = { add: async () => 1, where: () => this.chain() };

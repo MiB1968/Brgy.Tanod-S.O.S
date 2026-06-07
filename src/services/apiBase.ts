@@ -6,12 +6,31 @@
 import * as safeStorage from '../lib/safeStorage';
 import * as ReactSentry from '@sentry/react';
 import { getToken } from 'firebase/app-check';
-import { appCheck } from '../lib/firebase';
+import { auth, appCheck } from '../lib/firebase';
 
 const API_BASE = '/api';
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}, retries = 2): Promise<any> {
-  const token = safeStorage.getItem('token');
+  let token = safeStorage.getItem('token');
+
+  // PROACTIVE REFRESH: If Firebase is the source of truth, ensure we have a fresh token.
+  // We prefer the live SDK token over the potentially stale SafeStorage one.
+  if (auth.currentUser) {
+    try {
+      // getIdToken(false) is fast and returns the cached token if it's still valid,
+      // or fetches a new one if it has expired within its own internal lifecycle.
+      const freshToken = await auth.currentUser.getIdToken();
+      if (freshToken) {
+        token = freshToken;
+        // Keep storage in sync
+        if (safeStorage.getItem('token') !== freshToken) {
+          safeStorage.setItem('token', freshToken);
+        }
+      }
+    } catch (err) {
+      console.warn('[API] Proactive token refresh failed:', err);
+    }
+  }
   
   let appCheckTokenString = '';
   if (appCheck) {
@@ -90,7 +109,8 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}, retr
       }
 
       if (response.status === 401) {
-        window.dispatchEvent(new Event('auth-expired'));
+        // ALIGNMENT: Match the listener name in AuthContext.tsx
+        window.dispatchEvent(new Event('auth:token_expired'));
       }
       
       let errorMessage = `Server error (${response.status}): ${response.statusText}`;

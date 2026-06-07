@@ -40,6 +40,8 @@ import { useOfflineSOS } from "../hooks/useOfflineSOS";
 import { useTTS } from "../hooks/useTTS";
 import { useEmergencySound } from "../lib/EmergencySoundManager";
 import { photoService } from "../services/photoService";
+import { triageEmergency } from "../services/webllmTriage";
+import { isWebLLMReady } from "../lib/webllm";
 // Unified AI Chat accessible globally via Tactical Dock
 
 import { OfflineVoiceManager } from "./OfflineVoicePackManager";
@@ -170,16 +172,37 @@ export default function ResidentDashboard({
           })
         );
 
-        await createSOS(type, description, location, b64Photos);
+        const alertId = await createSOS(type, description, location, b64Photos);
         setSelectedPhotos([]);
         toast.success("SOS Protocol Initiated. Units alerted.");
-      } catch (err) {
-        console.warn("Online SOS failed, falling back to outbox queue.");
-        await handleQueueSOS(type, description, location, photosToProcess);
-        setSelectedPhotos([]);
+        runTriage(alertId, type, description);
+      } catch (err: any) {
+        if (err.message === "OFFLINE_MODE") {
+          toast.success("SOS Queued Offline. SMS Fallback active.");
+          setSelectedPhotos([]);
+          const activeId = useSOSStore.getState().activeAlert?.id;
+          if (activeId) runTriage(activeId, type, description);
+        } else {
+          console.warn("Online SOS failed, falling back to outbox queue.");
+          await handleQueueSOS(type, description, location, photosToProcess);
+          setSelectedPhotos([]);
+        }
       }
     } catch (err: any) {
       toast.error("Emergency transmission system failure.");
+    }
+  };
+
+  const runTriage = (id: string | null, type: EmergencyType, description: string) => {
+    if (id && isWebLLMReady()) {
+      triageEmergency({ type, description }, description)
+        .then((result) => {
+          if (result) {
+            useSOSStore.getState().updateSOS(id, { aiAnalysis: result });
+            toast.success("Guardian AI triage completed.", { icon: "🛡️" });
+          }
+        })
+        .catch((e) => console.warn("[Triage] Background error:", e));
     }
   };
 

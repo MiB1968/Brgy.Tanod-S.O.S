@@ -49,7 +49,7 @@ export default function OfflineSyncButton() {
     setSyncing(true);
     try {
       const { offlineService } = await import("../../services/offlineService");
-      await offlineService.processOfflineQueue();
+      await offlineService.syncPendingQueuedActions();
       setOfflineCount(0);
       toast.success("Offline actions successfully synchronized.");
     } catch (err: any) {

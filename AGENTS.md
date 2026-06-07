@@ -38,6 +38,17 @@ You must strictly adhere to and maintain this architecture:
 5. **Emergency Flow Error Handling**: Ensure emergency pipelines never fail silently. Provide clear, offline-resilient UI state queues and graceful degradations.
 6. **Philippine Context Grounding**: Maintain high fidelity Tagalog language localization, offline battery-saving protocols, and SMS broadcast fallback behaviors for local watchmen (*Tanods*).
 
+## File Lock Registry (DO NOT MODIFY WITHOUT EXPLICIT PERMISSION)
+The following files represent the core stable infrastructure of Brgy.Tanod-S.O.S. They have been manually verified and locked to prevent regression in connectivity, security, or emergency handling.
+- **`src/services/apiBase.ts`**: Proactive token refresh cycle.
+- **`src/server/config/index.ts`**: Secure API key resolution and server constants.
+- **`src/server/services/aiService.ts`**: Server-side Gemini SDK injection.
+- **`src/services/offlineService.ts`**: Core synchronization locks and offline queue processing.
+- **`src/services/tanodLocationService.ts`**: @capgo/background-geolocation stable implementation.
+- **`src/db/offlineDB_utils.ts`**: Dexie.js stability guards for incognito/native environments.
+- **`src/components/Admin/OfflineSyncButton.tsx`**: Critical UI for clearing the emergency queue.
+- **`src/lib/firebase.ts`**: Safe initialization with project-level environment detection.
+
 ## Response format
 - Short task summary first.
 - Clear file path(s).

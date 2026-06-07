@@ -50,7 +50,6 @@ export const sosService = {
         userId: report.reportedBy,
         userName: report.reportedByName || 'Resident',
         photos: photosAsBlobs,
-        clientUuid: crypto.randomUUID(),
         smsFallback: true
       });
     } catch (offlineErr) {

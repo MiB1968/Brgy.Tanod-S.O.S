@@ -73,6 +73,7 @@ export class TanodLocationService {
         }
 
         console.log('📱 Starting @capgo/background-geolocation watcher…');
+        // @ts-ignore - Capgo BackgroundGeolocation typing can be inconsistent across versions
         const watcherId = await BackgroundGeolocation.addWatcher(
           {
             backgroundMessage: "Tanod tracking active for community safety.",
@@ -271,6 +272,7 @@ export class TanodLocationService {
   async stopTracking() {
     try {
       if (Capacitor.isNativePlatform() && (this as any).nativeWatcherId) {
+        // @ts-ignore
         await BackgroundGeolocation.removeWatcher({ id: (this as any).nativeWatcherId });
         (this as any).nativeWatcherId = null;
       }

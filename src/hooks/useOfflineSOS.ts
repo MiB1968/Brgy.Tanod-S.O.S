@@ -79,8 +79,7 @@ export function useOfflineSOS() {
         timestamp: new Date().toISOString(),
         userId: profile.id,
         userName: profile.name || 'Citizen',
-        photos: photoBlobs,
-        clientUuid: crypto.randomUUID()
+        photos: photoBlobs
       });
 
       await updateCount();

@@ -16,6 +16,7 @@ export interface QueuedSOS {
   lastError?: string;
   clientUuid: string;
   smsFallback?: boolean;
+  aiAnalysis?: any;
   nextAttemptAt?: number;
   lockedAt?: number;
   createdAt?: number;

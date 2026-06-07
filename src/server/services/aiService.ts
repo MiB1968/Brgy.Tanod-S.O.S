@@ -15,7 +15,7 @@ let ai: GoogleGenAI | null = null;
 
 function getAIClient(): GoogleGenAI {
   if (!ai) {
-    const key = process.env.GEMINI_API_KEY_NEW || process.env.GEMINI_API_KEY;
+    const key = config.geminiApiKey;
     if (!key) {
       throw new Error('GEMINI_API_KEY_NEW or GEMINI_API_KEY (Free Tier) is required for server-side AI');
     }

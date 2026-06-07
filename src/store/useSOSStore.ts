@@ -18,6 +18,7 @@ interface SOSState {
     isOfflineRecovered?: boolean
   ) => Promise<string | null>;
   cancelSOS: (id: string) => Promise<void>;
+  updateSOS: (id: string, data: Partial<Alert>) => Promise<void>;
   clearActiveAlert: () => void;
   subscribeToUserAlerts: (userId: string) => () => void;
 }
@@ -113,8 +114,8 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
         userId: user?.id || "anonymous",
         userName: user?.name || "Resident",
         photos: photoBlobs,
-        clientUuid: finalClientUuid,
-        smsFallback: true
+        smsFallback: true,
+        clientUuid: finalClientUuid
       });
 
       // Optimistic update for UI tracking
@@ -124,6 +125,29 @@ export const useSOSStore = create<SOSState>()((set, get) => ({
       throw new Error("OFFLINE_MODE");
     } finally {
       set({ isSending: false });
+    }
+  },
+
+  updateSOS: async (id, data) => {
+    try {
+      if (navigator.onLine) {
+        await api.alerts.updateAlert(id, data);
+      } else {
+        // If offline, check if it's in the outbox
+        await offlineService.updatePendingSOS(id, data as any);
+        
+        // Also queue as an action just in case it's already semi-synced 
+        // or for more complex update logic on server
+        await offlineService.queueAction("status_update", { id, ...data }, id);
+      }
+
+      const current = get().activeAlert;
+      if (current && current.id === id) {
+        set({ activeAlert: { ...current, ...data } });
+      }
+    } catch (error) {
+      console.error("[SOS] Update failed:", error);
+      throw error;
     }
   },
 
