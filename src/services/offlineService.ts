@@ -8,7 +8,7 @@ const MAX_ATTEMPTS = 5;
 
 const computeBackoff = (attempts: number) => Math.min(Math.pow(2, attempts) * 1000, 3600000); // Max 1hr
 
-async function withSyncLock<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
+async function withSyncLock(name: string, fn: () => Promise<T>): Promise<T | null> {
   if (typeof navigator === "undefined" || !(navigator as any).locks) {
     return fn();
   }

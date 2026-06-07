@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/node';
 import releaseInfo from '../../release.json';
 
-export const initSentry = async () => {
+export const initSentry = () => {
   const dsn = process.env.SENTRY_DSN;
 
   if (!dsn) {
@@ -14,9 +14,8 @@ export const initSentry = async () => {
   ];
 
   try {
-    // Dynamically import to prevent compile-time/runtime hard crashes on platforms lacking native bindings
-    const profiling = await import('@sentry/profiling-node');
-    const nodeProfilingIntegration = profiling.nodeProfilingIntegration;
+    // Dynamically require to prevent compile-time/runtime hard crashes on platforms lacking native bindings
+    const { nodeProfilingIntegration } = require('@sentry/profiling-node');
     if (nodeProfilingIntegration) {
       integrations.push(nodeProfilingIntegration());
       console.log('[Sentry] Profiling integration loaded');
