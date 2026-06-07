@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { toast } from "react-hot-toast";
-import { generic } from "../../lib/api";
+import { generic, system } from "../../lib/api";
 import SMSFallbackSettings from "./SMSFallbackSettings";
 import GSMModemIntegration from "./GSMModemIntegration";
 import { googleSignIn, logout, getAccessToken, initWorkspaceAuth } from "../../lib/workspaceAuth";
@@ -85,6 +85,15 @@ const INITIAL_INTEGRATIONS: Integration[] = [
     color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
   },
   {
+    id: "qwenpaw",
+    name: "QwenPaw AI Agent Platform",
+    description:
+      "Autonomous dispatch and reporting agents powered by hybrid Qwen models for Philippine emergency context.",
+    icon: Bot,
+    status: "configuring",
+    color: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
+  },
+  {
     id: "nodered",
     name: "Node-RED IoT",
     description:
@@ -138,6 +147,9 @@ export default function OpsIntegrations() {
   const [integrations, setIntegrations] =
     useState<Integration[]>(INITIAL_INTEGRATIONS);
   const [activeConfig, setActiveConfig] = useState<string | null>(null);
+  const [discoveredAgents, setDiscoveredAgents] = useState<any[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [qwenpawConfig, setQwenpawConfig] = useState({ dispatcherAgentId: "dispatcher-agent" });
   const [twilioSettings, setTwilioSettings] = useState({
     enabled: false,
     fallbackDelayMinutes: 5,
@@ -266,6 +278,46 @@ export default function OpsIntegrations() {
         return int;
       })
     );
+  };
+
+  useEffect(() => {
+    if (activeConfig === "qwenpaw") {
+      system.getQwenPawConfig().then(res => {
+        if (res && res.success && res.data) {
+          setQwenpawConfig(res.data);
+        }
+      }).catch(() => {});
+    }
+  }, [activeConfig]);
+
+  const handleScanAgents = async () => {
+    setIsScanning(true);
+    setDiscoveredAgents([]);
+    try {
+      const result = await system.listQwenPawAgents();
+      if (result && result.success && result.data) {
+        setDiscoveredAgents(result.data);
+        toast.success(`Found ${result.data.length} agents on platform.`);
+      } else {
+        toast.error("Format error in platform response.");
+      }
+    } catch (err) {
+      toast.error("Failed to scan QwenPaw agents. Verify QWENPAW_URL.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleSaveQwenPaw = async () => {
+    try {
+      const result = await system.saveQwenPawConfig(qwenpawConfig);
+      if (result && result.success) {
+        toast.success("QwenPaw Configuration Active");
+        setActiveConfig(null);
+      }
+    } catch (err) {
+      toast.error("Failed to save QwenPaw configuration.");
+    }
   };
 
   return (
@@ -398,6 +450,90 @@ export default function OpsIntegrations() {
               />
             ) : activeConfig === "gsm" ? (
               <GSMModemIntegration onClose={() => setActiveConfig(null)} />
+            ) : activeConfig === "qwenpaw" ? (
+              <>
+                <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">
+                  QwenPaw Discovery Tool
+                </h3>
+                <p className="text-xs text-white/50 mb-6">
+                  Verify the QwenPaw platform endpoint and discover agent IDs for mobile configuration.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl">
+                    <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <Bot className="w-3 h-3" />
+                      Platform Agent IDs
+                    </p>
+                    
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {discoveredAgents.length > 0 ? (
+                        discoveredAgents.map((agent: any) => (
+                          <div 
+                            key={agent.id} 
+                            onClick={() => {
+                              navigator.clipboard.writeText(agent.id);
+                              toast.success("ID Copied to clipboard");
+                            }}
+                            className="bg-black/40 border border-white/5 p-2 rounded-lg cursor-pointer hover:border-cyan-500/40 transition-all flex items-center justify-between"
+                          >
+                            <div className="overflow-hidden">
+                              <p className="text-xs font-bold text-white truncate">{agent.name}</p>
+                              <p className="text-[9px] font-mono text-white/30 truncate">{agent.id}</p>
+                            </div>
+                            <span className="text-[8px] bg-white/5 px-1.5 py-0.5 rounded text-white/40 uppercase">Copy</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4">
+                          <p className="text-[10px] font-mono text-white/20 italic">
+                            {isScanning ? "Scanning platform..." : "No agents discovered yet."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleScanAgents}
+                      disabled={isScanning}
+                      className="w-full mt-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                    >
+                      {isScanning ? "Scanning..." : "Scan Platform Agents"}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">
+                      Dispatcher Agent ID
+                    </label>
+                    <input
+                      type="text"
+                      value={qwenpawConfig.dispatcherAgentId}
+                      onChange={(e) => setQwenpawConfig({ ...qwenpawConfig, dispatcherAgentId: e.target.value })}
+                      placeholder="uuid-xxxx-xxxx"
+                      className="w-full bg-[#0F1115] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-cyan-500 outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-8">
+                  <button
+                    onClick={() => {
+                      setActiveConfig(null);
+                      setDiscoveredAgents([]);
+                    }}
+                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleSaveQwenPaw}
+                    className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)] rounded-xl text-sm font-bold transition-all"
+                  >
+                    Save & Test
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <h3 className="text-xl font-bold font-mono uppercase text-white mb-2">

@@ -6,6 +6,7 @@ import * as response from '../utils/response';
 import { rateLimit } from 'express-rate-limit';
 import { ttsService } from '../services/ttsService';
 import { z } from 'zod';
+import { listQwenPawAgents } from '../services/qwenpawService';
 
 const router = Router();
 
@@ -129,6 +130,38 @@ router.post('/tts', authenticate, authorize(['resident', 'admin', 'super_admin',
   } catch (err: any) {
     console.error('TTS Error:', err);
     response.error(res, err.message, "TTS_ERROR", 500);
+  }
+});
+
+router.post('/qwenpaw/config', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+  const { dispatcherAgentId } = req.body;
+  try {
+    await pool.query(
+      "INSERT INTO system_config (key, data, updated_at) VALUES ('qwenpaw', $1, now()) ON CONFLICT (key) DO UPDATE SET data = $1, updated_at = now()",
+      [JSON.stringify({ dispatcherAgentId })]
+    );
+    response.success(res, { dispatcherAgentId });
+  } catch (err: any) {
+    response.error(res, err.message);
+  }
+});
+
+router.get('/qwenpaw/config', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+  try {
+    const result = await pool.query("SELECT data FROM system_config WHERE key = 'qwenpaw'");
+    const config = result.rows[0]?.data || { dispatcherAgentId: 'dispatcher-agent' };
+    response.success(res, config);
+  } catch (err: any) {
+    response.error(res, err.message);
+  }
+});
+
+router.get('/qwenpaw/agents', authenticate, authorize(['admin', 'super_admin']), async (req, res) => {
+  try {
+    const agents = await listQwenPawAgents();
+    response.success(res, agents);
+  } catch (err: any) {
+    response.error(res, err.message, "QWENPAW_DISCOVERY_FAILED", 500);
   }
 });
 

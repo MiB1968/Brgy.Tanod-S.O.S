@@ -41,3 +41,19 @@ export async function triggerQwenPawReporter(sosId: string) {
     logger.error("❌ Failed to trigger QwenPaw Reporter", { error: error.message });
   }
 }
+
+export async function listQwenPawAgents() {
+  if (QWENPAW_URL === 'http://localhost:8088') {
+    return [
+      { id: 'dispatcher-agent', name: 'Mock Dispatcher' },
+      { id: 'reporter-agent', name: 'Mock Reporter' }
+    ];
+  }
+  try {
+    const response = await axios.get(`${QWENPAW_URL}/api/agents`);
+    return response.data;
+  } catch (error: any) {
+    logger.error("❌ Failed to fetch QwenPaw agents", { error: error.message });
+    throw error;
+  }
+}
